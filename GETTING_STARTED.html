@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lineage - Getting Started</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f3;
+      --paper: #ffffff;
+      --ink: #1f2a24;
+      --muted: #5f6c64;
+      --line: #d9ded7;
+      --accent: #2f7d4f;
+      --accent-ink: #17402a;
+      --code-bg: #17201b;
+      --code-ink: #eef7ef;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
+
+    header {
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 24px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.15;
+    }
+
+    h1 {
+      font-size: 40px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-top: 36px;
+      font-size: 24px;
+    }
+
+    h3 {
+      margin-top: 22px;
+      font-size: 18px;
+    }
+
+    p {
+      margin: 10px 0;
+      color: var(--muted);
+    }
+
+    a {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    section {
+      margin-top: 22px;
+      padding: 24px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    ul,
+    ol {
+      margin: 12px 0 0;
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 0.95em;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 14px 16px;
+      overflow-x: auto;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 6px;
+      line-height: 1.45;
+    }
+
+    pre code {
+      color: inherit;
+      font-size: 14px;
+    }
+
+    .summary {
+      max-width: 760px;
+      margin-top: 12px;
+      font-size: 17px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: #eef6ef;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-right: 8px;
+      padding: 3px 8px;
+      color: var(--accent-ink);
+      background: #dcefe2;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .path {
+      color: var(--ink);
+      background: #eef0ec;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 28px 16px 48px;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Lineage Getting Started</h1>
+      <p class="summary">
+        This guide explains how to run the Godot viewer, run headless CLI experiments,
+        and validate the current C# solution.
+      </p>
+    </header>
+
+    <section class="callout">
+      <h2>Current Project Layout</h2>
+      <p>
+        The simulation core is independent from Godot. The viewer and CLI both call
+        into <code>Lineage.Core</code>.
+      </p>
+      <ul>
+        <li><span class="tag">Core</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Core</code></li>
+        <li><span class="tag">Viewer</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Godot</code></li>
+        <li><span class="tag">CLI</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Cli</code></li>
+        <li><span class="tag">Tests</span><code class="path">D:\AIProjects\Codex\Lineage\tests\Lineage.Core.Tests</code></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Run The Godot Viewer</h2>
+      <ol>
+        <li>Launch the Godot .NET editor:</li>
+      </ol>
+      <pre><code>D:\Godot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64.exe</code></pre>
+
+      <ol start="2">
+        <li>Open or import the project folder:</li>
+      </ol>
+      <pre><code>D:\AIProjects\Codex\Lineage\src\Lineage.Godot</code></pre>
+
+      <ol start="3">
+        <li>Run the main scene with the Play button or press <code>F5</code>.</li>
+      </ol>
+
+      <p>
+        If Godot asks for the main scene, choose <code>Scenes/Main.tscn</code>.
+        If C# changes are not picked up, use the <code>MSBuild</code> panel and build once.
+      </p>
+
+      <h3>Viewer Controls</h3>
+      <div class="grid">
+        <ul>
+          <li><code>S</code>: collapse or expand the scenario launcher</li>
+          <li><code>Space</code> or <code>P</code>: pause or resume</li>
+          <li><code>R</code>: reset the current seed</li>
+          <li><code>N</code>: create a new seed and reset</li>
+          <li><code>F</code>: fit the view to the world</li>
+          <li><code>G</code>: follow the selected creature at a closer map zoom</li>
+          <li><code>B</code>: show or hide biome colors</li>
+          <li><code>C</code>: cycle creature color mode</li>
+        </ul>
+        <ul>
+          <li><code>+</code> / <code>-</code>: change simulation speed</li>
+          <li>Arrow keys: pan the map camera</li>
+          <li><code>Shift</code> + arrow keys: pan faster</li>
+          <li>Mouse wheel: zoom at cursor</li>
+          <li>Right or middle mouse drag: pan</li>
+          <li>Left click: select a creature</li>
+        </ul>
+      </div>
+
+      <h3>Scenario Launcher</h3>
+      <p>
+        The launcher panel lets you edit all shared scenario settings, then launch
+        them visually in Godot or run a headless CLI experiment from the same values.
+      </p>
+      <ul>
+        <li><code>Launch/Restart</code>: restarts the Godot viewer using the edited settings</li>
+        <li><code>Load</code>: loads a scenario JSON file into the editor and restarts the viewer</li>
+        <li><code>Save</code> / <code>Save As</code>: writes the edited scenario as CLI-compatible JSON</li>
+        <li><code>Collapse</code> / <code>Expand</code>: shrinks the launcher to a small strip and moves realtime stats into the left column</li>
+        <li><code>Run CLI</code>: saves the edited scenario to <code>out/godot_cli_scenario.json</code>, then runs <code>Lineage.Cli</code> with the requested tick count, stats CSV, HTML report path, and final snapshot path</li>
+        <li><code>Write Current Report</code>: writes an HTML report from the simulation currently running in Godot, without rerunning the CLI</li>
+        <li><code>Open Report</code>: opens the last successful CLI or viewer HTML report in your default browser</li>
+        <li><code>Snapshot JSON</code>: sets where a Godot-triggered CLI run writes its final simulation snapshot</li>
+        <li><code>Checkpoint interval</code>: writes loadable snapshot checkpoints every N ticks; use <code>0</code> to disable</li>
+        <li><code>Checkpoint folder</code>: sets where periodic checkpoint JSON files are written</li>
+        <li><code>Load Snapshot File</code>: loads a saved simulation snapshot into Godot for inspection</li>
+        <li><code>Load Checkpoint File</code>: opens the checkpoint folder so you can choose a saved checkpoint</li>
+        <li><code>Load Last Snapshot</code>: loads the final snapshot from the most recent successful Godot-triggered CLI run</li>
+        <li><code>Load Latest Checkpoint</code>: loads the most recent checkpoint from the last successful Godot-triggered CLI run</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Run Headless CLI Experiments</h2>
+      <p>
+        Run commands from the repository root:
+        <code class="path">D:\AIProjects\Codex\Lineage</code>
+      </p>
+
+      <h3>Example Run</h3>
+      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --scenario .\scenarios\balanced-foraging.json --ticks 20000 --seed 42 --output .\out\seed42_stats.csv --report .\out\seed42_report.html --save-snapshot .\out\seed42_snapshot.json --checkpoint-interval 5000 --checkpoint-dir .\out\seed42_checkpoints</code></pre>
+
+      <h3>Preset Comparison</h3>
+      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --batch-report .\out\preset_comparison.html --batch-output-dir .\out\preset_comparison --ticks 20000 --seed 42</code></pre>
+
+      <h3>Scenario Files</h3>
+      <p>
+        Scenario JSON files describe the world size, seed, pipeline, initial
+        population, resource density per 1M world area, biome mode, biome cell size, resource void border,
+        food abundance, regrowth, depleted-resource relocation, initial brain mode, per-founder random brain weights, metabolism, movement cost, eating rate,
+        diet adaptation, death-meat output, meat decay, vision range and angle, trait upkeep costs, optional egg upkeep, egg production rate, egg incubation, maturity age, mutation strength, trait/brain mutation rates, reproduction threshold, and
+        bite damage, bite energy cost, bite reach, and snapshot interval. The current starter scenario is:
+      </p>
+      <p>The saved starter and pressure preset scenarios currently use a <code>2000 x 2000</code> world.</p>
+      <pre><code>.\scenarios\balanced-foraging.json</code></pre>
+      <p>Current pressure presets:</p>
+      <ul>
+        <li><code>.\scenarios\gentle-foraging.json</code>: abundant food, smaller void border, lower basal/movement pressure, and moderate reproduction delay</li>
+        <li><code>.\scenarios\balanced-foraging.json</code>: baseline food, void border, energy pressure, longer maturity, and higher reproduction threshold</li>
+        <li><code>.\scenarios\harsh-foraging.json</code>: sparse food, wider void border, slower regrowth, and higher basal/movement pressure</li>
+      </ul>
+
+      <p>
+        Large worlds need proportionally more resources or longer-lived creatures.
+        The Godot viewer now treats the center view as a map camera: use the mouse
+        wheel to zoom, arrow keys or right/middle mouse drag to pan, <code>F</code>
+        to return to the full-world view, and <code>G</code> to follow a selected
+        creature. The scale bar in the lower-right of the map shows the current
+        world-unit distance. Biomes are generated from the scenario seed; richer
+        biomes attract more initial and relocated resource patches. The resource void
+        border is a no-plant/no-regrowth edge zone. Press <code>B</code> to toggle
+        the biome and void underlay.
+      </p>
+      <p>
+        Creatures do not get direct biome fertility or void-border knowledge. Food
+        direction and proximity are only exposed for edible resources inside the creature's
+        current vision cone, while the brain receives visible food density as a
+        local crowding cue. Selecting a creature draws that vision cone. Vision
+        range and vision angle are heritable traits, and both have upkeep costs so
+        maximum-range 360-degree vision is not free.
+      </p>
+      <p>
+        Food currently has two kinds: plants and meat. Plants regrow and relocate
+        when fully depleted; meat is left by dead creatures, decays, and disappears.
+        Eggs are also edible meat-like targets: they can be seen only inside the
+        vision cone, use meat digestion efficiency, and count as egg predation
+        deaths if fully consumed.
+        Living creatures can also be sensed as prey inside the vision cone. A
+        creature with attack intent can bite another creature at body-contact range;
+        biting costs energy, deals health damage, and injury deaths become meat.
+        A heritable diet value controls digestion: plant specialists get strong
+        plant calories but weak meat calories, meat specialists mirror that, and
+        omnivores sit in the middle. The balanced starter begins near herbivore
+        behavior, with about 92% plant digestion and 28% meat digestion.
+        Neural brains receive both a generic diet-weighted best-food cue and
+        separate plant/meat density, direction, and proximity cues. This keeps the
+        information local while allowing lineages to evolve different foraging
+        responses as their digestion shifts.
+      </p>
+      <p>
+        The live HUD and HTML reports include foraging diagnostics: share seeing
+        food, share touching food, share eating on the sampled tick, average visible
+        food density, calories eaten per second, plant/meat resource calories,
+        egg predation deaths, visible prey density, attacking creatures, attack
+        damage per second, average time since last meal, and average effective
+        vision range/angle.
+      </p>
+      <p>
+        Resource and creature rendering are zoom-aware. Close views draw individual
+        entities. Wide or crowded map views switch to density cells so very large
+        worlds do not try to paint every plant patch or creature body.
+      </p>
+      <p>
+        The HUD includes performance telemetry: <code>TPS</code> is actual simulation
+        ticks processed per real second, <code>Frame</code> is average frame time,
+        <code>v</code> is visible/estimated entities in the current view, and
+        <code>d</code> is the number of individual entities or density cells drawn.
+      </p>
+
+      <p>Save the resolved scenario used by a run:</p>
+      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --seed 99 --creatures 40 --resources-per-million-area 80 --save-scenario .\out\scenario_99.json --no-output</code></pre>
+
+      <h3>Useful Options</h3>
+      <ul>
+        <li><code>--scenario &lt;path&gt;</code>: load a scenario JSON file</li>
+        <li><code>--save-scenario &lt;path&gt;</code>: save the resolved scenario before running</li>
+        <li><code>--ticks &lt;n&gt;</code>: number of simulation ticks to run</li>
+        <li><code>--seed &lt;n&gt;</code>: override deterministic scenario seed</li>
+        <li><code>--pipeline &lt;neural|simple&gt;</code>: override controller pipeline</li>
+        <li><code>--creatures &lt;n&gt;</code>: override initial creature count</li>
+        <li><code>--resources-per-million-area &lt;n&gt;</code>: override initial resource density; the actual patch count scales with world area</li>
+        <li><code>--resources &lt;n&gt;</code>: legacy absolute resource count override; converted to density for the resolved world</li>
+        <li><code>--snapshot-interval &lt;n&gt;</code>: override stats snapshot interval</li>
+        <li><code>--output &lt;path&gt;</code>: stats CSV output path</li>
+        <li><code>--lineage-output &lt;path&gt;</code>: lineage CSV output path</li>
+        <li><code>--traits-output &lt;path&gt;</code>: final trait summary CSV output path</li>
+        <li><code>--founders-output &lt;path&gt;</code>: founder summary CSV output path</li>
+        <li><code>--generations-output &lt;path&gt;</code>: generation survival CSV output path</li>
+        <li><code>--lineage-trends-output &lt;path&gt;</code>: founder lineage trend CSV output path</li>
+        <li><code>--report &lt;path&gt;</code>: HTML run report output path</li>
+        <li><code>--save-snapshot &lt;path&gt;</code>: final simulation snapshot JSON path that can be loaded back into Godot</li>
+        <li><code>--checkpoint-interval &lt;n&gt;</code>: save loadable checkpoint snapshots every N ticks</li>
+        <li><code>--checkpoint-dir &lt;dir&gt;</code>: directory for checkpoint JSON files; defaults near the snapshot, report, or stats output</li>
+        <li><code>--batch-report &lt;path&gt;</code>: HTML comparison report output path; uses gentle/balanced/harsh presets when no batch scenarios are listed</li>
+        <li><code>--batch-scenario &lt;path&gt;</code>: add a scenario to a comparison run; repeat for multiple scenarios</li>
+        <li><code>--batch-output-dir &lt;dir&gt;</code>: per-run batch CSV/report output directory</li>
+        <li><code>--no-output</code>: run without writing CSV files</li>
+      </ul>
+
+      <h3>Help</h3>
+      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --help</code></pre>
+
+      <p>
+        The CLI currently writes a global stats CSV, a lineage CSV, a final living
+        trait summary CSV, a founder lineage summary CSV, and a generation survival
+        CSV, plus a lineage trend CSV. If only
+        <code>--output</code> is provided, the other filenames are derived from it.
+        The stats CSV includes plant and meat resource counts/calories plus egg predation deaths and foraging diagnostics such as food-seeing share,
+        plant-seeing share, meat-seeing share, food-contact share, eating share,
+        visible food/plant/meat/prey density, attacking share, attack damage per
+        second, calories eaten per second, time since last meal, and average vision
+        range/angle.
+        If <code>--report</code> is provided, it also writes an HTML report with
+        outcome totals, foraging diagnostics, biome resource distribution, diet/digestion summaries, trend notes, diagnostics, dominant lineage snapshots, top
+        founder lineages, final living trait summaries, and generation survival.
+        If <code>--save-snapshot</code> is provided, the final world state can be
+        opened from the Godot launcher's <code>Load Snapshot File</code> button.
+        If <code>--checkpoint-interval</code> is provided, each checkpoint JSON is
+        the same loadable snapshot format and appears in the HTML report.
+      </p>
+    </section>
+
+    <section>
+      <h2>Validate The Solution</h2>
+      <p>Build the solution and run the core smoke tests:</p>
+      <pre><code>dotnet build .\Lineage.slnx -v:minimal
+dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj</code></pre>
+
+      <p>Optional Godot headless scene validation:</p>
+      <pre><code>&amp; 'D:\Godot\Godot_v4.6.2-stable_mono_win64\Godot_v4.6.2-stable_mono_win64_console.exe' --headless --path 'D:\AIProjects\Codex\Lineage\src\Lineage.Godot' --quit-after 1</code></pre>
+    </section>
+
+    <section>
+      <h2>Current Notes</h2>
+      <ul>
+        <li>The viewer and CLI share the same default scenario factory.</li>
+        <li>The simulation already has mutation, inheritance, reproduction, death, and lineage records.</li>
+        <li>Reproduction lays eggs. Mature creatures first build a reproductive reserve from surplus energy, then neural brains can decide when to deposit a completed egg with the mutated offspring genome and brain. Eggs have investment-derived health, can take environmental exposure damage in poor locations, can be eaten as meat-like food by other creatures, incubate for a heritable duration, and hatch into lineage-tracked creatures if viable.</li>
+        <li>Juveniles grow toward adult body size, speed, and eating capacity, and cannot reproduce before maturity.</li>
+        <li>Food search is local and imperfect: creatures target only visible food inside their vision cone and receive visible food density rather than map fertility.</li>
+        <li>Dead creatures leave meat resources. Living creatures can now bite one another at close range when their brain outputs attack intent. Diet adaptation is heritable, so lineages can evolve from mostly herbivory toward omnivory or meat specialization when the scenario makes that viable.</li>
+        <li>Evolutionary pressure is configurable through biome-shaped food density, no-plant void borders, regrowth, death-meat output, meat decay, bite damage/cost/reach, metabolism, movement cost, shared trait upkeep, vision range/angle upkeep, optional egg upkeep, egg exposure damage, egg production rate, offspring investment, egg incubation, maturity age, reproduction threshold, and body-size upkeep.</li>
+        <li>Offspring investment sets egg sturdiness and hatchling birth quality; explicit fat, strength, and clutches can build on this later.</li>
+        <li>Next simulation work should tune combat in longer preset runs, then likely add attack/defense genes, carcass scent, or stronger r/K tradeoffs.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

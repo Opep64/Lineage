@@ -1,0 +1,101 @@
+namespace Lineage.Core;
+
+/// <summary>
+/// Removes creatures that have exhausted their survival state.
+/// </summary>
+public sealed class DeathSystem : ISimulationSystem
+{
+    private readonly float _meatCaloriesPerBodyRadius;
+    private readonly float _meatEnergyFraction;
+    private readonly float _meatDecayCaloriesPerSecond;
+
+    public DeathSystem(
+        float meatCaloriesPerBodyRadius = 4f,
+        float meatEnergyFraction = 0.35f,
+        float meatDecayCaloriesPerSecond = 0.03f)
+    {
+        _meatCaloriesPerBodyRadius = ValidateNonNegative(meatCaloriesPerBodyRadius, nameof(meatCaloriesPerBodyRadius));
+        _meatEnergyFraction = ValidateProbability(meatEnergyFraction, nameof(meatEnergyFraction));
+        _meatDecayCaloriesPerSecond = ValidateNonNegative(meatDecayCaloriesPerSecond, nameof(meatDecayCaloriesPerSecond));
+    }
+
+    public void Update(WorldState state, float deltaSeconds)
+    {
+        var writeIndex = 0;
+
+        for (var readIndex = 0; readIndex < state.Creatures.Count; readIndex++)
+        {
+            var creature = state.Creatures[readIndex];
+            if (creature.Energy <= 0f || creature.Health <= 0f)
+            {
+                SpawnMeatResource(state, creature);
+                state.MarkCreatureDead(creature.Id, GetDeathReason(creature));
+                continue;
+            }
+
+            if (writeIndex != readIndex)
+            {
+                state.Creatures[writeIndex] = creature;
+            }
+
+            writeIndex++;
+        }
+
+        if (writeIndex < state.Creatures.Count)
+        {
+            state.Creatures.RemoveRange(writeIndex, state.Creatures.Count - writeIndex);
+        }
+    }
+
+    private void SpawnMeatResource(WorldState state, CreatureState creature)
+    {
+        var genome = state.GetGenome(creature.GenomeId);
+        var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+        var calories = bodyRadius * _meatCaloriesPerBodyRadius
+            + Math.Max(0f, creature.Energy) * _meatEnergyFraction;
+        if (calories <= 0f)
+        {
+            return;
+        }
+
+        state.SpawnResourcePatch(new ResourcePatchState
+        {
+            Kind = ResourceKind.Meat,
+            Position = creature.Position,
+            Radius = Math.Clamp(bodyRadius * 0.85f, 1.5f, 12f),
+            Calories = calories,
+            MaxCalories = calories,
+            RegrowthCaloriesPerSecond = 0f,
+            DecayCaloriesPerSecond = _meatDecayCaloriesPerSecond
+        });
+    }
+
+    private static CreatureDeathReason GetDeathReason(CreatureState creature)
+    {
+        if (creature.Energy <= 0f)
+        {
+            return CreatureDeathReason.Starvation;
+        }
+
+        if (creature.Health <= 0f)
+        {
+            return CreatureDeathReason.Injury;
+        }
+
+        return CreatureDeathReason.Unknown;
+    }
+
+    private static float ValidateNonNegative(float value, string name)
+    {
+        return float.IsFinite(value) && value >= 0f
+            ? value
+            : throw new ArgumentOutOfRangeException(name, "Death meat setting must be finite and non-negative.");
+    }
+
+    private static float ValidateProbability(float value, string name)
+    {
+        return float.IsFinite(value) && value >= 0f && value <= 1f
+            ? value
+            : throw new ArgumentOutOfRangeException(name, "Death meat energy fraction must be finite and between 0 and 1.");
+    }
+}

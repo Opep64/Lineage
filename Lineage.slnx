@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Lineage.Cli/Lineage.Cli.csproj" />
+    <Project Path="src/Lineage.Core/Lineage.Core.csproj" />
+    <Project Path="src/Lineage.Godot/Lineage.Godot.csproj">
+      <BuildType Project="Debug" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Lineage.Core.Tests/Lineage.Core.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,20 @@
+# .NET build output
+bin/
+obj/
+**/bin/
+**/obj/
+
+# User/editor state
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Godot local/editor output
+.godot/
+*.tmp
+
+# Logs and generated experiment output
+logs/
+out/
+artifacts/

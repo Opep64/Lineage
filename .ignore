@@ -1,0 +1,12 @@
+# Keep ripgrep output focused before this folder is initialized as a git repo.
+bin/
+obj/
+**/bin/
+**/obj/
+
+.godot/
+.vs/
+.vscode/
+out/
+logs/
+artifacts/

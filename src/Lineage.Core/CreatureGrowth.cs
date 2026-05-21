@@ -1,0 +1,68 @@
+namespace Lineage.Core;
+
+/// <summary>
+/// Shared juvenile-to-adult growth helpers for systems that need effective traits.
+/// </summary>
+///
+/// <remarks>
+/// Genomes describe adult traits. The growth factor scales traits that should be
+/// weaker while a creature is still juvenile, giving offspring investment and
+/// maturity age room to create r/K-style tradeoffs.
+/// </remarks>
+public static class CreatureGrowth
+{
+    private const float MinimumJuvenileScale = 0.35f;
+
+    public static float MaturityProgress(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.MaturityAgeSeconds <= 0f
+            ? 1f
+            : Math.Clamp(creature.AgeSeconds / genome.MaturityAgeSeconds, 0f, 1f);
+    }
+
+    public static float GrowthFactor(CreatureState creature, CreatureGenome genome)
+    {
+        var progress = MaturityProgress(creature, genome);
+        var smoothed = progress * progress * (3f - 2f * progress);
+        var newbornScale = Math.Clamp(
+            MinimumJuvenileScale * OffspringDevelopment.JuvenileGrowthScale(creature.BirthInvestmentRatio),
+            0.18f,
+            0.7f);
+        return newbornScale + (1f - newbornScale) * smoothed;
+    }
+
+    public static bool IsMature(CreatureState creature, CreatureGenome genome)
+    {
+        return MaturityProgress(creature, genome) >= 1f;
+    }
+
+    public static float EffectiveBodyRadius(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.BodyRadius * GrowthFactor(creature, genome);
+    }
+
+    public static float EffectiveMaxSpeed(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.MaxSpeed * MathF.Sqrt(GrowthFactor(creature, genome));
+    }
+
+    public static float EffectiveMaxTurnRadiansPerSecond(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.MaxTurnRadiansPerSecond * MathF.Sqrt(GrowthFactor(creature, genome));
+    }
+
+    public static float EffectiveSenseRadius(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.SenseRadius * MathF.Sqrt(GrowthFactor(creature, genome));
+    }
+
+    public static float EffectiveVisionAngleRadians(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.VisionAngleRadians;
+    }
+
+    public static float EffectiveEatCaloriesPerSecond(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.EatCaloriesPerSecond * GrowthFactor(creature, genome);
+    }
+}
