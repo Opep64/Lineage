@@ -3100,6 +3100,7 @@ internal static class RunReportWriter
             ? TraitAccumulator.FromLivingCreatures(state)
             : default;
         var biomeSummaries = state.Biomes.SummarizeResources(state.Resources);
+        var seasonPressure = SeasonPressureAnalysis.Analyze(scenario, snapshots);
 
         WriteDocumentStart(writer, $"Lineage Run Report - {scenario.Name}");
 
@@ -3262,6 +3263,12 @@ internal static class RunReportWriter
         WriteMetric(writer, "Season fertility", $"{finalSnapshot.SeasonFertilityMultiplier:0.###}x");
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
+
+        WriteSeasonPressureSection(
+            writer,
+            seasonPressure,
+            founderSummaries.Count(summary => summary.LivingCreatures > 0),
+            founderSummaries.Length);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Foraging Diagnostics</h2>");
@@ -3751,6 +3758,121 @@ internal static class RunReportWriter
         writer.WriteLine($"<span class=\"metric-label\">{Html(label)}</span>");
         writer.WriteLine($"<span class=\"metric-value\">{Html(value)}</span>");
         writer.WriteLine("</div>");
+    }
+
+    private static void WriteSeasonPressureSection(
+        StreamWriter writer,
+        SeasonPressureSummary summary,
+        int livingFounderLineages,
+        int totalFounderLineages)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Season Pressure</h2>");
+        if (!summary.Enabled)
+        {
+            writer.WriteLine("<p class=\"empty\">Seasons are disabled for this scenario.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        if (summary.SnapshotCount == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No stats snapshots were recorded, so season pressure could not be analyzed.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        var low = summary.LowFertility;
+        var high = summary.HighFertility;
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Cycles observed", summary.CyclesObserved.ToString("0.##", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Fertility range", FormatFertilityRange(summary));
+        WriteMetric(writer, "Low fertility population", FormatSeasonPopulation(low));
+        WriteMetric(writer, "High fertility population", FormatSeasonPopulation(high));
+        WriteMetric(writer, "Low fertility plants", FormatSeasonPlantCalories(low));
+        WriteMetric(writer, "High fertility plants", FormatSeasonPlantCalories(high));
+        WriteMetric(writer, "Low starvation rate", FormatSeasonRate(low, band => band.StarvationDeathsPerSecond));
+        WriteMetric(writer, "High starvation rate", FormatSeasonRate(high, band => band.StarvationDeathsPerSecond));
+        WriteMetric(writer, "Low eggs laid rate", FormatSeasonRate(low, band => band.EggsLaidPerSecond));
+        WriteMetric(writer, "High eggs laid rate", FormatSeasonRate(high, band => band.EggsLaidPerSecond));
+        WriteMetric(writer, "Living founder lineages", totalFounderLineages > 0 ? $"{livingFounderLineages} / {totalFounderLineages}" : "n/a");
+        writer.WriteLine("</div>");
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Season phase</th><th>Samples</th><th>Avg fertility</th><th>Avg pop</th><th>Min pop</th><th>Avg plant kcal</th><th>Min plant kcal</th><th>Births/s</th><th>Eggs/s</th><th>Deaths/s</th><th>Starvation/s</th><th>Food seen</th><th>Meal gap</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var bin in summary.PhaseBins)
+        {
+            WriteSeasonPressureRow(writer, bin);
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSeasonPressureRow(StreamWriter writer, SeasonPressureBand bin)
+    {
+        if (bin.SampleCount == 0)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(bin.Label)}</td>" +
+                $"<td>{Html(bin.SampleCount)}</td>" +
+                "<td colspan=\"11\" class=\"empty\">No snapshots in this phase.</td>" +
+                "</tr>");
+            return;
+        }
+
+        writer.WriteLine(
+            "<tr>" +
+            $"<td>{Html(bin.Label)}</td>" +
+            $"<td>{Html(bin.SampleCount)}</td>" +
+            $"<td>{Html($"{bin.AverageFertility:0.###}x")}</td>" +
+            $"<td>{Html(bin.AveragePopulation.ToString("0.#", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(bin.MinPopulation)}</td>" +
+            $"<td>{Html(bin.AveragePlantCalories.ToString("0.#", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(bin.MinPlantCalories.ToString("0.#", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(bin.BirthsPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(bin.EggsLaidPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(bin.DeathsPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(bin.StarvationDeathsPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(FormatPercent(bin.AverageFoodSeenShare))}</td>" +
+            $"<td>{Html($"{bin.AverageMealGapSeconds:0.#}s")}</td>" +
+            "</tr>");
+    }
+
+    private static string FormatSeasonPopulation(SeasonPressureBand band)
+    {
+        return band.SampleCount > 0
+            ? $"{band.AveragePopulation:0.#} avg, {band.MinPopulation} min"
+            : "No samples";
+    }
+
+    private static string FormatSeasonPlantCalories(SeasonPressureBand band)
+    {
+        return band.SampleCount > 0
+            ? $"{band.AveragePlantCalories:0} kcal avg, {band.MinPlantCalories:0} min"
+            : "No samples";
+    }
+
+    private static string FormatSeasonRate(SeasonPressureBand band, Func<SeasonPressureBand, float> selector)
+    {
+        return band.SampleCount > 0
+            ? $"{selector(band):0.###}/s"
+            : "No samples";
+    }
+
+    private static string FormatFertilityRange(SeasonPressureSummary summary)
+    {
+        var observed = summary.PhaseBins
+            .Where(bin => bin.SampleCount > 0)
+            .ToArray();
+        if (observed.Length == 0)
+        {
+            return "n/a";
+        }
+
+        return $"{observed.Min(bin => bin.MinFertility):0.###}x-{observed.Max(bin => bin.MaxFertility):0.###}x";
     }
 
     private static void WriteChartsSection(StreamWriter writer, IReadOnlyList<SimulationStatsSnapshot> snapshots)
