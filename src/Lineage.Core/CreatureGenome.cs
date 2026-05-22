@@ -107,7 +107,7 @@ public readonly record struct CreatureGenome
             MaturityAgeSeconds = MutateTraitIfSelected(random, mutations[11], MaturityAgeSeconds, strength, 10f, 600f),
             ReproductionCooldownSeconds = MutateTraitIfSelected(random, mutations[12], ReproductionCooldownSeconds, strength, 1f, 60f),
             DietaryAdaptation = MutateUnitIntervalTraitIfSelected(random, mutations[13], DietaryAdaptation, strength * 0.5f),
-            CarrionAdaptation = MutateUnitIntervalTraitIfSelected(random, mutations[14], CarrionAdaptation, strength * 0.5f),
+            CarrionAdaptation = MutateUnitIntervalTraitIfSelected(random, mutations[14], CarrionAdaptation, strength),
             GutCapacityCalories = MutateTraitIfSelected(random, mutations[15], GutCapacityCalories, strength, 5f, 250f),
             DigestionCaloriesPerSecond = MutateTraitIfSelected(random, mutations[16], DigestionCaloriesPerSecond, strength, 1f, 60f),
             BiteStrength = MutateTraitIfSelected(random, mutations[17], BiteStrength, strength, 0.05f, 4f),

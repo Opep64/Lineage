@@ -422,6 +422,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Tail meat probe on 2026-05-22 reran Scavenger, Omnivore, and Predation for 10k ticks across seeds 42, 43, and 44. Tail-window meat intake was about `18.4%`, `14.5%`, and `21.4%` respectively; tail stale-carcass share was `11.2%`, `17.2%`, and `4.9%`; tail diet remained near founder-biased values at `0.10`, `0.12`, and `0.15`. Probe files: `out/tail_meat_probe_20260522.csv` and `.html`. Done.
 - Retune Scavenger Pressure for more persistent carrion. A 2026-05-22 10k tick, three-seed probe compared the current preset against a carcass-persistence variant and a harsher plant-scarcity variant. The selected persistence variant changes death meat body calories `9 -> 12`, death meat energy fraction `0.60 -> 0.75`, and meat decay `0.010 -> 0.004` kcal/s. It raised tail stale-carcass share from `11.2%` to `16.8%` while keeping average final population near the current value (`417 -> 437`) and avoiding the extra harshness of plant scarcity. Probe files: `out/scavenger_carrion_probe_20260522.csv` and `.html`. Done.
 - Add separate carrion specialization. Genomes now carry `CarrionAdaptation`, where `0` preserves the current fresh-meat baseline and higher values trade some fresh meat and egg digestion efficiency for better stale-meat digestion. Food targeting, sensing scores, digestion, scenario JSON, stats CSVs, probe CSV/HTML, CLI/Godot reports, and selected-creature inspection expose the gene and its fresh/stale digestion effect. A 2026-05-22 10k tick, three-seed Scavenger/Omnivore/Predation probe showed tail carrion adaptation still near the founder baseline (`0.002-0.003`) after short runs, so longer selective-pressure probes are needed before tuning the effect size. Probe files: `out/carrion_gene_probe_20260522.csv` and `.html`. Done.
+- Tune carrion specialization enough to create a measurable signal. A pre-tune 15k Scavenger/Omnivore probe plus a 30k Scavenger seed-42 run showed average carrion adaptation moving only from `0` to about `0.003-0.007`, with the best final Scavenger mutant around `0.064`. The tuning changed full carrion specialization from `15%` fresh-meat penalty and `55%` stale recovery to `25%` fresh-meat penalty and `85%` stale recovery, and lets the carrion gene mutate at the full trait strength instead of half strength. A matched 15k three-seed Scavenger/Omnivore probe raised tail carrion adaptation to about `0.0060-0.0063` while keeping both presets viable. Probe files: `out/carrion_gene_15k_probe_20260522.csv`, `out/carrion_gene_scavenger_30k_seed42_20260522.html`, and `out/carrion_gene_tuned_15k_probe_20260522.html`. Done.
 
 ### Phase 14: Terrain, Climate, And World Editing
 
@@ -543,7 +544,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: run longer Scavenger/Omnivore tail probes with carrion adaptation telemetry to see whether stale-meat pressure can move `CarrionAdaptation` upward, then tune the fresh-meat penalty/stale-meat recovery or scenario scarcity if the signal remains too weak.
+Next practical step: add explicit scenario/analysis support for experimental variants so pressure-tuning probes can compare candidate setting changes without editing checked-in scenario JSON each time.
 
 ## Current Implementation State
 
@@ -827,6 +828,7 @@ Build and a 10k tick, three-seed Scavenger/Omnivore/Predation meat-freshness pro
 Build, probe smoke, and a 10k tick, three-seed Scavenger/Omnivore/Predation tail-metrics probe passed on 2026-05-22 after adding last-quarter probe metrics.
 Build, 68 core tests, `git diff --check`, and a 10k tick three-seed Scavenger carrion-variant probe passed on 2026-05-22 after tuning Scavenger Pressure toward more persistent carrion.
 Build, 69 core tests, CLI smoke/report/traits, Godot headless `--quit`, `git diff --check`, and a 10k tick three-seed Scavenger/Omnivore/Predation probe passed on 2026-05-22 after adding `CarrionAdaptation`.
+Build, 69 core tests, Godot headless `--quit`, `git diff --check`, a pre-tune 15k Scavenger/Omnivore probe, a 30k Scavenger seed-42 diagnostic run, and a matched post-tune 15k Scavenger/Omnivore probe passed on 2026-05-22 after tuning carrion effect size and mutation ramp.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

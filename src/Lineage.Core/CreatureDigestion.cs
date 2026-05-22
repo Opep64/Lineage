@@ -13,8 +13,8 @@ public static class CreatureDigestion
 {
     public const float MinimumEfficiency = 0.2f;
     public const float MaximumEfficiency = 1f;
-    public const float FullCarrionFreshMeatPenalty = 0.15f;
-    public const float FullCarrionStaleMeatRecovery = 0.55f;
+    public const float FullCarrionFreshMeatPenalty = 0.25f;
+    public const float FullCarrionStaleMeatRecovery = 0.85f;
 
     public static float PlantEfficiency(CreatureGenome genome)
     {

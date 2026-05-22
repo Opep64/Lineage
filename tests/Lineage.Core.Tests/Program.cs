@@ -684,8 +684,8 @@ static void CarrionAdaptationTradesFreshAndStaleMeatDigestion()
 
     AssertClose(1f, CreatureDigestion.FreshMeatEnergyEfficiency(freshSpecialist), 0.000001, "Fresh specialist fresh meat");
     AssertClose(MeatQuality.MinimumFreshness, CreatureDigestion.StaleMeatEnergyEfficiency(freshSpecialist), 0.000001, "Fresh specialist stale meat");
-    AssertClose(0.85f, CreatureDigestion.FreshMeatEnergyEfficiency(carrionSpecialist), 0.000001, "Carrion specialist fresh meat penalty");
-    AssertClose(0.7075f, CreatureDigestion.StaleMeatEnergyEfficiency(carrionSpecialist), 0.000001, "Carrion specialist stale meat recovery");
+    AssertClose(0.75f, CreatureDigestion.FreshMeatEnergyEfficiency(carrionSpecialist), 0.000001, "Carrion specialist fresh meat penalty");
+    AssertClose(0.9025f, CreatureDigestion.StaleMeatEnergyEfficiency(carrionSpecialist), 0.000001, "Carrion specialist stale meat recovery");
     AssertTrue(
         CreatureDigestion.FreshMeatEnergyEfficiency(carrionSpecialist) < CreatureDigestion.FreshMeatEnergyEfficiency(freshSpecialist),
         "Carrion specialization should cost fresh meat efficiency");
