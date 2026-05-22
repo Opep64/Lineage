@@ -3,10 +3,15 @@ namespace Lineage.Core;
 /// <summary>
 /// Resolves desired creature movement and charges movement energy.
 /// </summary>
-public sealed class MovementSystem(BiomePressureProfile? biomeMovementCostProfile = null) : ISimulationSystem
+public sealed class MovementSystem(
+    BiomePressureProfile? biomeMovementCostProfile = null,
+    float movementSpeedCostExponent = 1f) : ISimulationSystem
 {
     private readonly BiomePressureProfile _biomeMovementCostProfile =
         BiomePressureProfile.Validate(biomeMovementCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeMovementCostProfile));
+    private readonly float _movementSpeedCostExponent = ValidateExponent(
+        movementSpeedCostExponent,
+        nameof(movementSpeedCostExponent));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -25,17 +30,34 @@ public sealed class MovementSystem(BiomePressureProfile? biomeMovementCostProfil
             creature.LastDistanceTraveled = distanceTraveled;
             creature.DistanceSinceLastMeal += distanceTraveled;
 
-            var effort = effectiveMaxSpeed > 0f
-                ? desiredVelocity.Length / effectiveMaxSpeed
-                : 0f;
+            var speedCostMultiplier = CalculateSpeedCostMultiplier(creature.Velocity.Length, _movementSpeedCostExponent);
             var biomeMovementCostMultiplier = _biomeMovementCostProfile.For(state.Biomes.GetKindAt(creature.Position));
             creature.Energy -= genome.MovementEnergyPerSecond
                 * biomeMovementCostMultiplier
                 * CreatureGrowth.GrowthFactor(creature, genome)
-                * effort
+                * speedCostMultiplier
                 * deltaSeconds;
 
             state.Creatures[i] = creature;
         }
+    }
+
+    public static float CalculateSpeedCostMultiplier(float speed, float movementSpeedCostExponent)
+    {
+        if (speed <= 0f)
+        {
+            return 0f;
+        }
+
+        var referenceSpeed = MathF.Max(0.000001f, CreatureGenome.Baseline.MaxSpeed);
+        var speedRatio = speed / referenceSpeed;
+        return MathF.Pow(speedRatio, movementSpeedCostExponent);
+    }
+
+    private static float ValidateExponent(float value, string name)
+    {
+        return float.IsFinite(value) && value > 0f
+            ? value
+            : throw new ArgumentOutOfRangeException(name, "Movement speed cost exponent must be finite and positive.");
     }
 }

@@ -281,7 +281,7 @@
       <p>
         Scenario JSON files describe the world size, seed, pipeline, initial
         population, resource density per 1M world area, biome mode, biome cell size, resource void border,
-        food abundance, regrowth, depleted-resource relocation, resource clustering, biome movement/basal cost multipliers, initial brain mode, metabolism, movement cost, eating rate,
+        food abundance, regrowth, depleted-resource relocation, resource clustering, biome movement/basal cost multipliers, nonlinear movement-speed cost, initial brain mode, metabolism, movement cost, eating rate,
         gut capacity, digestion rate, diet adaptation, bite strength, damage resistance, death-meat output, meat decay, meat scent, vision range and angle, trait upkeep costs, optional egg upkeep, egg production rate, egg incubation, maturity age, mutation strength, trait/brain mutation rates, reproduction threshold, and
         bite damage, bite energy cost, combat-trait upkeep, bite reach, and snapshot interval. The current starter scenario is:
       </p>
@@ -309,7 +309,9 @@
         evenly dusting the world. The resource void border is a no-plant/no-regrowth
         edge zone. Biomes also apply indirect movement and basal metabolism cost
         multipliers, so sparse and barren ground can be harder to cross without
-        giving the brain perfect biome knowledge. Press <code>B</code> to toggle the biome and void underlay.
+        giving the brain perfect biome knowledge. Movement cost is also nonlinear
+        by actual speed, so slow cruising is cheap and high-speed travel becomes
+        increasingly expensive. Press <code>B</code> to toggle the biome and void underlay.
       </p>
       <p>
         Creatures do not get direct biome fertility or void-border knowledge. Food

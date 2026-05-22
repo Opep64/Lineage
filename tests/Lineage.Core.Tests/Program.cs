@@ -7,6 +7,7 @@ var tests = new (string Name, Action Body)[]
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
     ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
+    ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
@@ -202,18 +203,53 @@ static void MovementCostFollowsBiomeMultiplier()
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
-        MaxSpeed = 10f,
+        MaxSpeed = CreatureGenome.Baseline.MaxSpeed,
         MovementEnergyPerSecond = 2f,
         MaturityAgeSeconds = 0f
     });
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
     var creature = simulation.State.Creatures[0];
-    creature.DesiredVelocity = new SimVector2(10f, 0f);
+    creature.DesiredVelocity = new SimVector2(CreatureGenome.Baseline.MaxSpeed, 0f);
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
     AssertClose(16.5f, simulation.State.Creatures[0].Energy, 0.000001, "Movement biome cost");
+}
+
+static void MovementSpeedCostIsNonlinear()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 23,
+        systems: [new MovementSystem(movementSpeedCostExponent: 2f)]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = CreatureGenome.Baseline.MaxSpeed * 2f,
+        MovementEnergyPerSecond = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 40f), energy: 10f);
+
+    var slowCreature = simulation.State.Creatures[0];
+    slowCreature.DesiredVelocity = new SimVector2(CreatureGenome.Baseline.MaxSpeed * 0.5f, 0f);
+    simulation.State.Creatures[0] = slowCreature;
+
+    var fastCreature = simulation.State.Creatures[1];
+    fastCreature.DesiredVelocity = new SimVector2(CreatureGenome.Baseline.MaxSpeed * 2f, 0f);
+    simulation.State.Creatures[1] = fastCreature;
+
+    simulation.Step();
+
+    AssertClose(9.75f, simulation.State.Creatures[0].Energy, 0.000001, "Slow movement nonlinear cost");
+    AssertClose(6f, simulation.State.Creatures[1].Energy, 0.000001, "Fast movement nonlinear cost");
 }
 
 static void InvalidConfigurationIsRejected()
@@ -2660,6 +2696,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(0.02f, scenario.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(0.04f, scenario.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(1.25f, genome.MovementEnergyPerSecond, 0.000001, "Seeded movement energy");
+    AssertClose(1.6f, scenario.MovementSpeedCostExponent, 0.000001, "Scenario movement speed cost exponent");
     AssertClose(9.5f, genome.EatCaloriesPerSecond, 0.000001, "Seeded eat rate");
     AssertClose(40f, genome.GutCapacityCalories, 0.000001, "Seeded gut capacity");
     AssertClose(11f, genome.DigestionCaloriesPerSecond, 0.000001, "Seeded digestion rate");
@@ -2684,7 +2721,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
 
     simulation.Step();
 
-    AssertClose(7.431876f, simulation.State.Creatures[0].Energy, 0.000001, "Scenario energy pressure");
+    AssertClose(7.608353f, simulation.State.Creatures[0].Energy, 0.000001, "Scenario energy pressure");
 }
 
 static void ScenarioJsonMigratesLegacyResourceCount()
@@ -2748,6 +2785,7 @@ static void ScenarioJsonRoundTrips()
         EggEnergyCostPerSecond = 0.023f,
         EggEnvironmentalDamagePerSecond = 0.037f,
         MovementEnergyPerSecond = 0.62f,
+        MovementSpeedCostExponent = 1.75f,
         EatCaloriesPerSecond = 14f,
         GutCapacityCalories = 65f,
         DigestionCaloriesPerSecond = 16f,
@@ -2818,6 +2856,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.EggEnergyCostPerSecond, roundTripped.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(scenario.EggEnvironmentalDamagePerSecond, roundTripped.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(scenario.MovementEnergyPerSecond, roundTripped.MovementEnergyPerSecond, 0.000001, "Scenario movement energy");
+    AssertClose(scenario.MovementSpeedCostExponent, roundTripped.MovementSpeedCostExponent, 0.000001, "Scenario movement speed cost exponent");
     AssertClose(scenario.EatCaloriesPerSecond, roundTripped.EatCaloriesPerSecond, 0.000001, "Scenario eat rate");
     AssertClose(scenario.GutCapacityCalories, roundTripped.GutCapacityCalories, 0.000001, "Scenario gut capacity");
     AssertClose(scenario.DigestionCaloriesPerSecond, roundTripped.DigestionCaloriesPerSecond, 0.000001, "Scenario digestion rate");

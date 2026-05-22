@@ -48,6 +48,7 @@
   "eggEnergyCostPerSecond": 0,
   "eggEnvironmentalDamagePerSecond": 0.09,
   "movementEnergyPerSecond": 0.42,
+  "movementSpeedCostExponent": 1.6,
   "eatCaloriesPerSecond": 16,
   "gutCapacityCalories": 55,
   "digestionCaloriesPerSecond": 5,

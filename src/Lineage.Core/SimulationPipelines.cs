@@ -33,7 +33,8 @@ public static class SimulationPipelines
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
         BiomePressureProfile? biomeMovementCostProfile = null,
-        BiomePressureProfile? biomeBasalCostProfile = null)
+        BiomePressureProfile? biomeBasalCostProfile = null,
+        float movementSpeedCostExponent = 1f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -54,7 +55,7 @@ public static class SimulationPipelines
                 biomeBasalCostProfile),
             new SpatialIndexRebuildSystem(spatialIndex),
             new SimpleForagingSystem(spatialIndex),
-            new MovementSystem(biomeMovementCostProfile),
+            new MovementSystem(biomeMovementCostProfile, movementSpeedCostExponent),
             new SpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
             new DigestionSystem(),
@@ -94,7 +95,8 @@ public static class SimulationPipelines
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
         BiomePressureProfile? biomeMovementCostProfile = null,
-        BiomePressureProfile? biomeBasalCostProfile = null)
+        BiomePressureProfile? biomeBasalCostProfile = null,
+        float movementSpeedCostExponent = 1f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -120,7 +122,7 @@ public static class SimulationPipelines
                 meatScentCaloriesForFullStrength,
                 meatScentDensitySaturation),
             new NeuralControllerSystem(),
-            new MovementSystem(biomeMovementCostProfile),
+            new MovementSystem(biomeMovementCostProfile, movementSpeedCostExponent),
             new SpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex, requireEatIntent: true),
             new DigestionSystem(),

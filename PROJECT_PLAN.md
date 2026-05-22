@@ -313,6 +313,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add scenario-backed relocation for fully depleted resource patches before regrowth. Done.
 - Add scenario-backed initial brain mode. Scenarios now choose `SeedForager`, `ForagerPredator`, or `RandomPerFounder`; legacy `randomizeInitialBrainWeights` JSON migrates to `RandomPerFounder`. Done.
 - Add viewer creature color modes and actual-speed readout. Done.
+- Add scenario-backed nonlinear movement-speed cost so fast travel is increasingly expensive while slow cruising is cheaper. Done.
 - Tune seed forager movement so food proximity slows approach and eat intent fires only near food. Done.
 - Add Godot viewer report export for the currently running simulation. Done.
 
@@ -690,7 +691,7 @@ Current simulation systems:
 - `SimpleForagingSystem`
 - `CreatureSensingSystem`
 - `NeuralControllerSystem`
-- `MovementSystem`, using growth-scaled effective max speed and biome movement-cost pressure
+- `MovementSystem`, using growth-scaled effective max speed, biome movement-cost pressure, and nonlinear actual-speed cost
 - `EatingSystem`, using growth-scaled contact range and eating rate to move raw food into gut stores; eggs are edible meat-like contacts
 - `DigestionSystem`, converting raw gut contents into usable energy over time with diet-dependent efficiency
 - `ReproductionSystem`, including adult maturity gating and egg laying

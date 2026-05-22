@@ -780,6 +780,7 @@ public partial class Main : Node2D
             $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
             $"Actual speed {creature.Velocity.Length:0.0}\n" +
             $"Desired speed {creature.DesiredVelocity.Length:0.0}\n" +
+            $"Speed cost {MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, _scenario.MovementSpeedCostExponent):0.00}x\n" +
             $"Turn {CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome):0.0}/{genome.MaxTurnRadiansPerSecond:0.0}\n" +
             $"Vision range {CreatureGrowth.EffectiveSenseRadius(creature, genome):0.0}/{genome.SenseRadius:0.0}\n" +
             $"Vision angle {ToDegrees(CreatureGrowth.EffectiveVisionAngleRadians(creature, genome)):0}deg/{ToDegrees(genome.VisionAngleRadians):0}deg\n" +

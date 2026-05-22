@@ -120,6 +120,8 @@ public sealed record SimulationScenario
 
     public float MovementEnergyPerSecond { get; init; } = 0.35f;
 
+    public float MovementSpeedCostExponent { get; init; } = 1.6f;
+
     public float EatCaloriesPerSecond { get; init; } = 18f;
 
     public float GutCapacityCalories { get; init; } = 55f;
@@ -209,6 +211,7 @@ public sealed record SimulationScenario
         EnsureNonNegative(EggEnergyCostPerSecond, nameof(EggEnergyCostPerSecond));
         EnsureNonNegative(EggEnvironmentalDamagePerSecond, nameof(EggEnvironmentalDamagePerSecond));
         EnsureNonNegative(MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));
+        EnsurePositive(MovementSpeedCostExponent, nameof(MovementSpeedCostExponent));
         EnsurePositive(EatCaloriesPerSecond, nameof(EatCaloriesPerSecond));
         EnsurePositive(GutCapacityCalories, nameof(GutCapacityCalories));
         EnsurePositive(DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
