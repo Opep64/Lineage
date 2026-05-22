@@ -73,9 +73,16 @@ public sealed class NeuralControllerSystem(
         inputs[NeuralBrainSchema.DietaryMeatBiasInput] = genome.DietaryAdaptation;
         inputs[NeuralBrainSchema.EggReserveRatioInput] = senses.EggReserveRatio;
         inputs[NeuralBrainSchema.ReproductionReadinessInput] = senses.ReproductionReadiness;
-        inputs[NeuralBrainSchema.VisiblePreyDensityInput] = senses.VisiblePreyDensity;
-        inputs[NeuralBrainSchema.PreyProximityInput] = senses.PreyProximity;
-        inputs[NeuralBrainSchema.PreyForwardInput] = senses.PreyDirectionForward;
-        inputs[NeuralBrainSchema.PreyRightInput] = senses.PreyDirectionRight;
+        inputs[NeuralBrainSchema.VisibleCreatureDensityInput] = senses.VisibleCreatureDensity;
+        inputs[NeuralBrainSchema.CreatureProximityInput] = senses.CreatureProximity;
+        inputs[NeuralBrainSchema.CreatureForwardInput] = senses.CreatureDirectionForward;
+        inputs[NeuralBrainSchema.CreatureRightInput] = senses.CreatureDirectionRight;
+        inputs[NeuralBrainSchema.MeatScentDensityInput] = senses.MeatScentDensity;
+        inputs[NeuralBrainSchema.MeatScentForwardInput] = senses.MeatScentDirectionForward;
+        inputs[NeuralBrainSchema.MeatScentRightInput] = senses.MeatScentDirectionRight;
+        inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput] = senses.CreatureRelativeBodySize;
+        inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = senses.CreatureRelativeSpeed;
+        inputs[NeuralBrainSchema.CreatureApproachRateInput] = senses.CreatureApproachRate;
+        inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = senses.CreatureFacingAlignment;
     }
 }

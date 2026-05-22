@@ -3,16 +3,51 @@ namespace Lineage.Core;
 /// <summary>
 /// Converts nearby world state and internal state into explicit creature senses.
 /// </summary>
-public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : ISimulationSystem
+public sealed class CreatureSensingSystem : ISimulationSystem
 {
     private const float DensitySaturationFoodCount = 8f;
+    private const float MinimumScentStrength = 0.001f;
+
+    private readonly UniformSpatialIndex _spatialIndex;
+    private readonly float _meatScentRangeMultiplier;
+    private readonly float _meatScentCaloriesForFullStrength;
+    private readonly float _meatScentDensitySaturation;
 
     private readonly List<int> _resourceCandidates = [];
     private readonly HashSet<int> _seenResourceCandidates = [];
+    private readonly List<int> _scentResourceCandidates = [];
+    private readonly HashSet<int> _seenScentResourceCandidates = [];
     private readonly List<int> _eggCandidates = [];
     private readonly HashSet<int> _seenEggCandidates = [];
     private readonly List<int> _creatureCandidates = [];
     private readonly HashSet<int> _seenCreatureCandidates = [];
+
+    public CreatureSensingSystem(
+        UniformSpatialIndex spatialIndex,
+        float meatScentRangeMultiplier = 2f,
+        float meatScentCaloriesForFullStrength = 60f,
+        float meatScentDensitySaturation = 1f)
+    {
+        if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
+        {
+            throw new ArgumentOutOfRangeException(nameof(meatScentRangeMultiplier), "Meat scent range multiplier must be finite and at least 1.");
+        }
+
+        if (meatScentCaloriesForFullStrength <= 0f || !float.IsFinite(meatScentCaloriesForFullStrength))
+        {
+            throw new ArgumentOutOfRangeException(nameof(meatScentCaloriesForFullStrength), "Meat scent calorie scale must be finite and positive.");
+        }
+
+        if (meatScentDensitySaturation <= 0f || !float.IsFinite(meatScentDensitySaturation))
+        {
+            throw new ArgumentOutOfRangeException(nameof(meatScentDensitySaturation), "Meat scent density saturation must be finite and positive.");
+        }
+
+        _spatialIndex = spatialIndex;
+        _meatScentRangeMultiplier = meatScentRangeMultiplier;
+        _meatScentCaloriesForFullStrength = meatScentCaloriesForFullStrength;
+        _meatScentDensitySaturation = meatScentDensitySaturation;
+    }
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -22,21 +57,29 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
             var genome = state.GetGenome(creature.GenomeId);
             var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
             var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
-            spatialIndex.AddResourceCandidatesWithCalories(
+            _spatialIndex.AddResourceCandidatesWithCalories(
                 state,
                 creature.Position,
                 effectiveSenseRadius,
                 minimumCalories: 0f,
                 _resourceCandidates,
                 _seenResourceCandidates);
-            spatialIndex.AddEggCandidatesWithEnergy(
+            var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
+            _spatialIndex.AddResourceCandidatesWithCalories(
+                state,
+                creature.Position,
+                meatScentRadius,
+                minimumCalories: 0f,
+                _scentResourceCandidates,
+                _seenScentResourceCandidates);
+            _spatialIndex.AddEggCandidatesWithEnergy(
                 state,
                 creature.Position,
                 effectiveSenseRadius,
                 minimumEnergy: 0f,
                 _eggCandidates,
                 _seenEggCandidates);
-            spatialIndex.AddCreatureCandidates(
+            _spatialIndex.AddCreatureCandidates(
                 state,
                 creature.Position,
                 effectiveSenseRadius + 12f,
@@ -60,7 +103,9 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
             var visibleFoodCount = 0;
             var visiblePlantCount = 0;
             var visibleMeatCount = 0;
-            var visiblePreyCount = 0;
+            var visibleCreatureCount = 0;
+            var totalMeatScentStrength = 0f;
+            var meatScentVector = SimVector2.Zero;
             var bestVisibleFoodKind = FoodContactKind.None;
             var bestVisibleFoodIndex = -1;
             var bestVisibleFoodScore = float.NegativeInfinity;
@@ -70,10 +115,41 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
             var nearestVisibleMeatKind = FoodContactKind.None;
             var nearestVisibleMeatIndex = -1;
             var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
-            var nearestVisiblePreyIndex = -1;
-            var nearestVisiblePreyDistanceSquared = float.PositiveInfinity;
+            var nearestVisibleCreatureIndex = -1;
+            var nearestVisibleCreatureDistanceSquared = float.PositiveInfinity;
             var forward = SimVector2.FromAngle(creature.HeadingRadians);
             var right = new SimVector2(-forward.Y, forward.X);
+
+            foreach (var resourceIndex in _scentResourceCandidates)
+            {
+                var resource = state.Resources[resourceIndex];
+                if (resource.Kind != ResourceKind.Meat || resource.Calories <= 0f)
+                {
+                    continue;
+                }
+
+                var toResource = resource.Position - creature.Position;
+                var centerDistance = toResource.Length;
+                var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
+                var distanceFactor = 1f - Math.Clamp(edgeDistance / meatScentRadius, 0f, 1f);
+                if (distanceFactor <= 0f)
+                {
+                    continue;
+                }
+
+                var calorieFactor = Math.Clamp(resource.Calories / _meatScentCaloriesForFullStrength, 0f, 1f);
+                var scentStrength = calorieFactor * distanceFactor * distanceFactor;
+                if (scentStrength <= MinimumScentStrength)
+                {
+                    continue;
+                }
+
+                var direction = centerDistance > 0.0001f
+                    ? toResource / centerDistance
+                    : forward;
+                totalMeatScentStrength += scentStrength;
+                meatScentVector += direction * scentStrength;
+            }
 
             foreach (var resourceIndex in _resourceCandidates)
             {
@@ -167,31 +243,31 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
                 }
             }
 
-            foreach (var preyIndex in _creatureCandidates)
+            foreach (var otherCreatureIndex in _creatureCandidates)
             {
-                if (preyIndex == i)
+                if (otherCreatureIndex == i)
                 {
                     continue;
                 }
 
-                var prey = state.Creatures[preyIndex];
-                if (prey.Id == creature.Id || prey.Health <= 0f || prey.Energy <= 0f)
+                var otherCreature = state.Creatures[otherCreatureIndex];
+                if (otherCreature.Id == creature.Id || otherCreature.Health <= 0f || otherCreature.Energy <= 0f)
                 {
                     continue;
                 }
 
-                var preyGenome = state.GetGenome(prey.GenomeId);
-                var preyRadius = CreatureGrowth.EffectiveBodyRadius(prey, preyGenome);
-                var toPrey = prey.Position - creature.Position;
-                var centerDistance = toPrey.Length;
-                var edgeDistance = Math.Max(0f, centerDistance - preyRadius);
+                var otherGenome = state.GetGenome(otherCreature.GenomeId);
+                var otherRadius = CreatureGrowth.EffectiveBodyRadius(otherCreature, otherGenome);
+                var toOther = otherCreature.Position - creature.Position;
+                var centerDistance = toOther.Length;
+                var edgeDistance = Math.Max(0f, centerDistance - otherRadius);
                 if (edgeDistance > effectiveSenseRadius)
                 {
                     continue;
                 }
 
                 var direction = centerDistance > 0.0001f
-                    ? toPrey / centerDistance
+                    ? toOther / centerDistance
                     : forward;
 
                 if (!IsInsideVisionCone(direction, forward, effectiveVisionAngle))
@@ -201,20 +277,20 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
 
                 visibleFoodCount++;
                 visibleMeatCount++;
-                visiblePreyCount++;
+                visibleCreatureCount++;
 
                 var distanceSquared = centerDistance * centerDistance;
                 if (distanceSquared < nearestVisibleMeatDistanceSquared)
                 {
                     nearestVisibleMeatDistanceSquared = distanceSquared;
                     nearestVisibleMeatKind = FoodContactKind.Creature;
-                    nearestVisibleMeatIndex = preyIndex;
+                    nearestVisibleMeatIndex = otherCreatureIndex;
                 }
 
-                if (distanceSquared < nearestVisiblePreyDistanceSquared)
+                if (distanceSquared < nearestVisibleCreatureDistanceSquared)
                 {
-                    nearestVisiblePreyDistanceSquared = distanceSquared;
-                    nearestVisiblePreyIndex = preyIndex;
+                    nearestVisibleCreatureDistanceSquared = distanceSquared;
+                    nearestVisibleCreatureIndex = otherCreatureIndex;
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
@@ -226,14 +302,16 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
                     bestVisibleFoodScore = foodScore;
                     bestVisibleFoodDistanceSquared = distanceSquared;
                     bestVisibleFoodKind = FoodContactKind.Creature;
-                    bestVisibleFoodIndex = preyIndex;
+                    bestVisibleFoodIndex = otherCreatureIndex;
                 }
             }
 
             senses.VisibleFoodDensity = Math.Clamp(visibleFoodCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisiblePlantDensity = Math.Clamp(visiblePlantCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
-            senses.VisiblePreyDensity = Math.Clamp(visiblePreyCount / DensitySaturationFoodCount, 0f, 1f);
+            senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
+            senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
+            ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
 
             if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
             {
@@ -257,10 +335,11 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
             }
             else if (bestVisibleFoodKind == FoodContactKind.Creature && bestVisibleFoodIndex >= 0)
             {
-                ApplyGenericPreySense(
+                ApplyGenericCreatureSense(
                     ref senses,
                     state.Creatures[bestVisibleFoodIndex],
                     state.GetGenome(state.Creatures[bestVisibleFoodIndex].GenomeId),
+                    genome,
                     creature,
                     forward,
                     right,
@@ -300,22 +379,24 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
             }
             else if (nearestVisibleMeatKind == FoodContactKind.Creature && nearestVisibleMeatIndex >= 0)
             {
-                ApplyMeatPreySense(
+                ApplyMeatCreatureSense(
                     ref senses,
                     state.Creatures[nearestVisibleMeatIndex],
                     state.GetGenome(state.Creatures[nearestVisibleMeatIndex].GenomeId),
+                    genome,
                     creature,
                     forward,
                     right,
                     effectiveSenseRadius);
             }
 
-            if (nearestVisiblePreyIndex >= 0)
+            if (nearestVisibleCreatureIndex >= 0)
             {
-                ApplyPreySense(
+                ApplyCreatureSense(
                     ref senses,
-                    state.Creatures[nearestVisiblePreyIndex],
-                    state.GetGenome(state.Creatures[nearestVisiblePreyIndex].GenomeId),
+                    state.Creatures[nearestVisibleCreatureIndex],
+                    state.GetGenome(state.Creatures[nearestVisibleCreatureIndex].GenomeId),
+                    genome,
                     creature,
                     forward,
                     right,
@@ -325,6 +406,28 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
             creature.Senses = senses;
             state.Creatures[i] = creature;
         }
+    }
+
+    private void ApplyMeatScentSense(
+        ref CreatureSenseState senses,
+        SimVector2 scentVector,
+        float totalScentStrength,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        if (totalScentStrength <= MinimumScentStrength || scentVector.LengthSquared <= 0.000001f)
+        {
+            return;
+        }
+
+        var density = Math.Clamp(totalScentStrength / _meatScentDensitySaturation, 0f, 1f);
+        var direction = scentVector.Normalized();
+        var directionalConfidence = Math.Clamp(scentVector.Length / totalScentStrength, 0f, 1f) * density;
+
+        senses.MeatScentDetected = true;
+        senses.MeatScentDensity = density;
+        senses.MeatScentDirectionForward = Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
+        senses.MeatScentDirectionRight = Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 
     private static void ApplyGenericFoodSense(
@@ -357,16 +460,24 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
         senses.FoodDirectionRight = sense.DirectionRight;
     }
 
-    private static void ApplyGenericPreySense(
+    private static void ApplyGenericCreatureSense(
         ref CreatureSenseState senses,
-        CreatureState prey,
-        CreatureGenome preyGenome,
+        CreatureState visibleCreature,
+        CreatureGenome visibleCreatureGenome,
+        CreatureGenome creatureGenome,
         CreatureState creature,
         SimVector2 forward,
         SimVector2 right,
         float effectiveSenseRadius)
     {
-        var sense = CalculateCreatureSense(prey, preyGenome, creature, forward, right, effectiveSenseRadius);
+        var sense = CalculateCreatureSense(
+            visibleCreature,
+            visibleCreatureGenome,
+            creature,
+            creatureGenome,
+            forward,
+            right,
+            effectiveSenseRadius);
         senses.FoodDetected = true;
         senses.FoodProximity = sense.Proximity;
         senses.FoodDirectionForward = sense.DirectionForward;
@@ -418,32 +529,56 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
         senses.MeatDirectionRight = sense.DirectionRight;
     }
 
-    private static void ApplyMeatPreySense(
+    private static void ApplyMeatCreatureSense(
         ref CreatureSenseState senses,
-        CreatureState prey,
-        CreatureGenome preyGenome,
+        CreatureState visibleCreature,
+        CreatureGenome visibleCreatureGenome,
+        CreatureGenome creatureGenome,
         CreatureState creature,
         SimVector2 forward,
         SimVector2 right,
         float effectiveSenseRadius)
     {
-        var sense = CalculateCreatureSense(prey, preyGenome, creature, forward, right, effectiveSenseRadius);
+        var sense = CalculateCreatureSense(
+            visibleCreature,
+            visibleCreatureGenome,
+            creature,
+            creatureGenome,
+            forward,
+            right,
+            effectiveSenseRadius);
         senses.MeatDetected = true;
         senses.MeatProximity = sense.Proximity;
         senses.MeatDirectionForward = sense.DirectionForward;
         senses.MeatDirectionRight = sense.DirectionRight;
     }
 
-    private static void ApplyPreySense(
+    private static void ApplyCreatureSense(
         ref CreatureSenseState senses,
-        CreatureState prey,
-        CreatureGenome preyGenome,
+        CreatureState visibleCreature,
+        CreatureGenome visibleCreatureGenome,
+        CreatureGenome creatureGenome,
         CreatureState creature,
         SimVector2 forward,
         SimVector2 right,
         float effectiveSenseRadius)
     {
-        var sense = CalculateCreatureSense(prey, preyGenome, creature, forward, right, effectiveSenseRadius);
+        var sense = CalculateCreatureSense(
+            visibleCreature,
+            visibleCreatureGenome,
+            creature,
+            creatureGenome,
+            forward,
+            right,
+            effectiveSenseRadius);
+        senses.CreatureDetected = true;
+        senses.CreatureProximity = sense.Proximity;
+        senses.CreatureDirectionForward = sense.DirectionForward;
+        senses.CreatureDirectionRight = sense.DirectionRight;
+        senses.CreatureRelativeBodySize = sense.RelativeBodySize;
+        senses.CreatureRelativeSpeed = sense.RelativeSpeed;
+        senses.CreatureApproachRate = sense.ApproachRate;
+        senses.CreatureFacingAlignment = sense.FacingAlignment;
         senses.PreyDetected = true;
         senses.PreyProximity = sense.Proximity;
         senses.PreyDirectionForward = sense.DirectionForward;
@@ -460,21 +595,53 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
         return CalculateFoodSense(resource.Position, resource.Radius, creature, forward, right, effectiveSenseRadius);
     }
 
-    private static ResourceSense CalculateCreatureSense(
-        CreatureState prey,
-        CreatureGenome preyGenome,
+    private static CreatureVisualSense CalculateCreatureSense(
+        CreatureState visibleCreature,
+        CreatureGenome visibleCreatureGenome,
         CreatureState creature,
+        CreatureGenome creatureGenome,
         SimVector2 forward,
         SimVector2 right,
         float effectiveSenseRadius)
     {
-        return CalculateFoodSense(
-            prey.Position,
-            CreatureGrowth.EffectiveBodyRadius(prey, preyGenome),
+        var contactSense = CalculateFoodSense(
+            visibleCreature.Position,
+            CreatureGrowth.EffectiveBodyRadius(visibleCreature, visibleCreatureGenome),
             creature,
             forward,
             right,
             effectiveSenseRadius);
+        var selfRadius = CreatureGrowth.EffectiveBodyRadius(creature, creatureGenome);
+        var visibleRadius = CreatureGrowth.EffectiveBodyRadius(visibleCreature, visibleCreatureGenome);
+        var radiusScale = MathF.Max(0.001f, MathF.Max(selfRadius, visibleRadius));
+        var relativeBodySize = Math.Clamp((visibleRadius - selfRadius) / radiusScale, -1f, 1f);
+
+        var selfMaxSpeed = MathF.Max(1f, CreatureGrowth.EffectiveMaxSpeed(creature, creatureGenome));
+        var visibleMaxSpeed = MathF.Max(1f, CreatureGrowth.EffectiveMaxSpeed(visibleCreature, visibleCreatureGenome));
+        var relativeSpeed = Math.Clamp(
+            (visibleCreature.Velocity.Length - creature.Velocity.Length) / selfMaxSpeed,
+            -1f,
+            1f);
+
+        var toVisible = visibleCreature.Position - creature.Position;
+        var centerDistance = toVisible.Length;
+        var directionToVisible = centerDistance > 0.0001f
+            ? toVisible / centerDistance
+            : forward;
+        var relativeVelocity = visibleCreature.Velocity - creature.Velocity;
+        var approachScale = MathF.Max(1f, MathF.Max(selfMaxSpeed, visibleMaxSpeed));
+        var approachRate = Math.Clamp(-SimVector2.Dot(relativeVelocity, directionToVisible) / approachScale, -1f, 1f);
+        var visibleForward = SimVector2.FromAngle(visibleCreature.HeadingRadians);
+        var facingAlignment = Math.Clamp(SimVector2.Dot(visibleForward, directionToVisible * -1f), -1f, 1f);
+
+        return new CreatureVisualSense(
+            contactSense.Proximity,
+            contactSense.DirectionForward,
+            contactSense.DirectionRight,
+            relativeBodySize,
+            relativeSpeed,
+            approachRate,
+            facingAlignment);
     }
 
     private static ResourceSense CalculateFoodSense(
@@ -513,4 +680,13 @@ public sealed class CreatureSensingSystem(UniformSpatialIndex spatialIndex) : IS
         float Proximity,
         float DirectionForward,
         float DirectionRight);
+
+    private readonly record struct CreatureVisualSense(
+        float Proximity,
+        float DirectionForward,
+        float DirectionRight,
+        float RelativeBodySize,
+        float RelativeSpeed,
+        float ApproachRate,
+        float FacingAlignment);
 }

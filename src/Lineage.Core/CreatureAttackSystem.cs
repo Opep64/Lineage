@@ -13,6 +13,7 @@ public sealed class CreatureAttackSystem(
     private readonly List<int> _creatureCandidates = [];
     private readonly HashSet<int> _seenCreatureCandidates = [];
     private readonly List<float> _damageByCreature = [];
+    private readonly List<EntityId> _damageSourceByCreature = [];
     private readonly float _biteDamagePerSecond = ValidateNonNegative(biteDamagePerSecond, nameof(biteDamagePerSecond));
     private readonly float _biteEnergyCostPerSecond = ValidateNonNegative(biteEnergyCostPerSecond, nameof(biteEnergyCostPerSecond));
     private readonly float _biteRangePadding = ValidateNonNegative(biteRangePadding, nameof(biteRangePadding));
@@ -55,15 +56,20 @@ public sealed class CreatureAttackSystem(
                 continue;
             }
 
-            var biteCost = _biteEnergyCostPerSecond * deltaSeconds;
+            var biteCost = CreatureCombat.BiteEnergyCostPerSecond(attacker, attackerGenome, _biteEnergyCostPerSecond)
+                * deltaSeconds;
             if (biteCost > 0f && attacker.Energy <= biteCost)
             {
                 state.Creatures[i] = attacker;
                 continue;
             }
 
-            var damage = CreatureCombat.BiteDamagePerSecond(attacker, attackerGenome, _biteDamagePerSecond)
-                * deltaSeconds;
+            var target = state.Creatures[contact.TargetIndex];
+            var targetGenome = state.GetGenome(target.GenomeId);
+            var damage = CreatureCombat.ApplyDamageResistance(
+                CreatureCombat.BiteDamagePerSecond(attacker, attackerGenome, _biteDamagePerSecond) * deltaSeconds,
+                target,
+                targetGenome);
             if (damage <= 0f)
             {
                 state.Creatures[i] = attacker;
@@ -73,6 +79,7 @@ public sealed class CreatureAttackSystem(
             attacker.Energy -= biteCost;
             attacker.LastAttackDamageDealt = damage;
             _damageByCreature[contact.TargetIndex] += damage;
+            _damageSourceByCreature[contact.TargetIndex] = attacker.Id;
             state.Creatures[i] = attacker;
         }
 
@@ -86,6 +93,11 @@ public sealed class CreatureAttackSystem(
 
             var creature = state.Creatures[i];
             creature.Health = Math.Max(0f, creature.Health - damage);
+            if (_damageSourceByCreature[i] != default)
+            {
+                creature.LastDamagingCreatureId = _damageSourceByCreature[i];
+            }
+
             state.Creatures[i] = creature;
         }
     }
@@ -144,14 +156,25 @@ public sealed class CreatureAttackSystem(
             _damageByCreature.RemoveRange(count, _damageByCreature.Count - count);
         }
 
+        if (_damageSourceByCreature.Count > count)
+        {
+            _damageSourceByCreature.RemoveRange(count, _damageSourceByCreature.Count - count);
+        }
+
         while (_damageByCreature.Count < count)
         {
             _damageByCreature.Add(0f);
         }
 
-        for (var i = 0; i < _damageByCreature.Count; i++)
+        while (_damageSourceByCreature.Count < count)
+        {
+            _damageSourceByCreature.Add(default);
+        }
+
+        for (var i = 0; i < count; i++)
         {
             _damageByCreature[i] = 0f;
+            _damageSourceByCreature[i] = default;
         }
     }
 

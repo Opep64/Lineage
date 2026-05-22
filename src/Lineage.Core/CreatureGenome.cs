@@ -27,12 +27,16 @@ public readonly record struct CreatureGenome
         MaturityAgeSeconds = 45f,
         ReproductionCooldownSeconds = 8f,
         DietaryAdaptation = 0.1f,
+        GutCapacityCalories = 55f,
+        DigestionCaloriesPerSecond = 5f,
+        BiteStrength = 0.55f,
+        DamageResistance = 1f,
         MutationStrength = 0.05f,
         TraitMutationRate = 0.2f,
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 18;
+    private const int MutatingTraitCount = 22;
 
     public float BodyRadius { get; init; }
 
@@ -64,6 +68,14 @@ public readonly record struct CreatureGenome
 
     public float DietaryAdaptation { get; init; }
 
+    public float GutCapacityCalories { get; init; }
+
+    public float DigestionCaloriesPerSecond { get; init; }
+
+    public float BiteStrength { get; init; }
+
+    public float DamageResistance { get; init; }
+
     public float MutationStrength { get; init; }
 
     public float TraitMutationRate { get; init; }
@@ -92,9 +104,13 @@ public readonly record struct CreatureGenome
             MaturityAgeSeconds = MutateTraitIfSelected(random, mutations[11], MaturityAgeSeconds, strength, 10f, 600f),
             ReproductionCooldownSeconds = MutateTraitIfSelected(random, mutations[12], ReproductionCooldownSeconds, strength, 1f, 60f),
             DietaryAdaptation = MutateUnitIntervalTraitIfSelected(random, mutations[13], DietaryAdaptation, strength * 0.5f),
-            MutationStrength = MutateTraitIfSelected(random, mutations[14], MutationStrength, strength * 0.25f, 0.001f, 0.5f),
-            TraitMutationRate = MutateTraitIfSelected(random, mutations[15], TraitMutationRate, strength * 0.25f, 0f, 1f),
-            BrainMutationRate = MutateTraitIfSelected(random, mutations[16], BrainMutationRate, strength * 0.25f, 0f, 1f)
+            GutCapacityCalories = MutateTraitIfSelected(random, mutations[14], GutCapacityCalories, strength, 5f, 250f),
+            DigestionCaloriesPerSecond = MutateTraitIfSelected(random, mutations[15], DigestionCaloriesPerSecond, strength, 1f, 60f),
+            BiteStrength = MutateTraitIfSelected(random, mutations[16], BiteStrength, strength, 0.05f, 4f),
+            DamageResistance = MutateTraitIfSelected(random, mutations[17], DamageResistance, strength, 0.25f, 4f),
+            MutationStrength = MutateTraitIfSelected(random, mutations[18], MutationStrength, strength * 0.25f, 0.001f, 0.5f),
+            TraitMutationRate = MutateTraitIfSelected(random, mutations[19], TraitMutationRate, strength * 0.25f, 0f, 1f),
+            BrainMutationRate = MutateTraitIfSelected(random, mutations[20], BrainMutationRate, strength * 0.25f, 0f, 1f)
         };
 
         var minimumThreshold = mutated.OffspringEnergyInvestment + 1f;
@@ -102,7 +118,7 @@ public readonly record struct CreatureGenome
         {
             ReproductionEnergyThreshold = MutateTraitIfSelected(
                 random,
-                mutations[17],
+                mutations[21],
                 Math.Max(ReproductionEnergyThreshold, minimumThreshold),
                 strength,
                 minimumThreshold,
@@ -129,6 +145,10 @@ public readonly record struct CreatureGenome
         EnsureNonNegative(MaturityAgeSeconds, nameof(MaturityAgeSeconds));
         EnsureNonNegative(ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
         EnsureProbability(DietaryAdaptation, nameof(DietaryAdaptation));
+        EnsurePositive(GutCapacityCalories, nameof(GutCapacityCalories));
+        EnsurePositive(DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
+        EnsurePositive(BiteStrength, nameof(BiteStrength));
+        EnsurePositive(DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(MutationStrength, nameof(MutationStrength));
         EnsureProbability(TraitMutationRate, nameof(TraitMutationRate));
         EnsureProbability(BrainMutationRate, nameof(BrainMutationRate));

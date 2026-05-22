@@ -41,6 +41,45 @@ public struct CreatureSenseState
 
     public float VisibleMeatDensity { get; set; }
 
+    public bool MeatScentDetected { get; set; }
+
+    public float MeatScentDensity { get; set; }
+
+    public float MeatScentDirectionForward { get; set; }
+
+    public float MeatScentDirectionRight { get; set; }
+
+    public bool CreatureDetected { get; set; }
+
+    public float CreatureProximity { get; set; }
+
+    public float CreatureDirectionForward { get; set; }
+
+    public float CreatureDirectionRight { get; set; }
+
+    public float VisibleCreatureDensity { get; set; }
+
+    /// <summary>
+    /// Relative body radius of the nearest visible creature, where negative is smaller and positive is larger.
+    /// </summary>
+    public float CreatureRelativeBodySize { get; set; }
+
+    /// <summary>
+    /// Relative speed of the nearest visible creature compared with this creature, clamped to [-1, 1].
+    /// </summary>
+    public float CreatureRelativeSpeed { get; set; }
+
+    /// <summary>
+    /// Closing rate of the nearest visible creature. Positive means the distance is shrinking.
+    /// </summary>
+    public float CreatureApproachRate { get; set; }
+
+    /// <summary>
+    /// Facing alignment of the nearest visible creature. Positive means it is pointed toward this creature.
+    /// </summary>
+    public float CreatureFacingAlignment { get; set; }
+
+    // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }
 
     public float PreyProximity { get; set; }

@@ -39,15 +39,24 @@ public static class SimulationScenarioFactory
                 scenario.SenseRadiusEnergyCostPerSecond,
                 scenario.VisionAngleEnergyCostPerSecond,
                 scenario.EatRateEnergyCostPerSecond,
+                scenario.GutCapacityEnergyCostPerSecond,
+                scenario.DigestionRateEnergyCostPerSecond,
+                scenario.BiteStrengthEnergyCostPerSecond,
+                scenario.DamageResistanceEnergyCostPerSecond,
                 scenario.EggEnergyCostPerSecond,
                 scenario.EggEnvironmentalDamagePerSecond,
                 scenario.DeathMeatCaloriesPerBodyRadius,
                 scenario.DeathMeatEnergyFraction,
                 scenario.MeatDecayCaloriesPerSecond,
+                scenario.MeatScentRangeMultiplier,
+                scenario.MeatScentCaloriesForFullStrength,
+                scenario.MeatScentDensitySaturation,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,
-                scenario.RelocateDepletedResources),
+                scenario.RelocateDepletedResources,
+                scenario.ResourceClusterStrength,
+                scenario.ResourceClusterRadius),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -57,15 +66,24 @@ public static class SimulationScenarioFactory
                 scenario.SenseRadiusEnergyCostPerSecond,
                 scenario.VisionAngleEnergyCostPerSecond,
                 scenario.EatRateEnergyCostPerSecond,
+                scenario.GutCapacityEnergyCostPerSecond,
+                scenario.DigestionRateEnergyCostPerSecond,
+                scenario.BiteStrengthEnergyCostPerSecond,
+                scenario.DamageResistanceEnergyCostPerSecond,
                 scenario.EggEnergyCostPerSecond,
                 scenario.EggEnvironmentalDamagePerSecond,
                 scenario.DeathMeatCaloriesPerBodyRadius,
                 scenario.DeathMeatEnergyFraction,
                 scenario.MeatDecayCaloriesPerSecond,
+                scenario.MeatScentRangeMultiplier,
+                scenario.MeatScentCaloriesForFullStrength,
+                scenario.MeatScentDensitySaturation,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,
-                scenario.RelocateDepletedResources),
+                scenario.RelocateDepletedResources,
+                scenario.ResourceClusterStrength,
+                scenario.ResourceClusterRadius),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }
@@ -78,6 +96,8 @@ public static class SimulationScenarioFactory
             BasalEnergyPerSecond = scenario.BasalEnergyPerSecond,
             MovementEnergyPerSecond = scenario.MovementEnergyPerSecond,
             EatCaloriesPerSecond = scenario.EatCaloriesPerSecond,
+            GutCapacityCalories = scenario.GutCapacityCalories,
+            DigestionCaloriesPerSecond = scenario.DigestionCaloriesPerSecond,
             VisionAngleRadians = scenario.VisionAngleRadians,
             ReproductionEnergyThreshold = scenario.ReproductionEnergyThreshold,
             OffspringEnergyInvestment = scenario.OffspringEnergyInvestment,
@@ -86,19 +106,24 @@ public static class SimulationScenarioFactory
             MaturityAgeSeconds = scenario.MaturityAgeSeconds,
             ReproductionCooldownSeconds = scenario.ReproductionCooldownSeconds,
             DietaryAdaptation = scenario.DietaryAdaptation,
+            BiteStrength = scenario.BiteStrength,
+            DamageResistance = scenario.DamageResistance,
             MutationStrength = scenario.MutationStrength,
             TraitMutationRate = scenario.TraitMutationRate,
             BrainMutationRate = scenario.BrainMutationRate
         });
         var sharedBrainId = CreateSharedInitialBrainId(state, scenario);
-        var initialBrainRandom = scenario.RandomizeInitialBrainWeights
+        var initialBrainRandom = scenario.InitialBrainKind == InitialBrainKind.RandomPerFounder
             ? new DeterministicRandom(scenario.Seed ^ InitialBrainRandomizationSalt)
             : null;
 
         var initialResourceCount = scenario.CalculateInitialResourceCount();
         for (var i = 0; i < initialResourceCount; i++)
         {
-            var position = RandomResourcePosition(state);
+            var position = ResourcePlacement.SamplePlantPosition(
+                state,
+                scenario.ResourceClusterStrength,
+                scenario.ResourceClusterRadius);
             state.SpawnResourcePatch(new ResourcePatchState
             {
                 Position = position,
@@ -137,12 +162,13 @@ public static class SimulationScenarioFactory
 
     private static int CreateSharedInitialBrainId(WorldState state, SimulationScenario scenario)
     {
-        if (scenario.PipelineKind != SimulationPipelineKind.Neural || scenario.RandomizeInitialBrainWeights)
+        if (scenario.PipelineKind != SimulationPipelineKind.Neural
+            || scenario.InitialBrainKind == InitialBrainKind.RandomPerFounder)
         {
             return -1;
         }
 
-        return state.AddBrain(NeuralBrainGenome.CreateSeedForager());
+        return state.AddBrain(CreateInitialBrain(scenario.InitialBrainKind));
     }
 
     private static int CreateFounderBrainId(
@@ -156,7 +182,7 @@ public static class SimulationScenarioFactory
             return -1;
         }
 
-        if (!scenario.RandomizeInitialBrainWeights)
+        if (scenario.InitialBrainKind != InitialBrainKind.RandomPerFounder)
         {
             return sharedBrainId;
         }
@@ -170,16 +196,22 @@ public static class SimulationScenarioFactory
         return state.AddBrain(NeuralBrainGenome.CreateRandom(initialBrainRandom));
     }
 
+    private static NeuralBrainGenome CreateInitialBrain(InitialBrainKind initialBrainKind)
+    {
+        return initialBrainKind switch
+        {
+            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(),
+            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(),
+            InitialBrainKind.RandomPerFounder => throw new ArgumentException("Random-per-founder brains are created individually."),
+            _ => throw new ArgumentOutOfRangeException(nameof(initialBrainKind), initialBrainKind, "Unsupported initial brain kind.")
+        };
+    }
+
     private static SimVector2 RandomPosition(WorldState state)
     {
         return new SimVector2(
             state.Random.NextSingle(0f, state.Bounds.Width),
             state.Random.NextSingle(0f, state.Bounds.Height));
-    }
-
-    private static SimVector2 RandomResourcePosition(WorldState state)
-    {
-        return state.Biomes.SampleResourcePosition(state.Random);
     }
 
     private static float RandomRange(WorldState state, float inclusiveMin, float exclusiveMax)

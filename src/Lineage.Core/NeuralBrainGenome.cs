@@ -15,6 +15,8 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutEggReserve = 8;
     private const int LegacyInputCountWithoutDietSenses = 9;
     private const int LegacyInputCountWithoutPreySenses = 18;
+    private const int LegacyInputCountWithoutMeatScent = 22;
+    private const int LegacyInputCountWithoutCreatureRelations = 25;
     private const int LegacyOutputCountWithoutAttack = 4;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
@@ -61,6 +63,39 @@ public sealed class NeuralBrainGenome
     /// </summary>
     public static NeuralBrainGenome CreateSeedForager()
     {
+        return new NeuralBrainGenome(CreateSeedForagerWeights(), trusted: true);
+    }
+
+    /// <summary>
+    /// Seed controller that still forages, but also steers toward close visible creatures while hungry.
+    /// </summary>
+    public static NeuralBrainGenome CreateForagerPredator()
+    {
+        var weights = CreateSeedForagerWeights();
+
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureForwardInput, 1.2f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureProximityInput, -0.6f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 0.8f);
+
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.CreatureRightInput, 2.8f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 1.4f);
+
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.EnergyRatioInput, -1.5f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.HungerInput, 2f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 4f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.8f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureFacingAlignmentInput, -0.3f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.5f);
+
+        return new NeuralBrainGenome(weights, trusted: true);
+    }
+
+    private static float[] CreateSeedForagerWeights()
+    {
         var weights = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.35f);
@@ -75,11 +110,13 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.BiasInput, -1f);
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput, 3f);
 
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -2.8f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.PreyProximityInput, 4f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -3.4f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.HungerInput, 1.2f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 2.5f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.5f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.4f);
 
-        return new NeuralBrainGenome(weights, trusted: true);
+        return weights;
     }
 
     public float GetWeight(int outputIndex, int inputIndex)
@@ -193,6 +230,26 @@ public sealed class NeuralBrainGenome
         if (weights.Length == NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount)
         {
             return weights;
+        }
+
+        if (weights.Length == LegacyInputCountWithoutCreatureRelations * NeuralBrainSchema.OutputCount)
+        {
+            return NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutCreatureRelations,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+        }
+
+        if (weights.Length == LegacyInputCountWithoutMeatScent * NeuralBrainSchema.OutputCount)
+        {
+            return NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutMeatScent,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
         }
 
         if (weights.Length == LegacyInputCountWithoutPreySenses * LegacyOutputCountWithoutAttack)

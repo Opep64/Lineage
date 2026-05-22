@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Lineage.Core;
 
 /// <summary>
@@ -20,6 +22,12 @@ public sealed record SimulationScenario
 
     public SimulationPipelineKind PipelineKind { get; init; } = SimulationPipelineKind.Neural;
 
+    public InitialBrainKind InitialBrainKind { get; init; } = InitialBrainKind.SeedForager;
+
+    /// <summary>
+    /// Legacy JSON migration field. New scenarios should use <see cref="InitialBrainKind"/>.
+    /// </summary>
+    [JsonIgnore]
     public bool RandomizeInitialBrainWeights { get; init; }
 
     public bool EnableBiomes { get; init; } = true;
@@ -62,6 +70,10 @@ public sealed record SimulationScenario
 
     public bool RelocateDepletedResources { get; init; } = true;
 
+    public float ResourceClusterStrength { get; init; } = 0.2f;
+
+    public float ResourceClusterRadius { get; init; } = 180f;
+
     public float BasalEnergyPerSecond { get; init; } = 0.25f;
 
     public float BodyRadiusEnergyCostPerSecond { get; init; } = 0.04f;
@@ -78,6 +90,14 @@ public sealed record SimulationScenario
 
     public float EatRateEnergyCostPerSecond { get; init; } = 0.006f;
 
+    public float GutCapacityEnergyCostPerSecond { get; init; } = 0.0008f;
+
+    public float DigestionRateEnergyCostPerSecond { get; init; } = 0.014f;
+
+    public float BiteStrengthEnergyCostPerSecond { get; init; } = 0.04f;
+
+    public float DamageResistanceEnergyCostPerSecond { get; init; } = 0.03f;
+
     public float EggEnergyCostPerSecond { get; init; } = 0f;
 
     public float EggEnvironmentalDamagePerSecond { get; init; } = 0.08f;
@@ -85,6 +105,10 @@ public sealed record SimulationScenario
     public float MovementEnergyPerSecond { get; init; } = 0.35f;
 
     public float EatCaloriesPerSecond { get; init; } = 18f;
+
+    public float GutCapacityCalories { get; init; } = 55f;
+
+    public float DigestionCaloriesPerSecond { get; init; } = 5f;
 
     public float ReproductionEnergyThreshold { get; init; } = 84f;
 
@@ -100,15 +124,25 @@ public sealed record SimulationScenario
 
     public float DietaryAdaptation { get; init; } = 0.1f;
 
+    public float BiteStrength { get; init; } = 0.55f;
+
+    public float DamageResistance { get; init; } = 1f;
+
     public float DeathMeatCaloriesPerBodyRadius { get; init; } = 4f;
 
     public float DeathMeatEnergyFraction { get; init; } = 0.35f;
 
     public float MeatDecayCaloriesPerSecond { get; init; } = 0.03f;
 
-    public float BiteDamagePerSecond { get; init; } = 0.25f;
+    public float MeatScentRangeMultiplier { get; init; } = 2f;
 
-    public float BiteEnergyCostPerSecond { get; init; } = 0.12f;
+    public float MeatScentCaloriesForFullStrength { get; init; } = 60f;
+
+    public float MeatScentDensitySaturation { get; init; } = 1f;
+
+    public float BiteDamagePerSecond { get; init; } = 0.18f;
+
+    public float BiteEnergyCostPerSecond { get; init; } = 0.15f;
 
     public float BiteRangePadding { get; init; } = 1f;
 
@@ -127,6 +161,7 @@ public sealed record SimulationScenario
 
         EnsurePositive(WorldWidth, nameof(WorldWidth));
         EnsurePositive(WorldHeight, nameof(WorldHeight));
+        EnsureEnumDefined(InitialBrainKind, nameof(InitialBrainKind));
         EnsurePositive(BiomeCellSize, nameof(BiomeCellSize));
         EnsureNonNegative(ResourceVoidBorderWidth, nameof(ResourceVoidBorderWidth));
         EnsurePositive(FixedDeltaSeconds, nameof(FixedDeltaSeconds));
@@ -139,6 +174,8 @@ public sealed record SimulationScenario
         EnsureRange(ResourceCaloriesMin, ResourceCaloriesMax, nameof(ResourceCaloriesMin), nameof(ResourceCaloriesMax));
         EnsurePositive(ResourceMaxCalories, nameof(ResourceMaxCalories));
         EnsureRange(ResourceRegrowthMin, ResourceRegrowthMax, nameof(ResourceRegrowthMin), nameof(ResourceRegrowthMax));
+        EnsureProbability(ResourceClusterStrength, nameof(ResourceClusterStrength));
+        EnsurePositive(ResourceClusterRadius, nameof(ResourceClusterRadius));
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
         EnsureNonNegative(BodyRadiusEnergyCostPerSecond, nameof(BodyRadiusEnergyCostPerSecond));
         EnsureNonNegative(MaxSpeedEnergyCostPerSecond, nameof(MaxSpeedEnergyCostPerSecond));
@@ -147,10 +184,16 @@ public sealed record SimulationScenario
         EnsureRange(VisionAngleRadians, MathF.PI / 12f, MathF.Tau, nameof(VisionAngleRadians));
         EnsureNonNegative(VisionAngleEnergyCostPerSecond, nameof(VisionAngleEnergyCostPerSecond));
         EnsureNonNegative(EatRateEnergyCostPerSecond, nameof(EatRateEnergyCostPerSecond));
+        EnsureNonNegative(GutCapacityEnergyCostPerSecond, nameof(GutCapacityEnergyCostPerSecond));
+        EnsureNonNegative(DigestionRateEnergyCostPerSecond, nameof(DigestionRateEnergyCostPerSecond));
+        EnsureNonNegative(BiteStrengthEnergyCostPerSecond, nameof(BiteStrengthEnergyCostPerSecond));
+        EnsureNonNegative(DamageResistanceEnergyCostPerSecond, nameof(DamageResistanceEnergyCostPerSecond));
         EnsureNonNegative(EggEnergyCostPerSecond, nameof(EggEnergyCostPerSecond));
         EnsureNonNegative(EggEnvironmentalDamagePerSecond, nameof(EggEnvironmentalDamagePerSecond));
         EnsureNonNegative(MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));
         EnsurePositive(EatCaloriesPerSecond, nameof(EatCaloriesPerSecond));
+        EnsurePositive(GutCapacityCalories, nameof(GutCapacityCalories));
+        EnsurePositive(DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
         EnsurePositive(ReproductionEnergyThreshold, nameof(ReproductionEnergyThreshold));
         EnsurePositive(OffspringEnergyInvestment, nameof(OffspringEnergyInvestment));
         EnsurePositive(EggProductionEnergyPerSecond, nameof(EggProductionEnergyPerSecond));
@@ -158,9 +201,14 @@ public sealed record SimulationScenario
         EnsureNonNegative(MaturityAgeSeconds, nameof(MaturityAgeSeconds));
         EnsureNonNegative(ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
         EnsureProbability(DietaryAdaptation, nameof(DietaryAdaptation));
+        EnsurePositive(BiteStrength, nameof(BiteStrength));
+        EnsurePositive(DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(DeathMeatCaloriesPerBodyRadius, nameof(DeathMeatCaloriesPerBodyRadius));
         EnsureProbability(DeathMeatEnergyFraction, nameof(DeathMeatEnergyFraction));
         EnsureNonNegative(MeatDecayCaloriesPerSecond, nameof(MeatDecayCaloriesPerSecond));
+        EnsureRange(MeatScentRangeMultiplier, 1f, 10f, nameof(MeatScentRangeMultiplier));
+        EnsurePositive(MeatScentCaloriesForFullStrength, nameof(MeatScentCaloriesForFullStrength));
+        EnsurePositive(MeatScentDensitySaturation, nameof(MeatScentDensitySaturation));
         EnsureNonNegative(BiteDamagePerSecond, nameof(BiteDamagePerSecond));
         EnsureNonNegative(BiteEnergyCostPerSecond, nameof(BiteEnergyCostPerSecond));
         EnsureNonNegative(BiteRangePadding, nameof(BiteRangePadding));
@@ -266,6 +314,15 @@ public sealed record SimulationScenario
         if (!float.IsFinite(value) || value < 0f || value > 1f)
         {
             throw new InvalidOperationException($"{name} must be finite and between 0 and 1.");
+        }
+    }
+
+    private static void EnsureEnumDefined<TEnum>(TEnum value, string name)
+        where TEnum : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new InvalidOperationException($"{name} must be a defined {typeof(TEnum).Name} value.");
         }
     }
 }

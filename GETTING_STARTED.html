@@ -241,7 +241,7 @@
         <li><code>Save</code> / <code>Save As</code>: writes the edited scenario as CLI-compatible JSON</li>
         <li><code>Collapse</code> / <code>Expand</code>: shrinks the launcher to a small strip and moves realtime stats into the left column</li>
         <li><code>Run CLI</code>: saves the edited scenario to <code>out/godot_cli_scenario.json</code>, then runs <code>Lineage.Cli</code> with the requested tick count, stats CSV, HTML report path, and final snapshot path</li>
-        <li><code>Write Current Report</code>: writes an HTML report from the simulation currently running in Godot, without rerunning the CLI</li>
+        <li><code>Write Current Report</code>: writes an HTML report with graphs and behavior assays from the simulation currently running in Godot, without rerunning the CLI</li>
         <li><code>Open Report</code>: opens the last successful CLI or viewer HTML report in your default browser</li>
         <li><code>Snapshot JSON</code>: sets where a Godot-triggered CLI run writes its final simulation snapshot</li>
         <li><code>Checkpoint interval</code>: writes loadable snapshot checkpoints every N ticks; use <code>0</code> to disable</li>
@@ -265,14 +265,25 @@
 
       <h3>Preset Comparison</h3>
       <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --batch-report .\out\preset_comparison.html --batch-output-dir .\out\preset_comparison --ticks 20000 --seed 42</code></pre>
+      <p>
+        Batch comparison writes full per-run reports, snapshots, and CSV suites. Use it when a run deserves
+        deep inspection or you want loadable snapshots.
+      </p>
+
+      <h3>Lightweight Probe</h3>
+      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -c Release -- --probe --ticks 20000 --probe-seeds 42,43,44 --probe-output .\out\probe_summary.csv --probe-report .\out\probe_summary.html --probe-stop-on-extinction --probe-max-population 5000</code></pre>
+      <p>
+        Probe mode runs the current pressure presets by default and writes only one compact CSV plus one compact
+        HTML summary. Add repeated <code>--probe-scenario &lt;path&gt;</code> values to test a smaller scenario set.
+      </p>
 
       <h3>Scenario Files</h3>
       <p>
         Scenario JSON files describe the world size, seed, pipeline, initial
         population, resource density per 1M world area, biome mode, biome cell size, resource void border,
-        food abundance, regrowth, depleted-resource relocation, initial brain mode, per-founder random brain weights, metabolism, movement cost, eating rate,
-        diet adaptation, death-meat output, meat decay, vision range and angle, trait upkeep costs, optional egg upkeep, egg production rate, egg incubation, maturity age, mutation strength, trait/brain mutation rates, reproduction threshold, and
-        bite damage, bite energy cost, bite reach, and snapshot interval. The current starter scenario is:
+        food abundance, regrowth, depleted-resource relocation, resource clustering, initial brain mode, metabolism, movement cost, eating rate,
+        gut capacity, digestion rate, diet adaptation, bite strength, damage resistance, death-meat output, meat decay, meat scent, vision range and angle, trait upkeep costs, optional egg upkeep, egg production rate, egg incubation, maturity age, mutation strength, trait/brain mutation rates, reproduction threshold, and
+        bite damage, bite energy cost, combat-trait upkeep, bite reach, and snapshot interval. The current starter scenario is:
       </p>
       <p>The saved starter and pressure preset scenarios currently use a <code>2000 x 2000</code> world.</p>
       <pre><code>.\scenarios\balanced-foraging.json</code></pre>
@@ -281,6 +292,9 @@
         <li><code>.\scenarios\gentle-foraging.json</code>: abundant food, smaller void border, lower basal/movement pressure, and moderate reproduction delay</li>
         <li><code>.\scenarios\balanced-foraging.json</code>: baseline food, void border, energy pressure, longer maturity, and higher reproduction threshold</li>
         <li><code>.\scenarios\harsh-foraging.json</code>: sparse food, wider void border, slower regrowth, and higher basal/movement pressure</li>
+        <li><code>.\scenarios\scavenger-pressure.json</code>: lower plant availability, wider void, richer slower-decaying carcasses, and balanced-style combat/egg rules for testing scavenging pressure</li>
+        <li><code>.\scenarios\omnivore-pressure.json</code>: middle pressure between scavenging and predation, with richer carcasses and modest combat pressure while keeping the seed-forager starter brain</li>
+        <li><code>.\scenarios\predation-pressure.json</code>: lower plant reliability, richer persistent meat, slower reproduction, a forager-predator starter brain, and moderated costly bites for testing active predation pressure</li>
       </ul>
 
       <p>
@@ -290,9 +304,10 @@
         to return to the full-world view, and <code>G</code> to follow a selected
         creature. The scale bar in the lower-right of the map shows the current
         world-unit distance. Biomes are generated from the scenario seed; richer
-        biomes attract more initial and relocated resource patches. The resource void
-        border is a no-plant/no-regrowth edge zone. Press <code>B</code> to toggle
-        the biome and void underlay.
+        biomes attract more initial and relocated resource patches. Scenario-backed
+        resource clustering can make plants form local food patches instead of
+        evenly dusting the world. The resource void border is a no-plant/no-regrowth
+        edge zone. Press <code>B</code> to toggle the biome and void underlay.
       </p>
       <p>
         Creatures do not get direct biome fertility or void-border knowledge. Food
@@ -304,29 +319,54 @@
       </p>
       <p>
         Food currently has two kinds: plants and meat. Plants regrow and relocate
-        when fully depleted; meat is left by dead creatures, decays, and disappears.
+        when fully depleted; meat is left by dead creatures, decays, emits local
+        scent, and disappears. Meat scent can be detected farther away than exact
+        vision, but it only gives a fuzzy density and forward/right gradient. A
+        creature still needs visible food inside its cone for exact target
+        direction and proximity. The current presets use scent out to <code>2x</code>
+        effective vision range, <code>60</code> kcal as the full-strength scent
+        scale, and <code>1.0</code> scent-density saturation.
         Eggs are also edible meat-like targets: they can be seen only inside the
         vision cone, use meat digestion efficiency, and count as egg predation
         deaths if fully consumed.
-        Living creatures can also be sensed as prey inside the vision cone. A
-        creature with attack intent can bite another creature at body-contact range;
+        Living creatures can also be sensed inside the vision cone as neutral
+        creature cues: density, proximity, direction, relative body size, relative
+        speed, approach rate, and facing alignment. A creature with attack intent can bite another creature at body-contact range;
         biting costs energy, deals health damage, and injury deaths become meat.
+        Bite strength and damage resistance are heritable, growth-scaled traits:
+        juveniles hit less hard and take more damage, while stronger or tougher
+        adults pay more upkeep.
         A heritable diet value controls digestion: plant specialists get strong
         plant calories but weak meat calories, meat specialists mirror that, and
-        omnivores sit in the middle. The balanced starter begins near herbivore
-        behavior, with about 92% plant digestion and 28% meat digestion.
+        omnivores sit in the middle. Food is not instantly converted to energy:
+        eating fills plant/meat gut stores, then digestion releases usable energy
+        over time. Fast digestion has upkeep, slow digestion can leave the gut
+        full, and larger gut capacity also costs upkeep. The current starter
+        scenarios use a 55 kcal gut, 5 kcal/s digestion, 0.0008 gut-capacity
+        upkeep, and 0.014 digestion-rate upkeep.
+        The balanced starter begins near herbivore behavior, with about 92%
+        plant digestion and 28% meat digestion.
         Neural brains receive both a generic diet-weighted best-food cue and
-        separate plant/meat density, direction, and proximity cues. This keeps the
+        separate plant/meat density, direction, proximity, meat-scent cues, and
+        neutral visible-creature cues. This keeps the
         information local while allowing lineages to evolve different foraging
         responses as their digestion shifts.
       </p>
       <p>
         The live HUD and HTML reports include foraging diagnostics: share seeing
         food, share touching food, share eating on the sampled tick, average visible
-        food density, calories eaten per second, plant/meat resource calories,
-        egg predation deaths, visible prey density, attacking creatures, attack
-        damage per second, average time since last meal, and average effective
-        vision range/angle.
+        food density, meat-scent detection and density, raw calories eaten per second,
+        raw intake split by plants, passive carcasses, eggs, and attacker-credited fresh kills, calories digested per second,
+        digested energy split by plant and meat source,
+        average gut fullness and gut composition, plant/meat resource calories,
+        egg predation deaths, visible creature density, creature-detection share, attacking creatures, attack
+        damage per second, fresh-kill/meat intake shares, meat-derived energy share,
+        attacker versus non-attacker diet/bite/resistance averages, average time since
+        last meal, movement distance per second, distance since last meal, calories per distance,
+        calories per food-vision event, and average effective vision range/angle. HTML reports also include inline SVG graphs for population,
+        eggs, resource calories, foraging signals, search efficiency, food-source intake, predation diagnostics, digested energy source, digestion, and combat pressure, plus behavior
+        assays that replay fixed food, visible-creature, small/large-creature risk, and reproduction cues through the living
+        neural brains. The same probes are also grouped by top living founder lineage so minority ecotypes are easier to spot.
       </p>
       <p>
         Resource and creature rendering are zoom-aware. Close views draw individual
@@ -365,6 +405,14 @@
         <li><code>--checkpoint-interval &lt;n&gt;</code>: save loadable checkpoint snapshots every N ticks</li>
         <li><code>--checkpoint-dir &lt;dir&gt;</code>: directory for checkpoint JSON files; defaults near the snapshot, report, or stats output</li>
         <li><code>--batch-report &lt;path&gt;</code>: HTML comparison report output path; uses gentle/balanced/harsh presets when no batch scenarios are listed</li>
+        <li><code>--probe</code>: run lightweight tuning probes without per-run reports, snapshots, or lineage CSV suites</li>
+        <li><code>--probe-scenario &lt;path&gt;</code>: add a scenario to a lightweight probe; can repeat</li>
+        <li><code>--probe-seeds &lt;a,b,c&gt;</code>: comma-separated seed overrides for probe runs</li>
+        <li><code>--probe-output &lt;path&gt;</code>: compact probe CSV output path</li>
+        <li><code>--probe-report &lt;path&gt;</code>: compact probe HTML output path</li>
+        <li><code>--probe-snapshot-interval &lt;n&gt;</code>: stats interval for probe runs; defaults to 100</li>
+        <li><code>--probe-stop-on-extinction</code>: stop a probe run early if all creatures die</li>
+        <li><code>--probe-max-population &lt;n&gt;</code>: stop a probe run early if population exceeds a safety cap</li>
         <li><code>--batch-scenario &lt;path&gt;</code>: add a scenario to a comparison run; repeat for multiple scenarios</li>
         <li><code>--batch-output-dir &lt;dir&gt;</code>: per-run batch CSV/report output directory</li>
         <li><code>--no-output</code>: run without writing CSV files</li>
@@ -380,11 +428,14 @@
         <code>--output</code> is provided, the other filenames are derived from it.
         The stats CSV includes plant and meat resource counts/calories plus egg predation deaths and foraging diagnostics such as food-seeing share,
         plant-seeing share, meat-seeing share, food-contact share, eating share,
-        visible food/plant/meat/prey density, attacking share, attack damage per
-        second, calories eaten per second, time since last meal, and average vision
+        visible food/plant/meat/creature density, meat-scent share and density, creature-detection share,
+        attacking share, attack damage per
+        second, raw calories eaten per second split by plant/passive carcass/egg/fresh kill, raw meat and fresh-kill shares, digested plant/meat energy, meat-derived energy share,
+        average diet/bite/resistance split across attackers and non-attackers,
+        time since last meal, distance since last meal, calories per distance, calories per food-vision event, and average vision
         range/angle.
         If <code>--report</code> is provided, it also writes an HTML report with
-        outcome totals, foraging diagnostics, biome resource distribution, diet/digestion summaries, trend notes, diagnostics, dominant lineage snapshots, top
+        outcome totals, inline SVG graphs, standardized behavior and risk assays, per-lineage ecotype summaries, foraging diagnostics, predation diagnostics, biome resource distribution, diet/digestion summaries, trend notes, diagnostics, dominant lineage snapshots, top
         founder lineages, final living trait summaries, and generation survival.
         If <code>--save-snapshot</code> is provided, the final world state can be
         opened from the Godot launcher's <code>Load Snapshot File</code> button.
@@ -409,12 +460,13 @@ dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj</code>
         <li>The viewer and CLI share the same default scenario factory.</li>
         <li>The simulation already has mutation, inheritance, reproduction, death, and lineage records.</li>
         <li>Reproduction lays eggs. Mature creatures first build a reproductive reserve from surplus energy, then neural brains can decide when to deposit a completed egg with the mutated offspring genome and brain. Eggs have investment-derived health, can take environmental exposure damage in poor locations, can be eaten as meat-like food by other creatures, incubate for a heritable duration, and hatch into lineage-tracked creatures if viable.</li>
-        <li>Juveniles grow toward adult body size, speed, and eating capacity, and cannot reproduce before maturity.</li>
-        <li>Food search is local and imperfect: creatures target only visible food inside their vision cone and receive visible food density rather than map fertility.</li>
-        <li>Dead creatures leave meat resources. Living creatures can now bite one another at close range when their brain outputs attack intent. Diet adaptation is heritable, so lineages can evolve from mostly herbivory toward omnivory or meat specialization when the scenario makes that viable.</li>
-        <li>Evolutionary pressure is configurable through biome-shaped food density, no-plant void borders, regrowth, death-meat output, meat decay, bite damage/cost/reach, metabolism, movement cost, shared trait upkeep, vision range/angle upkeep, optional egg upkeep, egg exposure damage, egg production rate, offspring investment, egg incubation, maturity age, reproduction threshold, and body-size upkeep.</li>
+        <li>Juveniles grow toward adult body size, speed, eating capacity, gut capacity, and digestion rate, and cannot reproduce before maturity.</li>
+        <li>Food search is local and imperfect: creatures target only visible food inside their vision cone, receive visible food density rather than map fertility, and smell nearby meat as a fuzzy gradient rather than an exact target.</li>
+        <li>Dead creatures leave meat resources. Living creatures can now see other living creatures through neutral creature cues and bite one another at close range when their brain outputs attack intent. Bite strength and damage resistance are heritable and costly. Diet adaptation, gut capacity, and digestion rate are heritable, so lineages can evolve from mostly herbivory toward omnivory or meat specialization when the scenario makes that viable.</li>
+        <li>Evolutionary pressure is configurable through biome-shaped food density, resource clustering, no-plant void borders, regrowth, death-meat output, meat decay, meat scent, initial brain mode, bite strength, damage resistance, bite damage/cost/reach, combat-trait upkeep, metabolism, movement cost, shared trait upkeep, vision range/angle upkeep, gut-capacity and digestion-rate upkeep, optional egg upkeep, egg exposure damage, egg production rate, offspring investment, egg incubation, maturity age, reproduction threshold, and body-size upkeep.</li>
         <li>Offspring investment sets egg sturdiness and hatchling birth quality; explicit fat, strength, and clutches can build on this later.</li>
-        <li>Next simulation work should tune combat in longer preset runs, then likely add attack/defense genes, carcass scent, or stronger r/K tradeoffs.</li>
+        <li>The latest pressure tuning added an omnivore preset and softened predation-pressure. At 20k ticks, omnivore-pressure settles near 300 creatures with meat contributing about 7% of energy, while predation-pressure settles near 150 creatures with sustained fresh-kill intake and meat contributing about 12% of energy.</li>
+        <li>Local carcass/meat scent and neutral creature perception are now in place. The next simulation work should improve evolved behavior around risk, avoidance, and attack decisions rather than only tuning food and damage numbers.</li>
       </ul>
     </section>
   </main>

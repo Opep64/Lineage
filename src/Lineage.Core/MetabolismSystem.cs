@@ -9,7 +9,11 @@ public sealed class MetabolismSystem(
     float turnRateEnergyCostPerSecond = 0f,
     float senseRadiusEnergyCostPerSecond = 0f,
     float visionAngleEnergyCostPerSecond = 0f,
-    float eatRateEnergyCostPerSecond = 0f) : ISimulationSystem
+    float eatRateEnergyCostPerSecond = 0f,
+    float gutCapacityEnergyCostPerSecond = 0f,
+    float digestionRateEnergyCostPerSecond = 0f,
+    float biteStrengthEnergyCostPerSecond = 0f,
+    float damageResistanceEnergyCostPerSecond = 0f) : ISimulationSystem
 {
     private readonly float _bodyRadiusEnergyCostPerSecond =
         ValidateCost(bodyRadiusEnergyCostPerSecond, nameof(bodyRadiusEnergyCostPerSecond));
@@ -23,6 +27,14 @@ public sealed class MetabolismSystem(
         ValidateCost(visionAngleEnergyCostPerSecond, nameof(visionAngleEnergyCostPerSecond));
     private readonly float _eatRateEnergyCostPerSecond =
         ValidateCost(eatRateEnergyCostPerSecond, nameof(eatRateEnergyCostPerSecond));
+    private readonly float _gutCapacityEnergyCostPerSecond =
+        ValidateCost(gutCapacityEnergyCostPerSecond, nameof(gutCapacityEnergyCostPerSecond));
+    private readonly float _digestionRateEnergyCostPerSecond =
+        ValidateCost(digestionRateEnergyCostPerSecond, nameof(digestionRateEnergyCostPerSecond));
+    private readonly float _biteStrengthEnergyCostPerSecond =
+        ValidateCost(biteStrengthEnergyCostPerSecond, nameof(biteStrengthEnergyCostPerSecond));
+    private readonly float _damageResistanceEnergyCostPerSecond =
+        ValidateCost(damageResistanceEnergyCostPerSecond, nameof(damageResistanceEnergyCostPerSecond));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -42,7 +54,11 @@ public sealed class MetabolismSystem(
                 + CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome) * _turnRateEnergyCostPerSecond
                 + CreatureGrowth.EffectiveSenseRadius(creature, genome) * _senseRadiusEnergyCostPerSecond
                 + CreatureGrowth.EffectiveVisionAngleRadians(creature, genome) * _visionAngleEnergyCostPerSecond
-                + CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * _eatRateEnergyCostPerSecond;
+                + CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * _eatRateEnergyCostPerSecond
+                + CreatureGrowth.EffectiveGutCapacityCalories(creature, genome) * _gutCapacityEnergyCostPerSecond
+                + CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond
+                + CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond
+                + CreatureGrowth.EffectiveDamageResistance(creature, genome) * _damageResistanceEnergyCostPerSecond;
             creature.Energy -= (genome.BasalEnergyPerSecond + traitUpkeep) * deltaSeconds;
 
             state.Creatures[i] = creature;

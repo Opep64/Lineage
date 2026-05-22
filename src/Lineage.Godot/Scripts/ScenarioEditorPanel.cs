@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Text.Json.Serialization;
 using Godot;
 using Lineage.Core;
 
@@ -22,6 +23,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private static readonly PropertyInfo[] ScenarioProperties = typeof(SimulationScenario)
         .GetProperties(BindingFlags.Instance | BindingFlags.Public)
         .Where(property => property.CanRead && property.CanWrite)
+        .Where(property => property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
         .OrderBy(property => property.MetadataToken)
         .ToArray();
 

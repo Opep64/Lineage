@@ -5,11 +5,15 @@ var tests = new (string Name, Action Body)[]
     ("Simulation clock advances by fixed steps", SimulationClockAdvancesByFixedSteps),
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
+    ("Movement records search distance", MovementRecordsSearchDistance),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
+    ("Fresh-kill resource credit expires", FreshKillResourceCreditExpires),
     ("Eating transfers resource calories into creature energy", EatingTransfersCalories),
+    ("Eating fills gut before digestion", EatingFillsGutBeforeDigestion),
+    ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
     ("Eating requires body contact with a resource", EatingRequiresBodyContact),
     ("Dietary adaptation controls digested calories", DietaryAdaptationControlsDigestedCalories),
     ("Eating transfers egg energy as meat nutrition", EatingTransfersEggEnergyAsMeatNutrition),
@@ -28,12 +32,16 @@ var tests = new (string Name, Action Body)[]
     ("Minimal life loop is repeatable", MinimalLifeLoopIsRepeatable),
     ("Creature sensing reports local food direction", CreatureSensingReportsFoodDirection),
     ("Creature sensing splits plant and meat cues", CreatureSensingSplitsPlantAndMeatCues),
-    ("Creature sensing reports visible prey cues", CreatureSensingReportsVisiblePreyCues),
+    ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
+    ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
-    ("Neural controller turns prey proximity into attack intent", NeuralControllerTurnsPreyProximityIntoAttackIntent),
+    ("Neural controller turns creature proximity into attack intent", NeuralControllerTurnsCreatureProximityIntoAttackIntent),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
+    ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
+    ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
+    ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
     ("Sparse mutation rates gate genome and brain changes", SparseMutationRatesGateGenomeAndBrainChanges),
@@ -47,11 +55,12 @@ var tests = new (string Name, Action Body)[]
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
+    ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
-    ("Scenario factory can randomize initial brain weights", ScenarioFactoryCanRandomizeInitialBrainWeights),
+    ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
@@ -151,6 +160,32 @@ static Simulation CreateProbeSimulation()
     return simulation;
 }
 
+static void MovementRecordsSearchDistance()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 0.5f
+        },
+        seed: 2,
+        systems: [new MovementSystem()]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(12f, 0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var moved = simulation.State.Creatures[0];
+    AssertClose(6f, moved.LastDistanceTraveled, 0.000001, "Last movement distance");
+    AssertClose(6f, moved.DistanceSinceLastMeal, 0.000001, "Distance since meal accumulates");
+    AssertClose(26f, moved.Position.X, 0.000001, "Movement x position");
+}
+
 static void InvalidConfigurationIsRejected()
 {
     AssertThrows<InvalidOperationException>(
@@ -235,6 +270,36 @@ static void MeatResourcesDecayAndDisappear()
     AssertEqual(0, simulation.State.Resources.Count, "Decayed meat resource count");
 }
 
+static void FreshKillResourceCreditExpires()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 230,
+        systems: [new ResourceRegrowthSystem()]);
+
+    var attackerId = new EntityId(7);
+    var preyId = new EntityId(8);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(10f, 10f),
+        Radius = 2f,
+        Calories = 10f,
+        MaxCalories = 10f,
+        DecayCaloriesPerSecond = 0f,
+        FreshKillAttackerId = attackerId,
+        FreshKillPreyId = preyId,
+        FreshKillSecondsRemaining = 0.5f
+    });
+
+    simulation.Step();
+
+    var meat = simulation.State.Resources[0];
+    AssertClose(0f, meat.FreshKillSecondsRemaining, 0.000001, "Fresh-kill timer expires");
+    AssertEqual(default(EntityId), meat.FreshKillAttackerId, "Expired fresh-kill attacker clears");
+    AssertEqual(default(EntityId), meat.FreshKillPreyId, "Expired fresh-kill prey clears");
+}
+
 static void EatingTransfersCalories()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -244,13 +309,15 @@ static void EatingTransfersCalories()
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new EatingSystem(spatialIndex)
+            new EatingSystem(spatialIndex),
+            new DigestionSystem()
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 3f,
         EatCaloriesPerSecond = 12f,
+        DigestionCaloriesPerSecond = 12f,
         DietaryAdaptation = 0f,
         MaturityAgeSeconds = 0f
     });
@@ -258,6 +325,7 @@ static void EatingTransfersCalories()
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
     var hungryCreature = simulation.State.Creatures[0];
     hungryCreature.SecondsSinceLastMeal = 6f;
+    hungryCreature.DistanceSinceLastMeal = 42f;
     simulation.State.Creatures[0] = hungryCreature;
     simulation.State.SpawnResourcePatch(new ResourcePatchState
     {
@@ -276,8 +344,100 @@ static void EatingTransfersCalories()
     AssertClose(0f, simulation.State.Creatures[0].FoodContactEdgeDistance, 0.000001, "Touched resource edge distance");
     AssertClose(30f, simulation.State.Creatures[0].FoodContactCalories, 0.000001, "Touched resource calories before eating");
     AssertClose(12f, simulation.State.Creatures[0].LastCaloriesEaten, 0.000001, "Calories eaten last tick");
+    AssertClose(12f, simulation.State.Creatures[0].LastPlantCaloriesEaten, 0.000001, "Plant calories eaten last tick");
+    AssertClose(0f, simulation.State.Creatures[0].LastCarcassCaloriesEaten, 0.000001, "Carcass calories eaten last tick");
+    AssertClose(0f, simulation.State.Creatures[0].LastEggCaloriesEaten, 0.000001, "Egg calories eaten last tick");
+    AssertClose(12f, simulation.State.Creatures[0].LastCaloriesDigested, 0.000001, "Calories digested last tick");
+    AssertClose(12f, simulation.State.Creatures[0].LastPlantDigestedEnergy, 0.000001, "Plant energy digested last tick");
+    AssertClose(0f, simulation.State.Creatures[0].LastMeatDigestedEnergy, 0.000001, "Meat energy digested last tick");
+    AssertClose(0f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Gut plant calories after digestion");
     AssertClose(0f, simulation.State.Creatures[0].SecondsSinceLastMeal, 0.000001, "Meal timer resets after eating");
+    AssertClose(0f, simulation.State.Creatures[0].DistanceSinceLastMeal, 0.000001, "Meal distance resets after eating");
     AssertClose(18f, simulation.State.Resources[0].Calories, 0.000001, "Resource calories after eating");
+}
+
+static void EatingFillsGutBeforeDigestion()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 21,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 12f,
+        GutCapacityCalories = 20f,
+        DietaryAdaptation = 0f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    AssertClose(10f, simulation.State.Creatures[0].Energy, 0.000001, "Energy should not change before digestion");
+    AssertClose(12f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Plant gut calories after eating");
+    AssertClose(0f, simulation.State.Creatures[0].GutMeatCalories, 0.000001, "Meat gut calories after eating");
+    AssertClose(12f, simulation.State.Creatures[0].LastCaloriesEaten, 0.000001, "Raw calories eaten last tick");
+    AssertClose(12f, simulation.State.Creatures[0].LastPlantCaloriesEaten, 0.000001, "Plant source calories eaten last tick");
+    AssertClose(0f, simulation.State.Creatures[0].LastCaloriesDigested, 0.000001, "No calories digested without digestion system");
+    AssertClose(18f, simulation.State.Resources[0].Calories, 0.000001, "Resource calories after eating into gut");
+}
+
+static void GutCapacityLimitsAdditionalEating()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 23,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 20f,
+        GutCapacityCalories = 10f,
+        DietaryAdaptation = 0f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    var creature = simulation.State.Creatures[0];
+    creature.GutMeatCalories = 8f;
+    simulation.State.Creatures[0] = creature;
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    AssertClose(2f, simulation.State.Creatures[0].LastCaloriesEaten, 0.000001, "Only free gut capacity can be eaten");
+    AssertClose(2f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Plant gut calories are capacity-limited");
+    AssertClose(8f, simulation.State.Creatures[0].GutMeatCalories, 0.000001, "Existing meat gut calories remain");
+    AssertClose(28f, simulation.State.Resources[0].Calories, 0.000001, "Resource loses only capacity-limited calories");
 }
 
 static void EatingRequiresBodyContact()
@@ -289,13 +449,15 @@ static void EatingRequiresBodyContact()
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new EatingSystem(spatialIndex)
+            new EatingSystem(spatialIndex),
+            new DigestionSystem()
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 3f,
         EatCaloriesPerSecond = 12f,
+        DigestionCaloriesPerSecond = 12f,
         DietaryAdaptation = 0f,
         MaturityAgeSeconds = 0f
     });
@@ -330,6 +492,7 @@ static void EatingRequiresBodyContact()
     AssertClose(3f, simulation.State.Creatures[0].FoodContactEdgeDistance, 0.000001, "Touched resource edge distance");
     AssertClose(30f, simulation.State.Creatures[0].FoodContactCalories, 0.000001, "Touched resource calories before eating");
     AssertClose(12f, simulation.State.Creatures[0].LastCaloriesEaten, 0.000001, "Calories eaten inside body contact");
+    AssertClose(12f, simulation.State.Creatures[0].LastCaloriesDigested, 0.000001, "Calories digested inside body contact");
     AssertClose(18f, simulation.State.Resources[0].Calories, 0.000001, "Resource inside body contact");
 }
 
@@ -352,13 +515,15 @@ static float RunEatingProbe(ResourceKind resourceKind, float dietaryAdaptation)
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new EatingSystem(spatialIndex)
+            new EatingSystem(spatialIndex),
+            new DigestionSystem()
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 3f,
         EatCaloriesPerSecond = 10f,
+        DigestionCaloriesPerSecond = 10f,
         DietaryAdaptation = dietaryAdaptation,
         MaturityAgeSeconds = 0f
     });
@@ -377,6 +542,17 @@ static float RunEatingProbe(ResourceKind resourceKind, float dietaryAdaptation)
     simulation.Step();
 
     AssertClose(20f, simulation.State.Resources[0].Calories, 0.000001, "Raw resource calories removed");
+    if (resourceKind == ResourceKind.Meat)
+    {
+        AssertClose(10f, simulation.State.Creatures[0].LastCarcassCaloriesEaten, 0.000001, "Carcass source calories eaten");
+        AssertClose(0f, simulation.State.Creatures[0].LastPlantCaloriesEaten, 0.000001, "No plant source calories eaten");
+    }
+    else
+    {
+        AssertClose(10f, simulation.State.Creatures[0].LastPlantCaloriesEaten, 0.000001, "Plant source calories eaten");
+        AssertClose(0f, simulation.State.Creatures[0].LastCarcassCaloriesEaten, 0.000001, "No carcass source calories eaten");
+    }
+
     return simulation.State.Creatures[0].Energy - 1f;
 }
 
@@ -389,18 +565,23 @@ static void EatingTransfersEggEnergyAsMeatNutrition()
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new EatingSystem(spatialIndex)
+            new EatingSystem(spatialIndex),
+            new DigestionSystem()
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 3f,
         EatCaloriesPerSecond = 10f,
+        DigestionCaloriesPerSecond = 10f,
         DietaryAdaptation = 1f,
         MaturityAgeSeconds = 0f
     });
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    var predatorBeforeEating = simulation.State.Creatures[0];
+    predatorBeforeEating.DistanceSinceLastMeal = 18f;
+    simulation.State.Creatures[0] = predatorBeforeEating;
     var parentId = simulation.State.SpawnCreature(genomeId, new SimVector2(80f, 80f), energy: 10f);
     var eggId = simulation.State.SpawnEgg(
         genomeId: genomeId,
@@ -420,7 +601,14 @@ static void EatingTransfersEggEnergyAsMeatNutrition()
     AssertEqual(eggId, predator.FoodContactResourceId, "Touched egg id");
     AssertClose(20f, predator.FoodContactCalories, 0.000001, "Touched egg energy before eating");
     AssertClose(10f, predator.LastCaloriesEaten, 0.000001, "Egg calories eaten last tick");
+    AssertClose(0f, predator.LastPlantCaloriesEaten, 0.000001, "Plant calories eaten while eating egg");
+    AssertClose(0f, predator.LastCarcassCaloriesEaten, 0.000001, "Carcass calories eaten while eating egg");
+    AssertClose(10f, predator.LastEggCaloriesEaten, 0.000001, "Egg source calories eaten last tick");
+    AssertClose(10f, predator.LastCaloriesDigested, 0.000001, "Egg calories digested last tick");
+    AssertClose(0f, predator.LastPlantDigestedEnergy, 0.000001, "Plant energy digested while eating egg");
+    AssertClose(10f, predator.LastMeatDigestedEnergy, 0.000001, "Meat energy digested from egg");
     AssertClose(0f, predator.SecondsSinceLastMeal, 0.000001, "Meal timer resets after egg");
+    AssertClose(0f, predator.DistanceSinceLastMeal, 0.000001, "Meal distance resets after egg");
     AssertClose(10f, simulation.State.Eggs[0].Energy, 0.000001, "Egg energy after partial predation");
     AssertEqual(EggDeathReason.Unknown, simulation.State.Eggs[0].PendingDeathReason, "Partially eaten egg remains viable");
 }
@@ -435,6 +623,7 @@ static void EggPredationDeathsAreCounted()
         [
             new SpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
+            new DigestionSystem(),
             new EggSystem()
         ]);
 
@@ -517,6 +706,9 @@ static void DeadCreaturesLeaveMeatResources()
     AssertClose(19f, meat.MaxCalories, 0.000001, "Meat max calories");
     AssertClose(0f, meat.RegrowthCaloriesPerSecond, 0.000001, "Meat regrowth");
     AssertClose(0.25f, meat.DecayCaloriesPerSecond, 0.000001, "Meat decay");
+    AssertEqual(default(EntityId), meat.FreshKillAttackerId, "Starvation meat should not credit an attacker");
+    AssertEqual(default(EntityId), meat.FreshKillPreyId, "Starvation meat should not credit fresh-kill prey");
+    AssertClose(0f, meat.FreshKillSecondsRemaining, 0.000001, "Starvation meat fresh-kill timer");
 }
 
 static void MetabolismChargesBodySizeUpkeep()
@@ -551,7 +743,11 @@ static void MetabolismChargesTraitUpkeep()
                 maxSpeedEnergyCostPerSecond: 0.1f,
                 turnRateEnergyCostPerSecond: 0.2f,
                 senseRadiusEnergyCostPerSecond: 0.01f,
-                eatRateEnergyCostPerSecond: 0.3f)
+                eatRateEnergyCostPerSecond: 0.3f,
+                gutCapacityEnergyCostPerSecond: 0.01f,
+                digestionRateEnergyCostPerSecond: 0.02f,
+                biteStrengthEnergyCostPerSecond: 0.5f,
+                damageResistanceEnergyCostPerSecond: 0.25f)
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
@@ -564,7 +760,7 @@ static void MetabolismChargesTraitUpkeep()
 
     simulation.Step();
 
-    AssertClose(9.7f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after trait upkeep");
+    AssertClose(8.525f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after trait upkeep");
 }
 
 static void ReproductionBuildsEggReserveBeforeLaying()
@@ -1011,7 +1207,7 @@ static void CreatureSensingSplitsPlantAndMeatCues()
     AssertTrue(senses.FoodDirectionRight > 0.99f, "Meat specialist should prefer meat right");
 }
 
-static void CreatureSensingReportsVisiblePreyCues()
+static void CreatureSensingReportsVisibleCreatureCues()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
     var simulation = new Simulation(
@@ -1032,23 +1228,82 @@ static void CreatureSensingReportsVisiblePreyCues()
     });
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
-    var predator = simulation.State.Creatures[0];
-    predator.HeadingRadians = 0f;
-    simulation.State.Creatures[0] = predator;
+    var observer = simulation.State.Creatures[0];
+    observer.HeadingRadians = 0f;
+    observer.Velocity = new SimVector2(1f, 0f);
+    simulation.State.Creatures[0] = observer;
     simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 20f), energy: 25f);
+    var visibleCreature = simulation.State.Creatures[1];
+    visibleCreature.HeadingRadians = MathF.PI;
+    visibleCreature.Velocity = new SimVector2(-2f, 0f);
+    simulation.State.Creatures[1] = visibleCreature;
 
     simulation.Step();
 
     var senses = simulation.State.Creatures[0].Senses;
-    AssertTrue(senses.PreyDetected, "Prey should be detected");
-    AssertTrue(senses.MeatDetected, "Prey should also count as meat-like food");
-    AssertTrue(senses.FoodDetected, "Meat specialist should treat prey as food");
-    AssertClose(0.125f, senses.VisiblePreyDensity, 0.000001, "Visible prey density");
-    AssertClose(0.125f, senses.VisibleMeatDensity, 0.000001, "Visible meat density includes prey");
-    AssertClose(0.125f, senses.VisibleFoodDensity, 0.000001, "Visible food density includes prey");
-    AssertTrue(senses.PreyProximity > 0.9f, "Prey proximity should be high");
-    AssertTrue(senses.PreyDirectionForward > 0.99f, "Prey should be in front");
-    AssertClose(0f, senses.PreyDirectionRight, 0.0001, "Prey right direction");
+    AssertTrue(senses.CreatureDetected, "Creature should be detected");
+    AssertTrue(senses.MeatDetected, "Visible creature should also count as meat-like food");
+    AssertTrue(senses.FoodDetected, "Meat specialist should treat visible creature as food");
+    AssertClose(0.125f, senses.VisibleCreatureDensity, 0.000001, "Visible creature density");
+    AssertClose(0.125f, senses.VisibleMeatDensity, 0.000001, "Visible meat density includes visible creatures");
+    AssertClose(0.125f, senses.VisibleFoodDensity, 0.000001, "Visible food density includes visible creatures");
+    AssertTrue(senses.CreatureProximity > 0.9f, "Creature proximity should be high");
+    AssertTrue(senses.CreatureDirectionForward > 0.99f, "Creature should be in front");
+    AssertClose(0f, senses.CreatureDirectionRight, 0.0001, "Creature right direction");
+    AssertClose(0f, senses.CreatureRelativeBodySize, 0.0001, "Same-size creature relative body size");
+    AssertTrue(senses.CreatureRelativeSpeed > 0f, "Visible creature should be moving faster");
+    AssertTrue(senses.CreatureApproachRate > 0f, "Visible creature should be closing distance");
+    AssertTrue(senses.CreatureFacingAlignment > 0.99f, "Visible creature should be pointed at observer");
+}
+
+static void CreatureSensingSmellsMeatBeyondVision()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 307,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                meatScentRangeMultiplier: 3f,
+                meatScentCaloriesForFullStrength: 40f,
+                meatScentDensitySaturation: 0.1f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 50f,
+        VisionAngleRadians = MathF.PI / 3f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(120f, 20f),
+        Radius = 1f,
+        Calories = 80f,
+        MaxCalories = 80f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.FoodDetected, "Meat outside vision radius should not become exact food");
+    AssertTrue(!senses.MeatDetected, "Meat outside vision radius should not be visibly detected");
+    AssertClose(0f, senses.VisibleMeatDensity, 0.000001, "Invisible meat density");
+    AssertTrue(senses.MeatScentDetected, "Meat scent should be detected beyond vision");
+    AssertTrue(senses.MeatScentDensity > 0.9f, "Meat scent density should be strong in this probe");
+    AssertTrue(senses.MeatScentDirectionForward > 0.9f, "Meat scent should bias forward");
+    AssertClose(0f, senses.MeatScentDirectionRight, 0.0001, "Meat scent right direction");
 }
 
 static void CreatureSensingReportsEggReserveReadiness()
@@ -1187,7 +1442,7 @@ static void NeuralControllerTurnsSensesIntoActions()
     AssertTrue(creature.DesiredVelocity.X > 0f, "Desired velocity should face food");
 }
 
-static void NeuralControllerTurnsPreyProximityIntoAttackIntent()
+static void NeuralControllerTurnsCreatureProximityIntoAttackIntent()
 {
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
@@ -1206,16 +1461,16 @@ static void NeuralControllerTurnsPreyProximityIntoAttackIntent()
     var creature = simulation.State.Creatures[0];
     creature.Senses = new CreatureSenseState
     {
-        PreyDetected = true,
-        PreyProximity = 1f,
-        PreyDirectionForward = 1f,
-        VisiblePreyDensity = 0.125f
+        CreatureDetected = true,
+        CreatureProximity = 1f,
+        CreatureDirectionForward = 1f,
+        VisibleCreatureDensity = 0.125f
     };
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
-    AssertTrue(simulation.State.Creatures[0].Actions.WantsAttack, "Seed brain should attack when prey is very close");
+    AssertTrue(simulation.State.Creatures[0].Actions.WantsAttack, "Seed brain should attack when a visible creature is very close");
 }
 
 static void SeedForagerSlowsDownNearFood()
@@ -1226,6 +1481,97 @@ static void SeedForagerSlowsDownNearFood()
     AssertTrue(farMove > 0.85f, "Forager should move quickly toward distant food");
     AssertTrue(closeMove < 0.6f, "Forager should slow down near food");
     AssertTrue(farMove > closeMove + 0.25f, "Food proximity should reduce forward movement");
+}
+
+static void BehaviorAssaySummarizesSeedForagerResponses()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 401, systems: []);
+    var herbivoreGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.1f,
+        MaturityAgeSeconds = 0f
+    });
+    var meatGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+
+    simulation.State.SpawnCreature(herbivoreGenomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    simulation.State.SpawnCreature(meatGenomeId, new SimVector2(30f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
+    AssertEqual(14, summary.Results.Count, "Assay result count");
+    AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
+    AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
+    AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
+    AssertTrue(summary.CreatureAhead.AttackShare > 0f, "Meat-biased seed creature should attack close visible creatures");
+}
+
+static void ForagerPredatorStarterBrainHuntsCreatureCues()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 402, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.2f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator());
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Forager predator should still eat close plants");
+    AssertTrue(summary.CreatureAhead.AttackShare > 0.9f, "Forager predator should attack close visible creatures ahead");
+    AssertTrue(summary.CreatureRight.Turn > 0.8f, "Forager predator should turn toward visible creatures on the right");
+    AssertTrue(summary.SmallCreatureAhead.AttackShare > 0.9f, "Forager predator should attack smaller visible creatures");
+    AssertTrue(summary.LargeCreatureApproaching.AttackShare < 0.2f, "Forager predator should hold back from large approaching creatures");
+    AssertTrue(summary.RiskResponse == "size-aware restraint", "Forager predator should be classified as size-aware around risk cues");
+    AssertTrue(summary.Ecotype == "small-prey predator", "Forager predator should be classified as a small-prey predator");
+    AssertTrue(summary.Baseline.AttackShare < 0.1f, "Forager predator should not attack without visible creature cues");
+}
+
+static void LineageBehaviorAssaysSummarizeTopFounderStrategies()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 403, systems: []);
+    var grazerGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.1f,
+        MaturityAgeSeconds = 0f
+    });
+    var predatorGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.2f,
+        MaturityAgeSeconds = 0f
+    });
+    var grazerBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    var predatorBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator());
+
+    var grazerFounder = simulation.State.SpawnCreature(grazerGenomeId, new SimVector2(20f, 20f), energy: 25f, brainId: grazerBrainId);
+    var predatorFounder = simulation.State.SpawnCreature(predatorGenomeId, new SimVector2(40f, 20f), energy: 25f, brainId: predatorBrainId);
+    simulation.State.SpawnCreature(predatorGenomeId, new SimVector2(45f, 20f), energy: 25f, generation: 1, parentId: predatorFounder, brainId: predatorBrainId);
+
+    var summaries = BehaviorAssay.AnalyzeTopFounderLineages(simulation.State, maxLineages: 10);
+
+    AssertEqual(2, summaries.Count, "Lineage behavior summary count");
+    AssertEqual(predatorFounder, summaries[0].FounderId, "Largest living lineage should be listed first");
+
+    var predator = summaries.First(summary => summary.FounderId == predatorFounder);
+    AssertEqual(2, predator.TotalCreatures, "Predator lineage total");
+    AssertEqual(2, predator.LivingCreatures, "Predator lineage living");
+    AssertEqual(0, predator.DeadCreatures, "Predator lineage dead");
+    AssertEqual(1, predator.MaxGeneration, "Predator lineage max generation");
+    AssertClose(2f / 3f, predator.LivingShare, 0.000001, "Predator lineage living share");
+    AssertEqual("small-prey predator", predator.Behavior.Ecotype, "Predator lineage ecotype");
+    AssertEqual("size-aware restraint", predator.Behavior.RiskResponse, "Predator lineage risk response");
+
+    var grazer = summaries.First(summary => summary.FounderId == grazerFounder);
+    AssertEqual(1, grazer.LivingCreatures, "Grazer lineage living");
+    AssertEqual(1, grazer.Behavior.EvaluatedCreatureCount, "Grazer assayed creature count");
 }
 
 static float MeasureSeedForagerMove(SimVector2 resourcePosition)
@@ -1290,14 +1636,23 @@ static void CreatureAttackDamagesContactTargets()
                 requireAttackIntent: true)
         ]);
 
-    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    var attackerGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 3f,
+        BiteStrength = 2f,
+        DamageResistance = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    var targetGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        BiteStrength = 1f,
+        DamageResistance = 4f,
         MaturityAgeSeconds = 0f
     });
 
-    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
-    simulation.State.SpawnCreature(genomeId, new SimVector2(26f, 20f), energy: 10f);
+    simulation.State.SpawnCreature(attackerGenomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnCreature(targetGenomeId, new SimVector2(26f, 20f), energy: 10f);
     var attacker = simulation.State.Creatures[0];
     attacker.HeadingRadians = 0f;
     attacker.Actions = new CreatureActionState { WantsAttack = true };
@@ -1311,7 +1666,7 @@ static void CreatureAttackDamagesContactTargets()
     AssertEqual(target.Id, attacker.CreatureContactId, "Attacker contact id");
     AssertClose(0f, attacker.CreatureContactEdgeDistance, 0.000001, "Creature contact edge distance");
     AssertClose(0.25f, attacker.LastAttackDamageDealt, 0.000001, "Attack damage dealt");
-    AssertClose(9.9f, attacker.Energy, 0.000001, "Attack energy cost");
+    AssertClose(9.8f, attacker.Energy, 0.000001, "Attack energy cost");
     AssertClose(0.75f, target.Health, 0.000001, "Target health after bite");
 }
 
@@ -1330,7 +1685,9 @@ static void CreatureAttackDeathsBecomeInjuryMeat()
                 biteEnergyCostPerSecond: 0f,
                 biteRangePadding: 1f,
                 requireAttackIntent: true),
-            new DeathSystem(meatCaloriesPerBodyRadius: 4f, meatEnergyFraction: 0.5f, meatDecayCaloriesPerSecond: 0.25f)
+            new DeathSystem(meatCaloriesPerBodyRadius: 4f, meatEnergyFraction: 0.5f, meatDecayCaloriesPerSecond: 0.25f),
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex)
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
@@ -1340,7 +1697,8 @@ static void CreatureAttackDeathsBecomeInjuryMeat()
     });
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
-    var targetId = simulation.State.SpawnCreature(genomeId, new SimVector2(26f, 20f), energy: 6f);
+    var targetId = simulation.State.SpawnCreature(genomeId, new SimVector2(24f, 20f), energy: 6f);
+    var attackerId = simulation.State.Creatures[0].Id;
     var attacker = simulation.State.Creatures[0];
     attacker.HeadingRadians = 0f;
     attacker.Actions = new CreatureActionState { WantsAttack = true };
@@ -1354,7 +1712,14 @@ static void CreatureAttackDeathsBecomeInjuryMeat()
     AssertTrue(simulation.State.TryGetLineageRecord(targetId, out var targetRecord), "Target lineage lookup");
     AssertEqual(CreatureDeathReason.Injury, targetRecord.DeathReason, "Target death reason");
     AssertEqual(1, simulation.State.Resources.Count, "Meat resource count");
-    AssertEqual(ResourceKind.Meat, simulation.State.Resources[0].Kind, "Killed target should leave meat");
+    var meat = simulation.State.Resources[0];
+    AssertEqual(ResourceKind.Meat, meat.Kind, "Killed target should leave meat");
+    AssertEqual(attackerId, meat.FreshKillAttackerId, "Fresh-kill attacker id");
+    AssertEqual(targetId, meat.FreshKillPreyId, "Fresh-kill prey id");
+    AssertClose(20f, meat.FreshKillSecondsRemaining, 0.000001, "Fresh-kill credit window");
+    attacker = simulation.State.Creatures[0];
+    AssertTrue(attacker.LastLivePreyCaloriesEaten > 0f, "Attacker should receive fresh-kill intake credit");
+    AssertClose(0f, attacker.LastCarcassCaloriesEaten, 0.000001, "Attacker fresh-kill intake should not count as passive carcass");
 }
 
 static void SparseMutationRatesGateGenomeAndBrainChanges()
@@ -1391,13 +1756,15 @@ static void IntentGatedEatingRequiresEatOutput()
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new EatingSystem(spatialIndex, requireEatIntent: true)
+            new EatingSystem(spatialIndex, requireEatIntent: true),
+            new DigestionSystem()
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 3f,
         EatCaloriesPerSecond = 12f,
+        DigestionCaloriesPerSecond = 12f,
         DietaryAdaptation = 0f,
         MaturityAgeSeconds = 0f
     });
@@ -1424,6 +1791,7 @@ static void IntentGatedEatingRequiresEatOutput()
     simulation.Step();
 
     AssertClose(22f, simulation.State.Creatures[0].Energy, 0.000001, "Energy with eat intent");
+    AssertClose(12f, simulation.State.Creatures[0].LastCaloriesDigested, 0.000001, "Calories digested with eat intent");
     AssertClose(18f, simulation.State.Resources[0].Calories, 0.000001, "Resource with eat intent");
 }
 
@@ -1673,12 +2041,26 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleFoodDensity = 0.5f,
         VisiblePlantDensity = 0.4f,
         VisibleMeatDensity = 0.1f,
-        VisiblePreyDensity = 0.05f
+        MeatScentDetected = true,
+        MeatScentDensity = 0.3f,
+        CreatureDetected = true,
+        VisibleCreatureDensity = 0.05f
     };
     seeingCreature.IsTouchingFood = true;
-    seeingCreature.LastCaloriesEaten = 4f;
+    seeingCreature.LastCaloriesEaten = 4.25f;
+    seeingCreature.LastPlantCaloriesEaten = 2.5f;
+    seeingCreature.LastCarcassCaloriesEaten = 1f;
+    seeingCreature.LastEggCaloriesEaten = 0.5f;
+    seeingCreature.LastLivePreyCaloriesEaten = 0.25f;
+    seeingCreature.LastCaloriesDigested = 3.5f;
+    seeingCreature.LastPlantDigestedEnergy = 2f;
+    seeingCreature.LastMeatDigestedEnergy = 1.5f;
+    seeingCreature.GutPlantCalories = 20f;
+    seeingCreature.GutMeatCalories = 5f;
     seeingCreature.LastAttackDamageDealt = 0.2f;
     seeingCreature.SecondsSinceLastMeal = 2f;
+    seeingCreature.LastDistanceTraveled = 3f;
+    seeingCreature.DistanceSinceLastMeal = 8f;
     simulation.State.Creatures[0] = seeingCreature;
     var searchingCreature = simulation.State.Creatures[1];
     searchingCreature.Senses = new CreatureSenseState
@@ -1688,9 +2070,13 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleFoodDensity = 0.25f,
         VisiblePlantDensity = 0.05f,
         VisibleMeatDensity = 0.2f,
-        VisiblePreyDensity = 0.15f
+        MeatScentDetected = true,
+        MeatScentDensity = 0.7f,
+        VisibleCreatureDensity = 0.15f
     };
     searchingCreature.SecondsSinceLastMeal = 6f;
+    searchingCreature.LastDistanceTraveled = 5f;
+    searchingCreature.DistanceSinceLastMeal = 12f;
     simulation.State.Creatures[1] = searchingCreature;
     simulation.State.SpawnResourcePatch(new ResourcePatchState
     {
@@ -1731,16 +2117,46 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(2, snapshot.FoodDetectedCreatureCount, "Food detected count");
     AssertEqual(1, snapshot.PlantDetectedCreatureCount, "Plant detected count");
     AssertEqual(1, snapshot.MeatDetectedCreatureCount, "Meat detected count");
+    AssertEqual(2, snapshot.MeatScentDetectedCreatureCount, "Meat scent detected count");
+    AssertEqual(1, snapshot.CreatureDetectedCreatureCount, "Creature detected count");
     AssertEqual(1, snapshot.FoodContactCreatureCount, "Food contact count");
     AssertEqual(1, snapshot.EatingCreatureCount, "Eating creature count");
     AssertClose(0.375f, snapshot.AverageVisibleFoodDensity, 0.000001, "Average visible food density");
     AssertClose(0.225f, snapshot.AverageVisiblePlantDensity, 0.000001, "Average visible plant density");
     AssertClose(0.15f, snapshot.AverageVisibleMeatDensity, 0.000001, "Average visible meat density");
-    AssertClose(0.1f, snapshot.AverageVisiblePreyDensity, 0.000001, "Average visible prey density");
-    AssertClose(4f, snapshot.TotalCaloriesEatenPerSecond, 0.000001, "Calories eaten per second");
+    AssertClose(0.5f, snapshot.AverageMeatScentDensity, 0.000001, "Average meat scent density");
+    AssertClose(0.1f, snapshot.AverageVisibleCreatureDensity, 0.000001, "Average visible creature density");
+    AssertClose(4.25f, snapshot.TotalCaloriesEatenPerSecond, 0.000001, "Calories eaten per second");
+    AssertClose(2.5f, snapshot.TotalPlantCaloriesEatenPerSecond, 0.000001, "Plant calories eaten per second");
+    AssertClose(1f, snapshot.TotalCarcassCaloriesEatenPerSecond, 0.000001, "Carcass calories eaten per second");
+    AssertClose(0.5f, snapshot.TotalEggCaloriesEatenPerSecond, 0.000001, "Egg calories eaten per second");
+    AssertClose(0.25f, snapshot.TotalLivePreyCaloriesEatenPerSecond, 0.000001, "Live prey calories eaten per second");
+    AssertClose(3.5f, snapshot.TotalCaloriesDigestedPerSecond, 0.000001, "Calories digested per second");
+    AssertClose(2f, snapshot.TotalPlantDigestedEnergyPerSecond, 0.000001, "Plant energy digested per second");
+    AssertClose(1.5f, snapshot.TotalMeatDigestedEnergyPerSecond, 0.000001, "Meat energy digested per second");
+    AssertClose(1.75f / 4.25f, snapshot.MeatCaloriesEatenShare, 0.000001, "Meat calories eaten share");
+    AssertClose(0.25f / 4.25f, snapshot.FreshKillCaloriesEatenShare, 0.000001, "Fresh kill calories eaten share");
+    AssertClose(1.5f / 3.5f, snapshot.MeatDigestedEnergyShare, 0.000001, "Meat digested energy share");
+    AssertClose(0.5f, snapshot.AverageGutFillRatio, 0.000001, "Average gut fill");
+    AssertClose(0.4f, snapshot.AverageGutPlantShare, 0.000001, "Average gut plant share");
+    AssertClose(0.1f, snapshot.AverageGutMeatShare, 0.000001, "Average gut meat share");
     AssertEqual(1, snapshot.AttackingCreatureCount, "Attacking creature count");
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
+    AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AverageDietaryAdaptation, 0.000001, "Average dietary adaptation");
+    AssertClose(CreatureGenome.Baseline.BiteStrength, snapshot.AverageBiteStrength, 0.000001, "Average bite strength");
+    AssertClose(CreatureGenome.Baseline.DamageResistance, snapshot.AverageDamageResistance, 0.000001, "Average damage resistance");
+    AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AttackerAverageDietaryAdaptation, 0.000001, "Attacker dietary adaptation");
+    AssertClose(CreatureGenome.Baseline.BiteStrength, snapshot.AttackerAverageBiteStrength, 0.000001, "Attacker bite strength");
+    AssertClose(CreatureGenome.Baseline.DamageResistance, snapshot.AttackerAverageDamageResistance, 0.000001, "Attacker damage resistance");
+    AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.NonAttackerAverageDietaryAdaptation, 0.000001, "Non-attacker dietary adaptation");
+    AssertClose(CreatureGenome.Baseline.BiteStrength, snapshot.NonAttackerAverageBiteStrength, 0.000001, "Non-attacker bite strength");
+    AssertClose(CreatureGenome.Baseline.DamageResistance, snapshot.NonAttackerAverageDamageResistance, 0.000001, "Non-attacker damage resistance");
     AssertClose(4f, snapshot.AverageSecondsSinceLastMeal, 0.000001, "Average seconds since meal");
+    AssertClose(8f, snapshot.TotalDistanceTraveledPerSecond, 0.000001, "Distance traveled per second");
+    AssertClose(10f, snapshot.AverageDistanceSinceLastMeal, 0.000001, "Average distance since meal");
+    AssertClose(4.25f / 8f, snapshot.CaloriesEatenPerDistance, 0.000001, "Calories eaten per distance");
+    AssertClose(3.5f / 8f, snapshot.CaloriesDigestedPerDistance, 0.000001, "Calories digested per distance");
+    AssertClose(4.25f / 2f, snapshot.CaloriesEatenPerFoodVisionEvent, 0.000001, "Calories eaten per food vision event");
     AssertClose(1f, snapshot.AverageBirthInvestmentRatio, 0.000001, "Average birth investment");
     AssertClose(1f, snapshot.AverageEggHealthRatio, 0.000001, "Average egg health ratio");
     var expectedVisionRange = CreatureGrowth.EffectiveSenseRadius(simulation.State.Creatures[0], CreatureGenome.Baseline);
@@ -1826,6 +2242,40 @@ static void ScenarioResourceDensityScalesWithWorldArea()
 
     AssertEqual(4, smallWorld.State.Resources.Count, "Small-world resource count");
     AssertEqual(16, largeWorld.State.Resources.Count, "Large-world resource count");
+}
+
+static void ScenarioResourceClusteringCreatesLocalFoodPatches()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 71,
+        EnableBiomes = false,
+        WorldWidth = 500f,
+        WorldHeight = 500f,
+        ResourceVoidBorderWidth = 0f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 64f,
+        ResourceClusterStrength = 1f,
+        ResourceClusterRadius = 35f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+
+    AssertEqual(16, simulation.State.Resources.Count, "Clustered resource count");
+    for (var i = 1; i < simulation.State.Resources.Count; i++)
+    {
+        var nearestPrior = float.MaxValue;
+        for (var j = 0; j < i; j++)
+        {
+            nearestPrior = MathF.Min(
+                nearestPrior,
+                SimVector2.Distance(simulation.State.Resources[i].Position, simulation.State.Resources[j].Position));
+        }
+
+        AssertTrue(
+            nearestPrior <= scenario.ResourceClusterRadius + 0.001f,
+            $"Resource {i} should spawn near an existing plant when clustering is forced");
+    }
 }
 
 static void GeneratedSmallBiomeMapsContainVisibleVariety()
@@ -1939,14 +2389,14 @@ static void ScenarioFactoryCreatesDeterministicBiomes()
     }
 }
 
-static void ScenarioFactoryCanRandomizeInitialBrainWeights()
+static void ScenarioFactorySupportsInitialBrainKinds()
 {
     var scenario = new SimulationScenario
     {
         Seed = 16,
         InitialCreatureCount = 3,
         InitialResourcesPerMillionArea = 0f,
-        RandomizeInitialBrainWeights = true
+        InitialBrainKind = InitialBrainKind.RandomPerFounder
     };
 
     var first = SimulationScenarioFactory.CreateSimulation(scenario);
@@ -1975,7 +2425,7 @@ static void ScenarioFactoryCanRandomizeInitialBrainWeights()
 
     var seededSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
     {
-        RandomizeInitialBrainWeights = false
+        InitialBrainKind = InitialBrainKind.SeedForager
     });
 
     AssertEqual(1, seededSimulation.State.Brains.Count, "Seeded founder brain count");
@@ -1984,6 +2434,18 @@ static void ScenarioFactoryCanRandomizeInitialBrainWeights()
     for (var i = 0; i < seededBrain.Weights.Length; i++)
     {
         AssertClose(seededBrain.Weights[i], seededSimulation.State.Brains[0].Weights[i], 0.000001, $"Seed brain weight {i}");
+    }
+
+    var predatorSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
+    {
+        InitialBrainKind = InitialBrainKind.ForagerPredator
+    });
+    var predatorBrain = NeuralBrainGenome.CreateForagerPredator();
+
+    AssertEqual(1, predatorSimulation.State.Brains.Count, "Predator founder brain count");
+    for (var i = 0; i < predatorBrain.Weights.Length; i++)
+    {
+        AssertClose(predatorBrain.Weights[i], predatorSimulation.State.Brains[0].Weights[i], 0.000001, $"Predator brain weight {i}");
     }
 }
 
@@ -2029,6 +2491,9 @@ static void SimulationSnapshotsRestoreExactContinuation()
         AssertClose(expected.Energy, actual.Energy, 0.000001, $"Creature {i} energy");
         AssertClose(expected.BirthInvestmentRatio, actual.BirthInvestmentRatio, 0.000001, $"Creature {i} birth investment");
         AssertClose(expected.HeadingRadians, actual.HeadingRadians, 0.000001, $"Creature {i} heading");
+        AssertClose(expected.LastDistanceTraveled, actual.LastDistanceTraveled, 0.000001, $"Creature {i} last distance");
+        AssertClose(expected.DistanceSinceLastMeal, actual.DistanceSinceLastMeal, 0.000001, $"Creature {i} meal distance");
+        AssertEqual(expected.LastDamagingCreatureId, actual.LastDamagingCreatureId, $"Creature {i} last damaging creature");
         AssertEqual(expected.GenomeId, actual.GenomeId, $"Creature {i} genome");
         AssertEqual(expected.BrainId, actual.BrainId, $"Creature {i} brain");
     }
@@ -2063,6 +2528,9 @@ static void SimulationSnapshotsRestoreExactContinuation()
         AssertEqual(expected.Kind, actual.Kind, $"Resource {i} kind");
         AssertClose(expected.DecayCaloriesPerSecond, actual.DecayCaloriesPerSecond, 0.000001, $"Resource {i} decay");
         AssertClose(expected.RegrowthCaloriesPerSecond, actual.RegrowthCaloriesPerSecond, 0.000001, $"Resource {i} regrowth");
+        AssertEqual(expected.FreshKillAttackerId, actual.FreshKillAttackerId, $"Resource {i} fresh-kill attacker");
+        AssertEqual(expected.FreshKillPreyId, actual.FreshKillPreyId, $"Resource {i} fresh-kill prey");
+        AssertClose(expected.FreshKillSecondsRemaining, actual.FreshKillSecondsRemaining, 0.000001, $"Resource {i} fresh-kill timer");
     }
 }
 
@@ -2086,17 +2554,28 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         VisionAngleRadians = MathF.PI / 2f,
         VisionAngleEnergyCostPerSecond = 0.03f,
         EatRateEnergyCostPerSecond = 0.004f,
+        GutCapacityEnergyCostPerSecond = 0.007f,
+        DigestionRateEnergyCostPerSecond = 0.008f,
+        BiteStrengthEnergyCostPerSecond = 0.05f,
+        DamageResistanceEnergyCostPerSecond = 0.02f,
         EggEnergyCostPerSecond = 0.02f,
         EggEnvironmentalDamagePerSecond = 0.04f,
         MovementEnergyPerSecond = 1.25f,
         EatCaloriesPerSecond = 9.5f,
+        GutCapacityCalories = 40f,
+        DigestionCaloriesPerSecond = 11f,
         EggProductionEnergyPerSecond = 4.5f,
         EggIncubationSeconds = 7f,
         MaturityAgeSeconds = 0f,
         DietaryAdaptation = 0.25f,
+        BiteStrength = 0.75f,
+        DamageResistance = 1.25f,
         DeathMeatCaloriesPerBodyRadius = 5f,
         DeathMeatEnergyFraction = 0.4f,
         MeatDecayCaloriesPerSecond = 0.08f,
+        MeatScentRangeMultiplier = 4f,
+        MeatScentCaloriesForFullStrength = 70f,
+        MeatScentDensitySaturation = 1.5f,
         BiteDamagePerSecond = 0.4f,
         BiteEnergyCostPerSecond = 0.12f,
         BiteRangePadding = 1.5f,
@@ -2116,17 +2595,28 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(MathF.PI / 2f, genome.VisionAngleRadians, 0.000001, "Seeded vision angle");
     AssertClose(0.03f, scenario.VisionAngleEnergyCostPerSecond, 0.000001, "Scenario vision-angle energy");
     AssertClose(0.004f, scenario.EatRateEnergyCostPerSecond, 0.000001, "Scenario eat-rate energy");
+    AssertClose(0.007f, scenario.GutCapacityEnergyCostPerSecond, 0.000001, "Scenario gut-capacity energy");
+    AssertClose(0.008f, scenario.DigestionRateEnergyCostPerSecond, 0.000001, "Scenario digestion-rate energy");
+    AssertClose(0.05f, scenario.BiteStrengthEnergyCostPerSecond, 0.000001, "Scenario bite-strength energy");
+    AssertClose(0.02f, scenario.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
     AssertClose(0.02f, scenario.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(0.04f, scenario.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(1.25f, genome.MovementEnergyPerSecond, 0.000001, "Seeded movement energy");
     AssertClose(9.5f, genome.EatCaloriesPerSecond, 0.000001, "Seeded eat rate");
+    AssertClose(40f, genome.GutCapacityCalories, 0.000001, "Seeded gut capacity");
+    AssertClose(11f, genome.DigestionCaloriesPerSecond, 0.000001, "Seeded digestion rate");
     AssertClose(4.5f, genome.EggProductionEnergyPerSecond, 0.000001, "Seeded egg production");
     AssertClose(7f, genome.EggIncubationSeconds, 0.000001, "Seeded egg incubation");
     AssertClose(0f, genome.MaturityAgeSeconds, 0.000001, "Seeded maturity age");
     AssertClose(0.25f, genome.DietaryAdaptation, 0.000001, "Seeded dietary adaptation");
+    AssertClose(0.75f, genome.BiteStrength, 0.000001, "Seeded bite strength");
+    AssertClose(1.25f, genome.DamageResistance, 0.000001, "Seeded damage resistance");
     AssertClose(5f, scenario.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
     AssertClose(0.4f, scenario.DeathMeatEnergyFraction, 0.000001, "Scenario death meat energy fraction");
     AssertClose(0.08f, scenario.MeatDecayCaloriesPerSecond, 0.000001, "Scenario meat decay");
+    AssertClose(4f, scenario.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
+    AssertClose(70f, scenario.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");
+    AssertClose(1.5f, scenario.MeatScentDensitySaturation, 0.000001, "Scenario meat scent saturation");
     AssertClose(0.4f, scenario.BiteDamagePerSecond, 0.000001, "Scenario bite damage");
     AssertClose(0.12f, scenario.BiteEnergyCostPerSecond, 0.000001, "Scenario bite energy cost");
     AssertClose(1.5f, scenario.BiteRangePadding, 0.000001, "Scenario bite reach");
@@ -2136,7 +2626,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
 
     simulation.Step();
 
-    AssertClose(7.862376f, simulation.State.Creatures[0].Energy, 0.000001, "Scenario energy pressure");
+    AssertClose(7.431876f, simulation.State.Creatures[0].Energy, 0.000001, "Scenario energy pressure");
 }
 
 static void ScenarioJsonMigratesLegacyResourceCount()
@@ -2147,6 +2637,7 @@ static void ScenarioJsonMigratesLegacyResourceCount()
           "name": "Legacy Resources",
           "worldWidth": 1000,
           "worldHeight": 700,
+          "randomizeInitialBrainWeights": true,
           "initialResourceCount": 140
         }
         """;
@@ -2155,6 +2646,7 @@ static void ScenarioJsonMigratesLegacyResourceCount()
 
     AssertClose(200f, scenario.InitialResourcesPerMillionArea, 0.0001, "Migrated resource density");
     AssertEqual(140, scenario.CalculateInitialResourceCount(), "Migrated resource count");
+    AssertEqual(InitialBrainKind.RandomPerFounder, scenario.InitialBrainKind, "Migrated legacy random brain mode");
 }
 
 static void ScenarioJsonRoundTrips()
@@ -2164,7 +2656,7 @@ static void ScenarioJsonRoundTrips()
         Name = "Sparse Food",
         Seed = 1234,
         PipelineKind = SimulationPipelineKind.SimpleForaging,
-        RandomizeInitialBrainWeights = true,
+        InitialBrainKind = InitialBrainKind.ForagerPredator,
         EnableBiomes = false,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
@@ -2173,6 +2665,8 @@ static void ScenarioJsonRoundTrips()
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
         InitialResourcesPerMillionArea = 37.5f,
+        ResourceClusterStrength = 0.33f,
+        ResourceClusterRadius = 123f,
         BasalEnergyPerSecond = 0.31f,
         BodyRadiusEnergyCostPerSecond = 0.04f,
         MaxSpeedEnergyCostPerSecond = 0.003f,
@@ -2181,17 +2675,28 @@ static void ScenarioJsonRoundTrips()
         VisionAngleRadians = MathF.PI,
         VisionAngleEnergyCostPerSecond = 0.017f,
         EatRateEnergyCostPerSecond = 0.0025f,
+        GutCapacityEnergyCostPerSecond = 0.0007f,
+        DigestionRateEnergyCostPerSecond = 0.0065f,
+        BiteStrengthEnergyCostPerSecond = 0.041f,
+        DamageResistanceEnergyCostPerSecond = 0.032f,
         EggEnergyCostPerSecond = 0.023f,
         EggEnvironmentalDamagePerSecond = 0.037f,
         MovementEnergyPerSecond = 0.62f,
         EatCaloriesPerSecond = 14f,
+        GutCapacityCalories = 65f,
+        DigestionCaloriesPerSecond = 16f,
         EggProductionEnergyPerSecond = 3.75f,
         EggIncubationSeconds = 19f,
         MaturityAgeSeconds = 33f,
         DietaryAdaptation = 0.42f,
+        BiteStrength = 0.7f,
+        DamageResistance = 1.4f,
         DeathMeatCaloriesPerBodyRadius = 3.5f,
         DeathMeatEnergyFraction = 0.25f,
         MeatDecayCaloriesPerSecond = 0.09f,
+        MeatScentRangeMultiplier = 2.5f,
+        MeatScentCaloriesForFullStrength = 55f,
+        MeatScentDensitySaturation = 1.75f,
         BiteDamagePerSecond = 0.44f,
         BiteEnergyCostPerSecond = 0.13f,
         BiteRangePadding = 1.75f,
@@ -2205,11 +2710,14 @@ static void ScenarioJsonRoundTrips()
     var roundTripped = SimulationScenarioJson.FromJson(json);
 
     AssertTrue(json.Contains("\"pipelineKind\": \"simpleForaging\""), "JSON should serialize pipeline as a string");
+    AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
+    AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
+    AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
-    AssertEqual(scenario.RandomizeInitialBrainWeights, roundTripped.RandomizeInitialBrainWeights, "Scenario initial brain mode");
+    AssertEqual(scenario.InitialBrainKind, roundTripped.InitialBrainKind, "Scenario initial brain mode");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");
@@ -2218,6 +2726,8 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
+    AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
+    AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BasalEnergyPerSecond, roundTripped.BasalEnergyPerSecond, 0.000001, "Scenario basal energy");
     AssertClose(scenario.BodyRadiusEnergyCostPerSecond, roundTripped.BodyRadiusEnergyCostPerSecond, 0.000001, "Scenario body-size energy");
     AssertClose(scenario.MaxSpeedEnergyCostPerSecond, roundTripped.MaxSpeedEnergyCostPerSecond, 0.000001, "Scenario max-speed energy");
@@ -2226,17 +2736,28 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.VisionAngleRadians, roundTripped.VisionAngleRadians, 0.000001, "Scenario vision angle");
     AssertClose(scenario.VisionAngleEnergyCostPerSecond, roundTripped.VisionAngleEnergyCostPerSecond, 0.000001, "Scenario vision-angle energy");
     AssertClose(scenario.EatRateEnergyCostPerSecond, roundTripped.EatRateEnergyCostPerSecond, 0.000001, "Scenario eat-rate energy");
+    AssertClose(scenario.GutCapacityEnergyCostPerSecond, roundTripped.GutCapacityEnergyCostPerSecond, 0.000001, "Scenario gut-capacity energy");
+    AssertClose(scenario.DigestionRateEnergyCostPerSecond, roundTripped.DigestionRateEnergyCostPerSecond, 0.000001, "Scenario digestion-rate energy");
+    AssertClose(scenario.BiteStrengthEnergyCostPerSecond, roundTripped.BiteStrengthEnergyCostPerSecond, 0.000001, "Scenario bite-strength energy");
+    AssertClose(scenario.DamageResistanceEnergyCostPerSecond, roundTripped.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
     AssertClose(scenario.EggEnergyCostPerSecond, roundTripped.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(scenario.EggEnvironmentalDamagePerSecond, roundTripped.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(scenario.MovementEnergyPerSecond, roundTripped.MovementEnergyPerSecond, 0.000001, "Scenario movement energy");
     AssertClose(scenario.EatCaloriesPerSecond, roundTripped.EatCaloriesPerSecond, 0.000001, "Scenario eat rate");
+    AssertClose(scenario.GutCapacityCalories, roundTripped.GutCapacityCalories, 0.000001, "Scenario gut capacity");
+    AssertClose(scenario.DigestionCaloriesPerSecond, roundTripped.DigestionCaloriesPerSecond, 0.000001, "Scenario digestion rate");
     AssertClose(scenario.EggProductionEnergyPerSecond, roundTripped.EggProductionEnergyPerSecond, 0.000001, "Scenario egg production");
     AssertClose(scenario.EggIncubationSeconds, roundTripped.EggIncubationSeconds, 0.000001, "Scenario egg incubation");
     AssertClose(scenario.MaturityAgeSeconds, roundTripped.MaturityAgeSeconds, 0.000001, "Scenario maturity age");
     AssertClose(scenario.DietaryAdaptation, roundTripped.DietaryAdaptation, 0.000001, "Scenario dietary adaptation");
+    AssertClose(scenario.BiteStrength, roundTripped.BiteStrength, 0.000001, "Scenario bite strength");
+    AssertClose(scenario.DamageResistance, roundTripped.DamageResistance, 0.000001, "Scenario damage resistance");
     AssertClose(scenario.DeathMeatCaloriesPerBodyRadius, roundTripped.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
     AssertClose(scenario.DeathMeatEnergyFraction, roundTripped.DeathMeatEnergyFraction, 0.000001, "Scenario death meat energy fraction");
     AssertClose(scenario.MeatDecayCaloriesPerSecond, roundTripped.MeatDecayCaloriesPerSecond, 0.000001, "Scenario meat decay");
+    AssertClose(scenario.MeatScentRangeMultiplier, roundTripped.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
+    AssertClose(scenario.MeatScentCaloriesForFullStrength, roundTripped.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");
+    AssertClose(scenario.MeatScentDensitySaturation, roundTripped.MeatScentDensitySaturation, 0.000001, "Scenario meat scent saturation");
     AssertClose(scenario.BiteDamagePerSecond, roundTripped.BiteDamagePerSecond, 0.000001, "Scenario bite damage");
     AssertClose(scenario.BiteEnergyCostPerSecond, roundTripped.BiteEnergyCostPerSecond, 0.000001, "Scenario bite energy cost");
     AssertClose(scenario.BiteRangePadding, roundTripped.BiteRangePadding, 0.000001, "Scenario bite reach");

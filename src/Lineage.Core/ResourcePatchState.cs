@@ -25,4 +25,19 @@ public struct ResourcePatchState
     public float RegrowthCaloriesPerSecond { get; set; }
 
     public float DecayCaloriesPerSecond { get; set; }
+
+    /// <summary>
+    /// Creature credited with creating this meat patch while the fresh-kill window is active.
+    /// </summary>
+    public EntityId FreshKillAttackerId { get; set; }
+
+    /// <summary>
+    /// Creature whose injury death produced this meat patch.
+    /// </summary>
+    public EntityId FreshKillPreyId { get; set; }
+
+    /// <summary>
+    /// Remaining seconds during which the credited attacker treats this meat as fresh-kill prey.
+    /// </summary>
+    public float FreshKillSecondsRemaining { get; set; }
 }

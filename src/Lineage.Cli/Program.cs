@@ -12,6 +12,17 @@ try
         return;
     }
 
+    if (options.IsProbe)
+    {
+        var results = RunProbe(options);
+        var outputPath = options.ProbeOutputPath ?? Path.Combine("out", "probe_summary.csv");
+        var reportPath = options.ProbeReportPath ?? Path.ChangeExtension(outputPath, ".html");
+        ProbeCsvWriter.Write(outputPath, results);
+        ProbeReportWriter.Write(reportPath, options, results);
+        PrintProbeSummary(options, results, outputPath, reportPath);
+        return;
+    }
+
     if (options.IsBatch)
     {
         var results = RunBatch(options);
@@ -59,6 +70,14 @@ static void PrintHelp()
           --batch-scenario <path>    Add a scenario to a batch comparison. Can repeat.
           --batch-report <path>      HTML comparison report output path.
           --batch-output-dir <dir>   Per-run batch output directory. Default: out/batch
+          --probe                    Run a lightweight multi-scenario tuning probe.
+          --probe-scenario <path>    Add a scenario to a lightweight probe. Can repeat.
+          --probe-seeds <a,b,c>      Comma-separated seed overrides for probe runs.
+          --probe-output <path>      Compact probe CSV output path. Default: out/probe_summary.csv
+          --probe-report <path>      Compact probe HTML output path. Default: probe output with .html extension
+          --probe-snapshot-interval <n> Override stats interval for probe runs. Default: 100
+          --probe-stop-on-extinction Stop a probe run early if all creatures die.
+          --probe-max-population <n> Stop a probe run early if population exceeds n.
           --no-output                Run without writing CSV.
           --help                     Show this help.
 
@@ -66,6 +85,7 @@ static void PrintHelp()
           dotnet run --project .\src\Lineage.Cli -- --scenario .\scenarios\balanced-foraging.json --ticks 20000
           dotnet run --project .\src\Lineage.Cli -- --ticks 20000 --seed 42 --output .\out\seed42_stats.csv --report .\out\seed42_report.html
           dotnet run --project .\src\Lineage.Cli -- --batch-report .\out\preset_comparison.html --ticks 20000 --seed 42
+          dotnet run --project .\src\Lineage.Cli -- --probe --ticks 20000 --probe-seeds 42,43,44
         """);
 }
 
@@ -147,6 +167,102 @@ static IReadOnlyList<RunResult> RunBatch(RunOptions options)
     return results;
 }
 
+static IReadOnlyList<ProbeRunResult> RunProbe(RunOptions options)
+{
+    var scenarioPaths = ResolveProbeScenarioPaths(options);
+    var seedOverrides = ResolveProbeSeedOverrides(options);
+    var results = new List<ProbeRunResult>(scenarioPaths.Count * seedOverrides.Count);
+
+    foreach (var scenarioPath in scenarioPaths)
+    {
+        foreach (var seedOverride in seedOverrides)
+        {
+            var scenarioOptions = options with
+            {
+                ScenarioPath = scenarioPath,
+                SeedOverride = seedOverride,
+                SnapshotIntervalTicksOverride = options.ProbeSnapshotIntervalTicks
+                    ?? options.SnapshotIntervalTicksOverride
+                    ?? 100,
+                SaveScenarioPath = null,
+                OutputPath = null,
+                LineageOutputPath = null,
+                TraitSummaryOutputPath = null,
+                FounderSummaryOutputPath = null,
+                GenerationSummaryOutputPath = null,
+                LineageTrendOutputPath = null,
+                ReportPath = null,
+                SaveSnapshotPath = null,
+                CheckpointIntervalTicks = null,
+                CheckpointDirectory = null,
+                DisableOutput = true
+            };
+
+            var scenario = scenarioOptions.CreateScenario();
+            var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+            var stopwatch = Stopwatch.StartNew();
+            var status = RunProbeSimulation(options, simulation);
+            stopwatch.Stop();
+            results.Add(ProbeRunResult.From(scenarioPath, scenario, simulation, stopwatch.Elapsed, status, options.Ticks));
+        }
+    }
+
+    return results;
+}
+
+static ProbeRunStatus RunProbeSimulation(RunOptions options, Simulation simulation)
+{
+    for (var i = 0; i < options.Ticks; i++)
+    {
+        simulation.Step();
+
+        if (options.ProbeStopOnExtinction && simulation.State.Creatures.Count == 0)
+        {
+            return ProbeRunStatus.Extinct;
+        }
+
+        if (options.ProbeMaxPopulation is not null && simulation.State.Creatures.Count > options.ProbeMaxPopulation.Value)
+        {
+            return ProbeRunStatus.MaxPopulation;
+        }
+    }
+
+    return ProbeRunStatus.Completed;
+}
+
+static IReadOnlyList<string> ResolveProbeScenarioPaths(RunOptions options)
+{
+    if (options.ProbeScenarioPaths.Count > 0)
+    {
+        return options.ProbeScenarioPaths;
+    }
+
+    if (options.BatchScenarioPaths.Count > 0)
+    {
+        return options.BatchScenarioPaths;
+    }
+
+    return
+    [
+        Path.Combine("scenarios", "gentle-foraging.json"),
+        Path.Combine("scenarios", "balanced-foraging.json"),
+        Path.Combine("scenarios", "harsh-foraging.json"),
+        Path.Combine("scenarios", "scavenger-pressure.json"),
+        Path.Combine("scenarios", "omnivore-pressure.json"),
+        Path.Combine("scenarios", "predation-pressure.json")
+    ];
+}
+
+static IReadOnlyList<ulong?> ResolveProbeSeedOverrides(RunOptions options)
+{
+    if (options.ProbeSeeds.Count > 0)
+    {
+        return options.ProbeSeeds.Select(seed => (ulong?)seed).ToArray();
+    }
+
+    return [options.SeedOverride];
+}
+
 static void WriteRunOutputs(
     RunOptions options,
     SimulationScenario scenario,
@@ -200,6 +316,7 @@ static void PrintSummary(RunResult result)
     Console.WriteLine($"Egg predation deaths: {state.Stats.EggPredationDeathCount}");
     Console.WriteLine($"Deaths: {state.Stats.CreatureDeathCount}");
     Console.WriteLine($"Starvation deaths: {state.Stats.StarvationDeathCount}");
+    Console.WriteLine($"Injury deaths: {state.Stats.InjuryDeathCount}");
     Console.WriteLine($"Max generation: {snapshot.MaxGeneration}");
     Console.WriteLine($"Snapshots: {state.Stats.Snapshots.Count}");
 
@@ -249,7 +366,33 @@ static void PrintBatchSummary(RunOptions options, IReadOnlyList<RunResult> resul
         Console.WriteLine(
             $"{result.Scenario.Name}: final {state.Creatures.Count}, births {state.Stats.CreatureBirthCount}, " +
             $"eggs {state.Eggs.Count}, laid {state.Stats.EggLaidCount}, hatched {state.Stats.EggHatchedCount}, " +
-            $"deaths {state.Stats.CreatureDeathCount}, starved {state.Stats.StarvationDeathCount}, max gen {snapshot.MaxGeneration}");
+            $"deaths {state.Stats.CreatureDeathCount}, starved {state.Stats.StarvationDeathCount}, " +
+            $"injury {state.Stats.InjuryDeathCount}, max gen {snapshot.MaxGeneration}");
+    }
+}
+
+static void PrintProbeSummary(
+    RunOptions options,
+    IReadOnlyList<ProbeRunResult> results,
+    string outputPath,
+    string reportPath)
+{
+    Console.WriteLine($"Probe runs: {results.Count}");
+    Console.WriteLine($"Ticks requested per run: {options.Ticks}");
+    Console.WriteLine($"CSV: {Path.GetFullPath(outputPath)}");
+    Console.WriteLine($"Report: {Path.GetFullPath(reportPath)}");
+    Console.WriteLine($"Total wall time: {results.Sum(result => result.WallSeconds):0.000}s");
+    Console.WriteLine();
+
+    foreach (var group in results.GroupBy(result => result.ScenarioName).OrderBy(group => group.Key))
+    {
+        var averagePopulation = group.Average(result => result.FinalCreatures);
+        var averageTicksPerSecond = group.Average(result => result.TicksPerSecond);
+        var statuses = string.Join(", ", group.Select(result => result.Status.ToString()).Distinct().Order());
+        Console.WriteLine(
+            $"{group.Key}: runs {group.Count()}, avg final {averagePopulation:0.0}, " +
+            $"pop range {group.Min(result => result.FinalCreatures)}-{group.Max(result => result.FinalCreatures)}, " +
+            $"avg {averageTicksPerSecond:0.0} ticks/s, {statuses}");
     }
 }
 
@@ -299,9 +442,34 @@ internal sealed record RunOptions
 
     public string BatchOutputDirectory { get; init; } = Path.Combine("out", "batch");
 
+    public bool ProbeMode { get; init; }
+
+    public IReadOnlyList<string> ProbeScenarioPaths { get; init; } = Array.Empty<string>();
+
+    public IReadOnlyList<ulong> ProbeSeeds { get; init; } = Array.Empty<ulong>();
+
+    public string? ProbeOutputPath { get; init; }
+
+    public string? ProbeReportPath { get; init; }
+
+    public int? ProbeSnapshotIntervalTicks { get; init; }
+
+    public bool ProbeStopOnExtinction { get; init; }
+
+    public int? ProbeMaxPopulation { get; init; }
+
     public bool DisableOutput { get; init; }
 
     public bool ShowHelp { get; init; }
+
+    public bool IsProbe => ProbeMode
+        || ProbeScenarioPaths.Count > 0
+        || ProbeSeeds.Count > 0
+        || ProbeOutputPath is not null
+        || ProbeReportPath is not null
+        || ProbeSnapshotIntervalTicks is not null
+        || ProbeStopOnExtinction
+        || ProbeMaxPopulation is not null;
 
     public bool IsBatch => BatchScenarioPaths.Count > 0 || BatchReportPath is not null;
 
@@ -467,6 +635,30 @@ internal sealed record RunOptions
                 case "--batch-output-dir":
                     options = options with { BatchOutputDirectory = ReadValue(args, ref i, arg) };
                     break;
+                case "--probe":
+                    options = options with { ProbeMode = true };
+                    break;
+                case "--probe-scenario":
+                    options = options with { ProbeScenarioPaths = Append(options.ProbeScenarioPaths, ReadValue(args, ref i, arg)) };
+                    break;
+                case "--probe-seeds":
+                    options = options with { ProbeSeeds = ParseSeedList(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--probe-output":
+                    options = options with { ProbeOutputPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--probe-report":
+                    options = options with { ProbeReportPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--probe-snapshot-interval":
+                    options = options with { ProbeSnapshotIntervalTicks = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--probe-stop-on-extinction":
+                    options = options with { ProbeStopOnExtinction = true };
+                    break;
+                case "--probe-max-population":
+                    options = options with { ProbeMaxPopulation = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
                 case "--no-output":
                     options = options with { DisableOutput = true };
                     break;
@@ -599,6 +791,21 @@ internal sealed record RunOptions
         return parsed;
     }
 
+    private static IReadOnlyList<ulong> ParseSeedList(string value, string optionName)
+    {
+        var seeds = value
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(seed => ParseSeed(seed, optionName))
+            .ToArray();
+
+        if (seeds.Length == 0)
+        {
+            throw new ArgumentException($"{optionName} must include at least one seed.");
+        }
+
+        return seeds;
+    }
+
     private static SimulationPipelineKind ParsePipeline(string value)
     {
         return value.ToLowerInvariant() switch
@@ -630,12 +837,373 @@ internal readonly record struct OutputPaths(
 
 internal readonly record struct CheckpointArtifact(long Tick, string Path);
 
+internal enum ProbeRunStatus
+{
+    Completed,
+    Extinct,
+    MaxPopulation
+}
+
+internal readonly record struct ProbeRunResult(
+    string ScenarioName,
+    string ScenarioPath,
+    ulong Seed,
+    ProbeRunStatus Status,
+    int RequestedTicks,
+    long FinalTick,
+    double SimulatedSeconds,
+    double WallSeconds,
+    double TicksPerSecond,
+    SimulationPipelineKind PipelineKind,
+    InitialBrainKind InitialBrainKind,
+    int InitialCreatures,
+    int InitialResources,
+    float ResourceDensityPerMillion,
+    float ResourceClusterStrength,
+    float ResourceClusterRadius,
+    int FinalCreatures,
+    int FinalEggs,
+    int FinalResources,
+    int FinalPlants,
+    int FinalMeat,
+    int Births,
+    int EggsLaid,
+    int EggsHatched,
+    int EggDeaths,
+    int EggPredationDeaths,
+    int Deaths,
+    int StarvationDeaths,
+    int InjuryDeaths,
+    int MaxGeneration,
+    float FinalResourceRatio,
+    float TotalResourceCalories,
+    float TotalPlantCalories,
+    float TotalMeatCalories,
+    float FoodDetectedShare,
+    float PlantDetectedShare,
+    float MeatDetectedShare,
+    float MeatScentDetectedShare,
+    float CreatureDetectedShare,
+    float FoodContactShare,
+    float EatingShare,
+    float AttackingShare,
+    float VisibleFoodDensity,
+    float CaloriesEatenPerSecond,
+    float MeatCaloriesEatenShare,
+    float FreshKillCaloriesEatenShare,
+    float MeatDigestedEnergyShare,
+    float CaloriesEatenPerDistance,
+    float CaloriesDigestedPerDistance,
+    float CaloriesEatenPerFoodVisionEvent,
+    float AverageSecondsSinceLastMeal,
+    float AverageDistanceSinceLastMeal)
+{
+    public static ProbeRunResult From(
+        string scenarioPath,
+        SimulationScenario scenario,
+        Simulation simulation,
+        TimeSpan elapsed,
+        ProbeRunStatus status,
+        int requestedTicks)
+    {
+        var state = simulation.State;
+        var snapshot = state.Stats.Snapshots.Count > 0
+            ? state.Stats.Snapshots[^1]
+            : default;
+        var resourceCapacity = state.Resources.Sum(resource => resource.MaxCalories);
+        var resourceCalories = state.Resources.Sum(resource => resource.Calories);
+        var wallSeconds = Math.Max(elapsed.TotalSeconds, 0.000001);
+
+        return new ProbeRunResult(
+            scenario.Name,
+            scenarioPath,
+            scenario.Seed,
+            status,
+            requestedTicks,
+            state.Tick,
+            state.ElapsedSeconds,
+            elapsed.TotalSeconds,
+            state.Tick / wallSeconds,
+            scenario.PipelineKind,
+            scenario.InitialBrainKind,
+            scenario.InitialCreatureCount,
+            scenario.CalculateInitialResourceCount(),
+            scenario.InitialResourcesPerMillionArea,
+            scenario.ResourceClusterStrength,
+            scenario.ResourceClusterRadius,
+            state.Creatures.Count,
+            state.Eggs.Count,
+            state.Resources.Count,
+            state.Resources.Count(resource => resource.Kind == ResourceKind.Plant),
+            state.Resources.Count(resource => resource.Kind == ResourceKind.Meat),
+            state.Stats.CreatureBirthCount,
+            state.Stats.EggLaidCount,
+            state.Stats.EggHatchedCount,
+            state.Stats.EggDeathCount,
+            state.Stats.EggPredationDeathCount,
+            state.Stats.CreatureDeathCount,
+            state.Stats.StarvationDeathCount,
+            state.Stats.InjuryDeathCount,
+            snapshot.MaxGeneration,
+            resourceCapacity > 0f ? resourceCalories / resourceCapacity : 0f,
+            snapshot.TotalResourceCalories,
+            snapshot.TotalPlantCalories,
+            snapshot.TotalMeatCalories,
+            Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.PlantDetectedCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.EatingCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount),
+            snapshot.AverageVisibleFoodDensity,
+            snapshot.TotalCaloriesEatenPerSecond,
+            snapshot.MeatCaloriesEatenShare,
+            snapshot.FreshKillCaloriesEatenShare,
+            snapshot.MeatDigestedEnergyShare,
+            snapshot.CaloriesEatenPerDistance,
+            snapshot.CaloriesDigestedPerDistance,
+            snapshot.CaloriesEatenPerFoodVisionEvent,
+            snapshot.AverageSecondsSinceLastMeal,
+            snapshot.AverageDistanceSinceLastMeal);
+    }
+
+    private static float Share(int count, int total)
+    {
+        return total > 0 ? count / (float)total : 0f;
+    }
+}
+
+internal static class ProbeCsvWriter
+{
+    public static void Write(string path, IReadOnlyList<ProbeRunResult> results)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("scenario,scenario_path,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal");
+
+        foreach (var result in results)
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                Csv(result.ScenarioName),
+                Csv(result.ScenarioPath),
+                result.Seed.ToString(CultureInfo.InvariantCulture),
+                result.Status.ToString(),
+                result.RequestedTicks.ToString(CultureInfo.InvariantCulture),
+                result.FinalTick.ToString(CultureInfo.InvariantCulture),
+                Format(result.SimulatedSeconds),
+                result.WallSeconds.ToString("0.######", CultureInfo.InvariantCulture),
+                result.TicksPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                result.PipelineKind.ToString(),
+                result.InitialBrainKind.ToString(),
+                result.InitialCreatures.ToString(CultureInfo.InvariantCulture),
+                result.InitialResources.ToString(CultureInfo.InvariantCulture),
+                Format(result.ResourceDensityPerMillion),
+                Format(result.ResourceClusterStrength),
+                Format(result.ResourceClusterRadius),
+                result.FinalCreatures.ToString(CultureInfo.InvariantCulture),
+                result.FinalEggs.ToString(CultureInfo.InvariantCulture),
+                result.FinalResources.ToString(CultureInfo.InvariantCulture),
+                result.FinalPlants.ToString(CultureInfo.InvariantCulture),
+                result.FinalMeat.ToString(CultureInfo.InvariantCulture),
+                result.Births.ToString(CultureInfo.InvariantCulture),
+                result.EggsLaid.ToString(CultureInfo.InvariantCulture),
+                result.EggsHatched.ToString(CultureInfo.InvariantCulture),
+                result.EggDeaths.ToString(CultureInfo.InvariantCulture),
+                result.EggPredationDeaths.ToString(CultureInfo.InvariantCulture),
+                result.Deaths.ToString(CultureInfo.InvariantCulture),
+                result.StarvationDeaths.ToString(CultureInfo.InvariantCulture),
+                result.InjuryDeaths.ToString(CultureInfo.InvariantCulture),
+                result.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                Format(result.FinalResourceRatio),
+                Format(result.TotalResourceCalories),
+                Format(result.TotalPlantCalories),
+                Format(result.TotalMeatCalories),
+                Format(result.FoodDetectedShare),
+                Format(result.PlantDetectedShare),
+                Format(result.MeatDetectedShare),
+                Format(result.MeatScentDetectedShare),
+                Format(result.CreatureDetectedShare),
+                Format(result.FoodContactShare),
+                Format(result.EatingShare),
+                Format(result.AttackingShare),
+                Format(result.VisibleFoodDensity),
+                Format(result.CaloriesEatenPerSecond),
+                Format(result.MeatCaloriesEatenShare),
+                Format(result.FreshKillCaloriesEatenShare),
+                Format(result.MeatDigestedEnergyShare),
+                Format(result.CaloriesEatenPerDistance),
+                Format(result.CaloriesDigestedPerDistance),
+                Format(result.CaloriesEatenPerFoodVisionEvent),
+                Format(result.AverageSecondsSinceLastMeal),
+                Format(result.AverageDistanceSinceLastMeal)));
+        }
+    }
+
+    private static string Format(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Format(double value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Csv(string value)
+    {
+        if (!value.Contains(',') && !value.Contains('"') && !value.Contains('\n') && !value.Contains('\r'))
+        {
+            return value;
+        }
+
+        return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
+    }
+}
+
+internal static class ProbeReportWriter
+{
+    public static void Write(string path, RunOptions options, IReadOnlyList<ProbeRunResult> results)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        var groups = results
+            .GroupBy(result => result.ScenarioName)
+            .OrderBy(group => group.Key)
+            .ToArray();
+
+        WriteDocumentStart(writer, "Lineage Probe Summary");
+        writer.WriteLine("<header><div class=\"page-width\">");
+        writer.WriteLine("<p class=\"eyebrow\">Lineage Experiment</p>");
+        writer.WriteLine("<h1>Probe Summary</h1>");
+        writer.WriteLine($"<p>{Html(results.Count)} lightweight runs, {Html(options.Ticks)} requested ticks each.</p>");
+        writer.WriteLine("</div></header>");
+        writer.WriteLine("<main class=\"page-width\">");
+
+        writer.WriteLine("<section><h2>Overview</h2><div class=\"metric-grid\">");
+        WriteMetric(writer, "Runs", results.Count.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Scenarios", groups.Length.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Ticks requested", options.Ticks.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Total wall time", $"{results.Sum(result => result.WallSeconds):0.###} seconds");
+        WriteMetric(writer, "Average ticks/s", $"{results.Average(result => result.TicksPerSecond):0.###}");
+        WriteMetric(writer, "Snapshot interval", (options.ProbeSnapshotIntervalTicks ?? options.SnapshotIntervalTicksOverride ?? 100).ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Stop on extinction", options.ProbeStopOnExtinction ? "Yes" : "No");
+        WriteMetric(writer, "Max population stop", options.ProbeMaxPopulation?.ToString(CultureInfo.InvariantCulture) ?? "Off");
+        writer.WriteLine("</div></section>");
+
+        writer.WriteLine("<section><h2>Scenario Summary</h2><div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg starved</th><th>Avg injury</th><th>Meat raw</th><th>Fresh kill</th><th>Meat energy</th><th>kcal/distance</th><th>Meal gap</th><th>Ticks/s</th></tr></thead><tbody>");
+        foreach (var group in groups)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(group.Key)}</td>" +
+                $"<td>{Html(group.Count())}</td>" +
+                $"<td>{Html(FormatStatuses(group))}</td>" +
+                $"<td>{Html(group.Average(result => result.FinalCreatures).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html($"{group.Min(result => result.FinalCreatures)}-{group.Max(result => result.FinalCreatures)}")}</td>" +
+                $"<td>{Html(group.Average(result => result.FinalEggs).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.Deaths).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.StarvationDeaths).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.InjuryDeaths).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.MeatCaloriesEatenShare)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.FreshKillCaloriesEatenShare)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.MeatDigestedEnergyShare)))}</td>" +
+                $"<td>{Html(group.Average(result => result.CaloriesEatenPerDistance).ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html($"{group.Average(result => result.AverageSecondsSinceLastMeal):0.##}s")}</td>" +
+                $"<td>{Html(group.Average(result => result.TicksPerSecond).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div></section>");
+
+        writer.WriteLine("<section><h2>Run Rows</h2><div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Eggs</th><th>Deaths</th><th>Starved</th><th>Injury</th><th>Max gen</th><th>Food seen</th><th>Meat raw</th><th>Fresh kill</th><th>kcal/distance</th></tr></thead><tbody>");
+        foreach (var result in results.OrderBy(result => result.ScenarioName).ThenBy(result => result.Seed))
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(result.ScenarioName)}</td>" +
+                $"<td>{Html(result.Seed)}</td>" +
+                $"<td>{Html(result.Status)}</td>" +
+                $"<td>{Html(result.FinalTick)}</td>" +
+                $"<td>{Html($"{result.WallSeconds:0.###}s")}</td>" +
+                $"<td>{Html(result.TicksPerSecond.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.FinalCreatures)}</td>" +
+                $"<td>{Html(result.FinalEggs)}</td>" +
+                $"<td>{Html(result.Deaths)}</td>" +
+                $"<td>{Html(result.StarvationDeaths)}</td>" +
+                $"<td>{Html(result.InjuryDeaths)}</td>" +
+                $"<td>{Html(result.MaxGeneration)}</td>" +
+                $"<td>{Html(FormatPercent(result.FoodDetectedShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.MeatCaloriesEatenShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.FreshKillCaloriesEatenShare))}</td>" +
+                $"<td>{Html(result.CaloriesEatenPerDistance.ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div></section>");
+        writer.WriteLine("</main>");
+        writer.WriteLine("</body></html>");
+    }
+
+    private static string FormatStatuses(IEnumerable<ProbeRunResult> results)
+    {
+        return string.Join(", ", results.Select(result => result.Status.ToString()).Distinct().Order());
+    }
+
+    private static string FormatPercent(double value)
+    {
+        return $"{value * 100.0:0.##}%";
+    }
+
+    private static void WriteDocumentStart(StreamWriter writer, string title)
+    {
+        writer.WriteLine("<!doctype html>");
+        writer.WriteLine("<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+        writer.WriteLine($"<title>{Html(title)}</title>");
+        writer.WriteLine(
+            """
+            <style>
+            :root { color-scheme: light; --bg:#f6f7f2; --text:#172015; --muted:#62705e; --panel:#fff; --line:#dfe5d9; --accent:#2f7d45; }
+            body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; line-height:1.45; }
+            header { padding:34px 0 24px; background:#162015; color:#f4f7ef; }
+            .page-width { width:min(1180px, calc(100% - 32px)); margin:0 auto; }
+            .eyebrow { margin:0 0 6px; color:#a9c9aa; font-size:.78rem; text-transform:uppercase; }
+            h1,h2 { margin:0; } h1 { font-size:2rem; } h2 { margin-bottom:14px; font-size:1.15rem; }
+            main { padding:22px 0 40px; } section { margin-top:16px; padding:18px; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+            .metric-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px; }
+            .metric { padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:#fbfcf8; }
+            .metric-label { color:var(--muted); font-size:.75rem; text-transform:uppercase; }
+            .metric-value { display:block; margin-top:4px; overflow-wrap:anywhere; font-weight:650; }
+            .table-wrap { overflow-x:auto; } table { width:100%; border-collapse:collapse; font-size:.92rem; }
+            th,td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+            th:first-child,td:first-child { text-align:left; } th { color:var(--muted); font-size:.76rem; text-transform:uppercase; }
+            </style>
+            """);
+        writer.WriteLine("</head><body>");
+    }
+
+    private static void WriteMetric(StreamWriter writer, string label, string value)
+    {
+        writer.WriteLine("<div class=\"metric\">");
+        writer.WriteLine($"<span class=\"metric-label\">{Html(label)}</span>");
+        writer.WriteLine($"<span class=\"metric-value\">{Html(value)}</span>");
+        writer.WriteLine("</div>");
+    }
+
+    private static string Html(object? value)
+    {
+        return WebUtility.HtmlEncode(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
+    }
+}
+
 internal static class StatsCsvWriter
 {
     public static void Write(string path, IReadOnlyList<SimulationStatsSnapshot> snapshots)
     {
         using var writer = CreateWriter(path);
-        writer.WriteLine("tick,elapsed_seconds,creatures,eggs,resources,plant_resources,meat_resources,genomes,brains,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,total_meat_calories,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,avg_visible_prey_density,total_calories_eaten_per_second,total_attack_damage_per_second,avg_seconds_since_last_meal,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths");
+        writer.WriteLine("tick,elapsed_seconds,creatures,eggs,resources,plant_resources,meat_resources,genomes,brains,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,total_meat_calories,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,avg_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths");
 
         foreach (var snapshot in snapshots)
         {
@@ -663,6 +1231,10 @@ internal static class StatsCsvWriter
                 FormatShare(snapshot.PlantDetectedCreatureCount, snapshot.CreatureCount),
                 snapshot.MeatDetectedCreatureCount.ToString(CultureInfo.InvariantCulture),
                 FormatShare(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount),
+                snapshot.MeatScentDetectedCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount),
+                snapshot.CreatureDetectedCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount),
                 snapshot.FoodContactCreatureCount.ToString(CultureInfo.InvariantCulture),
                 FormatShare(snapshot.FoodContactCreatureCount, snapshot.CreatureCount),
                 snapshot.EatingCreatureCount.ToString(CultureInfo.InvariantCulture),
@@ -672,10 +1244,38 @@ internal static class StatsCsvWriter
                 snapshot.AverageVisibleFoodDensity.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageVisiblePlantDensity.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageVisibleMeatDensity.ToString("0.######", CultureInfo.InvariantCulture),
-                snapshot.AverageVisiblePreyDensity.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageMeatScentDensity.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageVisibleCreatureDensity.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.TotalCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalPlantCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalCarcassCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalEggCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalLivePreyCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MeatCaloriesEatenShare.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.FreshKillCaloriesEatenShare.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalCaloriesDigestedPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalPlantDigestedEnergyPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalMeatDigestedEnergyPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MeatDigestedEnergyShare.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageGutFillRatio.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageGutPlantShare.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageGutMeatShare.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageDietaryAdaptation.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageBiteStrength.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageDamageResistance.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AttackerAverageDietaryAdaptation.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AttackerAverageBiteStrength.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AttackerAverageDamageResistance.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.NonAttackerAverageDietaryAdaptation.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.NonAttackerAverageBiteStrength.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.NonAttackerAverageDamageResistance.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.TotalAttackDamagePerSecond.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageSecondsSinceLastMeal.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TotalDistanceTraveledPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageDistanceSinceLastMeal.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.CaloriesEatenPerDistance.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.CaloriesDigestedPerDistance.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.CaloriesEatenPerFoodVisionEvent.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageBirthInvestmentRatio.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageEggHealthRatio.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageVisionRange.ToString("0.######", CultureInfo.InvariantCulture),
@@ -746,11 +1346,11 @@ internal static class TraitSummaryCsvWriter
     public static void Write(string path, WorldState state)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scope,count,avg_body_radius,min_body_radius,max_body_radius,avg_max_speed,min_max_speed,max_max_speed,avg_vision_range,min_vision_range,max_vision_range,avg_vision_angle_degrees,min_vision_angle_degrees,max_vision_angle_degrees,avg_reproduction_threshold,min_reproduction_threshold,max_reproduction_threshold,avg_offspring_investment,min_offspring_investment,max_offspring_investment,avg_egg_production_per_second,min_egg_production_per_second,max_egg_production_per_second,avg_egg_incubation_seconds,min_egg_incubation_seconds,max_egg_incubation_seconds,avg_maturity_age_seconds,min_maturity_age_seconds,max_maturity_age_seconds,avg_dietary_adaptation,min_dietary_adaptation,max_dietary_adaptation,avg_plant_digestion,min_plant_digestion,max_plant_digestion,avg_meat_digestion,min_meat_digestion,max_meat_digestion,avg_mutation_strength,min_mutation_strength,max_mutation_strength,avg_trait_mutation_rate,min_trait_mutation_rate,max_trait_mutation_rate,avg_brain_mutation_rate,min_brain_mutation_rate,max_brain_mutation_rate");
+        writer.WriteLine("scope,count,avg_body_radius,min_body_radius,max_body_radius,avg_max_speed,min_max_speed,max_max_speed,avg_vision_range,min_vision_range,max_vision_range,avg_vision_angle_degrees,min_vision_angle_degrees,max_vision_angle_degrees,avg_reproduction_threshold,min_reproduction_threshold,max_reproduction_threshold,avg_offspring_investment,min_offspring_investment,max_offspring_investment,avg_egg_production_per_second,min_egg_production_per_second,max_egg_production_per_second,avg_egg_incubation_seconds,min_egg_incubation_seconds,max_egg_incubation_seconds,avg_maturity_age_seconds,min_maturity_age_seconds,max_maturity_age_seconds,avg_dietary_adaptation,min_dietary_adaptation,max_dietary_adaptation,avg_plant_digestion,min_plant_digestion,max_plant_digestion,avg_meat_digestion,min_meat_digestion,max_meat_digestion,avg_gut_capacity,min_gut_capacity,max_gut_capacity,avg_digestion_rate,min_digestion_rate,max_digestion_rate,avg_bite_strength,min_bite_strength,max_bite_strength,avg_damage_resistance,min_damage_resistance,max_damage_resistance,avg_mutation_strength,min_mutation_strength,max_mutation_strength,avg_trait_mutation_rate,min_trait_mutation_rate,max_trait_mutation_rate,avg_brain_mutation_rate,min_brain_mutation_rate,max_brain_mutation_rate");
 
         if (state.Creatures.Count == 0)
         {
-            writer.WriteLine("living_creatures,0" + new string(',', 45));
+            writer.WriteLine("living_creatures,0" + new string(',', 57));
             return;
         }
 
@@ -795,6 +1395,18 @@ internal static class TraitSummaryCsvWriter
             Format(summary.MeatDigestion.Average),
             Format(summary.MeatDigestion.Min),
             Format(summary.MeatDigestion.Max),
+            Format(summary.GutCapacityCalories.Average),
+            Format(summary.GutCapacityCalories.Min),
+            Format(summary.GutCapacityCalories.Max),
+            Format(summary.DigestionCaloriesPerSecond.Average),
+            Format(summary.DigestionCaloriesPerSecond.Min),
+            Format(summary.DigestionCaloriesPerSecond.Max),
+            Format(summary.BiteStrength.Average),
+            Format(summary.BiteStrength.Min),
+            Format(summary.BiteStrength.Max),
+            Format(summary.DamageResistance.Average),
+            Format(summary.DamageResistance.Min),
+            Format(summary.DamageResistance.Max),
             Format(summary.MutationStrength.Average),
             Format(summary.MutationStrength.Min),
             Format(summary.MutationStrength.Max),
@@ -1194,7 +1806,7 @@ internal static class BatchComparisonReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Outcome Comparison</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Final Pop</th><th>Eggs</th><th>Pop Change</th><th>Births</th><th>Eggs Laid</th><th>Hatched</th><th>Egg Deaths</th><th>Egg Pred</th><th>Deaths</th><th>Starved</th><th>Max Gen</th><th>Resource Final</th><th>Dominant Founder</th><th>Report</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Final Pop</th><th>Eggs</th><th>Pop Change</th><th>Births</th><th>Eggs Laid</th><th>Hatched</th><th>Egg Deaths</th><th>Egg Pred</th><th>Deaths</th><th>Starved</th><th>Injury</th><th>Max Gen</th><th>Resource Final</th><th>Dominant Founder</th><th>Report</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -1212,6 +1824,7 @@ internal static class BatchComparisonReportWriter
                 $"<td>{Html(summary.EggPredationDeaths)}</td>" +
                 $"<td>{Html(summary.Deaths)}</td>" +
                 $"<td>{Html(summary.StarvationDeaths)}</td>" +
+                $"<td>{Html(summary.InjuryDeaths)}</td>" +
                 $"<td>{Html(summary.MaxGeneration)}</td>" +
                 $"<td>{Html($"{summary.FinalResourceRatio * 100f:0.0}%")}</td>" +
                 $"<td>{Html(summary.DominantFounderText)}</td>" +
@@ -1225,7 +1838,7 @@ internal static class BatchComparisonReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Final Foraging Comparison</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seeing Food</th><th>Touching Food</th><th>Eating</th><th>Visible Density</th><th>Calories Eaten</th><th>Time Since Meal</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seeing Food</th><th>Touching Food</th><th>Eating</th><th>Visible Density</th><th>Calories Eaten</th><th>Time Since Meal</th><th>Meal Distance</th><th>Calories/Distance</th><th>Calories/Food Vision</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -1238,6 +1851,31 @@ internal static class BatchComparisonReportWriter
                 $"<td>{Html(summary.VisibleFoodDensity.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html($"{summary.CaloriesEatenPerSecond:0.###} kcal/s")}</td>" +
                 $"<td>{Html($"{summary.AverageSecondsSinceLastMeal:0.###} s")}</td>" +
+                $"<td>{Html($"{summary.AverageDistanceSinceLastMeal:0.###} u")}</td>" +
+                $"<td>{Html($"{summary.CaloriesEatenPerDistance:0.###} kcal/u")}</td>" +
+                $"<td>{Html($"{summary.CaloriesEatenPerFoodVisionEvent:0.###} kcal/event")}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Final Predation Comparison</h2>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Attacking</th><th>Attack Damage</th><th>Fresh Kill</th><th>Carcass</th><th>Egg</th><th>Meat Energy</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in summaries)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(summary.ScenarioName)}</td>" +
+                $"<td>{Html(FormatPercent(summary.AttackShare))}</td>" +
+                $"<td>{Html($"{summary.AttackDamagePerSecond:0.###} health/s")}</td>" +
+                $"<td>{Html($"{summary.FreshKillCaloriesEatenPerSecond:0.###} kcal/s")}</td>" +
+                $"<td>{Html($"{summary.CarcassCaloriesEatenPerSecond:0.###} kcal/s")}</td>" +
+                $"<td>{Html($"{summary.EggCaloriesEatenPerSecond:0.###} kcal/s")}</td>" +
+                $"<td>{Html($"{summary.MeatDigestedEnergyPerSecond:0.###} energy/s")}</td>" +
                 "</tr>");
         }
 
@@ -1247,7 +1885,7 @@ internal static class BatchComparisonReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Final Trait Comparison</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Living</th><th>Body Radius</th><th>Max Speed</th><th>Vision Range</th><th>Vision Angle</th><th>Repro Threshold</th><th>Offspring Investment</th><th>Egg Production</th><th>Egg Incubation</th><th>Maturity</th><th>Mutation Strength</th><th>Trait Mut Rate</th><th>Brain Mut Rate</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Living</th><th>Body Radius</th><th>Max Speed</th><th>Vision Range</th><th>Vision Angle</th><th>Repro Threshold</th><th>Offspring Investment</th><th>Egg Production</th><th>Egg Incubation</th><th>Maturity</th><th>Gut Capacity</th><th>Digestion Rate</th><th>Bite Strength</th><th>Damage Resistance</th><th>Mutation Strength</th><th>Trait Mut Rate</th><th>Brain Mut Rate</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -1264,6 +1902,10 @@ internal static class BatchComparisonReportWriter
                 $"<td>{Html(FormatSummary(summary.Traits.EggProductionEnergyPerSecond))}</td>" +
                 $"<td>{Html(FormatSummary(summary.Traits.EggIncubationSeconds))}</td>" +
                 $"<td>{Html(FormatSummary(summary.Traits.MaturityAgeSeconds))}</td>" +
+                $"<td>{Html(FormatSummary(summary.Traits.GutCapacityCalories))}</td>" +
+                $"<td>{Html(FormatSummary(summary.Traits.DigestionCaloriesPerSecond))}</td>" +
+                $"<td>{Html(FormatSummary(summary.Traits.BiteStrength))}</td>" +
+                $"<td>{Html(FormatSummary(summary.Traits.DamageResistance))}</td>" +
                 $"<td>{Html(FormatSummary(summary.Traits.MutationStrength))}</td>" +
                 $"<td>{Html(FormatSummary(summary.Traits.TraitMutationRate))}</td>" +
                 $"<td>{Html(FormatSummary(summary.Traits.BrainMutationRate))}</td>" +
@@ -1328,6 +1970,7 @@ internal static class BatchComparisonReportWriter
             state.Stats.EggPredationDeathCount,
             state.Stats.CreatureDeathCount,
             state.Stats.StarvationDeathCount,
+            state.Stats.InjuryDeathCount,
             finalSnapshot.MaxGeneration,
             finalResourceRatio,
             Share(finalSnapshot.FoodDetectedCreatureCount, finalSnapshot.CreatureCount),
@@ -1336,6 +1979,15 @@ internal static class BatchComparisonReportWriter
             finalSnapshot.AverageVisibleFoodDensity,
             finalSnapshot.TotalCaloriesEatenPerSecond,
             finalSnapshot.AverageSecondsSinceLastMeal,
+            finalSnapshot.AverageDistanceSinceLastMeal,
+            finalSnapshot.CaloriesEatenPerDistance,
+            finalSnapshot.CaloriesEatenPerFoodVisionEvent,
+            Share(finalSnapshot.AttackingCreatureCount, finalSnapshot.CreatureCount),
+            finalSnapshot.TotalAttackDamagePerSecond,
+            finalSnapshot.TotalCarcassCaloriesEatenPerSecond,
+            finalSnapshot.TotalEggCaloriesEatenPerSecond,
+            finalSnapshot.TotalLivePreyCaloriesEatenPerSecond,
+            finalSnapshot.TotalMeatDigestedEnergyPerSecond,
             dominantFounder.FounderId,
             dominantFounderShare,
             traits,
@@ -1580,6 +2232,7 @@ internal readonly record struct BatchRunSummary(
     int EggPredationDeaths,
     int Deaths,
     int StarvationDeaths,
+    int InjuryDeaths,
     int MaxGeneration,
     float FinalResourceRatio,
     float FoodSeenShare,
@@ -1588,6 +2241,15 @@ internal readonly record struct BatchRunSummary(
     float VisibleFoodDensity,
     float CaloriesEatenPerSecond,
     float AverageSecondsSinceLastMeal,
+    float AverageDistanceSinceLastMeal,
+    float CaloriesEatenPerDistance,
+    float CaloriesEatenPerFoodVisionEvent,
+    float AttackShare,
+    float AttackDamagePerSecond,
+    float CarcassCaloriesEatenPerSecond,
+    float EggCaloriesEatenPerSecond,
+    float FreshKillCaloriesEatenPerSecond,
+    float MeatDigestedEnergyPerSecond,
     EntityId DominantFounderId,
     float DominantFounderShare,
     TraitAccumulator Traits,
@@ -1625,23 +2287,57 @@ internal static class RunReportWriter
         var foodSeenTrend = Trend.From(
             snapshots,
             snapshot => Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount) * 100f,
-            0f);
+            Share(finalSnapshot.FoodDetectedCreatureCount, finalSnapshot.CreatureCount) * 100f);
         var visibleFoodDensityTrend = Trend.From(
             snapshots,
             snapshot => snapshot.AverageVisibleFoodDensity,
-            0f);
+            finalSnapshot.AverageVisibleFoodDensity);
         var eatingContactTrend = Trend.From(
             snapshots,
             snapshot => Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount) * 100f,
-            0f);
+            Share(finalSnapshot.FoodContactCreatureCount, finalSnapshot.CreatureCount) * 100f);
         var caloriesEatenTrend = Trend.From(
             snapshots,
             snapshot => snapshot.TotalCaloriesEatenPerSecond,
-            0f);
+            finalSnapshot.TotalCaloriesEatenPerSecond);
+        var caloriesDigestedTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.TotalCaloriesDigestedPerSecond,
+            finalSnapshot.TotalCaloriesDigestedPerSecond);
+        var gutFillTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.AverageGutFillRatio * 100f,
+            finalSnapshot.AverageGutFillRatio * 100f);
+        var attackingTrend = Trend.From(
+            snapshots,
+            snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f,
+            Share(finalSnapshot.AttackingCreatureCount, finalSnapshot.CreatureCount) * 100f);
+        var attackDamageTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.TotalAttackDamagePerSecond,
+            finalSnapshot.TotalAttackDamagePerSecond);
         var mealGapTrend = Trend.From(
             snapshots,
             snapshot => snapshot.AverageSecondsSinceLastMeal,
-            0f);
+            finalSnapshot.AverageSecondsSinceLastMeal);
+        var mealDistanceTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.AverageDistanceSinceLastMeal,
+            finalSnapshot.AverageDistanceSinceLastMeal);
+        var distanceTraveledTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.TotalDistanceTraveledPerSecond,
+            finalSnapshot.TotalDistanceTraveledPerSecond);
+        var caloriesPerDistanceTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.CaloriesEatenPerDistance,
+            finalSnapshot.CaloriesEatenPerDistance);
+        var caloriesPerFoodVisionTrend = Trend.From(
+            snapshots,
+            snapshot => snapshot.CaloriesEatenPerFoodVisionEvent,
+            finalSnapshot.CaloriesEatenPerFoodVisionEvent);
+        var behaviorSummary = BehaviorAssay.Analyze(state);
+        var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
         var founderSummaries = FounderSummaryCsvWriter.Summarize(state.LineageRecords)
             .OrderByDescending(summary => summary.LivingCreatures)
             .ThenByDescending(summary => summary.TotalCreatures)
@@ -1670,7 +2366,7 @@ internal static class RunReportWriter
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Scenario", scenario.Name);
         WriteMetric(writer, "Pipeline", scenario.PipelineKind.ToString());
-        WriteMetric(writer, "Initial brain", scenario.RandomizeInitialBrainWeights ? "Per-founder random weights" : "Seed forager");
+        WriteMetric(writer, "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Ticks requested", options.Ticks.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Final tick", state.Tick.ToString(CultureInfo.InvariantCulture));
@@ -1704,6 +2400,8 @@ internal static class RunReportWriter
         WriteMetric(writer, "Resource calories", FormatRange(scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax));
         WriteMetric(writer, "Resource regrowth", $"{FormatRange(scenario.ResourceRegrowthMin, scenario.ResourceRegrowthMax)} kcal/s");
         WriteMetric(writer, "Depleted resources relocate", scenario.RelocateDepletedResources ? "Yes" : "No");
+        WriteMetric(writer, "Resource clustering", FormatPercent(scenario.ResourceClusterStrength));
+        WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
         WriteMetric(writer, "Basal upkeep", $"{scenario.BasalEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Body radius upkeep", $"{scenario.BodyRadiusEnergyCostPerSecond:0.###} energy/radius/s");
         WriteMetric(writer, "Max speed upkeep", $"{scenario.MaxSpeedEnergyCostPerSecond:0.######} energy/speed/s");
@@ -1712,21 +2410,32 @@ internal static class RunReportWriter
         WriteMetric(writer, "Vision angle", $"{ToDegrees(scenario.VisionAngleRadians):0.###} degrees");
         WriteMetric(writer, "Vision angle upkeep", $"{scenario.VisionAngleEnergyCostPerSecond:0.######} energy/radian/s");
         WriteMetric(writer, "Eat rate upkeep", $"{scenario.EatRateEnergyCostPerSecond:0.######} energy/rate/s");
+        WriteMetric(writer, "Gut capacity upkeep", $"{scenario.GutCapacityEnergyCostPerSecond:0.######} energy/capacity/s");
+        WriteMetric(writer, "Digestion rate upkeep", $"{scenario.DigestionRateEnergyCostPerSecond:0.######} energy/rate/s");
+        WriteMetric(writer, "Bite strength upkeep", $"{scenario.BiteStrengthEnergyCostPerSecond:0.######} energy/strength/s");
+        WriteMetric(writer, "Damage resistance upkeep", $"{scenario.DamageResistanceEnergyCostPerSecond:0.######} energy/resistance/s");
         WriteMetric(writer, "Egg upkeep", $"{scenario.EggEnergyCostPerSecond:0.######} energy/egg/s");
         WriteMetric(writer, "Egg exposure damage", $"{scenario.EggEnvironmentalDamagePerSecond:0.######} health/s");
         WriteMetric(writer, "Movement upkeep", $"{scenario.MovementEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Eat rate", $"{scenario.EatCaloriesPerSecond:0.###} kcal/s");
+        WriteMetric(writer, "Gut capacity", $"{scenario.GutCapacityCalories:0.###} kcal");
+        WriteMetric(writer, "Digestion rate", $"{scenario.DigestionCaloriesPerSecond:0.###} kcal/s");
         WriteMetric(writer, "Reproduction threshold", scenario.ReproductionEnergyThreshold.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Offspring investment", scenario.OffspringEnergyInvestment.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Egg production", $"{scenario.EggProductionEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Egg incubation", $"{scenario.EggIncubationSeconds:0.###} seconds");
         WriteMetric(writer, "Maturity age", $"{scenario.MaturityAgeSeconds:0.###} seconds");
         WriteMetric(writer, "Starting diet", $"{scenario.DietaryAdaptation:0.###} meat bias");
+        WriteMetric(writer, "Starting bite strength", scenario.BiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Starting damage resistance", scenario.DamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(CreatureGenome.Baseline with { DietaryAdaptation = scenario.DietaryAdaptation })));
         WriteMetric(writer, "Starting meat digestion", FormatPercent(CreatureDigestion.MeatEfficiency(CreatureGenome.Baseline with { DietaryAdaptation = scenario.DietaryAdaptation })));
         WriteMetric(writer, "Death meat body calories", $"{scenario.DeathMeatCaloriesPerBodyRadius:0.###} kcal/radius");
         WriteMetric(writer, "Death meat energy fraction", FormatPercent(scenario.DeathMeatEnergyFraction));
         WriteMetric(writer, "Meat decay", $"{scenario.MeatDecayCaloriesPerSecond:0.###} kcal/s");
+        WriteMetric(writer, "Meat scent range", $"{scenario.MeatScentRangeMultiplier:0.###}x vision");
+        WriteMetric(writer, "Meat scent full strength", $"{scenario.MeatScentCaloriesForFullStrength:0.###} kcal");
+        WriteMetric(writer, "Meat scent saturation", scenario.MeatScentDensitySaturation.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Bite damage", $"{scenario.BiteDamagePerSecond:0.###} health/s");
         WriteMetric(writer, "Bite energy cost", $"{scenario.BiteEnergyCostPerSecond:0.###} energy/s");
         WriteMetric(writer, "Bite reach", $"{scenario.BiteRangePadding:0.###} world units");
@@ -1767,18 +2476,60 @@ internal static class RunReportWriter
         WriteMetric(writer, "Seeing food", FormatPercent(Share(finalSnapshot.FoodDetectedCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Seeing plants", FormatPercent(Share(finalSnapshot.PlantDetectedCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Seeing meat", FormatPercent(Share(finalSnapshot.MeatDetectedCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Smelling meat", FormatPercent(Share(finalSnapshot.MeatScentDetectedCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Seeing creatures", FormatPercent(Share(finalSnapshot.CreatureDetectedCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Touching food", FormatPercent(Share(finalSnapshot.FoodContactCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Eating this tick", FormatPercent(Share(finalSnapshot.EatingCreatureCount, finalSnapshot.CreatureCount)));
-        WriteMetric(writer, "Attacking this tick", FormatPercent(Share(finalSnapshot.AttackingCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Gut fullness", FormatPercent(finalSnapshot.AverageGutFillRatio));
+        WriteMetric(writer, "Gut plant share", FormatPercent(finalSnapshot.AverageGutPlantShare));
+        WriteMetric(writer, "Gut meat share", FormatPercent(finalSnapshot.AverageGutMeatShare));
         WriteMetric(writer, "Visible food density", finalSnapshot.AverageVisibleFoodDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible plant density", finalSnapshot.AverageVisiblePlantDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible meat density", finalSnapshot.AverageVisibleMeatDensity.ToString("0.###", CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Visible prey density", finalSnapshot.AverageVisiblePreyDensity.ToString("0.###", CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Calories eaten", $"{finalSnapshot.TotalCaloriesEatenPerSecond:0.###} kcal/s");
-        WriteMetric(writer, "Attack damage", $"{finalSnapshot.TotalAttackDamagePerSecond:0.###} health/s");
+        WriteMetric(writer, "Meat scent density", finalSnapshot.AverageMeatScentDensity.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Visible creature density", finalSnapshot.AverageVisibleCreatureDensity.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Calories eaten", $"{finalSnapshot.TotalCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Plant eaten", $"{finalSnapshot.TotalPlantCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Carcass eaten", $"{finalSnapshot.TotalCarcassCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Egg eaten", $"{finalSnapshot.TotalEggCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Fresh kill eaten", $"{finalSnapshot.TotalLivePreyCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Calories digested", $"{finalSnapshot.TotalCaloriesDigestedPerSecond:0.###} energy/s");
+        WriteMetric(writer, "Plant energy", $"{finalSnapshot.TotalPlantDigestedEnergyPerSecond:0.###} energy/s");
+        WriteMetric(writer, "Meat energy", $"{finalSnapshot.TotalMeatDigestedEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Time since meal", $"{finalSnapshot.AverageSecondsSinceLastMeal:0.###} s avg");
+        WriteMetric(writer, "Distance moved", $"{finalSnapshot.TotalDistanceTraveledPerSecond:0.###} units/s");
+        WriteMetric(writer, "Distance since meal", $"{finalSnapshot.AverageDistanceSinceLastMeal:0.###} units avg");
+        WriteMetric(writer, "Raw per distance", $"{finalSnapshot.CaloriesEatenPerDistance:0.###} kcal/unit");
+        WriteMetric(writer, "Energy per distance", $"{finalSnapshot.CaloriesDigestedPerDistance:0.###} energy/unit");
+        WriteMetric(writer, "Raw per food vision", $"{finalSnapshot.CaloriesEatenPerFoodVisionEvent:0.###} kcal/event");
         WriteMetric(writer, "Average vision range", finalSnapshot.AverageVisionRange.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average vision angle", $"{ToDegrees(finalSnapshot.AverageVisionAngleRadians):0.###} degrees");
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+
+        var attackDamagePerAttacker = finalSnapshot.AttackingCreatureCount > 0
+            ? finalSnapshot.TotalAttackDamagePerSecond / finalSnapshot.AttackingCreatureCount
+            : 0f;
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Predation Diagnostics</h2>");
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Seeing creatures", FormatPercent(Share(finalSnapshot.CreatureDetectedCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Attacking this tick", FormatPercent(Share(finalSnapshot.AttackingCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Attack damage", $"{finalSnapshot.TotalAttackDamagePerSecond:0.###} health/s");
+        WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
+        WriteMetric(writer, "Injury deaths", state.Stats.InjuryDeathCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Fresh kill share", FormatPercent(finalSnapshot.FreshKillCaloriesEatenShare));
+        WriteMetric(writer, "Meat raw share", FormatPercent(finalSnapshot.MeatCaloriesEatenShare));
+        WriteMetric(writer, "Meat energy share", FormatPercent(finalSnapshot.MeatDigestedEnergyShare));
+        WriteMetric(writer, "Average diet", finalSnapshot.AverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Average bite", finalSnapshot.AverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Average resistance", finalSnapshot.AverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Attacker diet", finalSnapshot.AttackerAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Attacker bite", finalSnapshot.AttackerAverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Attacker resistance", finalSnapshot.AttackerAverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Non-attacker diet", finalSnapshot.NonAttackerAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Non-attacker bite", finalSnapshot.NonAttackerAverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Non-attacker resistance", finalSnapshot.NonAttackerAverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -1808,6 +2559,8 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
+        WriteChartsSection(writer, snapshots);
+
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Trends</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -1819,10 +2572,21 @@ internal static class RunReportWriter
         WriteTrendRow(writer, "Seeing food", foodSeenTrend, "%");
         WriteTrendRow(writer, "Touching food", eatingContactTrend, "%");
         WriteTrendRow(writer, "Visible food density", visibleFoodDensityTrend, "");
-        WriteTrendRow(writer, "Calories eaten", caloriesEatenTrend, "kcal/s");
+        WriteTrendRow(writer, "Calories eaten", caloriesEatenTrend, "raw kcal/s");
+        WriteTrendRow(writer, "Calories digested", caloriesDigestedTrend, "energy/s");
+        WriteTrendRow(writer, "Gut fullness", gutFillTrend, "%");
+        WriteTrendRow(writer, "Attacking", attackingTrend, "%");
+        WriteTrendRow(writer, "Attack damage", attackDamageTrend, "health/s");
         WriteTrendRow(writer, "Time since meal", mealGapTrend, "s avg");
+        WriteTrendRow(writer, "Distance since meal", mealDistanceTrend, "units avg");
+        WriteTrendRow(writer, "Distance moved", distanceTraveledTrend, "units/s");
+        WriteTrendRow(writer, "Calories per distance", caloriesPerDistanceTrend, "kcal/unit");
+        WriteTrendRow(writer, "Calories per food vision", caloriesPerFoodVisionTrend, "kcal/event");
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
+
+        WriteBehaviorAssaySection(writer, behaviorSummary);
+        WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Diagnostics</h2>");
@@ -1938,6 +2702,8 @@ internal static class RunReportWriter
             WriteTraitRow(writer, "Dietary adaptation meat bias", traitSummary.DietaryAdaptation);
             WriteTraitRow(writer, "Plant digestion efficiency", traitSummary.PlantDigestion);
             WriteTraitRow(writer, "Meat digestion efficiency", traitSummary.MeatDigestion);
+            WriteTraitRow(writer, "Bite strength", traitSummary.BiteStrength);
+            WriteTraitRow(writer, "Damage resistance", traitSummary.DamageResistance);
             WriteTraitRow(writer, "Mutation strength", traitSummary.MutationStrength);
             WriteTraitRow(writer, "Trait mutation rate", traitSummary.TraitMutationRate);
             WriteTraitRow(writer, "Brain mutation rate", traitSummary.BrainMutationRate);
@@ -2103,6 +2869,50 @@ internal static class RunReportWriter
             }
             .file-list code { overflow-wrap: anywhere; }
             .empty { color: var(--muted); text-align: left; }
+            .chart-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+              gap: 16px;
+            }
+            .chart-card {
+              border: 1px solid var(--line);
+              border-radius: 8px;
+              padding: 12px;
+              background: #fbfcf8;
+            }
+            .chart-card h3 {
+              margin: 0 0 8px;
+              font-size: 0.95rem;
+            }
+            .chart-card svg {
+              width: 100%;
+              height: auto;
+              display: block;
+            }
+            .chart-axis {
+              stroke: #d6ddcf;
+              stroke-width: 1;
+            }
+            .chart-label {
+              fill: var(--muted);
+              font-size: 11px;
+            }
+            .chart-legend {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px 12px;
+              margin-top: 8px;
+              color: var(--muted);
+              font-size: 0.82rem;
+            }
+            .legend-swatch {
+              display: inline-block;
+              width: 10px;
+              height: 10px;
+              margin-right: 4px;
+              border-radius: 2px;
+              vertical-align: -1px;
+            }
             @media (max-width: 640px) {
               h1 { font-size: 1.7rem; }
               section { padding: 14px; }
@@ -2128,6 +2938,271 @@ internal static class RunReportWriter
         writer.WriteLine("</div>");
     }
 
+    private static void WriteChartsSection(StreamWriter writer, IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Graphs</h2>");
+        if (snapshots.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No stats snapshots were recorded, so no graphs are available.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"chart-grid\">");
+        WriteLineChart(
+            writer,
+            "Population and eggs",
+            "",
+            snapshots,
+            new ChartSeries("Creatures", "#2f7d4f", snapshots.Select(snapshot => (float)snapshot.CreatureCount).ToArray()),
+            new ChartSeries("Eggs", "#d69d2f", snapshots.Select(snapshot => (float)snapshot.EggCount).ToArray()));
+        WriteLineChart(
+            writer,
+            "Resource calories",
+            " kcal",
+            snapshots,
+            new ChartSeries("Plants", "#35a862", snapshots.Select(snapshot => snapshot.TotalPlantCalories).ToArray()),
+            new ChartSeries("Meat", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalMeatCalories).ToArray()));
+        WriteLineChart(
+            writer,
+            "Foraging signals",
+            "%",
+            snapshots,
+            new ChartSeries("Seeing food", "#2f7d4f", snapshots.Select(snapshot => Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Smelling meat", "#b84a4a", snapshots.Select(snapshot => Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Touching food", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Eating", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.EatingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Search Efficiency",
+            "",
+            snapshots,
+            new ChartSeries("Distance/s", "#6a8fce", snapshots.Select(snapshot => snapshot.TotalDistanceTraveledPerSecond).ToArray()),
+            new ChartSeries("Meal distance", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageDistanceSinceLastMeal).ToArray()),
+            new ChartSeries("Raw kcal/unit", "#2f7d4f", snapshots.Select(snapshot => snapshot.CaloriesEatenPerDistance).ToArray()),
+            new ChartSeries("Raw kcal/vision", "#8f4cb8", snapshots.Select(snapshot => snapshot.CaloriesEatenPerFoodVisionEvent).ToArray()));
+        WriteLineChart(
+            writer,
+            "Digestion",
+            "",
+            snapshots,
+            new ChartSeries("Raw eaten/s", "#d69d2f", snapshots.Select(snapshot => snapshot.TotalCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Digested/s", "#2f7d4f", snapshots.Select(snapshot => snapshot.TotalCaloriesDigestedPerSecond).ToArray()),
+            new ChartSeries("Gut fullness %", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageGutFillRatio * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Food Source Intake",
+            " kcal/s",
+            snapshots,
+            new ChartSeries("Plant eaten/s", "#35a862", snapshots.Select(snapshot => snapshot.TotalPlantCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Carcass eaten/s", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalCarcassCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Egg eaten/s", "#d69d2f", snapshots.Select(snapshot => snapshot.TotalEggCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Fresh kill eaten/s", "#8f4cb8", snapshots.Select(snapshot => snapshot.TotalLivePreyCaloriesEatenPerSecond).ToArray()));
+        WriteLineChart(
+            writer,
+            "Predation Diagnostics",
+            "%",
+            snapshots,
+            new ChartSeries("Seeing creatures", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Attacking", "#e05a47", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Fresh kill share", "#8f4cb8", snapshots.Select(snapshot => snapshot.FreshKillCaloriesEatenShare * 100f).ToArray()),
+            new ChartSeries("Meat energy share", "#b84a4a", snapshots.Select(snapshot => snapshot.MeatDigestedEnergyShare * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Digested Energy Source",
+            " energy/s",
+            snapshots,
+            new ChartSeries("Plant energy/s", "#35a862", snapshots.Select(snapshot => snapshot.TotalPlantDigestedEnergyPerSecond).ToArray()),
+            new ChartSeries("Meat energy/s", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalMeatDigestedEnergyPerSecond).ToArray()));
+        WriteLineChart(
+            writer,
+            "Combat pressure",
+            "",
+            snapshots,
+            new ChartSeries("Attacking %", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()));
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteLineChart(
+        StreamWriter writer,
+        string title,
+        string unit,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        params ChartSeries[] series)
+    {
+        const float width = 720f;
+        const float height = 240f;
+        const float left = 46f;
+        const float right = 14f;
+        const float top = 16f;
+        const float bottom = 34f;
+        var plotWidth = width - left - right;
+        var plotHeight = height - top - bottom;
+
+        var min = 0f;
+        var max = 1f;
+        var hasValue = false;
+        foreach (var chartSeries in series)
+        {
+            foreach (var value in chartSeries.Values)
+            {
+                if (!float.IsFinite(value))
+                {
+                    continue;
+                }
+
+                if (!hasValue)
+                {
+                    min = value;
+                    max = value;
+                    hasValue = true;
+                }
+                else
+                {
+                    min = Math.Min(min, value);
+                    max = Math.Max(max, value);
+                }
+            }
+        }
+
+        min = Math.Min(0f, min);
+        if (Math.Abs(max - min) < 0.000001f)
+        {
+            max = min + 1f;
+        }
+
+        writer.WriteLine("<div class=\"chart-card\">");
+        writer.WriteLine($"<h3>{Html(title)}</h3>");
+        writer.WriteLine($"<svg viewBox=\"0 0 {width:0} {height:0}\" role=\"img\" aria-label=\"{Html(title)} chart\">");
+        writer.WriteLine($"<line class=\"chart-axis\" x1=\"{left:0}\" y1=\"{top:0}\" x2=\"{left:0}\" y2=\"{height - bottom:0}\" />");
+        writer.WriteLine($"<line class=\"chart-axis\" x1=\"{left:0}\" y1=\"{height - bottom:0}\" x2=\"{width - right:0}\" y2=\"{height - bottom:0}\" />");
+        writer.WriteLine($"<text class=\"chart-label\" x=\"4\" y=\"{top + 4:0}\">{Html(FormatChartValue(max, unit))}</text>");
+        writer.WriteLine($"<text class=\"chart-label\" x=\"4\" y=\"{height - bottom:0}\">{Html(FormatChartValue(min, unit))}</text>");
+
+        foreach (var chartSeries in series)
+        {
+            if (chartSeries.Values.Length == 0)
+            {
+                continue;
+            }
+
+            var points = new string[chartSeries.Values.Length];
+            for (var i = 0; i < chartSeries.Values.Length; i++)
+            {
+                var x = chartSeries.Values.Length == 1
+                    ? left
+                    : left + i / (float)(chartSeries.Values.Length - 1) * plotWidth;
+                var y = top + (max - chartSeries.Values[i]) / (max - min) * plotHeight;
+                points[i] = $"{x.ToString("0.###", CultureInfo.InvariantCulture)},{y.ToString("0.###", CultureInfo.InvariantCulture)}";
+            }
+
+            writer.WriteLine($"<polyline points=\"{Html(string.Join(' ', points))}\" fill=\"none\" stroke=\"{Html(chartSeries.Color)}\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\" />");
+        }
+
+        writer.WriteLine("</svg>");
+        writer.WriteLine("<div class=\"chart-legend\">");
+        foreach (var chartSeries in series)
+        {
+            var final = chartSeries.Values.Length > 0 ? chartSeries.Values[^1] : 0f;
+            writer.WriteLine(
+                $"<span><span class=\"legend-swatch\" style=\"background:{Html(chartSeries.Color)}\"></span>{Html(chartSeries.Label)} {Html(FormatChartValue(final, unit))}</span>");
+        }
+
+        writer.WriteLine("</div>");
+        writer.WriteLine("</div>");
+    }
+
+    private static void WriteBehaviorAssaySection(StreamWriter writer, BehaviorAssaySummary summary)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Behavior Assays</h2>");
+        if (summary.EvaluatedCreatureCount == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living neural creatures were available for behavior assays.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Brains evaluated", summary.EvaluatedCreatureCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Movement style", summary.MovementStyle);
+        WriteMetric(writer, "Population ecotype", summary.Ecotype);
+        WriteMetric(writer, "Food response", summary.ForagingBias);
+        WriteMetric(writer, "Creature attack response", summary.PredatorTendency);
+        WriteMetric(writer, "Risk response", summary.RiskResponse);
+        WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
+        writer.WriteLine("</div>");
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Assay</th><th>Move</th><th>Turn</th><th>Eat</th><th>Reproduce</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var result in summary.Results)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(result.Name)}</td>" +
+                $"<td>{Html(result.MoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.Turn.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(result.EatShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.ReproduceShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.AttackShare))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteLineageBehaviorAssaySection(StreamWriter writer, IReadOnlyList<LineageBehaviorAssaySummary> summaries)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Lineage Behavior Assays</h2>");
+        if (summaries.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living founder lineages were available for behavior assays.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Risk</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in summaries)
+        {
+            var behavior = summary.Behavior;
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>#{Html(summary.FounderId.Value)}</td>" +
+                $"<td>{Html(summary.LivingCreatures)}</td>" +
+                $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
+                $"<td>{Html(behavior.Ecotype)}</td>" +
+                $"<td>{Html(behavior.ForagingBias)}</td>" +
+                $"<td>{Html(behavior.RiskResponse)}</td>" +
+                $"<td>{Html(behavior.PredatorTendency)}</td>" +
+                $"<td>{Html(behavior.MovementStyle)}</td>" +
+                $"<td>{Html(behavior.ReproductionTendency)}</td>" +
+                $"<td>{Html(FormatPercent(behavior.SmallCreatureAhead.AttackShare))}</td>" +
+                $"<td>{Html(FormatPercent(behavior.LargeCreatureApproaching.AttackShare))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static string FormatChartValue(float value, string unit)
+    {
+        return unit switch
+        {
+            "%" => $"{value:0.#}%",
+            " kcal" => $"{value:0.#} kcal",
+            _ => value.ToString("0.###", CultureInfo.InvariantCulture)
+        };
+    }
+
     private static void WriteTrendRow(StreamWriter writer, string name, Trend trend, string unit)
     {
         writer.WriteLine(
@@ -2140,6 +3215,8 @@ internal static class RunReportWriter
             $"<td>{Html($"{trend.Change:0.###} ({trend.PercentChange:0.#}%)")}</td>" +
             "</tr>");
     }
+
+    private readonly record struct ChartSeries(string Label, string Color, float[] Values);
 
     private static string FormatTrendValue(float value, string unit)
     {
@@ -2216,6 +3293,17 @@ internal static class RunReportWriter
     private static string FormatRange(float min, float max)
     {
         return $"{min.ToString("0.###", CultureInfo.InvariantCulture)}-{max.ToString("0.###", CultureInfo.InvariantCulture)}";
+    }
+
+    private static string FormatInitialBrainKind(InitialBrainKind kind)
+    {
+        return kind switch
+        {
+            InitialBrainKind.SeedForager => "Seed forager",
+            InitialBrainKind.ForagerPredator => "Forager predator",
+            InitialBrainKind.RandomPerFounder => "Per-founder random weights",
+            _ => kind.ToString()
+        };
     }
 
     private static string FormatPercent(float value)
@@ -2387,6 +3475,10 @@ internal readonly record struct TraitAccumulator(
     FloatSummary DietaryAdaptation,
     FloatSummary PlantDigestion,
     FloatSummary MeatDigestion,
+    FloatSummary GutCapacityCalories,
+    FloatSummary DigestionCaloriesPerSecond,
+    FloatSummary BiteStrength,
+    FloatSummary DamageResistance,
     FloatSummary MutationStrength,
     FloatSummary TraitMutationRate,
     FloatSummary BrainMutationRate)
@@ -2405,6 +3497,10 @@ internal readonly record struct TraitAccumulator(
         var dietaryAdaptation = new FloatAccumulator();
         var plantDigestion = new FloatAccumulator();
         var meatDigestion = new FloatAccumulator();
+        var gutCapacityCalories = new FloatAccumulator();
+        var digestionCaloriesPerSecond = new FloatAccumulator();
+        var biteStrength = new FloatAccumulator();
+        var damageResistance = new FloatAccumulator();
         var mutationStrength = new FloatAccumulator();
         var traitMutationRate = new FloatAccumulator();
         var brainMutationRate = new FloatAccumulator();
@@ -2424,6 +3520,10 @@ internal readonly record struct TraitAccumulator(
             dietaryAdaptation.Add(genome.DietaryAdaptation);
             plantDigestion.Add(CreatureDigestion.PlantEfficiency(genome));
             meatDigestion.Add(CreatureDigestion.MeatEfficiency(genome));
+            gutCapacityCalories.Add(genome.GutCapacityCalories);
+            digestionCaloriesPerSecond.Add(genome.DigestionCaloriesPerSecond);
+            biteStrength.Add(genome.BiteStrength);
+            damageResistance.Add(genome.DamageResistance);
             mutationStrength.Add(genome.MutationStrength);
             traitMutationRate.Add(genome.TraitMutationRate);
             brainMutationRate.Add(genome.BrainMutationRate);
@@ -2443,6 +3543,10 @@ internal readonly record struct TraitAccumulator(
             dietaryAdaptation.ToSummary(),
             plantDigestion.ToSummary(),
             meatDigestion.ToSummary(),
+            gutCapacityCalories.ToSummary(),
+            digestionCaloriesPerSecond.ToSummary(),
+            biteStrength.ToSummary(),
+            damageResistance.ToSummary(),
             mutationStrength.ToSummary(),
             traitMutationRate.ToSummary(),
             brainMutationRate.ToSummary());

@@ -266,6 +266,11 @@ public sealed class WorldState
             throw new ArgumentOutOfRangeException(nameof(patch), "Resource decay must be finite and non-negative.");
         }
 
+        if (!float.IsFinite(patch.FreshKillSecondsRemaining) || patch.FreshKillSecondsRemaining < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(patch), "Resource fresh-kill timer must be finite and non-negative.");
+        }
+
         var id = CreateEntityId();
         patch.Id = id;
         patch.Position = Bounds.Clamp(patch.Position);

@@ -5,6 +5,8 @@ namespace Lineage.Core;
 /// </summary>
 public sealed class DeathSystem : ISimulationSystem
 {
+    private const float FreshKillCreditSeconds = 20f;
+
     private readonly float _meatCaloriesPerBodyRadius;
     private readonly float _meatEnergyFraction;
     private readonly float _meatDecayCaloriesPerSecond;
@@ -28,8 +30,9 @@ public sealed class DeathSystem : ISimulationSystem
             var creature = state.Creatures[readIndex];
             if (creature.Energy <= 0f || creature.Health <= 0f)
             {
-                SpawnMeatResource(state, creature);
-                state.MarkCreatureDead(creature.Id, GetDeathReason(creature));
+                var reason = GetDeathReason(creature);
+                SpawnMeatResource(state, creature, reason);
+                state.MarkCreatureDead(creature.Id, reason);
                 continue;
             }
 
@@ -47,7 +50,7 @@ public sealed class DeathSystem : ISimulationSystem
         }
     }
 
-    private void SpawnMeatResource(WorldState state, CreatureState creature)
+    private void SpawnMeatResource(WorldState state, CreatureState creature, CreatureDeathReason reason)
     {
         var genome = state.GetGenome(creature.GenomeId);
         var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
@@ -66,7 +69,16 @@ public sealed class DeathSystem : ISimulationSystem
             Calories = calories,
             MaxCalories = calories,
             RegrowthCaloriesPerSecond = 0f,
-            DecayCaloriesPerSecond = _meatDecayCaloriesPerSecond
+            DecayCaloriesPerSecond = _meatDecayCaloriesPerSecond,
+            FreshKillAttackerId = reason == CreatureDeathReason.Injury
+                ? creature.LastDamagingCreatureId
+                : default,
+            FreshKillPreyId = reason == CreatureDeathReason.Injury && creature.LastDamagingCreatureId != default
+                ? creature.Id
+                : default,
+            FreshKillSecondsRemaining = reason == CreatureDeathReason.Injury && creature.LastDamagingCreatureId != default
+                ? FreshKillCreditSeconds
+                : 0f
         });
     }
 

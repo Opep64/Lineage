@@ -682,9 +682,13 @@ public partial class Main : Node2D
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
             $"Max gen {snapshot.MaxGeneration}\n" +
             $"Food seen {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  P {FormatPercent(Share(snapshot.PlantDetectedCreatureCount, snapshot.CreatureCount))}  M {FormatPercent(Share(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Eating {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Eat {snapshot.TotalCaloriesEatenPerSecond:0.0}/s\n" +
-            $"Attacking {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.00}/s  Prey {snapshot.AverageVisiblePreyDensity:0.00}\n" +
+            $"Meat scent {FormatPercent(Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageMeatScentDensity:0.00}\n" +
+            $"Eating {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Raw {snapshot.TotalCaloriesEatenPerSecond:0.0}/s  Digest {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s\n" +
+            $"Food src P {snapshot.TotalPlantCaloriesEatenPerSecond:0.0}/s  C {snapshot.TotalCarcassCaloriesEatenPerSecond:0.0}/s  Egg {snapshot.TotalEggCaloriesEatenPerSecond:0.0}/s\n" +
+            $"Creatures seen {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageVisibleCreatureDensity:0.00}\n" +
+            $"Attacking {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.00}/s  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
             $"Meal gap {snapshot.AverageSecondsSinceLastMeal:0.0}s  Vision {snapshot.AverageVisionRange:0}/{ToDegrees(snapshot.AverageVisionAngleRadians):0}deg\n" +
+            $"Search {snapshot.TotalDistanceTraveledPerSecond:0}u/s  meal dist {snapshot.AverageDistanceSinceLastMeal:0}u  kcal/u {snapshot.CaloriesEatenPerDistance:0.00}\n" +
             $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}\n" +
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
@@ -700,8 +704,10 @@ public partial class Main : Node2D
             $"Population {state.Creatures.Count}\n" +
             $"Food kcal {snapshot.TotalResourceCalories:0}\n" +
             $"Plant kcal {snapshot.TotalPlantCalories:0}  Meat kcal {snapshot.TotalMeatCalories:0}\n" +
-            $"Seeing food {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Eating {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Digested {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s  Gut {snapshot.AverageGutFillRatio * 100f:0}%\n" +
+            $"Seen F {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  C {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Attack {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.0}/s\n" +
+            $"Eat {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
             $"Deaths {state.Stats.CreatureDeathCount}";
     }
 
@@ -744,6 +750,11 @@ public partial class Main : Node2D
         var senses = creature.Senses;
         var maturityProgress = CreatureGrowth.MaturityProgress(creature, genome);
         var growthFactor = CreatureGrowth.GrowthFactor(creature, genome);
+        var gutCapacity = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome);
+        var gutTotal = creature.GutPlantCalories + creature.GutMeatCalories;
+        var gutFillRatio = gutCapacity > 0f
+            ? Math.Clamp(gutTotal / gutCapacity, 0f, 1f)
+            : 0f;
         _simulation.State.TryGetLineageRecord(creature.Id, out var lineage);
         var parentText = lineage.IsFounder ? "Founder" : $"Parent #{lineage.ParentId.Value}";
         var maturityText = CreatureGrowth.IsMature(creature, genome)
@@ -771,16 +782,27 @@ public partial class Main : Node2D
             $"Eat rate {CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome):0.0}/{genome.EatCaloriesPerSecond:0.0}\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}\n" +
             $"Digest plant {CreatureDigestion.PlantEfficiency(genome):P0}  meat {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
+            $"Digest rate {CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome):0.0}/{genome.DigestionCaloriesPerSecond:0.0}\n" +
+            $"Gut cap {gutCapacity:0.0}/{genome.GutCapacityCalories:0.0}\n" +
+            $"Gut {gutTotal:0.0}/{gutCapacity:0.0} ({gutFillRatio:P0})\n" +
+            $"Gut plant {creature.GutPlantCalories:0.0}  meat {creature.GutMeatCalories:0.0}\n" +
+            $"Bite str {CreatureGrowth.EffectiveBiteStrength(creature, genome):0.00}/{genome.BiteStrength:0.00}\n" +
+            $"Damage resist {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +
             $"Lay ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}\n" +
             $"Egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
             $"Food contact {(creature.IsTouchingFood ? "yes" : "no")}\n" +
             BuildFoodContactText(creature, genome) +
-            $"Ate this tick {creature.LastCaloriesEaten:0.00} ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
+            $"Last meal {BuildLastMealSourceText(creature)}\n" +
+            $"Swallowed this tick {creature.LastCaloriesEaten:0.00} raw ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
+            $"Source P {creature.LastPlantCaloriesEaten:0.00}  C {creature.LastCarcassCaloriesEaten:0.00}  Egg {creature.LastEggCaloriesEaten:0.00}  FK {creature.LastLivePreyCaloriesEaten:0.00}\n" +
+            $"Digested this tick {creature.LastCaloriesDigested:0.00} energy ({FormatCaloriesPerSecond(creature.LastCaloriesDigested)}/s)\n" +
+            $"Energy P {creature.LastPlantDigestedEnergy:0.00}  M {creature.LastMeatDigestedEnergy:0.00}\n" +
             $"Creature contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
             $"Attack dmg {creature.LastAttackDamageDealt:0.000}\n" +
-            $"Since meal {creature.SecondsSinceLastMeal:0.0}s\n" +
+            $"Since meal {creature.SecondsSinceLastMeal:0.0}s  {creature.DistanceSinceLastMeal:0.0}u\n" +
+            $"Moved last tick {creature.LastDistanceTraveled:0.00}u\n" +
             $"Repro at {genome.ReproductionEnergyThreshold:0.0}\n" +
             $"Mature at {genome.MaturityAgeSeconds:0.0}s\n" +
             $"Mutation {genome.MutationStrength:0.000}\n" +
@@ -796,8 +818,12 @@ public partial class Main : Node2D
             $"Plant prox {senses.PlantProximity:0.00}  fwd {senses.PlantDirectionForward:0.00}  right {senses.PlantDirectionRight:0.00}\n" +
             $"Meat {(senses.MeatDetected ? "yes" : "no")}  density {senses.VisibleMeatDensity:0.00}\n" +
             $"Meat prox {senses.MeatProximity:0.00}  fwd {senses.MeatDirectionForward:0.00}  right {senses.MeatDirectionRight:0.00}\n" +
-            $"Prey {(senses.PreyDetected ? "yes" : "no")}  density {senses.VisiblePreyDensity:0.00}\n" +
-            $"Prey prox {senses.PreyProximity:0.00}  fwd {senses.PreyDirectionForward:0.00}  right {senses.PreyDirectionRight:0.00}\n\n" +
+            $"Meat scent {(senses.MeatScentDetected ? "yes" : "no")}  density {senses.MeatScentDensity:0.00}\n" +
+            $"Scent fwd {senses.MeatScentDirectionForward:0.00}  right {senses.MeatScentDirectionRight:0.00}\n" +
+            $"Creature {(senses.CreatureDetected ? "yes" : "no")}  density {senses.VisibleCreatureDensity:0.00}\n" +
+            $"Creature prox {senses.CreatureProximity:0.00}  fwd {senses.CreatureDirectionForward:0.00}  right {senses.CreatureDirectionRight:0.00}\n" +
+            $"Creature size {senses.CreatureRelativeBodySize:0.00}  speed {senses.CreatureRelativeSpeed:0.00}  approach {senses.CreatureApproachRate:0.00}\n" +
+            $"Creature facing {senses.CreatureFacingAlignment:0.00}\n\n" +
             $"Move {creature.Actions.MoveForward:0.00}\n" +
             $"Turn {creature.Actions.Turn:0.00}\n" +
             $"Eat intent {creature.Actions.WantsEat}\n" +
@@ -877,6 +903,36 @@ public partial class Main : Node2D
         return
             $"Food edge {creature.FoodContactEdgeDistance:0.0}/{CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}\n" +
             $"Food kcal {creature.FoodContactCalories:0.00}\n";
+    }
+
+    private static string BuildLastMealSourceText(CreatureState creature)
+    {
+        if (creature.LastCaloriesEaten <= 0f)
+        {
+            return "none";
+        }
+
+        var source = "plant";
+        var amount = creature.LastPlantCaloriesEaten;
+        if (creature.LastCarcassCaloriesEaten > amount)
+        {
+            source = "carcass";
+            amount = creature.LastCarcassCaloriesEaten;
+        }
+
+        if (creature.LastEggCaloriesEaten > amount)
+        {
+            source = "egg";
+            amount = creature.LastEggCaloriesEaten;
+        }
+
+        if (creature.LastLivePreyCaloriesEaten > amount)
+        {
+            source = "fresh kill";
+            amount = creature.LastLivePreyCaloriesEaten;
+        }
+
+        return $"{source} {amount:0.00} raw";
     }
 
     private void DrawResources()

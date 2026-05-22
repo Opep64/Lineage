@@ -65,4 +65,24 @@ public static class CreatureGrowth
     {
         return genome.EatCaloriesPerSecond * GrowthFactor(creature, genome);
     }
+
+    public static float EffectiveGutCapacityCalories(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.GutCapacityCalories * GrowthFactor(creature, genome);
+    }
+
+    public static float EffectiveDigestionCaloriesPerSecond(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.DigestionCaloriesPerSecond * GrowthFactor(creature, genome);
+    }
+
+    public static float EffectiveBiteStrength(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.BiteStrength * GrowthFactor(creature, genome);
+    }
+
+    public static float EffectiveDamageResistance(CreatureState creature, CreatureGenome genome)
+    {
+        return genome.DamageResistance * GrowthFactor(creature, genome);
+    }
 }

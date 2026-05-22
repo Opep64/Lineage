@@ -156,6 +156,26 @@ public static class SimulationSnapshotJson
             genome = genome with { EggProductionEnergyPerSecond = CreatureGenome.Baseline.EggProductionEnergyPerSecond };
         }
 
+        if (genome.BiteStrength <= 0f)
+        {
+            genome = genome with { BiteStrength = CreatureGenome.Baseline.BiteStrength };
+        }
+
+        if (genome.GutCapacityCalories <= 0f)
+        {
+            genome = genome with { GutCapacityCalories = CreatureGenome.Baseline.GutCapacityCalories };
+        }
+
+        if (genome.DigestionCaloriesPerSecond <= 0f)
+        {
+            genome = genome with { DigestionCaloriesPerSecond = CreatureGenome.Baseline.DigestionCaloriesPerSecond };
+        }
+
+        if (genome.DamageResistance <= 0f)
+        {
+            genome = genome with { DamageResistance = CreatureGenome.Baseline.DamageResistance };
+        }
+
         return genome;
     }
 

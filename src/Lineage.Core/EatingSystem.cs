@@ -1,7 +1,7 @@
 namespace Lineage.Core;
 
 /// <summary>
-/// Transfers calories from reachable resource patches into creature energy.
+/// Transfers raw calories from reachable food into a creature's gut.
 /// </summary>
 public sealed class EatingSystem(
     UniformSpatialIndex spatialIndex,
@@ -43,6 +43,10 @@ public sealed class EatingSystem(
             creature.FoodContactEdgeDistance = 0f;
             creature.FoodContactCalories = 0f;
             creature.LastCaloriesEaten = 0f;
+            creature.LastPlantCaloriesEaten = 0f;
+            creature.LastCarcassCaloriesEaten = 0f;
+            creature.LastEggCaloriesEaten = 0f;
+            creature.LastLivePreyCaloriesEaten = 0f;
 
             var target = FindBestFoodContact(state, creature, genome, contactRadius);
 
@@ -176,20 +180,46 @@ public sealed class EatingSystem(
         float deltaSeconds)
     {
         var resource = state.Resources[resourceIndex];
-        var amount = Math.Min(resource.Calories, CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds);
+        var amount = Math.Min(
+            resource.Calories,
+            Math.Min(
+                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds,
+                AvailableGutCapacity(creature, genome)));
 
         if (amount <= 0f)
         {
             return;
         }
 
-        var digestedCalories = amount * CreatureDigestion.EfficiencyFor(genome, resource.Kind);
         resource.Calories -= amount;
-        creature.Energy += digestedCalories;
-        creature.LastCaloriesEaten = digestedCalories;
+        AddToGut(ref creature, resource.Kind, amount);
+        creature.LastCaloriesEaten = amount;
+        if (resource.Kind == ResourceKind.Meat)
+        {
+            if (IsCreditedFreshKill(resource, creature))
+            {
+                creature.LastLivePreyCaloriesEaten = amount;
+            }
+            else
+            {
+                creature.LastCarcassCaloriesEaten = amount;
+            }
+        }
+        else
+        {
+            creature.LastPlantCaloriesEaten = amount;
+        }
+
         creature.SecondsSinceLastMeal = 0f;
+        creature.DistanceSinceLastMeal = 0f;
 
         state.Resources[resourceIndex] = resource;
+    }
+
+    private static bool IsCreditedFreshKill(ResourcePatchState resource, CreatureState creature)
+    {
+        return resource.FreshKillSecondsRemaining > 0f
+            && resource.FreshKillAttackerId == creature.Id;
     }
 
     private static void EatEgg(
@@ -200,14 +230,17 @@ public sealed class EatingSystem(
         float deltaSeconds)
     {
         var egg = state.Eggs[eggIndex];
-        var amount = Math.Min(egg.Energy, CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds);
+        var amount = Math.Min(
+            egg.Energy,
+            Math.Min(
+                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds,
+                AvailableGutCapacity(creature, genome)));
 
         if (amount <= 0f)
         {
             return;
         }
 
-        var digestedCalories = amount * CreatureDigestion.MeatEfficiency(genome);
         egg.Energy -= amount;
         if (egg.Energy <= 0f)
         {
@@ -215,11 +248,31 @@ public sealed class EatingSystem(
             egg.PendingDeathReason = EggDeathReason.Predation;
         }
 
-        creature.Energy += digestedCalories;
-        creature.LastCaloriesEaten = digestedCalories;
+        creature.GutMeatCalories += amount;
+        creature.LastCaloriesEaten = amount;
+        creature.LastEggCaloriesEaten = amount;
         creature.SecondsSinceLastMeal = 0f;
+        creature.DistanceSinceLastMeal = 0f;
 
         state.Eggs[eggIndex] = egg;
+    }
+
+    private static float AvailableGutCapacity(CreatureState creature, CreatureGenome genome)
+    {
+        var capacity = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome);
+        return Math.Max(0f, capacity - creature.GutPlantCalories - creature.GutMeatCalories);
+    }
+
+    private static void AddToGut(ref CreatureState creature, ResourceKind kind, float amount)
+    {
+        if (kind == ResourceKind.Meat)
+        {
+            creature.GutMeatCalories += amount;
+        }
+        else
+        {
+            creature.GutPlantCalories += amount;
+        }
     }
 
     private readonly record struct FoodContact(

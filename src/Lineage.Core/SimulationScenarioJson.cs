@@ -53,20 +53,30 @@ public static class SimulationScenarioJson
     private static SimulationScenario ApplyMigrations(string json, SimulationScenario scenario)
     {
         using var document = JsonDocument.Parse(json);
-        if (TryGetProperty(document.RootElement, "initialResourcesPerMillionArea", out _)
-            || !TryGetProperty(document.RootElement, "initialResourceCount", out var legacyResourceCountElement))
+        var migrated = scenario;
+
+        if (!TryGetProperty(document.RootElement, "initialBrainKind", out _)
+            && TryGetProperty(document.RootElement, "randomizeInitialBrainWeights", out var legacyRandomBrainsElement)
+            && legacyRandomBrainsElement.ValueKind is JsonValueKind.True or JsonValueKind.False
+            && legacyRandomBrainsElement.GetBoolean())
         {
-            return scenario;
+            migrated = migrated with { InitialBrainKind = InitialBrainKind.RandomPerFounder };
         }
 
-        var legacyResourceCount = legacyResourceCountElement.GetInt32();
-        return scenario with
+        if (!TryGetProperty(document.RootElement, "initialResourcesPerMillionArea", out _)
+            && TryGetProperty(document.RootElement, "initialResourceCount", out var legacyResourceCountElement))
         {
-            InitialResourcesPerMillionArea = SimulationScenario.CalculateResourcesPerMillionArea(
-                legacyResourceCount,
-                scenario.WorldWidth,
-                scenario.WorldHeight)
-        };
+            var legacyResourceCount = legacyResourceCountElement.GetInt32();
+            migrated = migrated with
+            {
+                InitialResourcesPerMillionArea = SimulationScenario.CalculateResourcesPerMillionArea(
+                    legacyResourceCount,
+                    migrated.WorldWidth,
+                    migrated.WorldHeight)
+            };
+        }
+
+        return migrated;
     }
 
     private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value)

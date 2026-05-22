@@ -15,9 +15,12 @@ public sealed class MovementSystem : ISimulationSystem
             var desiredVelocity = creature.DesiredVelocity.ClampedLength(effectiveMaxSpeed);
             var previousPosition = creature.Position;
             var nextPosition = state.Bounds.Clamp(previousPosition + desiredVelocity * deltaSeconds);
+            var distanceTraveled = SimVector2.Distance(previousPosition, nextPosition);
 
             creature.Position = nextPosition;
             creature.Velocity = (nextPosition - previousPosition) / deltaSeconds;
+            creature.LastDistanceTraveled = distanceTraveled;
+            creature.DistanceSinceLastMeal += distanceTraveled;
 
             var effort = effectiveMaxSpeed > 0f
                 ? desiredVelocity.Length / effectiveMaxSpeed

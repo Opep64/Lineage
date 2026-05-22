@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputCount = 22;
+    public const int InputCount = 29;
 
     public const int OutputCount = 5;
 
@@ -45,13 +45,35 @@ public static class NeuralBrainSchema
 
     public const int ReproductionReadinessInput = 17;
 
-    public const int VisiblePreyDensityInput = 18;
+    public const int VisibleCreatureDensityInput = 18;
 
-    public const int PreyProximityInput = 19;
+    public const int CreatureProximityInput = 19;
 
-    public const int PreyForwardInput = 20;
+    public const int CreatureForwardInput = 20;
 
-    public const int PreyRightInput = 21;
+    public const int CreatureRightInput = 21;
+
+    public const int MeatScentDensityInput = 22;
+
+    public const int MeatScentForwardInput = 23;
+
+    public const int MeatScentRightInput = 24;
+
+    public const int CreatureRelativeBodySizeInput = 25;
+
+    public const int CreatureRelativeSpeedInput = 26;
+
+    public const int CreatureApproachRateInput = 27;
+
+    public const int CreatureFacingAlignmentInput = 28;
+
+    public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
+
+    public const int PreyProximityInput = CreatureProximityInput;
+
+    public const int PreyForwardInput = CreatureForwardInput;
+
+    public const int PreyRightInput = CreatureRightInput;
 
     public const int MoveForwardOutput = 0;
 

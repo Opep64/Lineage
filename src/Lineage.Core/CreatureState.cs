@@ -68,11 +68,47 @@ public struct CreatureState
     public float CreatureContactEdgeDistance { get; set; }
 
     /// <summary>
-    /// Calories transferred from food during the most recent eating pass.
+    /// Raw calories transferred from food into the gut during the most recent eating pass.
     /// </summary>
     public float LastCaloriesEaten { get; set; }
 
+    public float LastPlantCaloriesEaten { get; set; }
+
+    public float LastCarcassCaloriesEaten { get; set; }
+
+    public float LastEggCaloriesEaten { get; set; }
+
+    public float LastLivePreyCaloriesEaten { get; set; }
+
+    /// <summary>
+    /// World units moved during the most recent movement pass.
+    /// </summary>
+    public float LastDistanceTraveled { get; set; }
+
+    /// <summary>
+    /// World units moved since this creature last transferred calories into its gut.
+    /// </summary>
+    public float DistanceSinceLastMeal { get; set; }
+
+    /// <summary>
+    /// Energy released from gut contents during the most recent digestion pass.
+    /// </summary>
+    public float LastCaloriesDigested { get; set; }
+
+    public float LastPlantDigestedEnergy { get; set; }
+
+    public float LastMeatDigestedEnergy { get; set; }
+
+    public float GutPlantCalories { get; set; }
+
+    public float GutMeatCalories { get; set; }
+
     public float LastAttackDamageDealt { get; set; }
+
+    /// <summary>
+    /// Most recent creature that damaged this one, used to attribute fresh-kill meat after injury deaths.
+    /// </summary>
+    public EntityId LastDamagingCreatureId { get; set; }
 
     /// <summary>
     /// Seconds since this creature last transferred calories from food.

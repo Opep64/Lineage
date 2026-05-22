@@ -3,7 +3,10 @@ namespace Lineage.Core;
 /// <summary>
 /// Regrows generic resource patches up to their configured calorie cap.
 /// </summary>
-public sealed class ResourceRegrowthSystem(bool relocateDepletedResources = false) : ISimulationSystem
+public sealed class ResourceRegrowthSystem(
+    bool relocateDepletedResources = false,
+    float resourceClusterStrength = 0f,
+    float resourceClusterRadius = 180f) : ISimulationSystem
 {
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -13,6 +16,16 @@ public sealed class ResourceRegrowthSystem(bool relocateDepletedResources = fals
             var resource = state.Resources[readIndex];
             if (resource.Kind == ResourceKind.Meat)
             {
+                if (resource.FreshKillSecondsRemaining > 0f)
+                {
+                    resource.FreshKillSecondsRemaining = Math.Max(0f, resource.FreshKillSecondsRemaining - deltaSeconds);
+                    if (resource.FreshKillSecondsRemaining <= 0f)
+                    {
+                        resource.FreshKillAttackerId = default;
+                        resource.FreshKillPreyId = default;
+                    }
+                }
+
                 resource.Calories -= resource.DecayCaloriesPerSecond * deltaSeconds;
                 if (resource.Calories <= 0f)
                 {
@@ -25,7 +38,10 @@ public sealed class ResourceRegrowthSystem(bool relocateDepletedResources = fals
 
             if (relocateDepletedResources && resource.Calories <= 0f)
             {
-                resource.Position = state.Biomes.SampleResourcePosition(state.Random);
+                resource.Position = ResourcePlacement.SamplePlantPosition(
+                    state,
+                    resourceClusterStrength,
+                    resourceClusterRadius);
             }
 
             if (state.Biomes.IsInResourceVoid(resource.Position))
