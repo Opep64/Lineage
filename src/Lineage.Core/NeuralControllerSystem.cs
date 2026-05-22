@@ -86,5 +86,7 @@ public sealed class NeuralControllerSystem(
         inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = senses.CreatureFacingAlignment;
         inputs[NeuralBrainSchema.CurrentTerrainDragInput] = senses.CurrentTerrainDrag;
         inputs[NeuralBrainSchema.ForwardTerrainDragInput] = senses.ForwardTerrainDrag;
+        inputs[NeuralBrainSchema.LeftTerrainDragInput] = senses.LeftTerrainDrag;
+        inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
     }
 }

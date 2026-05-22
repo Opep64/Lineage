@@ -18,6 +18,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutMeatScent = 22;
     private const int LegacyInputCountWithoutCreatureRelations = 25;
     private const int LegacyInputCountWithoutTerrainDrag = 29;
+    private const int LegacyInputCountWithoutLateralTerrainDrag = 31;
     private const int LegacyOutputCountWithoutAttack = 4;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
@@ -227,6 +228,16 @@ public sealed class NeuralBrainGenome
         if (weights.Length == NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount)
         {
             return weights;
+        }
+
+        if (weights.Length == LegacyInputCountWithoutLateralTerrainDrag * NeuralBrainSchema.OutputCount)
+        {
+            return NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutLateralTerrainDrag,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
         }
 
         if (weights.Length == LegacyInputCountWithoutTerrainDrag * NeuralBrainSchema.OutputCount)

@@ -89,6 +89,16 @@ public struct CreatureSenseState
     /// </summary>
     public float ForwardTerrainDrag { get; set; }
 
+    /// <summary>
+    /// Local traversal drag sampled a short distance to the creature's left.
+    /// </summary>
+    public float LeftTerrainDrag { get; set; }
+
+    /// <summary>
+    /// Local traversal drag sampled a short distance to the creature's right.
+    /// </summary>
+    public float RightTerrainDrag { get; set; }
+
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }
 

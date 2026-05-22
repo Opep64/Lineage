@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputCount = 31;
+    public const int InputCount = 33;
 
     public const int OutputCount = 5;
 
@@ -70,6 +70,10 @@ public static class NeuralBrainSchema
     public const int CurrentTerrainDragInput = 29;
 
     public const int ForwardTerrainDragInput = 30;
+
+    public const int LeftTerrainDragInput = 31;
+
+    public const int RightTerrainDragInput = 32;
 
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 

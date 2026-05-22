@@ -786,7 +786,7 @@ public partial class Main : Node2D
             $"Vision range {CreatureGrowth.EffectiveSenseRadius(creature, genome):0.0}/{genome.SenseRadius:0.0}\n" +
             $"Vision angle {ToDegrees(CreatureGrowth.EffectiveVisionAngleRadians(creature, genome)):0}deg/{ToDegrees(genome.VisionAngleRadians):0}deg\n" +
             $"Body {CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}/{genome.BodyRadius:0.0}\n" +
-            $"Terrain drag now {senses.CurrentTerrainDrag:0.00}  ahead {senses.ForwardTerrainDrag:0.00}\n" +
+            $"Terrain drag now {senses.CurrentTerrainDrag:0.00}  ahead {senses.ForwardTerrainDrag:0.00}  L {senses.LeftTerrainDrag:0.00}  R {senses.RightTerrainDrag:0.00}\n" +
             $"Eat rate {CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome):0.0}/{genome.EatCaloriesPerSecond:0.0}\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}\n" +
             $"Carrion bias {genome.CarrionAdaptation:0.00}\n" +

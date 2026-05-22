@@ -41,6 +41,10 @@ public static class BehaviorAssay
         var slowTerrainHere = new BehaviorAssayAccumulator();
         var slowTerrainAhead = new BehaviorAssayAccumulator();
         var easierTerrainAhead = new BehaviorAssayAccumulator();
+        var slowTerrainLeft = new BehaviorAssayAccumulator();
+        var slowTerrainRight = new BehaviorAssayAccumulator();
+        var easierTerrainLeft = new BehaviorAssayAccumulator();
+        var easierTerrainRight = new BehaviorAssayAccumulator();
         var reproductionReady = new BehaviorAssayAccumulator();
 
         foreach (var creature in creatures)
@@ -69,6 +73,10 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
             Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
             Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
+            Accumulate(brain, genome, CreateSlowTerrainLeftSenses(), inputs, outputs, ref slowTerrainLeft);
+            Accumulate(brain, genome, CreateSlowTerrainRightSenses(), inputs, outputs, ref slowTerrainRight);
+            Accumulate(brain, genome, CreateEasierTerrainLeftSenses(), inputs, outputs, ref easierTerrainLeft);
+            Accumulate(brain, genome, CreateEasierTerrainRightSenses(), inputs, outputs, ref easierTerrainRight);
             Accumulate(brain, genome, CreateReproductionReadySenses(), inputs, outputs, ref reproductionReady);
         }
 
@@ -90,6 +98,10 @@ public static class BehaviorAssay
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
+            slowTerrainLeft.ToResult("Slow terrain left"),
+            slowTerrainRight.ToResult("Slow terrain right"),
+            easierTerrainLeft.ToResult("Easier terrain left"),
+            easierTerrainRight.ToResult("Easier terrain right"),
             reproductionReady.ToResult("Reproduction ready"));
 
         return summary with
@@ -378,6 +390,42 @@ public static class BehaviorAssay
         };
     }
 
+    private static CreatureSenseState CreateSlowTerrainLeftSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            LeftTerrainDrag = 0.45f
+        };
+    }
+
+    private static CreatureSenseState CreateSlowTerrainRightSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            RightTerrainDrag = 0.45f
+        };
+    }
+
+    private static CreatureSenseState CreateEasierTerrainLeftSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CurrentTerrainDrag = 0.45f,
+            ForwardTerrainDrag = 0.45f,
+            RightTerrainDrag = 0.45f
+        };
+    }
+
+    private static CreatureSenseState CreateEasierTerrainRightSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CurrentTerrainDrag = 0.45f,
+            ForwardTerrainDrag = 0.45f,
+            LeftTerrainDrag = 0.45f
+        };
+    }
+
     private static CreatureSenseState CreateReproductionReadySenses()
     {
         return new CreatureSenseState
@@ -422,6 +470,8 @@ public static class BehaviorAssay
         inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = senses.CreatureFacingAlignment;
         inputs[NeuralBrainSchema.CurrentTerrainDragInput] = senses.CurrentTerrainDrag;
         inputs[NeuralBrainSchema.ForwardTerrainDragInput] = senses.ForwardTerrainDrag;
+        inputs[NeuralBrainSchema.LeftTerrainDragInput] = senses.LeftTerrainDrag;
+        inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
     }
 
     private static string ClassifyMovement(BehaviorAssaySummary summary)
@@ -527,6 +577,20 @@ public static class BehaviorAssay
         var slowHereMoveDelta = summary.SlowTerrainHere.MoveForward - baselineMove;
         var slowAheadMoveDelta = summary.SlowTerrainAhead.MoveForward - baselineMove;
         var easierAheadMoveDelta = summary.EasierTerrainAhead.MoveForward - baselineMove;
+        var turnsAwayFromSlowLeft = summary.SlowTerrainLeft.Turn > 0.15f;
+        var turnsAwayFromSlowRight = summary.SlowTerrainRight.Turn < -0.15f;
+        var turnsTowardEasyLeft = summary.EasierTerrainLeft.Turn < -0.15f;
+        var turnsTowardEasyRight = summary.EasierTerrainRight.Turn > 0.15f;
+
+        if (turnsTowardEasyLeft && turnsTowardEasyRight)
+        {
+            return "steers toward easier terrain";
+        }
+
+        if (turnsAwayFromSlowLeft && turnsAwayFromSlowRight)
+        {
+            return "steers away from slow terrain";
+        }
 
         if (slowAheadMoveDelta < -0.15f && easierAheadMoveDelta > 0.15f)
         {
@@ -723,6 +787,10 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult SlowTerrainHere,
     BehaviorAssayResult SlowTerrainAhead,
     BehaviorAssayResult EasierTerrainAhead,
+    BehaviorAssayResult SlowTerrainLeft,
+    BehaviorAssayResult SlowTerrainRight,
+    BehaviorAssayResult EasierTerrainLeft,
+    BehaviorAssayResult EasierTerrainRight,
     BehaviorAssayResult ReproductionReady)
 {
     public string MovementStyle { get; init; } = "not evaluated";
@@ -757,6 +825,10 @@ public readonly record struct BehaviorAssaySummary(
         SlowTerrainHere,
         SlowTerrainAhead,
         EasierTerrainAhead,
+        SlowTerrainLeft,
+        SlowTerrainRight,
+        EasierTerrainLeft,
+        EasierTerrainRight,
         ReproductionReady
     ];
 }

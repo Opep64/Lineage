@@ -48,6 +48,7 @@ var tests = new (string Name, Action Body)[]
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
+    ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -1533,6 +1534,24 @@ static void CreatureSensingReportsLocalTerrainDrag()
     var senses = simulation.State.Creatures[0].Senses;
     AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.CurrentBiome)), senses.CurrentTerrainDrag, 0.000001, "Current terrain drag");
     AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.ForwardBiome)), senses.ForwardTerrainDrag, 0.000001, "Forward terrain drag");
+
+    creature = simulation.State.Creatures[0];
+    creature.Position = probe.Position;
+    creature.HeadingRadians = -MathF.PI * 0.5f;
+    simulation.State.Creatures[0] = creature;
+    simulation.Step();
+
+    senses = simulation.State.Creatures[0].Senses;
+    AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.ForwardBiome)), senses.RightTerrainDrag, 0.000001, "Right terrain drag");
+
+    creature = simulation.State.Creatures[0];
+    creature.Position = probe.Position;
+    creature.HeadingRadians = MathF.PI * 0.5f;
+    simulation.State.Creatures[0] = creature;
+    simulation.Step();
+
+    senses = simulation.State.Creatures[0].Senses;
+    AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.ForwardBiome)), senses.LeftTerrainDrag, 0.000001, "Left terrain drag");
 }
 
 static void CreatureSensingReportsEggReserveReadiness()
@@ -1733,7 +1752,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(17, summary.Results.Count, "Assay result count");
+    AssertEqual(21, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
@@ -1760,6 +1779,29 @@ static void BehaviorAssaySummarizesTerrainResponse()
     AssertTrue(summary.Baseline.MoveForward > 0.7f, "Probe brain should cruise without terrain cue");
     AssertTrue(summary.SlowTerrainAhead.MoveForward < 0.1f, "Probe brain should slow down when rough terrain is ahead");
     AssertEqual("avoids slow terrain ahead", summary.TerrainResponse, "Terrain response classification");
+}
+
+static void BehaviorAssaySummarizesLateralTerrainResponse()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 406, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.LeftTerrainDragInput] = 4.0f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RightTerrainDragInput] = -4.0f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.SlowTerrainLeft.Turn > 0.9f, "Probe brain should turn right away from rough terrain on the left");
+    AssertTrue(summary.SlowTerrainRight.Turn < -0.9f, "Probe brain should turn left away from rough terrain on the right");
+    AssertTrue(summary.EasierTerrainLeft.Turn < -0.9f, "Probe brain should turn toward easier terrain on the left");
+    AssertTrue(summary.EasierTerrainRight.Turn > 0.9f, "Probe brain should turn toward easier terrain on the right");
+    AssertEqual("steers toward easier terrain", summary.TerrainResponse, "Lateral terrain response classification");
 }
 
 static void ForagerPredatorStarterBrainHuntsCreatureCues()

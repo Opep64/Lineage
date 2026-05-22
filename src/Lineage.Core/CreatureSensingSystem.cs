@@ -107,7 +107,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 EggReserveRatio = eggReserveRatio,
                 ReproductionReadiness = isReadyToLay ? 1f : 0f
             };
-            ApplyTerrainDragSense(ref senses, state, creature, forward, effectiveSenseRadius);
+            ApplyTerrainDragSense(ref senses, state, creature, forward, right, effectiveSenseRadius);
 
             var visibleFoodCount = 0;
             var visiblePlantCount = 0;
@@ -369,6 +369,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         WorldState state,
         CreatureState creature,
         SimVector2 forward,
+        SimVector2 right,
         float effectiveSenseRadius)
     {
         var currentSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(creature.Position));
@@ -377,10 +378,16 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             MinimumTerrainProbeDistance,
             MaximumTerrainProbeDistance);
         var forwardPosition = state.Bounds.Clamp(creature.Position + forward * probeDistance);
+        var leftPosition = state.Bounds.Clamp(creature.Position - right * probeDistance);
+        var rightPosition = state.Bounds.Clamp(creature.Position + right * probeDistance);
         var forwardSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(forwardPosition));
+        var leftSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(leftPosition));
+        var rightSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(rightPosition));
 
         senses.CurrentTerrainDrag = SpeedMultiplierToDrag(currentSpeedMultiplier);
         senses.ForwardTerrainDrag = SpeedMultiplierToDrag(forwardSpeedMultiplier);
+        senses.LeftTerrainDrag = SpeedMultiplierToDrag(leftSpeedMultiplier);
+        senses.RightTerrainDrag = SpeedMultiplierToDrag(rightSpeedMultiplier);
     }
 
     private static float SpeedMultiplierToDrag(float speedMultiplier)
