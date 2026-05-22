@@ -49,6 +49,19 @@ public sealed class UniformSpatialIndex
         }
     }
 
+    public void RebuildCreatures(WorldState state)
+    {
+        foreach (var cell in _cells.Values)
+        {
+            cell.CreatureIndices.Clear();
+        }
+
+        for (var i = 0; i < state.Creatures.Count; i++)
+        {
+            AddCreatureToCell(i, state.Creatures[i].Position);
+        }
+    }
+
     public int FindNearestResourceWithCalories(
         WorldState state,
         SimVector2 position,
@@ -62,7 +75,6 @@ public sealed class UniformSpatialIndex
 
         var bestIndex = -1;
         var bestDistanceSquared = float.PositiveInfinity;
-        var radiusSquared = radius * radius;
 
         var minCellX = ToCell(position.X - radius);
         var maxCellX = ToCell(position.X + radius);
@@ -88,15 +100,13 @@ public sealed class UniformSpatialIndex
                         continue;
                     }
 
-                    var distance = SimVector2.Distance(position, resource.Position);
-                    var edgeDistance = Math.Max(0f, distance - resource.Radius);
-
-                    if (edgeDistance * edgeDistance > radiusSquared)
+                    var distanceSquared = (resource.Position - position).LengthSquared;
+                    var contactRadius = radius + resource.Radius;
+                    if (distanceSquared > contactRadius * contactRadius)
                     {
                         continue;
                     }
 
-                    var distanceSquared = distance * distance;
                     if (distanceSquared < bestDistanceSquared)
                     {
                         bestDistanceSquared = distanceSquared;
@@ -122,7 +132,6 @@ public sealed class UniformSpatialIndex
 
         var bestIndex = -1;
         var bestDistanceSquared = float.PositiveInfinity;
-        var radiusSquared = radius * radius;
 
         var minCellX = ToCell(position.X - radius);
         var maxCellX = ToCell(position.X + radius);
@@ -147,14 +156,13 @@ public sealed class UniformSpatialIndex
                         continue;
                     }
 
-                    var distance = SimVector2.Distance(position, egg.Position);
-                    var edgeDistance = Math.Max(0f, distance - EggPredation.ContactRadius(egg));
-                    if (edgeDistance * edgeDistance > radiusSquared)
+                    var contactRadius = radius + EggPredation.ContactRadius(egg);
+                    var distanceSquared = (egg.Position - position).LengthSquared;
+                    if (distanceSquared > contactRadius * contactRadius)
                     {
                         continue;
                     }
 
-                    var distanceSquared = distance * distance;
                     if (distanceSquared < bestDistanceSquared)
                     {
                         bestDistanceSquared = distanceSquared;
@@ -182,7 +190,6 @@ public sealed class UniformSpatialIndex
 
         results.Clear();
         seen.Clear();
-        var radiusSquared = radius * radius;
 
         var minCellX = ToCell(position.X - radius);
         var maxCellX = ToCell(position.X + radius);
@@ -212,9 +219,8 @@ public sealed class UniformSpatialIndex
                         continue;
                     }
 
-                    var distance = SimVector2.Distance(position, resource.Position);
-                    var edgeDistance = Math.Max(0f, distance - resource.Radius);
-                    if (edgeDistance * edgeDistance <= radiusSquared)
+                    var contactRadius = radius + resource.Radius;
+                    if ((resource.Position - position).LengthSquared <= contactRadius * contactRadius)
                     {
                         results.Add(resourceIndex);
                     }
@@ -238,7 +244,6 @@ public sealed class UniformSpatialIndex
 
         results.Clear();
         seen.Clear();
-        var radiusSquared = radius * radius;
 
         var minCellX = ToCell(position.X - radius);
         var maxCellX = ToCell(position.X + radius);
@@ -268,9 +273,8 @@ public sealed class UniformSpatialIndex
                         continue;
                     }
 
-                    var distance = SimVector2.Distance(position, egg.Position);
-                    var edgeDistance = Math.Max(0f, distance - EggPredation.ContactRadius(egg));
-                    if (edgeDistance * edgeDistance <= radiusSquared)
+                    var contactRadius = radius + EggPredation.ContactRadius(egg);
+                    if ((egg.Position - position).LengthSquared <= contactRadius * contactRadius)
                     {
                         results.Add(eggIndex);
                     }
@@ -283,8 +287,7 @@ public sealed class UniformSpatialIndex
         WorldState state,
         SimVector2 position,
         float radius,
-        List<int> results,
-        HashSet<int> seen)
+        List<int> results)
     {
         if (radius < 0f)
         {
@@ -292,7 +295,6 @@ public sealed class UniformSpatialIndex
         }
 
         results.Clear();
-        seen.Clear();
         var radiusSquared = radius * radius;
 
         var minCellX = ToCell(position.X - radius);
@@ -312,11 +314,6 @@ public sealed class UniformSpatialIndex
                 for (var i = 0; i < cell.CreatureIndices.Count; i++)
                 {
                     var creatureIndex = cell.CreatureIndices[i];
-                    if (!seen.Add(creatureIndex))
-                    {
-                        continue;
-                    }
-
                     var creature = state.Creatures[creatureIndex];
                     var distanceSquared = (creature.Position - position).LengthSquared;
                     if (distanceSquared <= radiusSquared)
@@ -326,6 +323,22 @@ public sealed class UniformSpatialIndex
                 }
             }
         }
+    }
+
+    public void AddCreatureCandidates(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        List<int> results,
+        HashSet<int> seen)
+    {
+        if (radius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius), "Query radius cannot be negative.");
+        }
+
+        seen.Clear();
+        AddCreatureCandidates(state, position, radius, results);
     }
 
     private void AddResourceToCells(int resourceIndex, SimVector2 position, float radius)

@@ -20,7 +20,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly List<int> _eggCandidates = [];
     private readonly HashSet<int> _seenEggCandidates = [];
     private readonly List<int> _creatureCandidates = [];
-    private readonly HashSet<int> _seenCreatureCandidates = [];
 
     public CreatureSensingSystem(
         UniformSpatialIndex spatialIndex,
@@ -83,8 +82,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 state,
                 creature.Position,
                 effectiveSenseRadius + 12f,
-                _creatureCandidates,
-                _seenCreatureCandidates);
+                _creatureCandidates);
 
             var energyRatio = Math.Clamp(creature.Energy / genome.ReproductionEnergyThreshold, 0f, 1f);
             var eggReserveRatio = Math.Clamp(creature.ReproductiveEnergy / genome.OffspringEnergyInvestment, 0f, 1f);

@@ -10,3 +10,14 @@ public sealed class SpatialIndexRebuildSystem(UniformSpatialIndex spatialIndex) 
         spatialIndex.Rebuild(state);
     }
 }
+
+/// <summary>
+/// Refreshes only creature positions after movement when resources and eggs have not moved.
+/// </summary>
+public sealed class CreatureSpatialIndexRebuildSystem(UniformSpatialIndex spatialIndex) : ISimulationSystem
+{
+    public void Update(WorldState state, float deltaSeconds)
+    {
+        spatialIndex.RebuildCreatures(state);
+    }
+}

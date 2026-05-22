@@ -11,7 +11,6 @@ public sealed class CreatureAttackSystem(
     bool requireAttackIntent = true) : ISimulationSystem
 {
     private readonly List<int> _creatureCandidates = [];
-    private readonly HashSet<int> _seenCreatureCandidates = [];
     private readonly List<float> _damageByCreature = [];
     private readonly List<EntityId> _damageSourceByCreature = [];
     private readonly float _biteDamagePerSecond = ValidateNonNegative(biteDamagePerSecond, nameof(biteDamagePerSecond));
@@ -31,8 +30,7 @@ public sealed class CreatureAttackSystem(
                 state,
                 attacker.Position,
                 attackerRadius + _biteRangePadding + 12f,
-                _creatureCandidates,
-                _seenCreatureCandidates);
+                _creatureCandidates);
 
             attacker.IsTouchingCreature = false;
             attacker.CreatureContactId = default;

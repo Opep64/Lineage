@@ -62,6 +62,7 @@ var tests = new (string Name, Action Body)[]
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
+    ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
@@ -2439,6 +2440,48 @@ static void ResourceVoidBorderExcludesPlantGrowth()
         var position = map.SampleResourcePosition(random);
         AssertTrue(!map.IsInResourceVoid(position), $"Sample {i} should be inside the resource area");
     }
+}
+
+static void CreatureOnlySpatialRebuildPreservesStaticEntities()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f
+        },
+        seed: 2);
+    var index = new UniformSpatialIndex(10f);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(10f, 10f), energy: 10f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Position = new SimVector2(50f, 50f),
+        Radius = 2f,
+        Calories = 8f,
+        MaxCalories = 10f
+    });
+    var candidates = new List<int>();
+    var seen = new HashSet<int>();
+
+    index.Rebuild(simulation.State);
+    var creature = simulation.State.Creatures[0];
+    creature.Position = new SimVector2(80f, 80f);
+    simulation.State.Creatures[0] = creature;
+    index.RebuildCreatures(simulation.State);
+
+    index.AddCreatureCandidates(simulation.State, new SimVector2(10f, 10f), 5f, candidates, seen);
+    AssertEqual(0, candidates.Count, "Old creature cell should be empty after creature-only rebuild");
+
+    index.AddCreatureCandidates(simulation.State, new SimVector2(80f, 80f), 5f, candidates, seen);
+    AssertEqual(1, candidates.Count, "New creature cell should contain moved creature");
+    AssertEqual(0, candidates[0], "Moved creature index");
+
+    var resourceIndex = index.FindNearestResourceWithCalories(
+        simulation.State,
+        new SimVector2(50f, 50f),
+        radius: 5f);
+    AssertEqual(0, resourceIndex, "Resource index should survive creature-only rebuild");
 }
 
 static void ScenarioFactoryCreatesDeterministicBiomes()
