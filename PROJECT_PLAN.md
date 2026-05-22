@@ -412,6 +412,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add scenario-backed upkeep costs for bite strength and damage resistance, plus report/trait-summary output and Godot inspection. Done.
 - Tune the first shared combat values. Gentle, balanced, harsh, and test scenarios currently use bite strength `0.55`, damage resistance `1.0`, bite strength upkeep `0.04`, damage resistance upkeep `0.03`, bite damage `0.18`, bite energy cost `0.15`, and bite reach `1.0`. Done.
 - Later: add richer attack/defense/body-strength genes, additional behavior assays, and pressure presets where a plant-to-omnivore-to-meat transition becomes plausible without flipping instantly.
+- Future fix: reduce early single-file creature-following artifacts by keeping living-creature sensing separate from generic food steering unless the scenario/brain explicitly uses predation behavior. Visible creatures can currently contribute to generic food cues, which may cause starter foragers to chase or align behind other creatures. Dedicated creature inputs and attack intent should drive predator behavior instead.
 
 ### Phase 14: Terrain, Climate, And World Editing
 
