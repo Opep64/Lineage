@@ -10,6 +10,7 @@ public sealed class ResourceRegrowthSystem(
 {
     public void Update(WorldState state, float deltaSeconds)
     {
+        var resourcesDirty = false;
         var writeIndex = 0;
         for (var readIndex = 0; readIndex < state.Resources.Count; readIndex++)
         {
@@ -30,6 +31,7 @@ public sealed class ResourceRegrowthSystem(
                 resource.Calories -= resource.DecayCaloriesPerSecond * deltaSeconds;
                 if (resource.Calories <= 0f)
                 {
+                    resourcesDirty = true;
                     continue;
                 }
 
@@ -43,6 +45,7 @@ public sealed class ResourceRegrowthSystem(
                     state,
                     resourceClusterStrength,
                     resourceClusterRadius);
+                resourcesDirty = true;
             }
 
             if (state.Biomes.IsInResourceVoid(resource.Position))
@@ -60,6 +63,12 @@ public sealed class ResourceRegrowthSystem(
         if (writeIndex < state.Resources.Count)
         {
             state.Resources.RemoveRange(writeIndex, state.Resources.Count - writeIndex);
+            resourcesDirty = true;
+        }
+
+        if (resourcesDirty)
+        {
+            state.MarkResourcesDirty();
         }
     }
 

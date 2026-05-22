@@ -9,7 +9,7 @@
   "biomeCellSize": 450,
   "resourceVoidBorderWidth": 125,
   "fixedDeltaSeconds": 0.033333335,
-  "spatialCellSize": 48,
+  "spatialCellSize": 192,
   "statsSnapshotIntervalTicks": 10,
   "initialCreatureCount": 120,
   "initialResourcesPerMillionArea": 145,

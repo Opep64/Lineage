@@ -51,6 +51,7 @@ public sealed class EggSystem(float eggEnergyCostPerSecond = 0f) : ISimulationSy
         if (writeIndex < state.Eggs.Count)
         {
             state.Eggs.RemoveRange(writeIndex, state.Eggs.Count - writeIndex);
+            state.MarkEggsDirty();
         }
     }
 

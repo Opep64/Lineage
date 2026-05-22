@@ -42,7 +42,7 @@ public sealed record SimulationScenario
 
     public float FixedDeltaSeconds { get; init; } = 1f / 30f;
 
-    public float SpatialCellSize { get; init; } = 48f;
+    public float SpatialCellSize { get; init; } = 192f;
 
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 

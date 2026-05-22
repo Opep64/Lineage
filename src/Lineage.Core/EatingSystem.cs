@@ -9,9 +9,9 @@ public sealed class EatingSystem(
     bool requireEatIntent = false) : ISimulationSystem
 {
     private readonly List<int> _resourceCandidates = [];
-    private readonly HashSet<int> _seenResourceCandidates = [];
+    private readonly IndexStampSet _seenResourceCandidates = new();
     private readonly List<int> _eggCandidates = [];
-    private readonly HashSet<int> _seenEggCandidates = [];
+    private readonly IndexStampSet _seenEggCandidates = new();
 
     public void Update(WorldState state, float deltaSeconds)
     {

@@ -46,6 +46,12 @@ public sealed class WorldState
 
     public List<NeuralBrainGenome> Brains { get; } = [];
 
+    internal long ResourceIndexVersion { get; private set; }
+
+    internal long EggIndexVersion { get; private set; }
+
+    internal SimulationProfile? Profile { get; set; }
+
     public EntityId CreateEntityId()
     {
         return new EntityId(_nextEntityId++);
@@ -199,6 +205,7 @@ public sealed class WorldState
             BrainId = brainId
         });
         Stats.RecordEggLaid();
+        MarkEggsDirty();
         return id;
     }
 
@@ -286,7 +293,18 @@ public sealed class WorldState
         }
 
         Resources.Add(patch);
+        MarkResourcesDirty();
         return id;
+    }
+
+    internal void MarkResourcesDirty()
+    {
+        ResourceIndexVersion++;
+    }
+
+    internal void MarkEggsDirty()
+    {
+        EggIndexVersion++;
     }
 
     internal void AdvanceClock(float deltaSeconds)

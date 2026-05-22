@@ -10,8 +10,16 @@ namespace Lineage.Core;
 /// </remarks>
 public sealed class UniformSpatialIndex
 {
-    private readonly Dictionary<long, SpatialCell> _cells = [];
+    private const float DirectionEpsilonSquared = 0.00000001f;
+
+    private SpatialCell?[] _cells = [];
+    private readonly List<SpatialCell> _resourceCells = [];
+    private readonly List<SpatialCell> _eggCells = [];
     private readonly List<SpatialCell> _creatureCells = [];
+    private int _cellCountX;
+    private int _cellCountY;
+    private long _indexedResourceVersion = -1;
+    private long _indexedEggVersion = -1;
 
     public UniformSpatialIndex(float cellSize)
     {
@@ -27,36 +35,62 @@ public sealed class UniformSpatialIndex
 
     public void Rebuild(WorldState state)
     {
-        foreach (var cell in _cells.Values)
+        EnsureGrid(state.Bounds);
+
+        if (_indexedResourceVersion != state.ResourceIndexVersion)
         {
-            cell.Clear();
+            RebuildResources(state);
+            _indexedResourceVersion = state.ResourceIndexVersion;
         }
 
-        _creatureCells.Clear();
+        if (_indexedEggVersion != state.EggIndexVersion)
+        {
+            RebuildEggs(state);
+            _indexedEggVersion = state.EggIndexVersion;
+        }
+
+        RebuildCreatures(state);
+    }
+
+    private void RebuildResources(WorldState state)
+    {
+        foreach (var cell in _resourceCells)
+        {
+            cell.ClearResources();
+        }
+
+        _resourceCells.Clear();
 
         for (var i = 0; i < state.Resources.Count; i++)
         {
             var resource = state.Resources[i];
-            AddResourceToCells(i, resource.Position, resource.Radius);
+            AddResourceToCells(i, resource.Kind, resource.Position, resource.Radius);
         }
+    }
+
+    private void RebuildEggs(WorldState state)
+    {
+        foreach (var cell in _eggCells)
+        {
+            cell.ClearEggs();
+        }
+
+        _eggCells.Clear();
 
         for (var i = 0; i < state.Eggs.Count; i++)
         {
             var egg = state.Eggs[i];
             AddEggToCells(i, egg.Position, EggPredation.ContactRadius(egg));
         }
-
-        for (var i = 0; i < state.Creatures.Count; i++)
-        {
-            AddCreatureToCell(i, state.Creatures[i].Position);
-        }
     }
 
     public void RebuildCreatures(WorldState state)
     {
+        EnsureGrid(state.Bounds);
+
         foreach (var cell in _creatureCells)
         {
-            cell.CreatureIndices.Clear();
+            cell.ClearCreatures();
         }
 
         _creatureCells.Clear();
@@ -81,16 +115,17 @@ public sealed class UniformSpatialIndex
         var bestIndex = -1;
         var bestDistanceSquared = float.PositiveInfinity;
 
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return -1;
+        }
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                if (!_cells.TryGetValue(MakeKey(cellX, cellY), out var cell))
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
                 {
                     continue;
                 }
@@ -138,16 +173,17 @@ public sealed class UniformSpatialIndex
         var bestIndex = -1;
         var bestDistanceSquared = float.PositiveInfinity;
 
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return -1;
+        }
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                if (!_cells.TryGetValue(MakeKey(cellX, cellY), out var cell))
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
                 {
                     continue;
                 }
@@ -196,16 +232,17 @@ public sealed class UniformSpatialIndex
         results.Clear();
         seen.Clear();
 
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                if (!_cells.TryGetValue(MakeKey(cellX, cellY), out var cell))
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
                 {
                     continue;
                 }
@@ -213,6 +250,350 @@ public sealed class UniformSpatialIndex
                 for (var i = 0; i < cell.ResourceIndices.Count; i++)
                 {
                     var resourceIndex = cell.ResourceIndices[i];
+                    if (!seen.Add(resourceIndex))
+                    {
+                        continue;
+                    }
+
+                    var resource = state.Resources[resourceIndex];
+                    if (resource.Calories <= minimumCalories)
+                    {
+                        continue;
+                    }
+
+                    var contactRadius = radius + resource.Radius;
+                    if ((resource.Position - position).LengthSquared <= contactRadius * contactRadius)
+                    {
+                        results.Add(resourceIndex);
+                    }
+                }
+            }
+        }
+    }
+
+    internal void AddResourceCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        AddResourceCandidatesWithKind(
+            state,
+            position,
+            radius,
+            minimumCalories,
+            kind: null,
+            results,
+            seen);
+    }
+
+    public void AddPlantAndMeatResourceCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float plantRadius,
+        float meatRadius,
+        float minimumCalories,
+        List<int> plantResults,
+        HashSet<int> seenPlants,
+        List<int> meatResults,
+        HashSet<int> seenMeat)
+    {
+        if (plantRadius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(plantRadius), "Query radius cannot be negative.");
+        }
+
+        if (meatRadius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(meatRadius), "Query radius cannot be negative.");
+        }
+
+        plantResults.Clear();
+        seenPlants.Clear();
+        meatResults.Clear();
+        seenMeat.Clear();
+
+        var maxRadius = MathF.Max(plantRadius, meatRadius);
+        if (!TryGetCellRange(position, maxRadius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        _ = TryGetCellRange(position, plantRadius, out var minPlantCellX, out var maxPlantCellX, out var minPlantCellY, out var maxPlantCellY);
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                if (cellX >= minPlantCellX
+                    && cellX <= maxPlantCellX
+                    && cellY >= minPlantCellY
+                    && cellY <= maxPlantCellY)
+                {
+                    var cell = GetCell(cellX, cellY);
+                    if (cell is null)
+                    {
+                        continue;
+                    }
+
+                    AddResourceCandidatesFromList(
+                        state,
+                        position,
+                        plantRadius,
+                        minimumCalories,
+                        cell.PlantResourceIndices,
+                        plantResults,
+                        seenPlants);
+
+                    AddResourceCandidatesFromList(
+                        state,
+                        position,
+                        meatRadius,
+                        minimumCalories,
+                        cell.MeatResourceIndices,
+                        meatResults,
+                        seenMeat);
+                    continue;
+                }
+
+                var meatCell = GetCell(cellX, cellY);
+                if (meatCell is null || meatCell.MeatResourceIndices.Count == 0)
+                {
+                    continue;
+                }
+
+                AddResourceCandidatesFromList(
+                    state,
+                    position,
+                    meatRadius,
+                    minimumCalories,
+                    meatCell.MeatResourceIndices,
+                    meatResults,
+                    seenMeat);
+            }
+        }
+    }
+
+    internal void AddPlantAndMeatResourceCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float plantRadius,
+        float meatRadius,
+        float minimumCalories,
+        List<int> plantResults,
+        IndexStampSet seenPlants,
+        List<int> meatResults,
+        IndexStampSet seenMeat)
+    {
+        if (plantRadius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(plantRadius), "Query radius cannot be negative.");
+        }
+
+        if (meatRadius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(meatRadius), "Query radius cannot be negative.");
+        }
+
+        plantResults.Clear();
+        seenPlants.Begin(state.Resources.Count);
+        meatResults.Clear();
+        seenMeat.Begin(state.Resources.Count);
+
+        var maxRadius = MathF.Max(plantRadius, meatRadius);
+        if (!TryGetCellRange(position, maxRadius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        _ = TryGetCellRange(position, plantRadius, out var minPlantCellX, out var maxPlantCellX, out var minPlantCellY, out var maxPlantCellY);
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                if (cellX >= minPlantCellX
+                    && cellX <= maxPlantCellX
+                    && cellY >= minPlantCellY
+                    && cellY <= maxPlantCellY)
+                {
+                    var cell = GetCell(cellX, cellY);
+                    if (cell is null)
+                    {
+                        continue;
+                    }
+
+                    AddResourceCandidatesFromList(
+                        state,
+                        position,
+                        plantRadius,
+                        minimumCalories,
+                        cell.PlantResourceIndices,
+                        plantResults,
+                        seenPlants);
+
+                    AddResourceCandidatesFromList(
+                        state,
+                        position,
+                        meatRadius,
+                        minimumCalories,
+                        cell.MeatResourceIndices,
+                        meatResults,
+                        seenMeat);
+                    continue;
+                }
+
+                var meatCell = GetCell(cellX, cellY);
+                if (meatCell is null || meatCell.MeatResourceIndices.Count == 0)
+                {
+                    continue;
+                }
+
+                AddResourceCandidatesFromList(
+                    state,
+                    position,
+                    meatRadius,
+                    minimumCalories,
+                    meatCell.MeatResourceIndices,
+                    meatResults,
+                    seenMeat);
+            }
+        }
+    }
+
+    public void AddResourceCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        ResourceKind kind,
+        List<int> results,
+        HashSet<int> seen)
+    {
+        AddResourceCandidatesWithKind(
+            state,
+            position,
+            radius,
+            minimumCalories,
+            kind,
+            results,
+            seen);
+    }
+
+    internal void AddResourceCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        ResourceKind kind,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        AddResourceCandidatesWithKind(
+            state,
+            position,
+            radius,
+            minimumCalories,
+            kind,
+            results,
+            seen);
+    }
+
+    private void AddResourceCandidatesWithKind(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        ResourceKind? kind,
+        List<int> results,
+        HashSet<int> seen)
+    {
+        if (radius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius), "Query radius cannot be negative.");
+        }
+
+        results.Clear();
+        seen.Clear();
+
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                var resourceIndices = ResourceIndicesForKind(cell, kind);
+                for (var i = 0; i < resourceIndices.Count; i++)
+                {
+                    var resourceIndex = resourceIndices[i];
+                    if (!seen.Add(resourceIndex))
+                    {
+                        continue;
+                    }
+
+                    var resource = state.Resources[resourceIndex];
+                    if (resource.Calories <= minimumCalories)
+                    {
+                        continue;
+                    }
+
+                    var contactRadius = radius + resource.Radius;
+                    if ((resource.Position - position).LengthSquared <= contactRadius * contactRadius)
+                    {
+                        results.Add(resourceIndex);
+                    }
+                }
+            }
+        }
+    }
+
+    private void AddResourceCandidatesWithKind(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        ResourceKind? kind,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        if (radius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius), "Query radius cannot be negative.");
+        }
+
+        results.Clear();
+        seen.Begin(state.Resources.Count);
+
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                var resourceIndices = ResourceIndicesForKind(cell, kind);
+                for (var i = 0; i < resourceIndices.Count; i++)
+                {
+                    var resourceIndex = resourceIndices[i];
                     if (!seen.Add(resourceIndex))
                     {
                         continue;
@@ -250,16 +631,72 @@ public sealed class UniformSpatialIndex
         results.Clear();
         seen.Clear();
 
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                if (!_cells.TryGetValue(MakeKey(cellX, cellY), out var cell))
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < cell.EggIndices.Count; i++)
+                {
+                    var eggIndex = cell.EggIndices[i];
+                    if (!seen.Add(eggIndex))
+                    {
+                        continue;
+                    }
+
+                    var egg = state.Eggs[eggIndex];
+                    if (egg.Energy <= minimumEnergy || egg.Health <= 0f)
+                    {
+                        continue;
+                    }
+
+                    var contactRadius = radius + EggPredation.ContactRadius(egg);
+                    if ((egg.Position - position).LengthSquared <= contactRadius * contactRadius)
+                    {
+                        results.Add(eggIndex);
+                    }
+                }
+            }
+        }
+    }
+
+    internal void AddEggCandidatesWithEnergy(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumEnergy,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        if (radius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius), "Query radius cannot be negative.");
+        }
+
+        results.Clear();
+        seen.Begin(state.Eggs.Count);
+
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
                 {
                     continue;
                 }
@@ -302,16 +739,17 @@ public sealed class UniformSpatialIndex
         results.Clear();
         var radiusSquared = radius * radius;
 
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                if (!_cells.TryGetValue(MakeKey(cellX, cellY), out var cell))
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
                 {
                     continue;
                 }
@@ -346,42 +784,154 @@ public sealed class UniformSpatialIndex
         AddCreatureCandidates(state, position, radius, results);
     }
 
-    private void AddResourceToCells(int resourceIndex, SimVector2 position, float radius)
+    internal VisibleCreatureQueryResult FindNearestVisibleCreature(
+        WorldState state,
+        int selfIndex,
+        EntityId selfId,
+        SimVector2 position,
+        float queryRadius,
+        float senseRadius,
+        SimVector2 forward,
+        bool hasLimitedVision,
+        float visionCosThreshold,
+        float[] bodyRadii)
     {
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (queryRadius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(queryRadius), "Query radius cannot be negative.");
+        }
+
+        if (senseRadius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(senseRadius), "Sense radius cannot be negative.");
+        }
+
+        if (!TryGetCellRange(position, queryRadius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return VisibleCreatureQueryResult.Empty;
+        }
+
+        var queryRadiusSquared = queryRadius * queryRadius;
+        var candidateCount = 0;
+        var visibleCount = 0;
+        var nearestIndex = -1;
+        var nearestDistanceSquared = float.PositiveInfinity;
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                GetOrCreateCell(cellX, cellY).ResourceIndices.Add(resourceIndex);
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < cell.CreatureIndices.Count; i++)
+                {
+                    var otherCreatureIndex = cell.CreatureIndices[i];
+                    var otherCreature = state.Creatures[otherCreatureIndex];
+                    var toOther = otherCreature.Position - position;
+                    var distanceSquared = toOther.LengthSquared;
+                    if (distanceSquared > queryRadiusSquared)
+                    {
+                        continue;
+                    }
+
+                    candidateCount++;
+
+                    if (otherCreatureIndex == selfIndex
+                        || otherCreature.Id == selfId
+                        || otherCreature.Health <= 0f
+                        || otherCreature.Energy <= 0f)
+                    {
+                        continue;
+                    }
+
+                    var otherRadius = bodyRadii[otherCreatureIndex];
+                    if (otherRadius < 0f)
+                    {
+                        otherRadius = CreatureGrowth.EffectiveBodyRadius(
+                            otherCreature,
+                            state.GetGenome(otherCreature.GenomeId));
+                        bodyRadii[otherCreatureIndex] = otherRadius;
+                    }
+
+                    if (!IsWithinEdgeRange(distanceSquared, otherRadius, senseRadius)
+                        || !IsInsideVisionCone(toOther, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
+                    {
+                        continue;
+                    }
+
+                    visibleCount++;
+                    if (distanceSquared < nearestDistanceSquared)
+                    {
+                        nearestDistanceSquared = distanceSquared;
+                        nearestIndex = otherCreatureIndex;
+                    }
+                }
+            }
+        }
+
+        return new VisibleCreatureQueryResult(candidateCount, visibleCount, nearestIndex, nearestDistanceSquared);
+    }
+
+    private void AddResourceToCells(int resourceIndex, ResourceKind kind, SimVector2 position, float radius)
+    {
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetOrCreateCell(cellX, cellY);
+                if (cell.ResourceIndices.Count == 0)
+                {
+                    _resourceCells.Add(cell);
+                }
+
+                cell.ResourceIndices.Add(resourceIndex);
+                if (kind == ResourceKind.Meat)
+                {
+                    cell.MeatResourceIndices.Add(resourceIndex);
+                }
+                else
+                {
+                    cell.PlantResourceIndices.Add(resourceIndex);
+                }
             }
         }
     }
 
     private void AddEggToCells(int eggIndex, SimVector2 position, float radius)
     {
-        var minCellX = ToCell(position.X - radius);
-        var maxCellX = ToCell(position.X + radius);
-        var minCellY = ToCell(position.Y - radius);
-        var maxCellY = ToCell(position.Y + radius);
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
-                GetOrCreateCell(cellX, cellY).EggIndices.Add(eggIndex);
+                var cell = GetOrCreateCell(cellX, cellY);
+                if (cell.EggIndices.Count == 0)
+                {
+                    _eggCells.Add(cell);
+                }
+
+                cell.EggIndices.Add(eggIndex);
             }
         }
     }
 
     private void AddCreatureToCell(int creatureIndex, SimVector2 position)
     {
-        var cellX = ToCell(position.X);
-        var cellY = ToCell(position.Y);
+        var cellX = ToBoundedCell(position.X, _cellCountX);
+        var cellY = ToBoundedCell(position.Y, _cellCountY);
         var cell = GetOrCreateCell(cellX, cellY);
         if (cell.CreatureIndices.Count == 0)
         {
@@ -391,15 +941,72 @@ public sealed class UniformSpatialIndex
         cell.CreatureIndices.Add(creatureIndex);
     }
 
-    private SpatialCell GetOrCreateCell(int cellX, int cellY)
+    private void EnsureGrid(WorldBounds bounds)
     {
-        var key = MakeKey(cellX, cellY);
-        if (!_cells.TryGetValue(key, out var cell))
+        var cellCountX = CalculateCellCount(bounds.Width, CellSize);
+        var cellCountY = CalculateCellCount(bounds.Height, CellSize);
+        if (_cells.Length > 0 && cellCountX == _cellCountX && cellCountY == _cellCountY)
         {
-            cell = new SpatialCell();
-            _cells.Add(key, cell);
+            return;
         }
 
+        var cellCount = checked((long)cellCountX * cellCountY);
+        if (cellCount > int.MaxValue)
+        {
+            throw new InvalidOperationException("Spatial index grid is too large for a single array.");
+        }
+
+        _cells = new SpatialCell?[cellCount];
+        _cellCountX = cellCountX;
+        _cellCountY = cellCountY;
+        _resourceCells.Clear();
+        _eggCells.Clear();
+        _creatureCells.Clear();
+        _indexedResourceVersion = -1;
+        _indexedEggVersion = -1;
+    }
+
+    private bool TryGetCellRange(
+        SimVector2 position,
+        float radius,
+        out int minCellX,
+        out int maxCellX,
+        out int minCellY,
+        out int maxCellY)
+    {
+        minCellX = 0;
+        maxCellX = 0;
+        minCellY = 0;
+        maxCellY = 0;
+
+        if (_cells.Length == 0)
+        {
+            return false;
+        }
+
+        minCellX = ToBoundedCell(position.X - radius, _cellCountX);
+        maxCellX = ToBoundedCell(position.X + radius, _cellCountX);
+        minCellY = ToBoundedCell(position.Y - radius, _cellCountY);
+        maxCellY = ToBoundedCell(position.Y + radius, _cellCountY);
+        return true;
+    }
+
+    private SpatialCell? GetCell(int cellX, int cellY)
+    {
+        return _cells[cellY * _cellCountX + cellX];
+    }
+
+    private SpatialCell GetOrCreateCell(int cellX, int cellY)
+    {
+        var index = cellY * _cellCountX + cellX;
+        var cell = _cells[index];
+        if (cell is not null)
+        {
+            return cell;
+        }
+
+        cell = new SpatialCell();
+        _cells[index] = cell;
         return cell;
     }
 
@@ -408,9 +1015,114 @@ public sealed class UniformSpatialIndex
         return (int)MathF.Floor(coordinate / CellSize);
     }
 
-    private static long MakeKey(int cellX, int cellY)
+    private int ToBoundedCell(float coordinate, int cellCount)
     {
-        return ((long)cellX << 32) ^ (uint)cellY;
+        return Math.Clamp(ToCell(coordinate), 0, cellCount - 1);
+    }
+
+    private static int CalculateCellCount(float length, float cellSize)
+    {
+        return Math.Max(1, (int)MathF.Floor(length / cellSize) + 1);
+    }
+
+    private static bool IsInsideVisionCone(
+        SimVector2 toTarget,
+        float distanceSquared,
+        SimVector2 forward,
+        bool hasLimitedVision,
+        float visionCosThreshold)
+    {
+        if (!hasLimitedVision || distanceSquared <= DirectionEpsilonSquared)
+        {
+            return true;
+        }
+
+        var forwardDot = SimVector2.Dot(toTarget, forward);
+        var thresholdSquaredDistance = visionCosThreshold * visionCosThreshold * distanceSquared;
+        if (visionCosThreshold >= 0f)
+        {
+            return forwardDot >= 0f && forwardDot * forwardDot >= thresholdSquaredDistance;
+        }
+
+        return forwardDot >= 0f || forwardDot * forwardDot <= thresholdSquaredDistance;
+    }
+
+    private static bool IsWithinEdgeRange(float distanceSquared, float targetRadius, float senseRadius)
+    {
+        var maxCenterDistance = targetRadius + senseRadius;
+        return distanceSquared <= maxCenterDistance * maxCenterDistance;
+    }
+
+    private static void AddResourceCandidatesFromList(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> resourceIndices,
+        List<int> results,
+        HashSet<int> seen)
+    {
+        for (var i = 0; i < resourceIndices.Count; i++)
+        {
+            var resourceIndex = resourceIndices[i];
+            if (!seen.Add(resourceIndex))
+            {
+                continue;
+            }
+
+            var resource = state.Resources[resourceIndex];
+            if (resource.Calories <= minimumCalories)
+            {
+                continue;
+            }
+
+            var contactRadius = radius + resource.Radius;
+            if ((resource.Position - position).LengthSquared <= contactRadius * contactRadius)
+            {
+                results.Add(resourceIndex);
+            }
+        }
+    }
+
+    private static void AddResourceCandidatesFromList(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> resourceIndices,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        for (var i = 0; i < resourceIndices.Count; i++)
+        {
+            var resourceIndex = resourceIndices[i];
+            if (!seen.Add(resourceIndex))
+            {
+                continue;
+            }
+
+            var resource = state.Resources[resourceIndex];
+            if (resource.Calories <= minimumCalories)
+            {
+                continue;
+            }
+
+            var contactRadius = radius + resource.Radius;
+            if ((resource.Position - position).LengthSquared <= contactRadius * contactRadius)
+            {
+                results.Add(resourceIndex);
+            }
+        }
+    }
+
+    private static List<int> ResourceIndicesForKind(SpatialCell cell, ResourceKind? kind)
+    {
+        return kind switch
+        {
+            ResourceKind.Plant => cell.PlantResourceIndices,
+            ResourceKind.Meat => cell.MeatResourceIndices,
+            _ => cell.ResourceIndices
+        };
     }
 
     private sealed class SpatialCell
@@ -419,13 +1131,36 @@ public sealed class UniformSpatialIndex
 
         public List<int> ResourceIndices { get; } = [];
 
+        public List<int> PlantResourceIndices { get; } = [];
+
+        public List<int> MeatResourceIndices { get; } = [];
+
         public List<int> EggIndices { get; } = [];
 
-        public void Clear()
+        public void ClearCreatures()
         {
             CreatureIndices.Clear();
+        }
+
+        public void ClearResources()
+        {
             ResourceIndices.Clear();
+            PlantResourceIndices.Clear();
+            MeatResourceIndices.Clear();
+        }
+
+        public void ClearEggs()
+        {
             EggIndices.Clear();
         }
     }
+}
+
+internal readonly record struct VisibleCreatureQueryResult(
+    int CandidateCount,
+    int VisibleCount,
+    int NearestIndex,
+    float NearestDistanceSquared)
+{
+    public static VisibleCreatureQueryResult Empty { get; } = new(0, 0, -1, float.PositiveInfinity);
 }

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Lineage.Core;
 
 /// <summary>
@@ -23,6 +25,8 @@ public sealed class Simulation
 
     public WorldState State { get; }
 
+    public SimulationProfile? Profile { get; set; }
+
     public void Step()
     {
         Step(Config.FixedDeltaSeconds);
@@ -35,9 +39,33 @@ public sealed class Simulation
             throw new ArgumentOutOfRangeException(nameof(deltaSeconds), "Step duration must be finite and positive.");
         }
 
-        foreach (var system in _systems)
+        State.Profile = Profile is { IsActive: true }
+            ? Profile
+            : null;
+
+        if (Profile is null || !Profile.IsActive)
         {
-            system.Update(State, deltaSeconds);
+            foreach (var system in _systems)
+            {
+                system.Update(State, deltaSeconds);
+            }
+        }
+        else
+        {
+            Profile.EnsureSystems(_systems);
+            Profile.BeginStep();
+            for (var i = 0; i < _systems.Length; i++)
+            {
+                var startedAt = Stopwatch.GetTimestamp();
+                try
+                {
+                    _systems[i].Update(State, deltaSeconds);
+                }
+                finally
+                {
+                    Profile.RecordSystem(i, Stopwatch.GetTimestamp() - startedAt);
+                }
+            }
         }
 
         State.AdvanceClock(deltaSeconds);

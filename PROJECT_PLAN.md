@@ -155,6 +155,7 @@ Performance-pass notes from 2026-05-20:
   - use chunk-level summaries for distant sensing and aggregate ecology
   - reduce/rework the two spatial-index rebuilds per tick
   - eventually parallelize safe per-entity systems without breaking determinism
+  - defer 8k-by-8k and larger terrain-pressure experiments until after profiling plus multicore support make large worlds practical enough to compare cleanly
 - If multithreading is added, preserve an explicit deterministic single-threaded execution mode for tests, debugging, exact replay, and controlled setting comparisons. Parallel modes should either match deterministic ordering or be clearly marked as fast/non-replayable.
 
 ## Initial Scope
@@ -448,6 +449,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add a first biome speed/drag layer. Scenarios now include per-biome speed multipliers separate from movement-energy and basal-energy multipliers. `MovementSystem` scales actual displacement by the local biome speed multiplier, while stats, CLI CSV/probe output, CLI/Godot HTML reports, and the Godot HUD/inspector expose average speed pressure. Starter scenarios currently use barren `0.55x`, sparse `0.80x`, grassland `1.0x`, and rich `1.0x` so bad terrain slows traversal without making rich cells a movement bonus. A 2026-05-22 5k two-seed probe across Balanced, Harsh, Scavenger, and Predation compared base, `drag-medium`, and `drag-hard`; `drag-hard` stayed viable and added modest pressure without the earlier calorie-only side effect where rich-biome discounts made Balanced easier. Probe file: `out/biome_speed_drag_probe_20260522.csv` with matching `.html` report. Done.
 - Confirm selected biome speed/drag values against no-drag baseline. A 2026-05-22 10k, three-seed probe compared the current starter drag values against `no-drag` across Balanced, Harsh, Scavenger, and Predation. All runs completed, and drag reduced average final populations in all four tested scenarios: Balanced `654 -> 647`, Harsh `230 -> 216`, Scavenger `454 -> 427`, and Predation `145 -> 132`. Average realized biome speed stayed modest (`0.954-0.979x`) because creatures do not spend all their time in poor cells. Conclusion: keep biome speed/drag, do not add a separate terrain layer yet, and next add local drag/terrain sensing so creatures can respond to traversal pressure without directly knowing biome fertility or void status. Probe file: `out/biome_speed_drag_confirm_20260522.csv` with matching `.html` report. Done.
 - Add local terrain/drag sensing. Creatures now sense `CurrentTerrainDrag` and `ForwardTerrainDrag`, derived only from the current biome-speed profile and sampled locally at the body position plus a short forward probe. The neural schema appends these two inputs with migration support for older brains, and the selected-creature inspector shows the sensed drag values. This gives terrain-aware evolution a cue without revealing biome labels, fertility, resource voids, or global map direction. Done.
+- Defer the large-world terrain-pressure scenario until after the next performance pass. The likely useful scale is `5,000 x 5,000` to `8,000 x 8,000` with larger biome cells and lower resource density, but that should wait until profiling and multicore support reduce the risk that the experiment measures runtime limits more than ecology.
 
 ### Far Future: Self-Sustaining Ecology
 
@@ -461,6 +463,14 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Let animal preferences emerge from nutrition, digestion, taste/palatability, toxicity, and availability. Different animal lineages may specialize on different plant types or plant stages.
 - Let plants face their own tradeoffs. Bad taste, toxins, toughness, or defensive structures may reduce grazing, but could also reduce attractiveness to seed carriers, slow growth, increase energy cost, or lower propagation success.
 - Explore whether stable ecosystems can arise without continually spawning plants in from scenario rules. This is likely difficult and should remain far-future, but it could become a rich experiment target once creature behavior, terrain, seasons, and reporting are mature.
+- Record the 2026-05-22 extreme-scarcity Godot observation: when plant calories/regrowth are made very low, the population can fall to only a few survivors, recover temporarily while plants regrow, then rapidly overshoot the available calories and crash back down. This boom-crash cycle repeated instead of producing a new stable strategy, suggesting the current reactive brain and body toolkit may not be enough to evolve restraint under severe scarcity.
+- Future mechanics that may help break scarcity boom-crash cycles include explicit fat reserves, stronger idle/low-speed conservation payoffs, reproduction suppression when local food density is poor, local depletion memory, imperfect route/refuge memory, seasonal or disturbance cues, and reporting that flags repeated low-population bottlenecks plus overshoot crashes.
+
+### Future Analysis: Ecosystem Health Metrics
+
+- Add first-class ecosystem health metrics beyond creature count. Creature count alone can be misleading because many tiny/starving creatures may represent less stable living biomass than a few large, healthy creatures.
+- Report standing living energy/biomass using multiple views: total usable creature energy, total gut contents, total reproductive reserve, total egg energy, estimated body biomass from size/growth, and total plant/meat resource calories.
+- Add derived ratios such as average energy per creature, energy per biomass, living biomass versus available resource calories, egg/reproductive investment share, and tail-window stability so boom-crash runs are easier to distinguish from genuinely stable ecosystems.
 
 ### Future Analysis: Taxonomy And Classification
 

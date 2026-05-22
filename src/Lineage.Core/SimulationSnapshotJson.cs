@@ -87,6 +87,8 @@ public static class SimulationSnapshotJson
         state.Creatures.AddRange(snapshot.Creatures.Select(NormalizeCreature));
         state.Eggs.AddRange(snapshot.Eggs.Select(NormalizeEgg));
         state.Resources.AddRange(snapshot.Resources.Select(NormalizeResource));
+        state.MarkEggsDirty();
+        state.MarkResourcesDirty();
         state.RestoreLineageRecords(snapshot.LineageRecords);
         state.Stats.Restore(
             snapshot.CreatureBirthCount,

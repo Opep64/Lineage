@@ -3,6 +3,9 @@ using Lineage.Core;
 var tests = new (string Name, Action Body)[]
 {
     ("Simulation clock advances by fixed steps", SimulationClockAdvancesByFixedSteps),
+    ("Simulation profiler records system timings", SimulationProfilerRecordsSystemTimings),
+    ("Simulation profiler can be paused", SimulationProfilerCanBePaused),
+    ("Sensing profiler records candidate counts", SensingProfilerRecordsCandidateCounts),
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
@@ -69,6 +72,8 @@ var tests = new (string Name, Action Body)[]
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
+    ("Persistent spatial rebuild removes decayed resources", PersistentSpatialRebuildRemovesDecayedResources),
+    ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
@@ -112,6 +117,105 @@ static void SimulationClockAdvancesByFixedSteps()
 
     AssertEqual(4L, simulation.State.Tick, "Tick count");
     AssertClose(1.0, simulation.State.ElapsedSeconds, 0.000001, "Elapsed seconds");
+}
+
+static void SimulationProfilerRecordsSystemTimings()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.25f },
+        seed: 42,
+        systems: [new ProfilingNoOpSystem(), new ProfilingNoOpSystem()]);
+    simulation.Profile = new SimulationProfile();
+
+    simulation.RunSteps(3);
+
+    AssertEqual(3L, simulation.Profile.ProfiledSteps, "Profiled steps");
+    AssertEqual(2, simulation.Profile.Systems.Count, "Profiled system count");
+    AssertEqual("ProfilingNoOpSystem", simulation.Profile.Systems[0].SystemName, "Profiled system name");
+    AssertEqual(3L, simulation.Profile.Systems[0].CallCount, "First system call count");
+    AssertEqual(3L, simulation.Profile.Systems[1].CallCount, "Second system call count");
+    AssertTrue(simulation.Profile.TotalMilliseconds >= 0.0, "Profiled time should be non-negative");
+}
+
+static void SimulationProfilerCanBePaused()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.25f },
+        seed: 42,
+        systems: [new ProfilingNoOpSystem()]);
+    simulation.Profile = new SimulationProfile { IsActive = false };
+
+    simulation.RunSteps(2);
+    AssertEqual(0L, simulation.Profile.ProfiledSteps, "Paused profiled steps");
+    AssertEqual(0, simulation.Profile.Systems.Count, "Paused profile system count");
+
+    simulation.Profile.IsActive = true;
+    simulation.RunSteps(1);
+
+    AssertEqual(1L, simulation.Profile.ProfiledSteps, "Resumed profiled steps");
+    AssertEqual(1, simulation.Profile.Systems.Count, "Resumed profile system count");
+    AssertEqual(1L, simulation.Profile.Systems[0].CallCount, "Resumed profile call count");
+}
+
+static void SensingProfilerRecordsCandidateCounts()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 7,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex)
+        ]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(30f, 20f),
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(40f, 20f),
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    var sensing = simulation.Profile.Sensing;
+    AssertEqual(1L, sensing.CreaturesSensed, "Sensed creature count");
+    AssertEqual(1L, sensing.ResourceQueries, "Resource query count");
+    AssertEqual(2L, sensing.ResourceCandidates, "Resource candidate count");
+    AssertEqual(1L, sensing.PlantResourceQueries, "Plant resource query count");
+    AssertEqual(1L, sensing.PlantResourceQueryCandidates, "Plant resource query candidate count");
+    AssertEqual(1L, sensing.MeatResourceQueries, "Meat resource query count");
+    AssertEqual(1L, sensing.MeatResourceQueryCandidates, "Meat resource query candidate count");
+    AssertEqual(1L, sensing.PlantCandidates, "Plant candidate count");
+    AssertEqual(1L, sensing.MeatResourceCandidates, "Meat candidate count");
+    AssertEqual(1L, sensing.VisiblePlantCandidates, "Visible plant count");
+    AssertEqual(1L, sensing.VisibleMeatResourceCandidates, "Visible meat count");
+    AssertEqual(1L, sensing.CreatureQueries, "Creature query count");
+    AssertEqual(1L, sensing.CreatureCandidates, "Raw creature candidate count includes self");
+    AssertEqual(0L, sensing.VisibleCreatureCandidates, "Visible creature count excludes self");
+    AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Measured sensing time should be non-negative");
 }
 
 static void RandomRepeatsFromSameSeed()
@@ -2699,6 +2803,80 @@ static void CreatureOnlySpatialRebuildPreservesStaticEntities()
     AssertEqual(0, resourceIndex, "Resource index should survive creature-only rebuild");
 }
 
+static void PersistentSpatialRebuildRemovesDecayedResources()
+{
+    var index = new UniformSpatialIndex(10f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 23,
+        systems:
+        [
+            new ResourceRegrowthSystem(),
+            new SpatialIndexRebuildSystem(index)
+        ]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(50f, 50f),
+        Radius = 2f,
+        Calories = 1f,
+        MaxCalories = 1f,
+        DecayCaloriesPerSecond = 2f
+    });
+
+    index.Rebuild(simulation.State);
+    AssertEqual(0, index.FindNearestResourceWithCalories(simulation.State, new SimVector2(50f, 50f), 5f), "Live meat precondition");
+
+    simulation.Step();
+
+    AssertEqual(0, simulation.State.Resources.Count, "Decayed meat should leave world state");
+    AssertEqual(-1, index.FindNearestResourceWithCalories(simulation.State, new SimVector2(50f, 50f), 5f), "Decayed meat should leave spatial index");
+}
+
+static void PersistentSpatialRebuildRemovesHatchedEggs()
+{
+    var index = new UniformSpatialIndex(10f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 404,
+        systems:
+        [
+            new EggSystem(),
+            new SpatialIndexRebuildSystem(index)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var parentId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.State.SpawnEgg(
+        genomeId,
+        brainId: -1,
+        parentId,
+        new SimVector2(50f, 50f),
+        energy: 12f,
+        incubationSeconds: 1f,
+        generation: 1);
+
+    index.Rebuild(simulation.State);
+    AssertEqual(0, index.FindNearestEggWithEnergy(simulation.State, new SimVector2(50f, 50f), 5f), "Live egg precondition");
+
+    simulation.Step();
+
+    AssertEqual(0, simulation.State.Eggs.Count, "Hatched egg should leave world state");
+    AssertEqual(2, simulation.State.Creatures.Count, "Hatched egg should create offspring");
+    AssertEqual(-1, index.FindNearestEggWithEnergy(simulation.State, new SimVector2(50f, 50f), 5f), "Hatched egg should leave spatial index");
+}
+
 static void ScenarioFactoryCreatesDeterministicBiomes()
 {
     var scenario = new SimulationScenario
@@ -3285,5 +3463,12 @@ sealed class ProbeMovementSystem : ISimulationSystem
 
             state.Creatures[i] = creature;
         }
+    }
+}
+
+sealed class ProfilingNoOpSystem : ISimulationSystem
+{
+    public void Update(WorldState state, float deltaSeconds)
+    {
     }
 }

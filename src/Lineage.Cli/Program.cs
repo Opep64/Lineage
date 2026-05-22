@@ -55,6 +55,7 @@ static void PrintHelp()
           --seed <n>                 Override scenario seed.
           --pipeline <neural|simple> Override controller pipeline.
           --creatures <n>            Override initial creature count.
+          --spatial-cell-size <n>    Override spatial index cell size.
           --resources-per-million-area <n> Override initial resource density.
           --resources <n>            Legacy absolute resource count override; converted to density.
           --snapshot-interval <n>    Override stats snapshot interval.
@@ -65,6 +66,10 @@ static void PrintHelp()
           --generations-output <path> Generation survival summary CSV output path.
           --lineage-trends-output <path> Founder lineage trend CSV output path.
           --report <path>            HTML run report output path.
+          --profile                  Time each simulation system and print/write a profile.
+          --profile-output <path>    Per-system profile CSV output path; writes a sensing sidecar.
+          --profile-start-tick <n>   Start profiling after n completed ticks. Default: 0
+          --profile-end-tick <n>     Stop profiling after n completed ticks.
           --save-snapshot <path>     Save final simulation snapshot JSON.
           --checkpoint-interval <n>  Save loadable snapshot checkpoints every n ticks.
           --checkpoint-dir <dir>      Directory for checkpoint JSON files.
@@ -101,6 +106,11 @@ static RunResult RunSingle(RunOptions options)
     }
 
     var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    if (options.ProfileEnabled)
+    {
+        simulation.Profile = new SimulationProfile();
+    }
+
     var stopwatch = Stopwatch.StartNew();
 
     var outputPaths = options.ResolveOutputPaths(scenario);
@@ -123,30 +133,64 @@ static IReadOnlyList<CheckpointArtifact> RunSimulation(
     Simulation simulation,
     OutputPaths outputPaths)
 {
-    if (options.CheckpointIntervalTicks is null)
+    if (options.ProfileEndTick is not null
+        && options.ProfileEndTick.Value <= (options.ProfileStartTick ?? 0))
+    {
+        throw new ArgumentException("--profile-end-tick must be greater than --profile-start-tick.");
+    }
+
+    if (options.CheckpointIntervalTicks is null && !options.HasProfileWindow)
     {
         simulation.RunSteps(options.Ticks);
+        if (simulation.Profile is not null)
+        {
+            simulation.Profile.IsActive = false;
+        }
+
         return Array.Empty<CheckpointArtifact>();
     }
 
-    var checkpointDirectory = outputPaths.CheckpointDirectory
-        ?? throw new InvalidOperationException("Checkpoint interval was set without a checkpoint directory.");
-    Directory.CreateDirectory(checkpointDirectory);
+    string? checkpointDirectory = null;
+    if (options.CheckpointIntervalTicks is not null)
+    {
+        checkpointDirectory = outputPaths.CheckpointDirectory
+            ?? throw new InvalidOperationException("Checkpoint interval was set without a checkpoint directory.");
+        Directory.CreateDirectory(checkpointDirectory);
+    }
 
     var checkpoints = new List<CheckpointArtifact>();
-    var interval = options.CheckpointIntervalTicks.Value;
     for (var i = 0; i < options.Ticks; i++)
     {
+        SetProfileWindowActivity(options, simulation);
         simulation.Step();
-        if (simulation.State.Tick % interval == 0)
+        if (options.CheckpointIntervalTicks is not null
+            && simulation.State.Tick % options.CheckpointIntervalTicks.Value == 0)
         {
-            var path = Path.Combine(checkpointDirectory, $"tick_{simulation.State.Tick:D10}.json");
+            var path = Path.Combine(checkpointDirectory!, $"tick_{simulation.State.Tick:D10}.json");
             SimulationSnapshotJson.Save(path, SimulationSnapshot.Capture(scenario, simulation));
             checkpoints.Add(new CheckpointArtifact(simulation.State.Tick, path));
         }
     }
 
+    if (simulation.Profile is not null)
+    {
+        simulation.Profile.IsActive = false;
+    }
+
     return checkpoints;
+}
+
+static void SetProfileWindowActivity(RunOptions options, Simulation simulation)
+{
+    if (simulation.Profile is null)
+    {
+        return;
+    }
+
+    var startTick = options.ProfileStartTick ?? 0;
+    var endTick = options.ProfileEndTick;
+    simulation.Profile.IsActive = simulation.State.Tick >= startTick
+        && (endTick is null || simulation.State.Tick < endTick.Value);
 }
 
 static IReadOnlyList<RunResult> RunBatch(RunOptions options)
@@ -313,6 +357,16 @@ static void WriteRunOutputs(
         LineageTrendCsvWriter.Write(outputPaths.LineageTrendPath!, simulation.State.Stats.Snapshots, simulation.State.LineageRecords);
     }
 
+    if (outputPaths.ProfilePath is not null && simulation.Profile is not null)
+    {
+        ProfileCsvWriter.Write(outputPaths.ProfilePath, simulation.Profile);
+    }
+
+    if (outputPaths.SensingProfilePath is not null && simulation.Profile is not null)
+    {
+        SensingProfileCsvWriter.Write(outputPaths.SensingProfilePath, simulation.Profile.Sensing);
+    }
+
     if (outputPaths.ReportPath is not null)
     {
         RunReportWriter.Write(outputPaths.ReportPath, options, scenario, simulation, elapsed, outputPaths, checkpoints);
@@ -351,6 +405,12 @@ static void PrintSummary(RunResult result)
     Console.WriteLine($"Injury deaths: {state.Stats.InjuryDeathCount}");
     Console.WriteLine($"Max generation: {snapshot.MaxGeneration}");
     Console.WriteLine($"Snapshots: {state.Stats.Snapshots.Count}");
+    if (options.ProfileEnabled)
+    {
+        var profileStart = options.ProfileStartTick ?? 0;
+        var profileEnd = options.ProfileEndTick?.ToString(CultureInfo.InvariantCulture) ?? "end";
+        Console.WriteLine($"Profile window: {profileStart} to {profileEnd}");
+    }
 
     if (options.SaveScenarioPath is not null)
     {
@@ -365,6 +425,21 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Founders CSV: {Path.GetFullPath(outputPaths.FounderSummaryPath!)}");
         Console.WriteLine($"Generations CSV: {Path.GetFullPath(outputPaths.GenerationSummaryPath!)}");
         Console.WriteLine($"Lineage trends CSV: {Path.GetFullPath(outputPaths.LineageTrendPath!)}");
+    }
+
+    if (result.Simulation.Profile is not null)
+    {
+        PrintProfileSummary(result.Simulation.Profile);
+    }
+
+    if (outputPaths.ProfilePath is not null)
+    {
+        Console.WriteLine($"Profile CSV: {Path.GetFullPath(outputPaths.ProfilePath)}");
+    }
+
+    if (outputPaths.SensingProfilePath is not null)
+    {
+        Console.WriteLine($"Sensing profile CSV: {Path.GetFullPath(outputPaths.SensingProfilePath)}");
     }
 
     if (outputPaths.ReportPath is not null)
@@ -382,6 +457,53 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Checkpoint directory: {Path.GetFullPath(outputPaths.CheckpointDirectory)}");
         Console.WriteLine($"Checkpoints: {result.Checkpoints.Count}");
     }
+}
+
+static void PrintProfileSummary(SimulationProfile profile, int maxSystems = 8)
+{
+    Console.WriteLine($"Profiled steps: {profile.ProfiledSteps}");
+    Console.WriteLine($"Profiled system time: {profile.TotalMilliseconds:0.000}ms");
+    foreach (var system in profile.Systems
+        .OrderByDescending(system => system.TotalMilliseconds)
+        .Take(maxSystems))
+    {
+        var share = profile.TotalMilliseconds > 0
+            ? system.TotalMilliseconds / profile.TotalMilliseconds * 100.0
+            : 0.0;
+        Console.WriteLine(
+            $"  {system.SystemName}: {system.TotalMilliseconds:0.000}ms ({share:0.0}%), avg {system.AverageMillisecondsPerCall:0.0000}ms");
+    }
+
+    PrintSensingProfileSummary(profile.Sensing);
+}
+
+static void PrintSensingProfileSummary(SimulationSensingProfile profile)
+{
+    if (profile.CreaturesSensed == 0)
+    {
+        return;
+    }
+
+    Console.WriteLine($"Sensing profile: {profile.CreaturesSensed} creature updates, {profile.TotalMeasuredMilliseconds:0.000}ms measured inside sensing");
+    Console.WriteLine(
+        $"  Resource query: {profile.ResourceQueryMilliseconds:0.000}ms, {FormatAverage(profile.ResourceCandidates, profile.ResourceQueries):0.00} candidates/query");
+    Console.WriteLine(
+        $"    Plant candidates: {FormatAverage(profile.PlantResourceQueryCandidates, profile.PlantResourceQueries):0.00}/query");
+    Console.WriteLine(
+        $"    Meat candidates: {FormatAverage(profile.MeatResourceQueryCandidates, profile.MeatResourceQueries):0.00}/query");
+    Console.WriteLine(
+        $"  Resource scan: {profile.ResourceScanMilliseconds:0.000}ms, plants {profile.PlantCandidates}, meat {profile.MeatResourceCandidates}, visible plants {profile.VisiblePlantCandidates}, visible meat {profile.VisibleMeatResourceCandidates}");
+    Console.WriteLine(
+        $"  Egg query/scan: {(profile.EggQueryMilliseconds + profile.EggScanMilliseconds):0.000}ms, {FormatAverage(profile.EggCandidates, profile.EggQueries):0.00} candidates/query, visible {profile.VisibleEggCandidates}");
+    Console.WriteLine(
+        $"  Creature query/scan: {(profile.CreatureQueryMilliseconds + profile.CreatureScanMilliseconds):0.000}ms, {FormatAverage(profile.CreatureCandidates, profile.CreatureQueries):0.00} candidates/query, visible {profile.VisibleCreatureCandidates}");
+}
+
+static double FormatAverage(long numerator, long denominator)
+{
+    return denominator > 0
+        ? numerator / (double)denominator
+        : 0.0;
 }
 
 static void PrintBatchSummary(RunOptions options, IReadOnlyList<RunResult> results, string reportPath)
@@ -447,6 +569,8 @@ internal sealed record RunOptions
 
     public int? InitialCreatureCountOverride { get; init; }
 
+    public float? SpatialCellSizeOverride { get; init; }
+
     public float? InitialResourcesPerMillionAreaOverride { get; init; }
 
     public int? LegacyInitialResourceCountOverride { get; init; }
@@ -466,6 +590,14 @@ internal sealed record RunOptions
     public string? LineageTrendOutputPath { get; init; }
 
     public string? ReportPath { get; init; }
+
+    public bool Profile { get; init; }
+
+    public string? ProfileOutputPath { get; init; }
+
+    public int? ProfileStartTick { get; init; }
+
+    public int? ProfileEndTick { get; init; }
 
     public string? SaveSnapshotPath { get; init; }
 
@@ -499,6 +631,13 @@ internal sealed record RunOptions
 
     public bool ShowHelp { get; init; }
 
+    public bool ProfileEnabled => Profile
+        || ProfileOutputPath is not null
+        || ProfileStartTick is not null
+        || ProfileEndTick is not null;
+
+    public bool HasProfileWindow => ProfileStartTick is not null || ProfileEndTick is not null;
+
     public bool IsProbe => ProbeMode
         || ProbeScenarioPaths.Count > 0
         || ProbeSeeds.Count > 0
@@ -522,6 +661,7 @@ internal sealed record RunOptions
             Seed = SeedOverride ?? scenario.Seed,
             PipelineKind = PipelineKindOverride ?? scenario.PipelineKind,
             InitialCreatureCount = InitialCreatureCountOverride ?? scenario.InitialCreatureCount,
+            SpatialCellSize = SpatialCellSizeOverride ?? scenario.SpatialCellSize,
             StatsSnapshotIntervalTicks = SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks
         };
 
@@ -551,11 +691,28 @@ internal sealed record RunOptions
     {
         if (DisableOutput)
         {
-            var disabledPaths = new OutputPaths(null, null, null, null, null, null, ReportPath, null);
+            var disabledSensingProfilePath = ProfileOutputPath is not null
+                ? AddSuffix(ProfileOutputPath, "sensing")
+                : null;
+            var disabledPaths = new OutputPaths(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                ReportPath,
+                ProfileOutputPath,
+                disabledSensingProfilePath,
+                null);
             return disabledPaths with { CheckpointDirectory = ResolveCheckpointDirectory(scenario, disabledPaths) };
         }
 
         var statsPath = OutputPath ?? Path.Combine("out", $"lineage_run_{scenario.Seed}_stats.csv");
+        var profilePath = ProfileOutputPath ?? (ProfileEnabled ? AddSuffix(statsPath, "profile") : null);
+        var sensingProfilePath = profilePath is not null
+            ? AddSuffix(profilePath, "sensing")
+            : null;
         var paths = new OutputPaths(
             statsPath,
             LineageOutputPath ?? AddSuffix(statsPath, "lineage"),
@@ -564,6 +721,8 @@ internal sealed record RunOptions
             GenerationSummaryOutputPath ?? AddSuffix(statsPath, "generations"),
             LineageTrendOutputPath ?? AddSuffix(statsPath, "lineage_trends"),
             ReportPath,
+            profilePath,
+            sensingProfilePath,
             null);
         return paths with { CheckpointDirectory = ResolveCheckpointDirectory(scenario, paths) };
     }
@@ -584,6 +743,7 @@ internal sealed record RunOptions
             FounderSummaryOutputPath = null,
             GenerationSummaryOutputPath = null,
             LineageTrendOutputPath = null,
+            ProfileOutputPath = ProfileEnabled ? Path.Combine(BatchOutputDirectory, $"{slug}_profile.csv") : null,
             ReportPath = DisableOutput ? null : Path.Combine(BatchOutputDirectory, $"{slug}_report.html"),
             SaveSnapshotPath = DisableOutput ? null : Path.Combine(BatchOutputDirectory, $"{slug}_snapshot.json"),
             CheckpointDirectory = CheckpointIntervalTicks is null
@@ -628,6 +788,9 @@ internal sealed record RunOptions
                 case "--creatures":
                     options = options with { InitialCreatureCountOverride = ParseNonNegativeInt(ReadValue(args, ref i, arg), arg) };
                     break;
+                case "--spatial-cell-size":
+                    options = options with { SpatialCellSizeOverride = ParsePositiveFloat(ReadValue(args, ref i, arg), arg) };
+                    break;
                 case "--resources-per-million-area":
                     options = options with { InitialResourcesPerMillionAreaOverride = ParseNonNegativeFloat(ReadValue(args, ref i, arg), arg) };
                     break;
@@ -657,6 +820,18 @@ internal sealed record RunOptions
                     break;
                 case "--report":
                     options = options with { ReportPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--profile":
+                    options = options with { Profile = true };
+                    break;
+                case "--profile-output":
+                    options = options with { ProfileOutputPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--profile-start-tick":
+                    options = options with { ProfileStartTick = ParseNonNegativeInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--profile-end-tick":
+                    options = options with { ProfileEndTick = ParseNonNegativeInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--save-snapshot":
                     options = options with { SaveSnapshotPath = ReadValue(args, ref i, arg) };
@@ -822,6 +997,18 @@ internal sealed record RunOptions
         return parsed;
     }
 
+    private static float ParsePositiveFloat(string value, string optionName)
+    {
+        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            || !float.IsFinite(parsed)
+            || parsed <= 0f)
+        {
+            throw new ArgumentException($"{optionName} must be a finite positive number.");
+        }
+
+        return parsed;
+    }
+
     private static ulong ParseSeed(string value, string optionName)
     {
         if (!ulong.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
@@ -874,6 +1061,8 @@ internal readonly record struct OutputPaths(
     string? GenerationSummaryPath,
     string? LineageTrendPath,
     string? ReportPath,
+    string? ProfilePath,
+    string? SensingProfilePath,
     string? CheckpointDirectory);
 
 internal readonly record struct CheckpointArtifact(long Tick, string Path);
@@ -2185,6 +2374,130 @@ internal readonly record struct LineageTrendRow(
     float OverallAverageGeneration,
     int OverallMaxGeneration);
 
+internal static class ProfileCsvWriter
+{
+    public static void Write(string path, SimulationProfile profile)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("system,calls,total_ms,avg_ms_per_call,share");
+
+        var total = profile.TotalMilliseconds;
+        foreach (var system in profile.Systems.OrderByDescending(system => system.TotalMilliseconds))
+        {
+            var share = total > 0.0
+                ? system.TotalMilliseconds / total
+                : 0.0;
+            writer.WriteLine(string.Join(
+                ',',
+                EscapeCsv(system.SystemName),
+                system.CallCount.ToString(CultureInfo.InvariantCulture),
+                system.TotalMilliseconds.ToString("0.######", CultureInfo.InvariantCulture),
+                system.AverageMillisecondsPerCall.ToString("0.######", CultureInfo.InvariantCulture),
+                share.ToString("0.######", CultureInfo.InvariantCulture)));
+        }
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
+
+internal static class SensingProfileCsvWriter
+{
+    public static void Write(string path, SimulationSensingProfile profile)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("phase,queries,candidates,plant_candidates,meat_candidates,visible,total_ms,avg_candidates_per_query,avg_ms_per_query");
+        WriteRow(
+            writer,
+            "resource_query",
+            profile.ResourceQueries,
+            profile.ResourceCandidates,
+            profile.PlantCandidates,
+            profile.MeatResourceCandidates,
+            profile.VisiblePlantCandidates + profile.VisibleMeatResourceCandidates,
+            profile.ResourceQueryMilliseconds);
+        WriteRow(
+            writer,
+            "resource_scan",
+            profile.ResourceQueries,
+            profile.ResourceCandidates,
+            profile.PlantCandidates,
+            profile.MeatResourceCandidates,
+            profile.VisiblePlantCandidates + profile.VisibleMeatResourceCandidates,
+            profile.ResourceScanMilliseconds);
+        WriteRow(
+            writer,
+            "egg_query",
+            profile.EggQueries,
+            profile.EggCandidates,
+            0,
+            0,
+            profile.VisibleEggCandidates,
+            profile.EggQueryMilliseconds);
+        WriteRow(
+            writer,
+            "egg_scan",
+            profile.EggQueries,
+            profile.EggCandidates,
+            0,
+            0,
+            profile.VisibleEggCandidates,
+            profile.EggScanMilliseconds);
+        WriteRow(
+            writer,
+            "creature_query",
+            profile.CreatureQueries,
+            profile.CreatureCandidates,
+            0,
+            0,
+            profile.VisibleCreatureCandidates,
+            profile.CreatureQueryMilliseconds);
+        WriteRow(
+            writer,
+            "creature_scan",
+            profile.CreatureQueries,
+            profile.CreatureCandidates,
+            0,
+            0,
+            profile.VisibleCreatureCandidates,
+            profile.CreatureScanMilliseconds);
+    }
+
+    private static void WriteRow(
+        TextWriter writer,
+        string phase,
+        long queries,
+        long candidates,
+        long plantCandidates,
+        long meatCandidates,
+        long visible,
+        double totalMilliseconds)
+    {
+        var averageCandidates = queries > 0
+            ? candidates / (double)queries
+            : 0.0;
+        var averageMilliseconds = queries > 0
+            ? totalMilliseconds / queries
+            : 0.0;
+
+        writer.WriteLine(string.Join(
+            ',',
+            phase,
+            queries.ToString(CultureInfo.InvariantCulture),
+            candidates.ToString(CultureInfo.InvariantCulture),
+            plantCandidates.ToString(CultureInfo.InvariantCulture),
+            meatCandidates.ToString(CultureInfo.InvariantCulture),
+            visible.ToString(CultureInfo.InvariantCulture),
+            totalMilliseconds.ToString("0.######", CultureInfo.InvariantCulture),
+            averageCandidates.ToString("0.######", CultureInfo.InvariantCulture),
+            averageMilliseconds.ToString("0.######", CultureInfo.InvariantCulture)));
+    }
+}
+
 internal static class BatchComparisonReportWriter
 {
     public static void Write(string path, RunOptions options, IReadOnlyList<RunResult> results)
@@ -3207,6 +3520,8 @@ internal static class RunReportWriter
         WriteOptionalPath(writer, "Founders CSV", outputPaths.FounderSummaryPath);
         WriteOptionalPath(writer, "Generations CSV", outputPaths.GenerationSummaryPath);
         WriteOptionalPath(writer, "Lineage trends CSV", outputPaths.LineageTrendPath);
+        WriteOptionalPath(writer, "Profile CSV", outputPaths.ProfilePath);
+        WriteOptionalPath(writer, "Sensing profile CSV", outputPaths.SensingProfilePath);
         WriteOptionalPath(writer, "Snapshot JSON", options.SaveSnapshotPath);
         WriteOptionalPath(writer, "Checkpoint directory", outputPaths.CheckpointDirectory);
         writer.WriteLine("</ul>");
