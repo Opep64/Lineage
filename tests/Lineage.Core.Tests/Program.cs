@@ -16,6 +16,7 @@ var tests = new (string Name, Action Body)[]
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
     ("Seasonal fertility scales plant regrowth", SeasonalFertilityScalesPlantRegrowth),
     ("Seasonal fertility scales plant dormancy", SeasonalFertilityScalesPlantDormancy),
+    ("Biome seasonal response scales plant regrowth", BiomeSeasonalResponseScalesPlantRegrowth),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
     ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
@@ -494,6 +495,36 @@ static void SeasonalFertilityScalesPlantDormancy()
 
     AssertClose(1.5f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Peak-season dormancy countdown");
     AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Dormant plant remains inedible");
+}
+
+static void BiomeSeasonalResponseScalesPlantRegrowth()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 4,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                enableSeasons: true,
+                seasonLengthSeconds: 4f,
+                seasonFertilityAmplitude: 0.5f,
+                seasonPhaseOffsetSeconds: 1f,
+                biomeSeasonalAmplitudeProfile: new BiomePressureProfile(1f, 1f, 0.5f, 1f))
+        ]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(10f, 10f),
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 100f,
+        RegrowthCaloriesPerSecond = 10f
+    });
+
+    simulation.Step();
+
+    AssertClose(12.5f, simulation.State.Resources[0].Calories, 0.000001, "Grassland seasonal response regrowth calories");
 }
 
 static void DepletedResourcesCanRelocateBeforeRegrowing()
@@ -3629,6 +3660,10 @@ static void ScenarioJsonRoundTrips()
         SeasonLengthSeconds = 480f,
         SeasonFertilityAmplitude = 0.45f,
         SeasonPhaseOffsetSeconds = 120f,
+        BarrenBiomeSeasonalAmplitudeMultiplier = 0.4f,
+        SparseBiomeSeasonalAmplitudeMultiplier = 0.8f,
+        GrasslandBiomeSeasonalAmplitudeMultiplier = 1.1f,
+        RichBiomeSeasonalAmplitudeMultiplier = 1.4f,
         ResourceClusterStrength = 0.33f,
         ResourceClusterRadius = 123f,
         BarrenBiomeMovementCostMultiplier = 1.4f,
@@ -3700,6 +3735,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
     AssertTrue(json.Contains("\"enableSeasons\""), "JSON should serialize season toggle");
     AssertTrue(json.Contains("\"seasonFertilityAmplitude\""), "JSON should serialize season fertility");
+    AssertTrue(json.Contains("\"barrenBiomeSeasonalAmplitudeMultiplier\""), "JSON should serialize biome seasonal response");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
@@ -3722,6 +3758,10 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.SeasonLengthSeconds, roundTripped.SeasonLengthSeconds, 0.000001, "Scenario season length");
     AssertClose(scenario.SeasonFertilityAmplitude, roundTripped.SeasonFertilityAmplitude, 0.000001, "Scenario season fertility amplitude");
     AssertClose(scenario.SeasonPhaseOffsetSeconds, roundTripped.SeasonPhaseOffsetSeconds, 0.000001, "Scenario season phase offset");
+    AssertClose(scenario.BarrenBiomeSeasonalAmplitudeMultiplier, roundTripped.BarrenBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario barren biome seasonal response");
+    AssertClose(scenario.SparseBiomeSeasonalAmplitudeMultiplier, roundTripped.SparseBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario sparse biome seasonal response");
+    AssertClose(scenario.GrasslandBiomeSeasonalAmplitudeMultiplier, roundTripped.GrasslandBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario grassland biome seasonal response");
+    AssertClose(scenario.RichBiomeSeasonalAmplitudeMultiplier, roundTripped.RichBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario rich biome seasonal response");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");

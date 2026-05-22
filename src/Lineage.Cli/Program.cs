@@ -3164,6 +3164,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Season length", $"{scenario.SeasonLengthSeconds:0.###} seconds");
         WriteMetric(writer, "Season fertility swing", FormatPercent(scenario.SeasonFertilityAmplitude));
         WriteMetric(writer, "Season phase offset", $"{scenario.SeasonPhaseOffsetSeconds:0.###} seconds");
+        WriteMetric(writer, "Biome season response", FormatBiomePressureProfile(scenario.CreateBiomeSeasonalAmplitudeProfile()));
         WriteMetric(writer, "Resource clustering", FormatPercent(scenario.ResourceClusterStrength));
         WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
         WriteMetric(writer, "Biome movement costs", FormatBiomePressureProfile(scenario.CreateBiomeMovementCostProfile()));
@@ -3341,11 +3342,12 @@ internal static class RunReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Biome</th><th>Area</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Move Cost</th><th>Basal Cost</th><th>Speed</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Season Amp</th><th>Move Cost</th><th>Basal Cost</th><th>Speed</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
         writer.WriteLine("<tbody>");
         var movementCostProfile = scenario.CreateBiomeMovementCostProfile();
         var basalCostProfile = scenario.CreateBiomeBasalCostProfile();
         var speedProfile = scenario.CreateBiomeSpeedProfile();
+        var seasonalAmplitudeProfile = scenario.CreateBiomeSeasonalAmplitudeProfile();
         foreach (var summary in biomeSummaries)
         {
             var resourcesPerMillion = summary.Area > 0f
@@ -3355,6 +3357,7 @@ internal static class RunReportWriter
             var movementCost = movementCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             var basalCost = basalCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             var speed = speedProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
+            var seasonalAmplitude = seasonalAmplitudeProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             writer.WriteLine(
                 "<tr>" +
                 $"<td>{Html(FormatBiomeKind(summary.Kind))}</td>" +
@@ -3362,6 +3365,7 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatPercent(summary.Area / MathF.Max(1f, state.Bounds.Width * state.Bounds.Height)))}</td>" +
                 $"<td>{Html(summary.ResourceDensityMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.ResourceRegrowthMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html($"{seasonalAmplitude}x")}</td>" +
                 $"<td>{Html($"{movementCost}x")}</td>" +
                 $"<td>{Html($"{basalCost}x")}</td>" +
                 $"<td>{Html($"{speed}x")}</td>" +

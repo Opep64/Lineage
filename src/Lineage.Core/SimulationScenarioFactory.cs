@@ -73,7 +73,8 @@ public static class SimulationScenarioFactory
                 scenario.ReproductivePrimeAgeSeconds,
                 scenario.ReproductiveSenescenceAgeSeconds,
                 scenario.SenescentFertilityMultiplier,
-                scenario.CrowdingFertilityPenalty),
+                scenario.CrowdingFertilityPenalty,
+                scenario.CreateBiomeSeasonalAmplitudeProfile()),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -117,7 +118,8 @@ public static class SimulationScenarioFactory
                 scenario.ReproductivePrimeAgeSeconds,
                 scenario.ReproductiveSenescenceAgeSeconds,
                 scenario.SenescentFertilityMultiplier,
-                scenario.CrowdingFertilityPenalty),
+                scenario.CrowdingFertilityPenalty,
+                scenario.CreateBiomeSeasonalAmplitudeProfile()),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }

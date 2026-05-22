@@ -88,6 +88,14 @@ public sealed record SimulationScenario
 
     public float SeasonPhaseOffsetSeconds { get; init; } = 0f;
 
+    public float BarrenBiomeSeasonalAmplitudeMultiplier { get; init; } = 0.5f;
+
+    public float SparseBiomeSeasonalAmplitudeMultiplier { get; init; } = 0.85f;
+
+    public float GrasslandBiomeSeasonalAmplitudeMultiplier { get; init; } = 1f;
+
+    public float RichBiomeSeasonalAmplitudeMultiplier { get; init; } = 1.2f;
+
     public float BarrenBiomeMovementCostMultiplier { get; init; } = 1.3f;
 
     public float SparseBiomeMovementCostMultiplier { get; init; } = 1.12f;
@@ -233,9 +241,14 @@ public sealed record SimulationScenario
         EnsurePositive(SeasonLengthSeconds, nameof(SeasonLengthSeconds));
         EnsureRange(SeasonFertilityAmplitude, 0f, 0.95f, nameof(SeasonFertilityAmplitude));
         EnsureFinite(SeasonPhaseOffsetSeconds, nameof(SeasonPhaseOffsetSeconds));
+        EnsureRange(BarrenBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(BarrenBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(SparseBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(SparseBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(GrasslandBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(GrasslandBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(RichBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(RichBiomeSeasonalAmplitudeMultiplier));
         _ = BiomePressureProfile.Validate(CreateBiomeMovementCostProfile(), "BiomeMovementCostProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeSpeedProfile(), "BiomeSpeedProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
+        _ = BiomePressureProfile.Validate(CreateBiomeSeasonalAmplitudeProfile(), "BiomeSeasonalAmplitudeProfile");
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
         EnsureNonNegative(BodyRadiusEnergyCostPerSecond, nameof(BodyRadiusEnergyCostPerSecond));
         EnsureNonNegative(MaxSpeedEnergyCostPerSecond, nameof(MaxSpeedEnergyCostPerSecond));
@@ -330,6 +343,15 @@ public sealed record SimulationScenario
             SparseBiomeSpeedMultiplier,
             GrasslandBiomeSpeedMultiplier,
             RichBiomeSpeedMultiplier);
+    }
+
+    public BiomePressureProfile CreateBiomeSeasonalAmplitudeProfile()
+    {
+        return new BiomePressureProfile(
+            BarrenBiomeSeasonalAmplitudeMultiplier,
+            SparseBiomeSeasonalAmplitudeMultiplier,
+            GrasslandBiomeSeasonalAmplitudeMultiplier,
+            RichBiomeSeasonalAmplitudeMultiplier);
     }
 
     public int CalculateInitialResourceCount()

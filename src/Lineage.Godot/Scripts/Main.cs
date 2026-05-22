@@ -700,16 +700,23 @@ public partial class Main : Node2D
             : CountActiveResources(state.Resources);
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
+        var centerBiome = state.Biomes.GetKindAt(_viewCenter);
         var season = SeasonalFertility.Calculate(
             _scenario.EnableSeasons,
             state.ElapsedSeconds,
             _scenario.SeasonLengthSeconds,
             _scenario.SeasonFertilityAmplitude,
             _scenario.SeasonPhaseOffsetSeconds);
+        var biomeSeason = SeasonalFertility.CalculateBiomeMultipliers(
+            _scenario.EnableSeasons,
+            state.ElapsedSeconds,
+            _scenario.SeasonLengthSeconds,
+            _scenario.SeasonFertilityAmplitude,
+            _scenario.SeasonPhaseOffsetSeconds,
+            _scenario.CreateBiomeSeasonalAmplitudeProfile());
         var seasonText = _scenario.EnableSeasons
-            ? $"Season {season.Phase * 100f:0}%  Fertility {season.FertilityMultiplier:0.00}x\n"
+            ? $"Season {season.Phase * 100f:0}%  Global {season.FertilityMultiplier:0.00}x  Here {biomeSeason.For(centerBiome):0.00}x\n"
             : string.Empty;
-        var centerBiome = state.Biomes.GetKindAt(_viewCenter);
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
         var launcherHint = _scenarioEditor.IsCollapsed
             ? "S expands launcher"
@@ -834,6 +841,13 @@ public partial class Main : Node2D
         var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
+        var seasonalFertility = SeasonalFertility.CalculateBiomeMultipliers(
+            _scenario.EnableSeasons,
+            _simulation.State.ElapsedSeconds,
+            _scenario.SeasonLengthSeconds,
+            _scenario.SeasonFertilityAmplitude,
+            _scenario.SeasonPhaseOffsetSeconds,
+            _scenario.CreateBiomeSeasonalAmplitudeProfile()).For(biome);
         var brainText = creature.BrainId >= 0
             ? $"{creature.BrainId} ({_simulation.State.GetBrain(creature.BrainId).HiddenNodeCount} hidden)"
             : "none";
@@ -848,7 +862,7 @@ public partial class Main : Node2D
             $"Age {creature.AgeSeconds:0.0}s\n" +
             $"Growth {maturityText} ({growthFactor:P0})\n" +
             $"Birth inv {creature.BirthInvestmentRatio:0.00}x\n" +
-            $"Biome {FormatBiomeKind(biome)}  move {movementCostMultiplier:0.00}x basal {basalCostMultiplier:0.00}x speed {speedMultiplier:0.00}x\n" +
+            $"Biome {FormatBiomeKind(biome)}  move {movementCostMultiplier:0.00}x basal {basalCostMultiplier:0.00}x speed {speedMultiplier:0.00}x season {seasonalFertility:0.00}x\n" +
             $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
             $"Actual speed {creature.Velocity.Length:0.0}\n" +
             $"Desired speed {creature.DesiredVelocity.Length:0.0}\n" +

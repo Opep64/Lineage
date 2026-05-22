@@ -48,7 +48,8 @@ public static class SimulationPipelines
         float reproductivePrimeAgeSeconds = 240f,
         float reproductiveSenescenceAgeSeconds = 900f,
         float senescentFertilityMultiplier = 0.18f,
-        float crowdingFertilityPenalty = 0.65f)
+        float crowdingFertilityPenalty = 0.65f,
+        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -65,7 +66,8 @@ public static class SimulationPipelines
                 enableSeasons,
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
-                seasonPhaseOffsetSeconds),
+                seasonPhaseOffsetSeconds,
+                biomeSeasonalAmplitudeProfile),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
                 maxSpeedEnergyCostPerSecond,
@@ -148,7 +150,8 @@ public static class SimulationPipelines
         float reproductivePrimeAgeSeconds = 240f,
         float reproductiveSenescenceAgeSeconds = 900f,
         float senescentFertilityMultiplier = 0.18f,
-        float crowdingFertilityPenalty = 0.65f)
+        float crowdingFertilityPenalty = 0.65f,
+        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -165,7 +168,8 @@ public static class SimulationPipelines
                 enableSeasons,
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
-                seasonPhaseOffsetSeconds),
+                seasonPhaseOffsetSeconds,
+                biomeSeasonalAmplitudeProfile),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
                 maxSpeedEnergyCostPerSecond,
