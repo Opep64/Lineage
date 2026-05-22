@@ -278,6 +278,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add first standardized behavior assays. Reports now replay fixed sensory situations through living neural brains to summarize movement style, plant/meat response, visible-creature attack response, small/large-creature risk response, completed-egg laying tendency, and top-founder ecotype summaries. Done.
 - Add batch scenario comparison runner/report. Preset gentle/balanced/harsh comparison and custom repeated `--batch-scenario` inputs done; comparison reports now include injury deaths and final predation-pressure metrics. Done.
 - Add lightweight probe runner. `--probe` runs multi-scenario/multi-seed tuning sweeps without per-run reports, snapshots, or lineage CSV suites; it writes one compact CSV and one compact HTML summary, with optional extinction/runaway-population early stops. Done.
+- Add temporary probe variants. `--probe-variant <name:key=value,...>` runs the checked-in base scenario plus named in-memory JSON-property overrides, so tuning candidates can be compared without editing scenario files. Probe CSVs and HTML reports keep `scenario`, `variant`, and override text separate. Done.
 
 ### Phase 6: Stronger Evolutionary Pressure
 
@@ -423,6 +424,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Retune Scavenger Pressure for more persistent carrion. A 2026-05-22 10k tick, three-seed probe compared the current preset against a carcass-persistence variant and a harsher plant-scarcity variant. The selected persistence variant changes death meat body calories `9 -> 12`, death meat energy fraction `0.60 -> 0.75`, and meat decay `0.010 -> 0.004` kcal/s. It raised tail stale-carcass share from `11.2%` to `16.8%` while keeping average final population near the current value (`417 -> 437`) and avoiding the extra harshness of plant scarcity. Probe files: `out/scavenger_carrion_probe_20260522.csv` and `.html`. Done.
 - Add separate carrion specialization. Genomes now carry `CarrionAdaptation`, where `0` preserves the current fresh-meat baseline and higher values trade some fresh meat and egg digestion efficiency for better stale-meat digestion. Food targeting, sensing scores, digestion, scenario JSON, stats CSVs, probe CSV/HTML, CLI/Godot reports, and selected-creature inspection expose the gene and its fresh/stale digestion effect. A 2026-05-22 10k tick, three-seed Scavenger/Omnivore/Predation probe showed tail carrion adaptation still near the founder baseline (`0.002-0.003`) after short runs, so longer selective-pressure probes are needed before tuning the effect size. Probe files: `out/carrion_gene_probe_20260522.csv` and `.html`. Done.
 - Tune carrion specialization enough to create a measurable signal. A pre-tune 15k Scavenger/Omnivore probe plus a 30k Scavenger seed-42 run showed average carrion adaptation moving only from `0` to about `0.003-0.007`, with the best final Scavenger mutant around `0.064`. The tuning changed full carrion specialization from `15%` fresh-meat penalty and `55%` stale recovery to `25%` fresh-meat penalty and `85%` stale recovery, and lets the carrion gene mutate at the full trait strength instead of half strength. A matched 15k three-seed Scavenger/Omnivore probe raised tail carrion adaptation to about `0.0060-0.0063` while keeping both presets viable. Probe files: `out/carrion_gene_15k_probe_20260522.csv`, `out/carrion_gene_scavenger_30k_seed42_20260522.html`, and `out/carrion_gene_tuned_15k_probe_20260522.html`. Done.
+- Add explicit probe variant support for pressure tuning. The CLI now accepts repeatable `--probe-variant <name:key=value,...>` arguments, applies them through scenario JSON round-tripping and validation, runs `base` plus each variant, and writes variant columns into the compact CSV/HTML probe summaries. A 2026-05-22 smoke probe compared Scavenger Pressure `base` against `sparse:initialResourcesPerMillionArea=120,resourceRegrowthMax=1.0`. Probe files: `out/variant_probe_smoke_20260522.csv` and `.html`. Done.
 
 ### Phase 14: Terrain, Climate, And World Editing
 
@@ -544,7 +546,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: add explicit scenario/analysis support for experimental variants so pressure-tuning probes can compare candidate setting changes without editing checked-in scenario JSON each time.
+Next practical step: use the new probe-variant path for the next evolutionary-pressure tuning pass, likely comparing biome/terrain movement-cost candidates before deciding whether terrain needs a separate layer from biomes.
 
 ## Current Implementation State
 
@@ -587,6 +589,12 @@ Useful CLI options:
 - `--batch-scenario <path>`
 - `--batch-report <path>`
 - `--batch-output-dir <dir>`
+- `--probe`
+- `--probe-scenario <path>`
+- `--probe-seeds <a,b,c>`
+- `--probe-variant <name:key=value,...>`
+- `--probe-output <path>`
+- `--probe-report <path>`
 - `--no-output`
 
 Starter scenarios:
@@ -829,6 +837,7 @@ Build, probe smoke, and a 10k tick, three-seed Scavenger/Omnivore/Predation tail
 Build, 68 core tests, `git diff --check`, and a 10k tick three-seed Scavenger carrion-variant probe passed on 2026-05-22 after tuning Scavenger Pressure toward more persistent carrion.
 Build, 69 core tests, CLI smoke/report/traits, Godot headless `--quit`, `git diff --check`, and a 10k tick three-seed Scavenger/Omnivore/Predation probe passed on 2026-05-22 after adding `CarrionAdaptation`.
 Build, 69 core tests, Godot headless `--quit`, `git diff --check`, a pre-tune 15k Scavenger/Omnivore probe, a 30k Scavenger seed-42 diagnostic run, and a matched post-tune 15k Scavenger/Omnivore probe passed on 2026-05-22 after tuning carrion effect size and mutation ramp.
+Build, 69 core tests, `git diff --check`, and a two-row Scavenger probe variant smoke passed on 2026-05-22 after adding temporary probe variants.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

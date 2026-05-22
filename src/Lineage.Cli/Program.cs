@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using System.Text.Json.Nodes;
 using Lineage.Core;
 
 try
@@ -73,6 +74,7 @@ static void PrintHelp()
           --probe                    Run a lightweight multi-scenario tuning probe.
           --probe-scenario <path>    Add a scenario to a lightweight probe. Can repeat.
           --probe-seeds <a,b,c>      Comma-separated seed overrides for probe runs.
+          --probe-variant <name:key=value,...> Add a temporary scenario variant. Can repeat; base also runs.
           --probe-output <path>      Compact probe CSV output path. Default: out/probe_summary.csv
           --probe-report <path>      Compact probe HTML output path. Default: probe output with .html extension
           --probe-snapshot-interval <n> Override stats interval for probe runs. Default: 100
@@ -86,6 +88,7 @@ static void PrintHelp()
           dotnet run --project .\src\Lineage.Cli -- --ticks 20000 --seed 42 --output .\out\seed42_stats.csv --report .\out\seed42_report.html
           dotnet run --project .\src\Lineage.Cli -- --batch-report .\out\preset_comparison.html --ticks 20000 --seed 42
           dotnet run --project .\src\Lineage.Cli -- --probe --ticks 20000 --probe-seeds 42,43,44
+          dotnet run --project .\src\Lineage.Cli -- --probe --probe-scenario .\scenarios\scavenger-pressure.json --probe-variant sparse:initialResourcesPerMillionArea=120,resourceRegrowthMax=1.0
         """);
 }
 
@@ -171,39 +174,51 @@ static IReadOnlyList<ProbeRunResult> RunProbe(RunOptions options)
 {
     var scenarioPaths = ResolveProbeScenarioPaths(options);
     var seedOverrides = ResolveProbeSeedOverrides(options);
-    var results = new List<ProbeRunResult>(scenarioPaths.Count * seedOverrides.Count);
+    var variants = ResolveProbeVariants(options);
+    var results = new List<ProbeRunResult>(scenarioPaths.Count * seedOverrides.Count * variants.Count);
 
     foreach (var scenarioPath in scenarioPaths)
     {
-        foreach (var seedOverride in seedOverrides)
+        foreach (var variant in variants)
         {
-            var scenarioOptions = options with
+            foreach (var seedOverride in seedOverrides)
             {
-                ScenarioPath = scenarioPath,
-                SeedOverride = seedOverride,
-                SnapshotIntervalTicksOverride = options.ProbeSnapshotIntervalTicks
-                    ?? options.SnapshotIntervalTicksOverride
-                    ?? 100,
-                SaveScenarioPath = null,
-                OutputPath = null,
-                LineageOutputPath = null,
-                TraitSummaryOutputPath = null,
-                FounderSummaryOutputPath = null,
-                GenerationSummaryOutputPath = null,
-                LineageTrendOutputPath = null,
-                ReportPath = null,
-                SaveSnapshotPath = null,
-                CheckpointIntervalTicks = null,
-                CheckpointDirectory = null,
-                DisableOutput = true
-            };
+                var scenarioOptions = options with
+                {
+                    ScenarioPath = scenarioPath,
+                    SeedOverride = seedOverride,
+                    SnapshotIntervalTicksOverride = options.ProbeSnapshotIntervalTicks
+                        ?? options.SnapshotIntervalTicksOverride
+                        ?? 100,
+                    SaveScenarioPath = null,
+                    OutputPath = null,
+                    LineageOutputPath = null,
+                    TraitSummaryOutputPath = null,
+                    FounderSummaryOutputPath = null,
+                    GenerationSummaryOutputPath = null,
+                    LineageTrendOutputPath = null,
+                    ReportPath = null,
+                    SaveSnapshotPath = null,
+                    CheckpointIntervalTicks = null,
+                    CheckpointDirectory = null,
+                    DisableOutput = true
+                };
 
-            var scenario = scenarioOptions.CreateScenario();
-            var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
-            var stopwatch = Stopwatch.StartNew();
-            var status = RunProbeSimulation(options, simulation);
-            stopwatch.Stop();
-            results.Add(ProbeRunResult.From(scenarioPath, scenario, simulation, stopwatch.Elapsed, status, options.Ticks));
+                var baseScenario = scenarioOptions.CreateScenario();
+                var scenario = variant.Apply(baseScenario);
+                scenario = scenario with
+                {
+                    Seed = seedOverride ?? scenario.Seed,
+                    StatsSnapshotIntervalTicks = scenarioOptions.SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks
+                };
+                scenario = scenario.Validated();
+
+                var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+                var stopwatch = Stopwatch.StartNew();
+                var status = RunProbeSimulation(options, simulation);
+                stopwatch.Stop();
+                results.Add(ProbeRunResult.From(scenarioPath, baseScenario.Name, variant, scenario, simulation, stopwatch.Elapsed, status, options.Ticks));
+            }
         }
     }
 
@@ -261,6 +276,23 @@ static IReadOnlyList<ulong?> ResolveProbeSeedOverrides(RunOptions options)
     }
 
     return [options.SeedOverride];
+}
+
+static IReadOnlyList<ProbeVariant> ResolveProbeVariants(RunOptions options)
+{
+    if (options.ProbeVariants.Count == 0)
+    {
+        return [ProbeVariant.Base];
+    }
+
+    var variants = new ProbeVariant[options.ProbeVariants.Count + 1];
+    variants[0] = ProbeVariant.Base;
+    for (var i = 0; i < options.ProbeVariants.Count; i++)
+    {
+        variants[i + 1] = options.ProbeVariants[i];
+    }
+
+    return variants;
 }
 
 static void WriteRunOutputs(
@@ -384,13 +416,16 @@ static void PrintProbeSummary(
     Console.WriteLine($"Total wall time: {results.Sum(result => result.WallSeconds):0.000}s");
     Console.WriteLine();
 
-    foreach (var group in results.GroupBy(result => result.ScenarioName).OrderBy(group => group.Key))
+    foreach (var group in results
+        .GroupBy(result => new ProbeResultGroupKey(result.ScenarioName, result.VariantName, result.VariantOverrides))
+        .OrderBy(group => group.Key.ScenarioName)
+        .ThenBy(group => group.Key.VariantName))
     {
         var averagePopulation = group.Average(result => result.FinalCreatures);
         var averageTicksPerSecond = group.Average(result => result.TicksPerSecond);
         var statuses = string.Join(", ", group.Select(result => result.Status.ToString()).Distinct().Order());
         Console.WriteLine(
-            $"{group.Key}: runs {group.Count()}, avg final {averagePopulation:0.0}, " +
+            $"{group.Key.ScenarioName} / {group.Key.VariantName}: runs {group.Count()}, avg final {averagePopulation:0.0}, " +
             $"pop range {group.Min(result => result.FinalCreatures)}-{group.Max(result => result.FinalCreatures)}, " +
             $"avg {averageTicksPerSecond:0.0} ticks/s, {statuses}");
     }
@@ -448,6 +483,8 @@ internal sealed record RunOptions
 
     public IReadOnlyList<ulong> ProbeSeeds { get; init; } = Array.Empty<ulong>();
 
+    public IReadOnlyList<ProbeVariant> ProbeVariants { get; init; } = Array.Empty<ProbeVariant>();
+
     public string? ProbeOutputPath { get; init; }
 
     public string? ProbeReportPath { get; init; }
@@ -465,6 +502,7 @@ internal sealed record RunOptions
     public bool IsProbe => ProbeMode
         || ProbeScenarioPaths.Count > 0
         || ProbeSeeds.Count > 0
+        || ProbeVariants.Count > 0
         || ProbeOutputPath is not null
         || ProbeReportPath is not null
         || ProbeSnapshotIntervalTicks is not null
@@ -644,6 +682,9 @@ internal sealed record RunOptions
                 case "--probe-seeds":
                     options = options with { ProbeSeeds = ParseSeedList(ReadValue(args, ref i, arg), arg) };
                     break;
+                case "--probe-variant":
+                    options = options with { ProbeVariants = Append(options.ProbeVariants, ProbeVariant.Parse(ReadValue(args, ref i, arg), arg)) };
+                    break;
                 case "--probe-output":
                     options = options with { ProbeOutputPath = ReadValue(args, ref i, arg) };
                     break;
@@ -670,9 +711,9 @@ internal sealed record RunOptions
         return options;
     }
 
-    private static IReadOnlyList<string> Append(IReadOnlyList<string> values, string value)
+    private static IReadOnlyList<T> Append<T>(IReadOnlyList<T> values, T value)
     {
-        var copy = new string[values.Count + 1];
+        var copy = new T[values.Count + 1];
         for (var i = 0; i < values.Count; i++)
         {
             copy[i] = values[i];
@@ -844,9 +885,138 @@ internal enum ProbeRunStatus
     MaxPopulation
 }
 
+internal readonly record struct ProbeResultGroupKey(string ScenarioName, string VariantName, string VariantOverrides);
+
+internal readonly record struct ScenarioOverride(string PropertyName, string Value)
+{
+    public string DisplayText => $"{PropertyName}={Value}";
+}
+
+internal sealed record ProbeVariant(string Name, IReadOnlyList<ScenarioOverride> Overrides)
+{
+    public static ProbeVariant Base { get; } = new("base", Array.Empty<ScenarioOverride>());
+
+    public string OverrideSummary => Overrides.Count == 0
+        ? string.Empty
+        : string.Join("; ", Overrides.Select(scenarioOverride => scenarioOverride.DisplayText));
+
+    public SimulationScenario Apply(SimulationScenario scenario)
+    {
+        if (Overrides.Count == 0)
+        {
+            return scenario;
+        }
+
+        var jsonObject = JsonNode.Parse(SimulationScenarioJson.ToJson(scenario)) as JsonObject
+            ?? throw new InvalidOperationException("Scenario JSON did not produce an object.");
+        var propertyNames = jsonObject.Select(property => property.Key).ToArray();
+
+        foreach (var scenarioOverride in Overrides)
+        {
+            var propertyName = ResolvePropertyName(propertyNames, scenarioOverride.PropertyName);
+            jsonObject[propertyName] = ParseOverrideValue(scenarioOverride.Value);
+        }
+
+        return SimulationScenarioJson.FromJson(jsonObject.ToJsonString());
+    }
+
+    public static ProbeVariant Parse(string value, string optionName)
+    {
+        var separatorIndex = value.IndexOf(':', StringComparison.Ordinal);
+        if (separatorIndex <= 0 || separatorIndex == value.Length - 1)
+        {
+            throw new ArgumentException($"{optionName} must use name:key=value[,key=value] format.");
+        }
+
+        var name = value[..separatorIndex].Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException($"{optionName} variant name cannot be empty.");
+        }
+
+        if (string.Equals(name, Base.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"{optionName} variant name 'base' is reserved.");
+        }
+
+        var overrideText = value[(separatorIndex + 1)..];
+        var overrides = overrideText
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => ParseOverride(token, optionName))
+            .ToArray();
+
+        if (overrides.Length == 0)
+        {
+            throw new ArgumentException($"{optionName} must include at least one key=value override.");
+        }
+
+        return new ProbeVariant(name, overrides);
+    }
+
+    private static ScenarioOverride ParseOverride(string token, string optionName)
+    {
+        var separatorIndex = token.IndexOf('=', StringComparison.Ordinal);
+        if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
+        {
+            throw new ArgumentException($"{optionName} overrides must use key=value entries.");
+        }
+
+        var propertyName = token[..separatorIndex].Trim();
+        var value = token[(separatorIndex + 1)..].Trim();
+        if (string.IsNullOrWhiteSpace(propertyName) || string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException($"{optionName} overrides must include non-empty keys and values.");
+        }
+
+        return new ScenarioOverride(propertyName, value);
+    }
+
+    private static string ResolvePropertyName(IReadOnlyList<string> propertyNames, string requestedName)
+    {
+        var normalizedRequest = NormalizeName(requestedName);
+        foreach (var propertyName in propertyNames)
+        {
+            if (NormalizeName(propertyName) == normalizedRequest)
+            {
+                return propertyName;
+            }
+        }
+
+        throw new ArgumentException($"Unknown scenario override '{requestedName}'. Use a scenario JSON property name such as initialResourcesPerMillionArea.");
+    }
+
+    private static string NormalizeName(string value)
+    {
+        return string.Concat(value.Where(char.IsLetterOrDigit)).ToLowerInvariant();
+    }
+
+    private static JsonNode? ParseOverrideValue(string value)
+    {
+        if (bool.TryParse(value, out var boolValue))
+        {
+            return JsonValue.Create(boolValue);
+        }
+
+        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+        {
+            return JsonValue.Create(longValue);
+        }
+
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue)
+            && double.IsFinite(doubleValue))
+        {
+            return JsonValue.Create(doubleValue);
+        }
+
+        return JsonValue.Create(value);
+    }
+}
+
 internal readonly record struct ProbeRunResult(
     string ScenarioName,
     string ScenarioPath,
+    string VariantName,
+    string VariantOverrides,
     ulong Seed,
     ProbeRunStatus Status,
     int RequestedTicks,
@@ -930,6 +1100,8 @@ internal readonly record struct ProbeRunResult(
 {
     public static ProbeRunResult From(
         string scenarioPath,
+        string scenarioName,
+        ProbeVariant variant,
         SimulationScenario scenario,
         Simulation simulation,
         TimeSpan elapsed,
@@ -946,8 +1118,10 @@ internal readonly record struct ProbeRunResult(
         var tail = ProbeTailSummary.From(state.Stats.Snapshots);
 
         return new ProbeRunResult(
-            scenario.Name,
+            scenarioName,
             scenarioPath,
+            variant.Name,
+            variant.OverrideSummary,
             scenario.Seed,
             status,
             requestedTicks,
@@ -1140,7 +1314,7 @@ internal static class ProbeCsvWriter
     public static void Write(string path, IReadOnlyList<ProbeRunResult> results)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scenario,scenario_path,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal");
+        writer.WriteLine("scenario,scenario_path,variant,variant_overrides,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal");
 
         foreach (var result in results)
         {
@@ -1148,6 +1322,8 @@ internal static class ProbeCsvWriter
                 ',',
                 Csv(result.ScenarioName),
                 Csv(result.ScenarioPath),
+                Csv(result.VariantName),
+                Csv(result.VariantOverrides),
                 result.Seed.ToString(CultureInfo.InvariantCulture),
                 result.Status.ToString(),
                 result.RequestedTicks.ToString(CultureInfo.InvariantCulture),
@@ -1258,8 +1434,9 @@ internal static class ProbeReportWriter
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
         var groups = results
-            .GroupBy(result => result.ScenarioName)
-            .OrderBy(group => group.Key)
+            .GroupBy(result => new ProbeResultGroupKey(result.ScenarioName, result.VariantName, result.VariantOverrides))
+            .OrderBy(group => group.Key.ScenarioName)
+            .ThenBy(group => group.Key.VariantName)
             .ToArray();
 
         WriteDocumentStart(writer, "Lineage Probe Summary");
@@ -1272,7 +1449,8 @@ internal static class ProbeReportWriter
 
         writer.WriteLine("<section><h2>Overview</h2><div class=\"metric-grid\">");
         WriteMetric(writer, "Runs", results.Count.ToString(CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Scenarios", groups.Length.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Scenarios", results.Select(result => result.ScenarioName).Distinct().Count().ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Scenario variants", groups.Length.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Ticks requested", options.Ticks.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Total wall time", $"{results.Sum(result => result.WallSeconds):0.###} seconds");
         WriteMetric(writer, "Average ticks/s", $"{results.Average(result => result.TicksPerSecond):0.###}");
@@ -1282,12 +1460,14 @@ internal static class ProbeReportWriter
         writer.WriteLine("</div></section>");
 
         writer.WriteLine("<section><h2>Scenario Summary</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Ticks/s</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Overrides</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Ticks/s</th></tr></thead><tbody>");
         foreach (var group in groups)
         {
             writer.WriteLine(
                 "<tr>" +
-                $"<td>{Html(group.Key)}</td>" +
+                $"<td>{Html(group.Key.ScenarioName)}</td>" +
+                $"<td>{Html(group.Key.VariantName)}</td>" +
+                $"<td>{Html(string.IsNullOrWhiteSpace(group.Key.VariantOverrides) ? "None" : group.Key.VariantOverrides)}</td>" +
                 $"<td>{Html(group.Count())}</td>" +
                 $"<td>{Html(FormatStatuses(group))}</td>" +
                 $"<td>{Html(group.Average(result => result.FinalCreatures).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
@@ -1312,12 +1492,16 @@ internal static class ProbeReportWriter
         writer.WriteLine("</tbody></table></div></section>");
 
         writer.WriteLine("<section><h2>Run Rows</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th></tr></thead><tbody>");
-        foreach (var result in results.OrderBy(result => result.ScenarioName).ThenBy(result => result.Seed))
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th></tr></thead><tbody>");
+        foreach (var result in results
+            .OrderBy(result => result.ScenarioName)
+            .ThenBy(result => result.VariantName)
+            .ThenBy(result => result.Seed))
         {
             writer.WriteLine(
                 "<tr>" +
                 $"<td>{Html(result.ScenarioName)}</td>" +
+                $"<td>{Html(result.VariantName)}</td>" +
                 $"<td>{Html(result.Seed)}</td>" +
                 $"<td>{Html(result.Status)}</td>" +
                 $"<td>{Html(result.FinalTick)}</td>" +
