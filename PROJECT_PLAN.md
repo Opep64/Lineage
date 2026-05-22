@@ -418,6 +418,8 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Retune Balanced reproduction pressure after disabling seed-forager starter attacks. A 2026-05-22 three-seed 10k probe compared current Balanced against a modest reproduction-cost variant and a modest resource-scarcity variant. The selected reproduction variant changes threshold `84 -> 90`, offspring investment `28 -> 30`, egg production `3.0 -> 2.8` kcal/s, and cooldown `7 -> 8` seconds. It reduced average final Balanced population from about `775` to `657` while keeping injury deaths at `0`, meat intake share near `20%`, and improving calories per distance from `0.183` to `0.210`. Probe files: `out/balanced_pressure_variant_probe_20260522.csv` and `.html`. Done.
 - Confirm four-scenario separation after the Balanced reproduction retune. A 2026-05-22 10k tick, three-seed probe across Balanced, Scavenger, Omnivore, and Predation produced average final populations of about `657`, `432`, `332`, and `140` respectively. Non-predator attack stayed at `0%`; Predation stayed at about `5.4%` attacking and `87` average injury deaths. Probe files: `out/four_scenario_probe_tuned_balanced_20260522.csv` and `.html`. Done.
 - First meat-freshness probe on 2026-05-22 ran Scavenger, Omnivore, and Predation for 10k ticks across seeds 42, 43, and 44. No freshness tuning was applied afterward. Average meat resources remained moderately fresh (`75-82%` freshness), carcass intake was mostly fresh rather than stale, and stale carcass intake was visible but not dominant. Probe files: `out/meat_freshness_probe_20260522.csv` and `.html`. Done.
+- Add tail-window metrics to lightweight probes. Probe CSVs now include last-quarter snapshot averages for population, diet, meat/fresh-kill intake, meat freshness, fresh/stale carcass intake, meat energy share, attack share, death rates, and search efficiency. Probe HTML summaries show the high-signal tail fields so tuning is not driven by a single final snapshot. Done.
+- Tail meat probe on 2026-05-22 reran Scavenger, Omnivore, and Predation for 10k ticks across seeds 42, 43, and 44. Tail-window meat intake was about `18.4%`, `14.5%`, and `21.4%` respectively; tail stale-carcass share was `11.2%`, `17.2%`, and `4.9%`; tail diet remained near founder-biased values at `0.10`, `0.12`, and `0.15`. Probe files: `out/tail_meat_probe_20260522.csv` and `.html`. Done.
 
 ### Phase 14: Terrain, Climate, And World Editing
 
@@ -539,7 +541,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: make stale/fresh meat pressure more evolvable. The current freshness curve is acceptable, so the next useful move is either a longer tail-sampled freshness probe or a small ecological pressure pass that makes old carcasses matter more before adding a dedicated carrion/fresh-meat digestion gene.
+Next practical step: make stale/fresh meat pressure more evolvable. The current freshness curve is acceptable, and tail metrics show old carcasses are visible but not yet a major driver. The next useful move is a small ecological pressure pass that makes old carcasses matter more, or adding a first carrion-specialization gene once that pressure exists.
 
 ## Current Implementation State
 
@@ -820,6 +822,7 @@ Build, 58 core tests, CLI tuned meat-scent smoke/report/snapshot/traits, and God
 Build, 58 core tests, CLI source-feeding smoke/report/snapshot/traits, and Godot headless `--quit-after 1` passed on 2026-05-21 after adding plant/carcass/egg/future-prey intake and plant/meat digested-energy telemetry.
 Build, 68 core tests, CLI meat-quality smoke/report, `git diff --check`, and Godot headless `--quit` passed on 2026-05-22 after adding age-based meat freshness and fresh/stale meat telemetry.
 Build and a 10k tick, three-seed Scavenger/Omnivore/Predation meat-freshness probe passed on 2026-05-22 after extending the lightweight probe CSV/report with fresh/stale carcass metrics.
+Build, probe smoke, and a 10k tick, three-seed Scavenger/Omnivore/Predation tail-metrics probe passed on 2026-05-22 after adding last-quarter probe metrics.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

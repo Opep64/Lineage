@@ -907,7 +907,25 @@ internal readonly record struct ProbeRunResult(
     float CaloriesDigestedPerDistance,
     float CaloriesEatenPerFoodVisionEvent,
     float AverageSecondsSinceLastMeal,
-    float AverageDistanceSinceLastMeal)
+    float AverageDistanceSinceLastMeal,
+    int TailSnapshotCount,
+    long TailStartTick,
+    long TailEndTick,
+    double TailSeconds,
+    float TailAverageCreatures,
+    float TailAverageDietaryAdaptation,
+    float TailMeatCaloriesEatenShare,
+    float TailFreshKillCaloriesEatenShare,
+    float TailAverageMeatFreshness,
+    float TailFreshMeatCaloriesEatenShare,
+    float TailStaleMeatCaloriesEatenShare,
+    float TailMeatDigestedEnergyShare,
+    float TailAttackingShare,
+    float TailDeathsPerSecond,
+    float TailStarvationDeathsPerSecond,
+    float TailInjuryDeathsPerSecond,
+    float TailCaloriesEatenPerDistance,
+    float TailAverageSecondsSinceLastMeal)
 {
     public static ProbeRunResult From(
         string scenarioPath,
@@ -924,6 +942,7 @@ internal readonly record struct ProbeRunResult(
         var resourceCapacity = state.Resources.Sum(resource => resource.MaxCalories);
         var resourceCalories = state.Resources.Sum(resource => resource.Calories);
         var wallSeconds = Math.Max(elapsed.TotalSeconds, 0.000001);
+        var tail = ProbeTailSummary.From(state.Stats.Snapshots);
 
         return new ProbeRunResult(
             scenario.Name,
@@ -988,7 +1007,25 @@ internal readonly record struct ProbeRunResult(
             snapshot.CaloriesDigestedPerDistance,
             snapshot.CaloriesEatenPerFoodVisionEvent,
             snapshot.AverageSecondsSinceLastMeal,
-            snapshot.AverageDistanceSinceLastMeal);
+            snapshot.AverageDistanceSinceLastMeal,
+            tail.SnapshotCount,
+            tail.StartTick,
+            tail.EndTick,
+            tail.Seconds,
+            tail.AverageCreatures,
+            tail.AverageDietaryAdaptation,
+            tail.MeatCaloriesEatenShare,
+            tail.FreshKillCaloriesEatenShare,
+            tail.AverageMeatFreshness,
+            tail.FreshMeatCaloriesEatenShare,
+            tail.StaleMeatCaloriesEatenShare,
+            tail.MeatDigestedEnergyShare,
+            tail.AttackingShare,
+            tail.DeathsPerSecond,
+            tail.StarvationDeathsPerSecond,
+            tail.InjuryDeathsPerSecond,
+            tail.CaloriesEatenPerDistance,
+            tail.AverageSecondsSinceLastMeal);
     }
 
     private static float Share(int count, int total)
@@ -997,12 +1034,107 @@ internal readonly record struct ProbeRunResult(
     }
 }
 
+internal readonly record struct ProbeTailSummary(
+    int SnapshotCount,
+    long StartTick,
+    long EndTick,
+    double Seconds,
+    float AverageCreatures,
+    float AverageDietaryAdaptation,
+    float MeatCaloriesEatenShare,
+    float FreshKillCaloriesEatenShare,
+    float AverageMeatFreshness,
+    float FreshMeatCaloriesEatenShare,
+    float StaleMeatCaloriesEatenShare,
+    float MeatDigestedEnergyShare,
+    float AttackingShare,
+    float DeathsPerSecond,
+    float StarvationDeathsPerSecond,
+    float InjuryDeathsPerSecond,
+    float CaloriesEatenPerDistance,
+    float AverageSecondsSinceLastMeal)
+{
+    public static ProbeTailSummary From(IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    {
+        if (snapshots.Count == 0)
+        {
+            return default;
+        }
+
+        var tailCount = Math.Min(snapshots.Count, Math.Max(3, (int)Math.Ceiling(snapshots.Count * 0.25)));
+        var startIndex = snapshots.Count - tailCount;
+        var first = snapshots[startIndex];
+        var last = snapshots[^1];
+        var seconds = Math.Max(0.0, last.ElapsedSeconds - first.ElapsedSeconds);
+
+        var averageCreatures = 0f;
+        var averageDietaryAdaptation = 0f;
+        var meatCaloriesEatenShare = 0f;
+        var freshKillCaloriesEatenShare = 0f;
+        var averageMeatFreshness = 0f;
+        var freshMeatCaloriesEatenShare = 0f;
+        var staleMeatCaloriesEatenShare = 0f;
+        var meatDigestedEnergyShare = 0f;
+        var attackingShare = 0f;
+        var caloriesEatenPerDistance = 0f;
+        var averageSecondsSinceLastMeal = 0f;
+
+        for (var i = startIndex; i < snapshots.Count; i++)
+        {
+            var snapshot = snapshots[i];
+            averageCreatures += snapshot.CreatureCount;
+            averageDietaryAdaptation += snapshot.AverageDietaryAdaptation;
+            meatCaloriesEatenShare += snapshot.MeatCaloriesEatenShare;
+            freshKillCaloriesEatenShare += snapshot.FreshKillCaloriesEatenShare;
+            averageMeatFreshness += snapshot.AverageMeatFreshness;
+            freshMeatCaloriesEatenShare += snapshot.FreshMeatCaloriesEatenShare;
+            staleMeatCaloriesEatenShare += snapshot.StaleMeatCaloriesEatenShare;
+            meatDigestedEnergyShare += snapshot.MeatDigestedEnergyShare;
+            attackingShare += Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount);
+            caloriesEatenPerDistance += snapshot.CaloriesEatenPerDistance;
+            averageSecondsSinceLastMeal += snapshot.AverageSecondsSinceLastMeal;
+        }
+
+        var divisor = tailCount;
+        var deathRateDivisor = seconds > 0.0 ? (float)seconds : 0f;
+        return new ProbeTailSummary(
+            tailCount,
+            first.Tick,
+            last.Tick,
+            seconds,
+            averageCreatures / divisor,
+            averageDietaryAdaptation / divisor,
+            meatCaloriesEatenShare / divisor,
+            freshKillCaloriesEatenShare / divisor,
+            averageMeatFreshness / divisor,
+            freshMeatCaloriesEatenShare / divisor,
+            staleMeatCaloriesEatenShare / divisor,
+            meatDigestedEnergyShare / divisor,
+            attackingShare / divisor,
+            Rate(last.CreatureDeathCount - first.CreatureDeathCount, deathRateDivisor),
+            Rate(last.StarvationDeathCount - first.StarvationDeathCount, deathRateDivisor),
+            Rate(last.InjuryDeathCount - first.InjuryDeathCount, deathRateDivisor),
+            caloriesEatenPerDistance / divisor,
+            averageSecondsSinceLastMeal / divisor);
+    }
+
+    private static float Share(int count, int total)
+    {
+        return total > 0 ? count / (float)total : 0f;
+    }
+
+    private static float Rate(int count, float seconds)
+    {
+        return seconds > 0f ? count / seconds : 0f;
+    }
+}
+
 internal static class ProbeCsvWriter
 {
     public static void Write(string path, IReadOnlyList<ProbeRunResult> results)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scenario,scenario_path,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal");
+        writer.WriteLine("scenario,scenario_path,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal");
 
         foreach (var result in results)
         {
@@ -1070,7 +1202,25 @@ internal static class ProbeCsvWriter
                 Format(result.CaloriesDigestedPerDistance),
                 Format(result.CaloriesEatenPerFoodVisionEvent),
                 Format(result.AverageSecondsSinceLastMeal),
-                Format(result.AverageDistanceSinceLastMeal)));
+                Format(result.AverageDistanceSinceLastMeal),
+                result.TailSnapshotCount.ToString(CultureInfo.InvariantCulture),
+                result.TailStartTick.ToString(CultureInfo.InvariantCulture),
+                result.TailEndTick.ToString(CultureInfo.InvariantCulture),
+                Format(result.TailSeconds),
+                Format(result.TailAverageCreatures),
+                Format(result.TailAverageDietaryAdaptation),
+                Format(result.TailMeatCaloriesEatenShare),
+                Format(result.TailFreshKillCaloriesEatenShare),
+                Format(result.TailAverageMeatFreshness),
+                Format(result.TailFreshMeatCaloriesEatenShare),
+                Format(result.TailStaleMeatCaloriesEatenShare),
+                Format(result.TailMeatDigestedEnergyShare),
+                Format(result.TailAttackingShare),
+                Format(result.TailDeathsPerSecond),
+                Format(result.TailStarvationDeathsPerSecond),
+                Format(result.TailInjuryDeathsPerSecond),
+                Format(result.TailCaloriesEatenPerDistance),
+                Format(result.TailAverageSecondsSinceLastMeal)));
         }
     }
 
@@ -1125,7 +1275,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</div></section>");
 
         writer.WriteLine("<section><h2>Scenario Summary</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg starved</th><th>Avg injury</th><th>Meat raw</th><th>Fresh kill</th><th>Meat fresh</th><th>Fresh carcass</th><th>Stale carcass</th><th>Move cost</th><th>Basal cost</th><th>Rich share</th><th>Barren share</th><th>kcal/distance</th><th>Meal gap</th><th>Ticks/s</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Ticks/s</th></tr></thead><tbody>");
         foreach (var group in groups)
         {
             writer.WriteLine(
@@ -1135,21 +1285,18 @@ internal static class ProbeReportWriter
                 $"<td>{Html(FormatStatuses(group))}</td>" +
                 $"<td>{Html(group.Average(result => result.FinalCreatures).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html($"{group.Min(result => result.FinalCreatures)}-{group.Max(result => result.FinalCreatures)}")}</td>" +
+                $"<td>{Html(group.Average(result => result.TailAverageCreatures).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.FinalEggs).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.Deaths).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
-                $"<td>{Html(group.Average(result => result.StarvationDeaths).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.InjuryDeaths).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPercent(group.Average(result => result.MeatCaloriesEatenShare)))}</td>" +
-                $"<td>{Html(FormatPercent(group.Average(result => result.FreshKillCaloriesEatenShare)))}</td>" +
-                $"<td>{Html(FormatPercent(group.Average(result => result.AverageMeatFreshness)))}</td>" +
-                $"<td>{Html(FormatPercent(group.Average(result => result.FreshMeatCaloriesEatenShare)))}</td>" +
-                $"<td>{Html(FormatPercent(group.Average(result => result.StaleMeatCaloriesEatenShare)))}</td>" +
-                $"<td>{Html(group.Average(result => result.AverageBiomeMovementCostMultiplier).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
-                $"<td>{Html(group.Average(result => result.AverageBiomeBasalCostMultiplier).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
-                $"<td>{Html(FormatPercent(group.Average(result => Share(result.RichCreatureCount, result.FinalCreatures))))}</td>" +
-                $"<td>{Html(FormatPercent(group.Average(result => Share(result.BarrenCreatureCount, result.FinalCreatures))))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailMeatCaloriesEatenShare)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailAverageMeatFreshness)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailStaleMeatCaloriesEatenShare)))}</td>" +
+                $"<td>{Html(group.Average(result => result.TailAverageDietaryAdaptation).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailAttackingShare)))}</td>" +
+                $"<td>{Html(group.Average(result => result.TailDeathsPerSecond).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.CaloriesEatenPerDistance).ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
-                $"<td>{Html($"{group.Average(result => result.AverageSecondsSinceLastMeal):0.##}s")}</td>" +
                 $"<td>{Html(group.Average(result => result.TicksPerSecond).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 "</tr>");
         }
@@ -1157,7 +1304,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</tbody></table></div></section>");
 
         writer.WriteLine("<section><h2>Run Rows</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Eggs</th><th>Deaths</th><th>Starved</th><th>Injury</th><th>Max gen</th><th>Biome counts B/S/G/R</th><th>Move cost</th><th>Basal cost</th><th>Food seen</th><th>Meat raw</th><th>Fresh kill</th><th>Meat fresh</th><th>Fresh carcass</th><th>Stale carcass</th><th>kcal/distance</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th></tr></thead><tbody>");
         foreach (var result in results.OrderBy(result => result.ScenarioName).ThenBy(result => result.Seed))
         {
             writer.WriteLine(
@@ -1169,20 +1316,20 @@ internal static class ProbeReportWriter
                 $"<td>{Html($"{result.WallSeconds:0.###}s")}</td>" +
                 $"<td>{Html(result.TicksPerSecond.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.FinalCreatures)}</td>" +
+                $"<td>{Html(result.TailAverageCreatures.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.FinalEggs)}</td>" +
                 $"<td>{Html(result.Deaths)}</td>" +
-                $"<td>{Html(result.StarvationDeaths)}</td>" +
                 $"<td>{Html(result.InjuryDeaths)}</td>" +
                 $"<td>{Html(result.MaxGeneration)}</td>" +
-                $"<td>{Html($"{result.BarrenCreatureCount}/{result.SparseCreatureCount}/{result.GrasslandCreatureCount}/{result.RichCreatureCount}")}</td>" +
-                $"<td>{Html(result.AverageBiomeMovementCostMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
-                $"<td>{Html(result.AverageBiomeBasalCostMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html($"{result.TailStartTick}-{result.TailEndTick}")}</td>" +
                 $"<td>{Html(FormatPercent(result.FoodDetectedShare))}</td>" +
                 $"<td>{Html(FormatPercent(result.MeatCaloriesEatenShare))}</td>" +
-                $"<td>{Html(FormatPercent(result.FreshKillCaloriesEatenShare))}</td>" +
-                $"<td>{Html(FormatPercent(result.AverageMeatFreshness))}</td>" +
-                $"<td>{Html(FormatPercent(result.FreshMeatCaloriesEatenShare))}</td>" +
-                $"<td>{Html(FormatPercent(result.StaleMeatCaloriesEatenShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailMeatCaloriesEatenShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailAverageMeatFreshness))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailStaleMeatCaloriesEatenShare))}</td>" +
+                $"<td>{Html(result.TailAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailAttackingShare))}</td>" +
+                $"<td>{Html(result.TailDeathsPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.CaloriesEatenPerDistance.ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
                 "</tr>");
         }
