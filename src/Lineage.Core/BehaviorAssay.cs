@@ -38,6 +38,9 @@ public static class BehaviorAssay
         var largeCreatureAhead = new BehaviorAssayAccumulator();
         var largeCreatureApproaching = new BehaviorAssayAccumulator();
         var largeCreatureFacingAway = new BehaviorAssayAccumulator();
+        var slowTerrainHere = new BehaviorAssayAccumulator();
+        var slowTerrainAhead = new BehaviorAssayAccumulator();
+        var easierTerrainAhead = new BehaviorAssayAccumulator();
         var reproductionReady = new BehaviorAssayAccumulator();
 
         foreach (var creature in creatures)
@@ -63,6 +66,9 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateLargeCreatureAheadSenses(), inputs, outputs, ref largeCreatureAhead);
             Accumulate(brain, genome, CreateLargeCreatureApproachingSenses(), inputs, outputs, ref largeCreatureApproaching);
             Accumulate(brain, genome, CreateLargeCreatureFacingAwaySenses(), inputs, outputs, ref largeCreatureFacingAway);
+            Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
+            Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
+            Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
             Accumulate(brain, genome, CreateReproductionReadySenses(), inputs, outputs, ref reproductionReady);
         }
 
@@ -81,6 +87,9 @@ public static class BehaviorAssay
             largeCreatureAhead.ToResult("Large creature ahead"),
             largeCreatureApproaching.ToResult("Large creature approaching"),
             largeCreatureFacingAway.ToResult("Large creature facing away"),
+            slowTerrainHere.ToResult("Slow terrain here"),
+            slowTerrainAhead.ToResult("Slow terrain ahead"),
+            easierTerrainAhead.ToResult("Easier terrain ahead"),
             reproductionReady.ToResult("Reproduction ready"));
 
         return summary with
@@ -90,6 +99,7 @@ public static class BehaviorAssay
             PredatorTendency = ClassifyPredatorTendency(summary),
             RiskResponse = ClassifyRiskResponse(summary),
             Ecotype = ClassifyEcotype(summary),
+            TerrainResponse = ClassifyTerrainResponse(summary),
             ReproductionTendency = ClassifyReproductionTendency(summary)
         };
     }
@@ -341,6 +351,33 @@ public static class BehaviorAssay
         };
     }
 
+    private static CreatureSenseState CreateSlowTerrainHereSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CurrentTerrainDrag = 0.45f,
+            ForwardTerrainDrag = 0.45f
+        };
+    }
+
+    private static CreatureSenseState CreateSlowTerrainAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CurrentTerrainDrag = 0f,
+            ForwardTerrainDrag = 0.45f
+        };
+    }
+
+    private static CreatureSenseState CreateEasierTerrainAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CurrentTerrainDrag = 0.45f,
+            ForwardTerrainDrag = 0f
+        };
+    }
+
     private static CreatureSenseState CreateReproductionReadySenses()
     {
         return new CreatureSenseState
@@ -482,6 +519,36 @@ public static class BehaviorAssay
         }
 
         return "little risk differentiation";
+    }
+
+    private static string ClassifyTerrainResponse(BehaviorAssaySummary summary)
+    {
+        var baselineMove = summary.Baseline.MoveForward;
+        var slowHereMoveDelta = summary.SlowTerrainHere.MoveForward - baselineMove;
+        var slowAheadMoveDelta = summary.SlowTerrainAhead.MoveForward - baselineMove;
+        var easierAheadMoveDelta = summary.EasierTerrainAhead.MoveForward - baselineMove;
+
+        if (slowAheadMoveDelta < -0.15f && easierAheadMoveDelta > 0.15f)
+        {
+            return "prefers easier terrain";
+        }
+
+        if (slowAheadMoveDelta < -0.15f)
+        {
+            return "avoids slow terrain ahead";
+        }
+
+        if (easierAheadMoveDelta > 0.15f || slowHereMoveDelta > 0.15f)
+        {
+            return "pushes out of slow terrain";
+        }
+
+        if (slowAheadMoveDelta > 0.15f)
+        {
+            return "moves into slow terrain";
+        }
+
+        return "little terrain differentiation";
     }
 
     private static string ClassifyEcotype(BehaviorAssaySummary summary)
@@ -653,6 +720,9 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult LargeCreatureAhead,
     BehaviorAssayResult LargeCreatureApproaching,
     BehaviorAssayResult LargeCreatureFacingAway,
+    BehaviorAssayResult SlowTerrainHere,
+    BehaviorAssayResult SlowTerrainAhead,
+    BehaviorAssayResult EasierTerrainAhead,
     BehaviorAssayResult ReproductionReady)
 {
     public string MovementStyle { get; init; } = "not evaluated";
@@ -664,6 +734,8 @@ public readonly record struct BehaviorAssaySummary(
     public string RiskResponse { get; init; } = "not evaluated";
 
     public string Ecotype { get; init; } = "not evaluated";
+
+    public string TerrainResponse { get; init; } = "not evaluated";
 
     public string ReproductionTendency { get; init; } = "not evaluated";
 
@@ -682,6 +754,9 @@ public readonly record struct BehaviorAssaySummary(
         LargeCreatureAhead,
         LargeCreatureApproaching,
         LargeCreatureFacingAway,
+        SlowTerrainHere,
+        SlowTerrainAhead,
+        EasierTerrainAhead,
         ReproductionReady
     ];
 }

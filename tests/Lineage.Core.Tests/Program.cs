@@ -47,6 +47,7 @@ var tests = new (string Name, Action Body)[]
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
+    ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -1732,11 +1733,33 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(14, summary.Results.Count, "Assay result count");
+    AssertEqual(17, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
+    AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
+}
+
+static void BehaviorAssaySummarizesTerrainResponse()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 405, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 1.0f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.ForwardTerrainDragInput] = -4.0f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.Baseline.MoveForward > 0.7f, "Probe brain should cruise without terrain cue");
+    AssertTrue(summary.SlowTerrainAhead.MoveForward < 0.1f, "Probe brain should slow down when rough terrain is ahead");
+    AssertEqual("avoids slow terrain ahead", summary.TerrainResponse, "Terrain response classification");
 }
 
 static void ForagerPredatorStarterBrainHuntsCreatureCues()

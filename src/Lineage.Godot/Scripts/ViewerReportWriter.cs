@@ -819,6 +819,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Food response", summary.ForagingBias);
         WriteMetric(writer, "Creature attack response", summary.PredatorTendency);
         WriteMetric(writer, "Risk response", summary.RiskResponse);
+        WriteMetric(writer, "Terrain response", summary.TerrainResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         writer.WriteLine("</div>");
 
@@ -854,7 +855,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Risk</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -867,6 +868,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(behavior.Ecotype)}</td>" +
                 $"<td>{Html(behavior.ForagingBias)}</td>" +
                 $"<td>{Html(behavior.RiskResponse)}</td>" +
+                $"<td>{Html(behavior.TerrainResponse)}</td>" +
                 $"<td>{Html(behavior.PredatorTendency)}</td>" +
                 $"<td>{Html(behavior.MovementStyle)}</td>" +
                 $"<td>{Html(behavior.ReproductionTendency)}</td>" +
