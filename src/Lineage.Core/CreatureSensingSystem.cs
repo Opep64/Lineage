@@ -13,8 +13,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly float _meatScentCaloriesForFullStrength;
     private readonly float _meatScentDensitySaturation;
 
-    private readonly List<int> _resourceCandidates = [];
-    private readonly HashSet<int> _seenResourceCandidates = [];
     private readonly List<int> _scentResourceCandidates = [];
     private readonly HashSet<int> _seenScentResourceCandidates = [];
     private readonly List<int> _eggCandidates = [];
@@ -56,13 +54,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var genome = state.GetGenome(creature.GenomeId);
             var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
             var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
-            _spatialIndex.AddResourceCandidatesWithCalories(
-                state,
-                creature.Position,
-                effectiveSenseRadius,
-                minimumCalories: 0f,
-                _resourceCandidates,
-                _seenResourceCandidates);
+            var hasLimitedVision = effectiveVisionAngle < MathF.Tau;
+            var visionCosThreshold = hasLimitedVision
+                ? MathF.Cos(effectiveVisionAngle * 0.5f)
+                : -1f;
+            var plantFoodEfficiency = CreatureDigestion.PlantEfficiency(genome);
+            var meatFoodEfficiency = CreatureDigestion.MeatEfficiency(genome);
             var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
             _spatialIndex.AddResourceCandidatesWithCalories(
                 state,
@@ -121,23 +118,29 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             foreach (var resourceIndex in _scentResourceCandidates)
             {
                 var resource = state.Resources[resourceIndex];
-                if (resource.Kind != ResourceKind.Meat || resource.Calories <= 0f)
-                {
-                    continue;
-                }
-
                 var toResource = resource.Position - creature.Position;
                 var centerDistance = toResource.Length;
                 var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
-                var distanceFactor = 1f - Math.Clamp(edgeDistance / meatScentRadius, 0f, 1f);
-                if (distanceFactor <= 0f)
+
+                if (resource.Kind == ResourceKind.Meat)
                 {
-                    continue;
+                    var distanceFactor = 1f - Math.Clamp(edgeDistance / meatScentRadius, 0f, 1f);
+                    if (distanceFactor > 0f)
+                    {
+                        var calorieFactor = Math.Clamp(resource.Calories / _meatScentCaloriesForFullStrength, 0f, 1f);
+                        var scentStrength = calorieFactor * distanceFactor * distanceFactor;
+                        if (scentStrength > MinimumScentStrength)
+                        {
+                            var scentDirection = centerDistance > 0.0001f
+                                ? toResource / centerDistance
+                                : forward;
+                            totalMeatScentStrength += scentStrength;
+                            meatScentVector += scentDirection * scentStrength;
+                        }
+                    }
                 }
 
-                var calorieFactor = Math.Clamp(resource.Calories / _meatScentCaloriesForFullStrength, 0f, 1f);
-                var scentStrength = calorieFactor * distanceFactor * distanceFactor;
-                if (scentStrength <= MinimumScentStrength)
+                if (edgeDistance > effectiveSenseRadius)
                 {
                     continue;
                 }
@@ -145,21 +148,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 var direction = centerDistance > 0.0001f
                     ? toResource / centerDistance
                     : forward;
-                totalMeatScentStrength += scentStrength;
-                meatScentVector += direction * scentStrength;
-            }
 
-            foreach (var resourceIndex in _resourceCandidates)
-            {
-                var resource = state.Resources[resourceIndex];
-                var toResource = resource.Position - creature.Position;
-                var centerDistance = toResource.Length;
-                var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
-                var direction = centerDistance > 0.0001f
-                    ? toResource / centerDistance
-                    : SimVector2.FromAngle(creature.HeadingRadians);
-
-                if (!IsInsideVisionCone(direction, forward, effectiveVisionAngle))
+                if (!IsInsideVisionCone(direction, forward, hasLimitedVision, visionCosThreshold))
                 {
                     continue;
                 }
@@ -189,7 +179,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-                var foodScore = proximity * CreatureDigestion.EfficiencyFor(genome, resource.Kind);
+                var foodScore = proximity * (resource.Kind == ResourceKind.Meat ? meatFoodEfficiency : plantFoodEfficiency);
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
                         && distanceSquared < bestVisibleFoodDistanceSquared))
@@ -212,7 +202,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     ? toEgg / centerDistance
                     : forward;
 
-                if (!IsInsideVisionCone(direction, forward, effectiveVisionAngle))
+                if (!IsInsideVisionCone(direction, forward, hasLimitedVision, visionCosThreshold))
                 {
                     continue;
                 }
@@ -229,7 +219,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-                var foodScore = proximity * CreatureDigestion.MeatEfficiency(genome);
+                var foodScore = proximity * meatFoodEfficiency;
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
                         && distanceSquared < bestVisibleFoodDistanceSquared))
@@ -268,7 +258,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     ? toOther / centerDistance
                     : forward;
 
-                if (!IsInsideVisionCone(direction, forward, effectiveVisionAngle))
+                if (!IsInsideVisionCone(direction, forward, hasLimitedVision, visionCosThreshold))
                 {
                     continue;
                 }
@@ -292,7 +282,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-                var foodScore = proximity * CreatureDigestion.MeatEfficiency(genome);
+                var foodScore = proximity * meatFoodEfficiency;
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
                         && distanceSquared < bestVisibleFoodDistanceSquared))
@@ -663,15 +653,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f));
     }
 
-    private static bool IsInsideVisionCone(SimVector2 direction, SimVector2 forward, float visionAngleRadians)
+    private static bool IsInsideVisionCone(
+        SimVector2 direction,
+        SimVector2 forward,
+        bool hasLimitedVision,
+        float visionCosThreshold)
     {
-        if (visionAngleRadians >= MathF.Tau)
+        if (!hasLimitedVision)
         {
             return true;
         }
 
-        var halfAngle = visionAngleRadians * 0.5f;
-        return SimVector2.Dot(direction, forward) >= MathF.Cos(halfAngle);
+        return SimVector2.Dot(direction, forward) >= visionCosThreshold;
     }
 
     private readonly record struct ResourceSense(
