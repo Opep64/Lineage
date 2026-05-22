@@ -107,7 +107,10 @@ public sealed class SimpleForagingSystem(
 
             var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
             var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-            var score = proximity * CreatureDigestion.EfficiencyFor(genome, resource.Kind);
+            var efficiency = resource.Kind == ResourceKind.Meat
+                ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
+                : CreatureDigestion.PlantEfficiency(genome);
+            var score = proximity * efficiency;
             var distanceSquared = centerDistance * centerDistance;
             if (score > bestScore
                 || (Math.Abs(score - bestScore) <= 0.0001f && distanceSquared < bestDistanceSquared))
@@ -134,7 +137,7 @@ public sealed class SimpleForagingSystem(
 
             var edgeDistance = Math.Max(0f, centerDistance - EggPredation.ContactRadius(egg));
             var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-            var score = proximity * CreatureDigestion.MeatEfficiency(genome);
+            var score = proximity * CreatureDigestion.FreshMeatEnergyEfficiency(genome);
             var distanceSquared = centerDistance * centerDistance;
             if (score > bestScore
                 || (Math.Abs(score - bestScore) <= 0.0001f && distanceSquared < bestDistanceSquared))

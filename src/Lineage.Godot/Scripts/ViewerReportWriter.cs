@@ -153,6 +153,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Stale meat share", FormatPercent(snapshot.StaleMeatCaloriesEatenShare));
         WriteMetric(writer, "Meat energy share", FormatPercent(snapshot.MeatDigestedEnergyShare));
         WriteMetric(writer, "Average diet", snapshot.AverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Average carrion", snapshot.AverageCarrionAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average bite", snapshot.AverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average resistance", snapshot.AverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Attacker diet", snapshot.AttackerAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
@@ -163,6 +164,12 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Non-attacker resistance", snapshot.NonAttackerAverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
+
+        var startingGenome = CreatureGenome.Baseline with
+        {
+            DietaryAdaptation = scenario.DietaryAdaptation,
+            CarrionAdaptation = scenario.CarrionAdaptation
+        };
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Pressure Settings</h2>");
@@ -203,10 +210,13 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Egg incubation", $"{scenario.EggIncubationSeconds:0.###} seconds");
         WriteMetric(writer, "Maturity age", $"{scenario.MaturityAgeSeconds:0.###} seconds");
         WriteMetric(writer, "Starting diet", $"{scenario.DietaryAdaptation:0.###} meat bias");
+        WriteMetric(writer, "Starting carrion", $"{scenario.CarrionAdaptation:0.###} stale-meat bias");
         WriteMetric(writer, "Starting bite strength", scenario.BiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting damage resistance", scenario.DamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(CreatureGenome.Baseline with { DietaryAdaptation = scenario.DietaryAdaptation })));
-        WriteMetric(writer, "Starting meat digestion", FormatPercent(CreatureDigestion.MeatEfficiency(CreatureGenome.Baseline with { DietaryAdaptation = scenario.DietaryAdaptation })));
+        WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting meat digestion", FormatPercent(CreatureDigestion.MeatEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting fresh meat digestion", FormatPercent(CreatureDigestion.FreshMeatEnergyEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting stale meat digestion", FormatPercent(CreatureDigestion.StaleMeatEnergyEfficiency(startingGenome)));
         WriteMetric(writer, "Death meat body calories", $"{scenario.DeathMeatCaloriesPerBodyRadius:0.###} kcal/radius");
         WriteMetric(writer, "Death meat energy fraction", FormatPercent(scenario.DeathMeatEnergyFraction));
         WriteMetric(writer, "Meat decay", $"{scenario.MeatDecayCaloriesPerSecond:0.###} kcal/s");
@@ -281,8 +291,11 @@ public static class ViewerReportWriter
             WriteTraitRow(writer, "Egg incubation seconds", traitSummary.EggIncubationSeconds);
             WriteTraitRow(writer, "Maturity age seconds", traitSummary.MaturityAgeSeconds);
             WriteTraitRow(writer, "Dietary adaptation meat bias", traitSummary.DietaryAdaptation);
+            WriteTraitRow(writer, "Carrion adaptation stale bias", traitSummary.CarrionAdaptation);
             WriteTraitRow(writer, "Plant digestion efficiency", traitSummary.PlantDigestion);
             WriteTraitRow(writer, "Meat digestion efficiency", traitSummary.MeatDigestion);
+            WriteTraitRow(writer, "Fresh meat digestion efficiency", traitSummary.FreshMeatDigestion);
+            WriteTraitRow(writer, "Stale meat digestion efficiency", traitSummary.StaleMeatDigestion);
             WriteTraitRow(writer, "Gut capacity", traitSummary.GutCapacityCalories);
             WriteTraitRow(writer, "Digestion rate", traitSummary.DigestionCaloriesPerSecond);
             WriteTraitRow(writer, "Bite strength", traitSummary.BiteStrength);
@@ -346,8 +359,11 @@ public static class ViewerReportWriter
             summary.EggIncubationSeconds.Add(genome.EggIncubationSeconds);
             summary.MaturityAgeSeconds.Add(genome.MaturityAgeSeconds);
             summary.DietaryAdaptation.Add(genome.DietaryAdaptation);
+            summary.CarrionAdaptation.Add(genome.CarrionAdaptation);
             summary.PlantDigestion.Add(CreatureDigestion.PlantEfficiency(genome));
             summary.MeatDigestion.Add(CreatureDigestion.MeatEfficiency(genome));
+            summary.FreshMeatDigestion.Add(CreatureDigestion.FreshMeatEnergyEfficiency(genome));
+            summary.StaleMeatDigestion.Add(CreatureDigestion.StaleMeatEnergyEfficiency(genome));
             summary.GutCapacityCalories.Add(genome.GutCapacityCalories);
             summary.DigestionCaloriesPerSecond.Add(genome.DigestionCaloriesPerSecond);
             summary.BiteStrength.Add(genome.BiteStrength);
@@ -674,6 +690,13 @@ public static class ViewerReportWriter
             new ChartSeries("Stale eaten share", "#b84a4a", snapshots.Select(snapshot => snapshot.StaleMeatCaloriesEatenShare * 100f).ToArray()));
         WriteLineChart(
             writer,
+            "Diet Traits",
+            "",
+            snapshots,
+            new ChartSeries("Diet meat bias", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageDietaryAdaptation).ToArray()),
+            new ChartSeries("Carrion bias", "#7d5546", snapshots.Select(snapshot => snapshot.AverageCarrionAdaptation).ToArray()));
+        WriteLineChart(
+            writer,
             "Digested Energy Source",
             " energy/s",
             snapshots,
@@ -968,8 +991,11 @@ public static class ViewerReportWriter
         public FloatAccumulator EggIncubationSeconds;
         public FloatAccumulator MaturityAgeSeconds;
         public FloatAccumulator DietaryAdaptation;
+        public FloatAccumulator CarrionAdaptation;
         public FloatAccumulator PlantDigestion;
         public FloatAccumulator MeatDigestion;
+        public FloatAccumulator FreshMeatDigestion;
+        public FloatAccumulator StaleMeatDigestion;
         public FloatAccumulator GutCapacityCalories;
         public FloatAccumulator DigestionCaloriesPerSecond;
         public FloatAccumulator BiteStrength;

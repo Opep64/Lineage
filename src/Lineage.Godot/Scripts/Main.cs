@@ -787,7 +787,9 @@ public partial class Main : Node2D
             $"Body {CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}/{genome.BodyRadius:0.0}\n" +
             $"Eat rate {CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome):0.0}/{genome.EatCaloriesPerSecond:0.0}\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}\n" +
+            $"Carrion bias {genome.CarrionAdaptation:0.00}\n" +
             $"Digest plant {CreatureDigestion.PlantEfficiency(genome):P0}  meat {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
+            $"Meat digest fresh {CreatureDigestion.FreshMeatEnergyEfficiency(genome):P0}  stale {CreatureDigestion.StaleMeatEnergyEfficiency(genome):P0}\n" +
             $"Digest rate {CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome):0.0}/{genome.DigestionCaloriesPerSecond:0.0}\n" +
             $"Gut cap {gutCapacity:0.0}/{genome.GutCapacityCalories:0.0}\n" +
             $"Gut {gutTotal:0.0}/{gutCapacity:0.0} ({gutFillRatio:P0})\n" +
@@ -889,9 +891,17 @@ public partial class Main : Node2D
                     continue;
                 }
 
+                var digestionEfficiency = resource.Kind == ResourceKind.Meat
+                    ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
+                    : CreatureDigestion.PlantEfficiency(genome);
+                var freshnessText = resource.Kind == ResourceKind.Meat
+                    ? $"Food fresh {MeatQuality.Freshness(resource):P0}\n"
+                    : string.Empty;
+
                 return
                     $"Food type {FormatResourceKind(resource.Kind)}\n" +
-                    $"Digest eff {CreatureDigestion.EfficiencyFor(genome, resource.Kind):P0}\n" +
+                    freshnessText +
+                    $"Digest eff {digestionEfficiency:P0}\n" +
                     $"Food edge {creature.FoodContactEdgeDistance:0.0}/{CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}\n" +
                     $"Food kcal {creature.FoodContactCalories:0.00}\n";
             }
@@ -901,7 +911,7 @@ public partial class Main : Node2D
         {
             return
                 $"Food type egg\n" +
-                $"Digest eff {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
+                $"Digest eff {CreatureDigestion.FreshMeatEnergyEfficiency(genome):P0}\n" +
                 $"Food edge {creature.FoodContactEdgeDistance:0.0}/{CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}\n" +
                 $"Food kcal {creature.FoodContactCalories:0.00}\n";
         }

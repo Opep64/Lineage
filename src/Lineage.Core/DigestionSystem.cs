@@ -65,7 +65,7 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.GutMeatQualityCalories = Math.Max(0f, creature.GutMeatQualityCalories - meatDigested * meatQuality);
 
             var plantReleasedEnergy = plantDigested * CreatureDigestion.PlantEfficiency(genome);
-            var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEfficiency(genome) * meatQuality;
+            var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEnergyEfficiency(genome, meatQuality);
             var releasedEnergy = plantReleasedEnergy + meatReleasedEnergy;
             creature.Energy += releasedEnergy;
             creature.LastCaloriesDigested = releasedEnergy;

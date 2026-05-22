@@ -73,6 +73,7 @@ public readonly record struct SimulationStatsSnapshot(
     float FreshKillCaloriesEatenShare,
     float MeatDigestedEnergyShare,
     float AverageDietaryAdaptation,
+    float AverageCarrionAdaptation,
     float AverageBiteStrength,
     float AverageDamageResistance,
     float AttackerAverageDietaryAdaptation,

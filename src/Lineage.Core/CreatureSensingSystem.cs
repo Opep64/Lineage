@@ -65,7 +65,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ? MathF.Cos(effectiveVisionAngle * 0.5f)
                 : -1f;
             var plantFoodEfficiency = CreatureDigestion.PlantEfficiency(genome);
-            var meatFoodEfficiency = CreatureDigestion.MeatEfficiency(genome);
+            var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
             var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
             _spatialIndex.AddResourceCandidatesWithCalories(
                 state,
@@ -185,7 +185,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-                var foodScore = proximity * (resource.Kind == ResourceKind.Meat ? meatFoodEfficiency : plantFoodEfficiency);
+                var resourceFoodEfficiency = resource.Kind == ResourceKind.Meat
+                    ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
+                    : plantFoodEfficiency;
+                var foodScore = proximity * resourceFoodEfficiency;
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
                         && distanceSquared < bestVisibleFoodDistanceSquared))
@@ -225,7 +228,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-                var foodScore = proximity * meatFoodEfficiency;
+                var foodScore = proximity * freshMeatFoodEfficiency;
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
                         && distanceSquared < bestVisibleFoodDistanceSquared))

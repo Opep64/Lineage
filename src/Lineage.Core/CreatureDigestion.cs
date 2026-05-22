@@ -13,6 +13,8 @@ public static class CreatureDigestion
 {
     public const float MinimumEfficiency = 0.2f;
     public const float MaximumEfficiency = 1f;
+    public const float FullCarrionFreshMeatPenalty = 0.15f;
+    public const float FullCarrionStaleMeatRecovery = 0.55f;
 
     public static float PlantEfficiency(CreatureGenome genome)
     {
@@ -22,6 +24,32 @@ public static class CreatureDigestion
     public static float MeatEfficiency(CreatureGenome genome)
     {
         return Efficiency(genome.DietaryAdaptation);
+    }
+
+    public static float MeatEnergyEfficiency(CreatureGenome genome, float meatFreshness)
+    {
+        return MeatEfficiency(genome) * MeatFreshnessEfficiency(genome, meatFreshness);
+    }
+
+    public static float FreshMeatEnergyEfficiency(CreatureGenome genome)
+    {
+        return MeatEnergyEfficiency(genome, meatFreshness: 1f);
+    }
+
+    public static float StaleMeatEnergyEfficiency(CreatureGenome genome)
+    {
+        return MeatEnergyEfficiency(genome, MeatQuality.MinimumFreshness);
+    }
+
+    public static float MeatFreshnessEfficiency(CreatureGenome genome, float meatFreshness)
+    {
+        var freshness = Math.Clamp(meatFreshness, MeatQuality.MinimumFreshness, 1f);
+        var carrion = Math.Clamp(genome.CarrionAdaptation, 0f, 1f);
+        var staleFactor = (1f - freshness) / (1f - MeatQuality.MinimumFreshness);
+        var freshFactor = 1f - staleFactor;
+        var recoveredStaleValue = staleFactor * FullCarrionStaleMeatRecovery * (1f - freshness);
+        var lostFreshValue = freshFactor * FullCarrionFreshMeatPenalty * freshness;
+        return Math.Clamp(freshness + carrion * (recoveredStaleValue - lostFreshValue), 0f, 1f);
     }
 
     public static float EfficiencyFor(CreatureGenome genome, ResourceKind kind)

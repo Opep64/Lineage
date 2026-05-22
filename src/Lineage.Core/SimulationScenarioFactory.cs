@@ -112,6 +112,7 @@ public static class SimulationScenarioFactory
             MaturityAgeSeconds = scenario.MaturityAgeSeconds,
             ReproductionCooldownSeconds = scenario.ReproductionCooldownSeconds,
             DietaryAdaptation = scenario.DietaryAdaptation,
+            CarrionAdaptation = scenario.CarrionAdaptation,
             BiteStrength = scenario.BiteStrength,
             DamageResistance = scenario.DamageResistance,
             MutationStrength = scenario.MutationStrength,

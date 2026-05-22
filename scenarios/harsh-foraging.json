@@ -59,6 +59,7 @@
   "maturityAgeSeconds": 60,
   "reproductionCooldownSeconds": 6,
   "dietaryAdaptation": 0.1,
+  "carrionAdaptation": 0,
   "biteStrength": 0.55,
   "damageResistance": 1,
   "deathMeatCaloriesPerBodyRadius": 4,

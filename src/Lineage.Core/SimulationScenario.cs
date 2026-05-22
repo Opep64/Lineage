@@ -142,6 +142,8 @@ public sealed record SimulationScenario
 
     public float DietaryAdaptation { get; init; } = 0.1f;
 
+    public float CarrionAdaptation { get; init; } = 0f;
+
     public float BiteStrength { get; init; } = 0.55f;
 
     public float DamageResistance { get; init; } = 1f;
@@ -222,6 +224,7 @@ public sealed record SimulationScenario
         EnsureNonNegative(MaturityAgeSeconds, nameof(MaturityAgeSeconds));
         EnsureNonNegative(ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
         EnsureProbability(DietaryAdaptation, nameof(DietaryAdaptation));
+        EnsureProbability(CarrionAdaptation, nameof(CarrionAdaptation));
         EnsurePositive(BiteStrength, nameof(BiteStrength));
         EnsurePositive(DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(DeathMeatCaloriesPerBodyRadius, nameof(DeathMeatCaloriesPerBodyRadius));

@@ -19,6 +19,7 @@ var tests = new (string Name, Action Body)[]
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
     ("Eating requires body contact with a resource", EatingRequiresBodyContact),
     ("Dietary adaptation controls digested calories", DietaryAdaptationControlsDigestedCalories),
+    ("Carrion adaptation trades fresh and stale meat digestion", CarrionAdaptationTradesFreshAndStaleMeatDigestion),
     ("Eating transfers egg energy as meat nutrition", EatingTransfersEggEnergyAsMeatNutrition),
     ("Egg predation deaths are counted", EggPredationDeathsAreCounted),
     ("Starving creatures are removed", StarvingCreaturesAreRemoved),
@@ -670,6 +671,27 @@ static float RunEatingProbe(ResourceKind resourceKind, float dietaryAdaptation)
     }
 
     return simulation.State.Creatures[0].Energy - 1f;
+}
+
+static void CarrionAdaptationTradesFreshAndStaleMeatDigestion()
+{
+    var freshSpecialist = CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 1f,
+        CarrionAdaptation = 0f
+    };
+    var carrionSpecialist = freshSpecialist with { CarrionAdaptation = 1f };
+
+    AssertClose(1f, CreatureDigestion.FreshMeatEnergyEfficiency(freshSpecialist), 0.000001, "Fresh specialist fresh meat");
+    AssertClose(MeatQuality.MinimumFreshness, CreatureDigestion.StaleMeatEnergyEfficiency(freshSpecialist), 0.000001, "Fresh specialist stale meat");
+    AssertClose(0.85f, CreatureDigestion.FreshMeatEnergyEfficiency(carrionSpecialist), 0.000001, "Carrion specialist fresh meat penalty");
+    AssertClose(0.7075f, CreatureDigestion.StaleMeatEnergyEfficiency(carrionSpecialist), 0.000001, "Carrion specialist stale meat recovery");
+    AssertTrue(
+        CreatureDigestion.FreshMeatEnergyEfficiency(carrionSpecialist) < CreatureDigestion.FreshMeatEnergyEfficiency(freshSpecialist),
+        "Carrion specialization should cost fresh meat efficiency");
+    AssertTrue(
+        CreatureDigestion.StaleMeatEnergyEfficiency(carrionSpecialist) > CreatureDigestion.StaleMeatEnergyEfficiency(freshSpecialist),
+        "Carrion specialization should improve stale meat efficiency");
 }
 
 static void EatingTransfersEggEnergyAsMeatNutrition()
@@ -2293,6 +2315,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.AttackingCreatureCount, "Attacking creature count");
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
     AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AverageDietaryAdaptation, 0.000001, "Average dietary adaptation");
+    AssertClose(CreatureGenome.Baseline.CarrionAdaptation, snapshot.AverageCarrionAdaptation, 0.000001, "Average carrion adaptation");
     AssertClose(CreatureGenome.Baseline.BiteStrength, snapshot.AverageBiteStrength, 0.000001, "Average bite strength");
     AssertClose(CreatureGenome.Baseline.DamageResistance, snapshot.AverageDamageResistance, 0.000001, "Average damage resistance");
     AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AttackerAverageDietaryAdaptation, 0.000001, "Attacker dietary adaptation");
@@ -2760,6 +2783,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         EggIncubationSeconds = 7f,
         MaturityAgeSeconds = 0f,
         DietaryAdaptation = 0.25f,
+        CarrionAdaptation = 0.35f,
         BiteStrength = 0.75f,
         DamageResistance = 1.25f,
         DeathMeatCaloriesPerBodyRadius = 5f,
@@ -2802,6 +2826,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(7f, genome.EggIncubationSeconds, 0.000001, "Seeded egg incubation");
     AssertClose(0f, genome.MaturityAgeSeconds, 0.000001, "Seeded maturity age");
     AssertClose(0.25f, genome.DietaryAdaptation, 0.000001, "Seeded dietary adaptation");
+    AssertClose(0.35f, genome.CarrionAdaptation, 0.000001, "Seeded carrion adaptation");
     AssertClose(0.75f, genome.BiteStrength, 0.000001, "Seeded bite strength");
     AssertClose(1.25f, genome.DamageResistance, 0.000001, "Seeded damage resistance");
     AssertClose(5f, scenario.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
@@ -2891,6 +2916,7 @@ static void ScenarioJsonRoundTrips()
         EggIncubationSeconds = 19f,
         MaturityAgeSeconds = 33f,
         DietaryAdaptation = 0.42f,
+        CarrionAdaptation = 0.37f,
         BiteStrength = 0.7f,
         DamageResistance = 1.4f,
         DeathMeatCaloriesPerBodyRadius = 3.5f,
@@ -2962,6 +2988,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.EggIncubationSeconds, roundTripped.EggIncubationSeconds, 0.000001, "Scenario egg incubation");
     AssertClose(scenario.MaturityAgeSeconds, roundTripped.MaturityAgeSeconds, 0.000001, "Scenario maturity age");
     AssertClose(scenario.DietaryAdaptation, roundTripped.DietaryAdaptation, 0.000001, "Scenario dietary adaptation");
+    AssertClose(scenario.CarrionAdaptation, roundTripped.CarrionAdaptation, 0.000001, "Scenario carrion adaptation");
     AssertClose(scenario.BiteStrength, roundTripped.BiteStrength, 0.000001, "Scenario bite strength");
     AssertClose(scenario.DamageResistance, roundTripped.DamageResistance, 0.000001, "Scenario damage resistance");
     AssertClose(scenario.DeathMeatCaloriesPerBodyRadius, roundTripped.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");

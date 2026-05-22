@@ -914,6 +914,7 @@ internal readonly record struct ProbeRunResult(
     double TailSeconds,
     float TailAverageCreatures,
     float TailAverageDietaryAdaptation,
+    float TailAverageCarrionAdaptation,
     float TailMeatCaloriesEatenShare,
     float TailFreshKillCaloriesEatenShare,
     float TailAverageMeatFreshness,
@@ -1014,6 +1015,7 @@ internal readonly record struct ProbeRunResult(
             tail.Seconds,
             tail.AverageCreatures,
             tail.AverageDietaryAdaptation,
+            tail.AverageCarrionAdaptation,
             tail.MeatCaloriesEatenShare,
             tail.FreshKillCaloriesEatenShare,
             tail.AverageMeatFreshness,
@@ -1041,6 +1043,7 @@ internal readonly record struct ProbeTailSummary(
     double Seconds,
     float AverageCreatures,
     float AverageDietaryAdaptation,
+    float AverageCarrionAdaptation,
     float MeatCaloriesEatenShare,
     float FreshKillCaloriesEatenShare,
     float AverageMeatFreshness,
@@ -1069,6 +1072,7 @@ internal readonly record struct ProbeTailSummary(
 
         var averageCreatures = 0f;
         var averageDietaryAdaptation = 0f;
+        var averageCarrionAdaptation = 0f;
         var meatCaloriesEatenShare = 0f;
         var freshKillCaloriesEatenShare = 0f;
         var averageMeatFreshness = 0f;
@@ -1084,6 +1088,7 @@ internal readonly record struct ProbeTailSummary(
             var snapshot = snapshots[i];
             averageCreatures += snapshot.CreatureCount;
             averageDietaryAdaptation += snapshot.AverageDietaryAdaptation;
+            averageCarrionAdaptation += snapshot.AverageCarrionAdaptation;
             meatCaloriesEatenShare += snapshot.MeatCaloriesEatenShare;
             freshKillCaloriesEatenShare += snapshot.FreshKillCaloriesEatenShare;
             averageMeatFreshness += snapshot.AverageMeatFreshness;
@@ -1104,6 +1109,7 @@ internal readonly record struct ProbeTailSummary(
             seconds,
             averageCreatures / divisor,
             averageDietaryAdaptation / divisor,
+            averageCarrionAdaptation / divisor,
             meatCaloriesEatenShare / divisor,
             freshKillCaloriesEatenShare / divisor,
             averageMeatFreshness / divisor,
@@ -1134,7 +1140,7 @@ internal static class ProbeCsvWriter
     public static void Write(string path, IReadOnlyList<ProbeRunResult> results)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scenario,scenario_path,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal");
+        writer.WriteLine("scenario,scenario_path,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_share,plant_detected_share,meat_detected_share,meat_scent_detected_share,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal");
 
         foreach (var result in results)
         {
@@ -1209,6 +1215,7 @@ internal static class ProbeCsvWriter
                 Format(result.TailSeconds),
                 Format(result.TailAverageCreatures),
                 Format(result.TailAverageDietaryAdaptation),
+                Format(result.TailAverageCarrionAdaptation),
                 Format(result.TailMeatCaloriesEatenShare),
                 Format(result.TailFreshKillCaloriesEatenShare),
                 Format(result.TailAverageMeatFreshness),
@@ -1275,7 +1282,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</div></section>");
 
         writer.WriteLine("<section><h2>Scenario Summary</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Ticks/s</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Ticks/s</th></tr></thead><tbody>");
         foreach (var group in groups)
         {
             writer.WriteLine(
@@ -1294,6 +1301,7 @@ internal static class ProbeReportWriter
                 $"<td>{Html(FormatPercent(group.Average(result => result.TailAverageMeatFreshness)))}</td>" +
                 $"<td>{Html(FormatPercent(group.Average(result => result.TailStaleMeatCaloriesEatenShare)))}</td>" +
                 $"<td>{Html(group.Average(result => result.TailAverageDietaryAdaptation).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.TailAverageCarrionAdaptation).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPercent(group.Average(result => result.TailAttackingShare)))}</td>" +
                 $"<td>{Html(group.Average(result => result.TailDeathsPerSecond).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.CaloriesEatenPerDistance).ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
@@ -1304,7 +1312,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</tbody></table></div></section>");
 
         writer.WriteLine("<section><h2>Run Rows</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail deaths/s</th><th>kcal/distance</th></tr></thead><tbody>");
         foreach (var result in results.OrderBy(result => result.ScenarioName).ThenBy(result => result.Seed))
         {
             writer.WriteLine(
@@ -1328,6 +1336,7 @@ internal static class ProbeReportWriter
                 $"<td>{Html(FormatPercent(result.TailAverageMeatFreshness))}</td>" +
                 $"<td>{Html(FormatPercent(result.TailStaleMeatCaloriesEatenShare))}</td>" +
                 $"<td>{Html(result.TailAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.TailAverageCarrionAdaptation.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPercent(result.TailAttackingShare))}</td>" +
                 $"<td>{Html(result.TailDeathsPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.CaloriesEatenPerDistance.ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
@@ -1400,7 +1409,7 @@ internal static class StatsCsvWriter
     public static void Write(string path, IReadOnlyList<SimulationStatsSnapshot> snapshots)
     {
         using var writer = CreateWriter(path);
-        writer.WriteLine("tick,elapsed_seconds,creatures,eggs,resources,plant_resources,meat_resources,genomes,brains,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,avg_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share");
+        writer.WriteLine("tick,elapsed_seconds,creatures,eggs,resources,plant_resources,meat_resources,genomes,brains,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,avg_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share");
 
         foreach (var snapshot in snapshots)
         {
@@ -1468,6 +1477,7 @@ internal static class StatsCsvWriter
                 snapshot.AverageGutPlantShare.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageGutMeatShare.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageDietaryAdaptation.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageCarrionAdaptation.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageBiteStrength.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageDamageResistance.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AttackerAverageDietaryAdaptation.ToString("0.######", CultureInfo.InvariantCulture),
@@ -1558,11 +1568,11 @@ internal static class TraitSummaryCsvWriter
     public static void Write(string path, WorldState state)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scope,count,avg_body_radius,min_body_radius,max_body_radius,avg_max_speed,min_max_speed,max_max_speed,avg_vision_range,min_vision_range,max_vision_range,avg_vision_angle_degrees,min_vision_angle_degrees,max_vision_angle_degrees,avg_reproduction_threshold,min_reproduction_threshold,max_reproduction_threshold,avg_offspring_investment,min_offspring_investment,max_offspring_investment,avg_egg_production_per_second,min_egg_production_per_second,max_egg_production_per_second,avg_egg_incubation_seconds,min_egg_incubation_seconds,max_egg_incubation_seconds,avg_maturity_age_seconds,min_maturity_age_seconds,max_maturity_age_seconds,avg_dietary_adaptation,min_dietary_adaptation,max_dietary_adaptation,avg_plant_digestion,min_plant_digestion,max_plant_digestion,avg_meat_digestion,min_meat_digestion,max_meat_digestion,avg_gut_capacity,min_gut_capacity,max_gut_capacity,avg_digestion_rate,min_digestion_rate,max_digestion_rate,avg_bite_strength,min_bite_strength,max_bite_strength,avg_damage_resistance,min_damage_resistance,max_damage_resistance,avg_mutation_strength,min_mutation_strength,max_mutation_strength,avg_trait_mutation_rate,min_trait_mutation_rate,max_trait_mutation_rate,avg_brain_mutation_rate,min_brain_mutation_rate,max_brain_mutation_rate");
+        writer.WriteLine("scope,count,avg_body_radius,min_body_radius,max_body_radius,avg_max_speed,min_max_speed,max_max_speed,avg_vision_range,min_vision_range,max_vision_range,avg_vision_angle_degrees,min_vision_angle_degrees,max_vision_angle_degrees,avg_reproduction_threshold,min_reproduction_threshold,max_reproduction_threshold,avg_offspring_investment,min_offspring_investment,max_offspring_investment,avg_egg_production_per_second,min_egg_production_per_second,max_egg_production_per_second,avg_egg_incubation_seconds,min_egg_incubation_seconds,max_egg_incubation_seconds,avg_maturity_age_seconds,min_maturity_age_seconds,max_maturity_age_seconds,avg_dietary_adaptation,min_dietary_adaptation,max_dietary_adaptation,avg_carrion_adaptation,min_carrion_adaptation,max_carrion_adaptation,avg_plant_digestion,min_plant_digestion,max_plant_digestion,avg_meat_digestion,min_meat_digestion,max_meat_digestion,avg_fresh_meat_digestion,min_fresh_meat_digestion,max_fresh_meat_digestion,avg_stale_meat_digestion,min_stale_meat_digestion,max_stale_meat_digestion,avg_gut_capacity,min_gut_capacity,max_gut_capacity,avg_digestion_rate,min_digestion_rate,max_digestion_rate,avg_bite_strength,min_bite_strength,max_bite_strength,avg_damage_resistance,min_damage_resistance,max_damage_resistance,avg_mutation_strength,min_mutation_strength,max_mutation_strength,avg_trait_mutation_rate,min_trait_mutation_rate,max_trait_mutation_rate,avg_brain_mutation_rate,min_brain_mutation_rate,max_brain_mutation_rate");
 
         if (state.Creatures.Count == 0)
         {
-            writer.WriteLine("living_creatures,0" + new string(',', 57));
+            writer.WriteLine("living_creatures,0" + new string(',', 66));
             return;
         }
 
@@ -1601,12 +1611,21 @@ internal static class TraitSummaryCsvWriter
             Format(summary.DietaryAdaptation.Average),
             Format(summary.DietaryAdaptation.Min),
             Format(summary.DietaryAdaptation.Max),
+            Format(summary.CarrionAdaptation.Average),
+            Format(summary.CarrionAdaptation.Min),
+            Format(summary.CarrionAdaptation.Max),
             Format(summary.PlantDigestion.Average),
             Format(summary.PlantDigestion.Min),
             Format(summary.PlantDigestion.Max),
             Format(summary.MeatDigestion.Average),
             Format(summary.MeatDigestion.Min),
             Format(summary.MeatDigestion.Max),
+            Format(summary.FreshMeatDigestion.Average),
+            Format(summary.FreshMeatDigestion.Min),
+            Format(summary.FreshMeatDigestion.Max),
+            Format(summary.StaleMeatDigestion.Average),
+            Format(summary.StaleMeatDigestion.Min),
+            Format(summary.StaleMeatDigestion.Max),
             Format(summary.GutCapacityCalories.Average),
             Format(summary.GutCapacityCalories.Min),
             Format(summary.GutCapacityCalories.Max),
@@ -2600,6 +2619,12 @@ internal static class RunReportWriter
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
+        var startingGenome = CreatureGenome.Baseline with
+        {
+            DietaryAdaptation = scenario.DietaryAdaptation,
+            CarrionAdaptation = scenario.CarrionAdaptation
+        };
+
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Pressure Settings</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
@@ -2641,10 +2666,13 @@ internal static class RunReportWriter
         WriteMetric(writer, "Egg incubation", $"{scenario.EggIncubationSeconds:0.###} seconds");
         WriteMetric(writer, "Maturity age", $"{scenario.MaturityAgeSeconds:0.###} seconds");
         WriteMetric(writer, "Starting diet", $"{scenario.DietaryAdaptation:0.###} meat bias");
+        WriteMetric(writer, "Starting carrion", $"{scenario.CarrionAdaptation:0.###} stale-meat bias");
         WriteMetric(writer, "Starting bite strength", scenario.BiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting damage resistance", scenario.DamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(CreatureGenome.Baseline with { DietaryAdaptation = scenario.DietaryAdaptation })));
-        WriteMetric(writer, "Starting meat digestion", FormatPercent(CreatureDigestion.MeatEfficiency(CreatureGenome.Baseline with { DietaryAdaptation = scenario.DietaryAdaptation })));
+        WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting meat digestion", FormatPercent(CreatureDigestion.MeatEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting fresh meat digestion", FormatPercent(CreatureDigestion.FreshMeatEnergyEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting stale meat digestion", FormatPercent(CreatureDigestion.StaleMeatEnergyEfficiency(startingGenome)));
         WriteMetric(writer, "Death meat body calories", $"{scenario.DeathMeatCaloriesPerBodyRadius:0.###} kcal/radius");
         WriteMetric(writer, "Death meat energy fraction", FormatPercent(scenario.DeathMeatEnergyFraction));
         WriteMetric(writer, "Meat decay", $"{scenario.MeatDecayCaloriesPerSecond:0.###} kcal/s");
@@ -2744,6 +2772,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Stale meat share", FormatPercent(finalSnapshot.StaleMeatCaloriesEatenShare));
         WriteMetric(writer, "Meat energy share", FormatPercent(finalSnapshot.MeatDigestedEnergyShare));
         WriteMetric(writer, "Average diet", finalSnapshot.AverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Average carrion", finalSnapshot.AverageCarrionAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average bite", finalSnapshot.AverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average resistance", finalSnapshot.AverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Attacker diet", finalSnapshot.AttackerAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
@@ -2931,8 +2960,11 @@ internal static class RunReportWriter
             WriteTraitRow(writer, "Egg incubation seconds", traitSummary.EggIncubationSeconds);
             WriteTraitRow(writer, "Maturity age seconds", traitSummary.MaturityAgeSeconds);
             WriteTraitRow(writer, "Dietary adaptation meat bias", traitSummary.DietaryAdaptation);
+            WriteTraitRow(writer, "Carrion adaptation stale bias", traitSummary.CarrionAdaptation);
             WriteTraitRow(writer, "Plant digestion efficiency", traitSummary.PlantDigestion);
             WriteTraitRow(writer, "Meat digestion efficiency", traitSummary.MeatDigestion);
+            WriteTraitRow(writer, "Fresh meat digestion efficiency", traitSummary.FreshMeatDigestion);
+            WriteTraitRow(writer, "Stale meat digestion efficiency", traitSummary.StaleMeatDigestion);
             WriteTraitRow(writer, "Bite strength", traitSummary.BiteStrength);
             WriteTraitRow(writer, "Damage resistance", traitSummary.DamageResistance);
             WriteTraitRow(writer, "Mutation strength", traitSummary.MutationStrength);
@@ -3266,6 +3298,13 @@ internal static class RunReportWriter
             new ChartSeries("Avg freshness", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageMeatFreshness * 100f).ToArray()),
             new ChartSeries("Fresh eaten share", "#35a862", snapshots.Select(snapshot => snapshot.FreshMeatCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Stale eaten share", "#b84a4a", snapshots.Select(snapshot => snapshot.StaleMeatCaloriesEatenShare * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Diet Traits",
+            "",
+            snapshots,
+            new ChartSeries("Diet meat bias", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageDietaryAdaptation).ToArray()),
+            new ChartSeries("Carrion bias", "#7d5546", snapshots.Select(snapshot => snapshot.AverageCarrionAdaptation).ToArray()));
         WriteLineChart(
             writer,
             "Digested Energy Source",
@@ -3750,8 +3789,11 @@ internal readonly record struct TraitAccumulator(
     FloatSummary EggIncubationSeconds,
     FloatSummary MaturityAgeSeconds,
     FloatSummary DietaryAdaptation,
+    FloatSummary CarrionAdaptation,
     FloatSummary PlantDigestion,
     FloatSummary MeatDigestion,
+    FloatSummary FreshMeatDigestion,
+    FloatSummary StaleMeatDigestion,
     FloatSummary GutCapacityCalories,
     FloatSummary DigestionCaloriesPerSecond,
     FloatSummary BiteStrength,
@@ -3772,8 +3814,11 @@ internal readonly record struct TraitAccumulator(
         var eggIncubationSeconds = new FloatAccumulator();
         var maturityAgeSeconds = new FloatAccumulator();
         var dietaryAdaptation = new FloatAccumulator();
+        var carrionAdaptation = new FloatAccumulator();
         var plantDigestion = new FloatAccumulator();
         var meatDigestion = new FloatAccumulator();
+        var freshMeatDigestion = new FloatAccumulator();
+        var staleMeatDigestion = new FloatAccumulator();
         var gutCapacityCalories = new FloatAccumulator();
         var digestionCaloriesPerSecond = new FloatAccumulator();
         var biteStrength = new FloatAccumulator();
@@ -3795,8 +3840,11 @@ internal readonly record struct TraitAccumulator(
             eggIncubationSeconds.Add(genome.EggIncubationSeconds);
             maturityAgeSeconds.Add(genome.MaturityAgeSeconds);
             dietaryAdaptation.Add(genome.DietaryAdaptation);
+            carrionAdaptation.Add(genome.CarrionAdaptation);
             plantDigestion.Add(CreatureDigestion.PlantEfficiency(genome));
             meatDigestion.Add(CreatureDigestion.MeatEfficiency(genome));
+            freshMeatDigestion.Add(CreatureDigestion.FreshMeatEnergyEfficiency(genome));
+            staleMeatDigestion.Add(CreatureDigestion.StaleMeatEnergyEfficiency(genome));
             gutCapacityCalories.Add(genome.GutCapacityCalories);
             digestionCaloriesPerSecond.Add(genome.DigestionCaloriesPerSecond);
             biteStrength.Add(genome.BiteStrength);
@@ -3818,8 +3866,11 @@ internal readonly record struct TraitAccumulator(
             eggIncubationSeconds.ToSummary(),
             maturityAgeSeconds.ToSummary(),
             dietaryAdaptation.ToSummary(),
+            carrionAdaptation.ToSummary(),
             plantDigestion.ToSummary(),
             meatDigestion.ToSummary(),
+            freshMeatDigestion.ToSummary(),
+            staleMeatDigestion.ToSummary(),
             gutCapacityCalories.ToSummary(),
             digestionCaloriesPerSecond.ToSummary(),
             biteStrength.ToSummary(),

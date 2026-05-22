@@ -109,11 +109,9 @@ public sealed class EatingSystem(
                 continue;
             }
 
-            var efficiency = CreatureDigestion.EfficiencyFor(genome, resource.Kind);
-            if (resource.Kind == ResourceKind.Meat)
-            {
-                efficiency *= MeatQuality.Freshness(resource);
-            }
+            var efficiency = resource.Kind == ResourceKind.Meat
+                ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
+                : CreatureDigestion.PlantEfficiency(genome);
 
             var distanceSquared = centerDistance * centerDistance;
             if (IsBetterFoodContact(efficiency, edgeDistance, distanceSquared, bestEfficiency, bestEdgeDistance, bestDistanceSquared))
@@ -145,7 +143,7 @@ public sealed class EatingSystem(
                 continue;
             }
 
-            var efficiency = CreatureDigestion.MeatEfficiency(genome);
+            var efficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
             var distanceSquared = centerDistance * centerDistance;
             if (IsBetterFoodContact(efficiency, edgeDistance, distanceSquared, bestEfficiency, bestEdgeDistance, bestDistanceSquared))
             {
