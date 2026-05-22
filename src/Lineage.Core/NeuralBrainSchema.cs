@@ -5,6 +5,10 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
+    public const int DefaultHiddenNodeCount = 4;
+
+    public const int MaxHiddenNodeCount = 64;
+
     public const int InputCount = 35;
 
     public const int OutputCount = 5;

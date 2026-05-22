@@ -1,17 +1,22 @@
 namespace Lineage.Core;
 
 /// <summary>
-/// Direct weighted-input neural controller used by the first evolvable brain phase.
+/// Weighted neural controller used by the first evolvable brain phases.
 /// </summary>
 ///
 /// <remarks>
-/// The model is intentionally modest: every output is a tanh activation over the
-/// fixed input vector. This is enough for selection to act on movement/eating/
-/// reproduction choices while keeping performance predictable and tests easy.
+/// The model keeps direct input-to-output weights for stable starter behavior, then
+/// optionally adds a small hidden layer for evolvable internal feature detectors.
+/// The flat weight layout is direct weights first, hidden input weights second, and
+/// hidden output weights last so older direct-only brains remain loadable.
 /// </remarks>
 public sealed class NeuralBrainGenome
 {
     private const float WeightLimit = 8f;
+    private const int SeedFoodOpportunityHiddenNode = 0;
+    private const int SeedReproductionOpportunityHiddenNode = 1;
+    private const int SeedCreatureCueHiddenNode = 2;
+    private const int SeedTerrainDragHiddenNode = 3;
     private const int LegacyInputCountWithoutEggReserve = 8;
     private const int LegacyInputCountWithoutDietSenses = 9;
     private const int LegacyInputCountWithoutPreySenses = 18;
@@ -24,57 +29,76 @@ public sealed class NeuralBrainGenome
 
     public NeuralBrainGenome(IEnumerable<float> weights)
     {
-        Weights = NormalizeWeights(weights.ToArray());
-        ValidateWeights(Weights);
+        var normalized = NormalizeWeights(weights.ToArray());
+        Weights = normalized.Weights;
+        HiddenNodeCount = normalized.HiddenNodeCount;
+        ValidateWeights(Weights, HiddenNodeCount);
     }
 
-    private NeuralBrainGenome(float[] weights, bool trusted)
+    private NeuralBrainGenome(float[] weights, int hiddenNodeCount, bool trusted)
     {
+        ValidateHiddenNodeCount(hiddenNodeCount);
         if (!trusted)
         {
-            ValidateWeights(weights);
+            ValidateWeights(weights, hiddenNodeCount);
         }
 
         Weights = weights;
+        HiddenNodeCount = hiddenNodeCount;
     }
 
     public float[] Weights { get; }
 
-    public static NeuralBrainGenome CreateZero()
+    public int HiddenNodeCount { get; }
+
+    public static int DirectWeightCount => NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount;
+
+    public static int GetExpectedWeightCount(int hiddenNodeCount)
     {
-        return new NeuralBrainGenome(new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount], trusted: true);
+        ValidateHiddenNodeCount(hiddenNodeCount);
+        return DirectWeightCount
+            + hiddenNodeCount * NeuralBrainSchema.InputCount
+            + hiddenNodeCount * NeuralBrainSchema.OutputCount;
     }
 
-    public static NeuralBrainGenome CreateRandom(DeterministicRandom random, float scale = 1f)
+    public static NeuralBrainGenome CreateZero(int hiddenNodeCount = 0)
+    {
+        return new NeuralBrainGenome(new float[GetExpectedWeightCount(hiddenNodeCount)], hiddenNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome CreateRandom(
+        DeterministicRandom random,
+        float scale = 1f,
+        int hiddenNodeCount = 0)
     {
         if (!float.IsFinite(scale) || scale < 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(scale), "Random brain scale must be finite and non-negative.");
         }
 
-        var weights = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
+        var weights = new float[GetExpectedWeightCount(hiddenNodeCount)];
         for (var i = 0; i < weights.Length; i++)
         {
             weights[i] = random.NextSingle(-scale, scale);
         }
 
-        return new NeuralBrainGenome(weights, trusted: true);
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
     }
 
     /// <summary>
     /// Seed controller that can seek and eat visible resources without hard-coded actions.
     /// </summary>
-    public static NeuralBrainGenome CreateSeedForager()
+    public static NeuralBrainGenome CreateSeedForager(int hiddenNodeCount = 0)
     {
-        return new NeuralBrainGenome(CreateSeedForagerWeights(), trusted: true);
+        return new NeuralBrainGenome(CreateSeedForagerWeights(hiddenNodeCount), hiddenNodeCount, trusted: true);
     }
 
     /// <summary>
     /// Seed controller that still forages, but also steers toward close visible creatures while hungry.
     /// </summary>
-    public static NeuralBrainGenome CreateForagerPredator()
+    public static NeuralBrainGenome CreateForagerPredator(int hiddenNodeCount = 0)
     {
-        var weights = CreateSeedForagerWeights();
+        var weights = CreateSeedForagerWeights(hiddenNodeCount);
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
@@ -94,12 +118,12 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureFacingAlignmentInput, -0.3f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.5f);
 
-        return new NeuralBrainGenome(weights, trusted: true);
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
     }
 
-    private static float[] CreateSeedForagerWeights()
+    private static float[] CreateSeedForagerWeights(int hiddenNodeCount)
     {
-        var weights = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
+        var weights = new float[GetExpectedWeightCount(hiddenNodeCount)];
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.35f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.4f);
@@ -118,12 +142,62 @@ public sealed class NeuralBrainGenome
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
 
+        SeedHiddenConceptInputs(weights, hiddenNodeCount);
+
         return weights;
+    }
+
+    private static void SeedHiddenConceptInputs(float[] weights, int hiddenNodeCount)
+    {
+        if (hiddenNodeCount > SeedFoodOpportunityHiddenNode)
+        {
+            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.BiasInput, -0.3f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.HungerInput, 0.9f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.FoodForwardInput, 1.2f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.FoodProximityInput, 0.8f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.VisibleFoodDensityInput, 0.5f);
+        }
+
+        if (hiddenNodeCount > SeedReproductionOpportunityHiddenNode)
+        {
+            SetHiddenInput(weights, hiddenNodeCount, SeedReproductionOpportunityHiddenNode, NeuralBrainSchema.BiasInput, -0.8f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedReproductionOpportunityHiddenNode, NeuralBrainSchema.ReproductionReadinessInput, 1.5f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedReproductionOpportunityHiddenNode, NeuralBrainSchema.EnergySurplusInput, 0.9f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedReproductionOpportunityHiddenNode, NeuralBrainSchema.RecentFoodSuccessInput, 0.5f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedReproductionOpportunityHiddenNode, NeuralBrainSchema.VisibleCreatureDensityInput, -0.6f);
+        }
+
+        if (hiddenNodeCount > SeedCreatureCueHiddenNode)
+        {
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.BiasInput, -0.2f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureForwardInput, 1.0f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureProximityInput, 1.1f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.4f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureApproachRateInput, 0.4f);
+        }
+
+        if (hiddenNodeCount > SeedTerrainDragHiddenNode)
+        {
+            SetHiddenInput(weights, hiddenNodeCount, SeedTerrainDragHiddenNode, NeuralBrainSchema.CurrentTerrainDragInput, 0.8f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedTerrainDragHiddenNode, NeuralBrainSchema.ForwardTerrainDragInput, 1.1f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedTerrainDragHiddenNode, NeuralBrainSchema.LeftTerrainDragInput, 0.6f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedTerrainDragHiddenNode, NeuralBrainSchema.RightTerrainDragInput, 0.6f);
+        }
     }
 
     public float GetWeight(int outputIndex, int inputIndex)
     {
         return Weights[GetWeightIndex(outputIndex, inputIndex)];
+    }
+
+    public float GetHiddenInputWeight(int hiddenIndex, int inputIndex)
+    {
+        return Weights[GetHiddenInputWeightIndex(HiddenNodeCount, hiddenIndex, inputIndex)];
+    }
+
+    public float GetHiddenOutputWeight(int outputIndex, int hiddenIndex)
+    {
+        return Weights[GetHiddenOutputWeightIndex(HiddenNodeCount, outputIndex, hiddenIndex)];
     }
 
     public void Evaluate(ReadOnlySpan<float> inputs, Span<float> outputs)
@@ -148,7 +222,46 @@ public sealed class NeuralBrainGenome
                 sum += Weights[offset + input] * inputs[input];
             }
 
-            outputs[output] = MathF.Tanh(sum);
+            outputs[output] = sum;
+        }
+
+        if (HiddenNodeCount > 0)
+        {
+            Span<float> hiddenValues = HiddenNodeCount <= NeuralBrainSchema.MaxHiddenNodeCount
+                ? stackalloc float[HiddenNodeCount]
+                : new float[HiddenNodeCount];
+
+            for (var hidden = 0; hidden < HiddenNodeCount; hidden++)
+            {
+                var sum = 0f;
+                var offset = DirectWeightCount + hidden * NeuralBrainSchema.InputCount;
+
+                for (var input = 0; input < NeuralBrainSchema.InputCount; input++)
+                {
+                    sum += Weights[offset + input] * inputs[input];
+                }
+
+                hiddenValues[hidden] = MathF.Tanh(sum);
+            }
+
+            var hiddenOutputOffset = DirectWeightCount + HiddenNodeCount * NeuralBrainSchema.InputCount;
+            for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+            {
+                var sum = outputs[output];
+                var offset = hiddenOutputOffset + output * HiddenNodeCount;
+
+                for (var hidden = 0; hidden < HiddenNodeCount; hidden++)
+                {
+                    sum += Weights[offset + hidden] * hiddenValues[hidden];
+                }
+
+                outputs[output] = sum;
+            }
+        }
+
+        for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+        {
+            outputs[output] = MathF.Tanh(outputs[output]);
         }
     }
 
@@ -188,12 +301,22 @@ public sealed class NeuralBrainGenome
             weights[index] = Math.Clamp(Weights[index] + random.NextSingle(-strength, strength), -WeightLimit, WeightLimit);
         }
 
-        return new NeuralBrainGenome(weights, trusted: true);
+        return new NeuralBrainGenome(weights, HiddenNodeCount, trusted: true);
     }
 
     private static void Set(float[] weights, int outputIndex, int inputIndex, float value)
     {
         weights[GetWeightIndex(outputIndex, inputIndex)] = value;
+    }
+
+    private static void SetHiddenInput(
+        float[] weights,
+        int hiddenNodeCount,
+        int hiddenIndex,
+        int inputIndex,
+        float value)
+    {
+        weights[GetHiddenInputWeightIndex(hiddenNodeCount, hiddenIndex, inputIndex)] = value;
     }
 
     private static int GetWeightIndex(int outputIndex, int inputIndex)
@@ -211,9 +334,44 @@ public sealed class NeuralBrainGenome
         return outputIndex * NeuralBrainSchema.InputCount + inputIndex;
     }
 
-    private static void ValidateWeights(float[] weights)
+    private static int GetHiddenInputWeightIndex(int hiddenNodeCount, int hiddenIndex, int inputIndex)
     {
-        if (weights.Length != NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount)
+        ValidateHiddenNodeCount(hiddenNodeCount);
+        if ((uint)hiddenIndex >= (uint)hiddenNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hiddenIndex));
+        }
+
+        if ((uint)inputIndex >= NeuralBrainSchema.InputCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(inputIndex));
+        }
+
+        return DirectWeightCount + hiddenIndex * NeuralBrainSchema.InputCount + inputIndex;
+    }
+
+    private static int GetHiddenOutputWeightIndex(int hiddenNodeCount, int outputIndex, int hiddenIndex)
+    {
+        ValidateHiddenNodeCount(hiddenNodeCount);
+        if ((uint)outputIndex >= NeuralBrainSchema.OutputCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(outputIndex));
+        }
+
+        if ((uint)hiddenIndex >= (uint)hiddenNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hiddenIndex));
+        }
+
+        return DirectWeightCount
+            + hiddenNodeCount * NeuralBrainSchema.InputCount
+            + outputIndex * hiddenNodeCount
+            + hiddenIndex;
+    }
+
+    private static void ValidateWeights(float[] weights, int hiddenNodeCount)
+    {
+        if (weights.Length != GetExpectedWeightCount(hiddenNodeCount))
         {
             throw new ArgumentException("Unexpected neural brain weight count.", nameof(weights));
         }
@@ -227,94 +385,124 @@ public sealed class NeuralBrainGenome
         }
     }
 
-    private static float[] NormalizeWeights(float[] weights)
+    private static void ValidateHiddenNodeCount(int hiddenNodeCount)
     {
-        if (weights.Length == NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount)
+        if (hiddenNodeCount < 0 || hiddenNodeCount > NeuralBrainSchema.MaxHiddenNodeCount)
         {
-            return weights;
+            throw new ArgumentOutOfRangeException(
+                nameof(hiddenNodeCount),
+                $"Hidden node count must be between 0 and {NeuralBrainSchema.MaxHiddenNodeCount}.");
+        }
+    }
+
+    private static (float[] Weights, int HiddenNodeCount) NormalizeWeights(float[] weights)
+    {
+        if (TryInferCurrentWeightLayout(weights.Length, out var hiddenNodeCount))
+        {
+            return (weights, hiddenNodeCount);
         }
 
         if (weights.Length == LegacyInputCountWithoutReproductiveContext * NeuralBrainSchema.OutputCount)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutReproductiveContext,
                 NeuralBrainSchema.OutputCount,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutLateralTerrainDrag * NeuralBrainSchema.OutputCount)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutLateralTerrainDrag,
                 NeuralBrainSchema.OutputCount,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutTerrainDrag * NeuralBrainSchema.OutputCount)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutTerrainDrag,
                 NeuralBrainSchema.OutputCount,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutCreatureRelations * NeuralBrainSchema.OutputCount)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutCreatureRelations,
                 NeuralBrainSchema.OutputCount,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutMeatScent * NeuralBrainSchema.OutputCount)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutMeatScent,
                 NeuralBrainSchema.OutputCount,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutPreySenses * LegacyOutputCountWithoutAttack)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutPreySenses,
                 LegacyOutputCountWithoutAttack,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutDietSenses * LegacyOutputCountWithoutAttack)
         {
-            return NormalizeLegacyWeights(
+            return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutDietSenses,
                 LegacyOutputCountWithoutAttack,
                 oldEggReserveInput: 7,
-                oldReproductionReadinessInput: 8);
+                oldReproductionReadinessInput: 8), 0);
         }
 
         if (weights.Length != LegacyInputCountWithoutEggReserve * LegacyOutputCountWithoutAttack)
         {
-            return weights;
+            return (weights, 0);
         }
 
-        return NormalizeLegacyWeights(
+        return (NormalizeLegacyWeights(
             weights,
             LegacyInputCountWithoutEggReserve,
             LegacyOutputCountWithoutAttack,
             oldEggReserveInput: -1,
-            oldReproductionReadinessInput: 7);
+            oldReproductionReadinessInput: 7), 0);
+    }
+
+    private static bool TryInferCurrentWeightLayout(int weightCount, out int hiddenNodeCount)
+    {
+        hiddenNodeCount = 0;
+        if (weightCount < DirectWeightCount)
+        {
+            return false;
+        }
+
+        var hiddenWeightCount = weightCount - DirectWeightCount;
+        var weightsPerHiddenNode = NeuralBrainSchema.InputCount + NeuralBrainSchema.OutputCount;
+        if (hiddenWeightCount % weightsPerHiddenNode != 0)
+        {
+            return false;
+        }
+
+        hiddenNodeCount = hiddenWeightCount / weightsPerHiddenNode;
+        ValidateHiddenNodeCount(hiddenNodeCount);
+        return true;
     }
 
     private static float[] NormalizeLegacyWeights(

@@ -71,6 +71,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Scenario", scenario.Name);
         WriteMetric(writer, "Pipeline", scenario.PipelineKind.ToString());
         WriteMetric(writer, "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
+        WriteMetric(writer, "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "World size", $"{state.Bounds.Width:0} x {state.Bounds.Height:0}");
         WriteMetric(writer, "Resources per 1M area", resourceDensity.ToString("0.###", CultureInfo.InvariantCulture));

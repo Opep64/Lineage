@@ -59,6 +59,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
+    ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
@@ -2116,7 +2117,8 @@ static void NeuralBrainMigratesReproductiveContextInputs()
 
     var brain = new NeuralBrainGenome(legacyWeights);
 
-    AssertEqual(NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount, brain.Weights.Length, "Migrated brain weight count");
+    AssertEqual(0, brain.HiddenNodeCount, "Migrated brain hidden node count");
+    AssertEqual(NeuralBrainGenome.DirectWeightCount, brain.Weights.Length, "Migrated brain weight count");
     AssertClose(
         2.5f,
         brain.GetWeight(NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput),
@@ -2129,6 +2131,42 @@ static void NeuralBrainMigratesReproductiveContextInputs()
         "Migrated terrain drag weight");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.EnergySurplusInput), 0.000001, "New energy surplus weight starts neutral");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.RecentFoodSuccessInput), 0.000001, "New food success weight starts neutral");
+}
+
+static void NeuralBrainSupportsHiddenNodes()
+{
+    const int hiddenNodeCount = 4;
+    var weights = new float[NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount)];
+    var hiddenInputOffset = NeuralBrainGenome.DirectWeightCount;
+    var hiddenOutputOffset = NeuralBrainGenome.DirectWeightCount
+        + hiddenNodeCount * NeuralBrainSchema.InputCount;
+
+    weights[hiddenInputOffset + NeuralBrainSchema.BiasInput] = 2f;
+    weights[hiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 2f;
+
+    var brain = new NeuralBrainGenome(weights);
+    Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
+    Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
+    inputs[NeuralBrainSchema.BiasInput] = 1f;
+
+    brain.Evaluate(inputs, outputs);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Hidden brain node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Hidden brain weight count");
+    AssertTrue(outputs[NeuralBrainSchema.MoveForwardOutput] > 0.9f, "Hidden node should influence output");
+    AssertClose(2f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.BiasInput), 0.000001, "Hidden input weight");
+    AssertClose(2f, brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0), 0.000001, "Hidden output weight");
+
+    var seedBrain = NeuralBrainGenome.CreateSeedForager(hiddenNodeCount);
+    AssertEqual(hiddenNodeCount, seedBrain.HiddenNodeCount, "Seed hidden node count");
+    AssertClose(
+        0f,
+        seedBrain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Seed hidden outputs start neutral");
+    AssertTrue(
+        Math.Abs(seedBrain.GetHiddenInputWeight(0, NeuralBrainSchema.FoodForwardInput)) > 0.000001f,
+        "Seed hidden concepts should be prewired on the input side");
 }
 
 static void ForagerPredatorStarterBrainHuntsCreatureCues()
@@ -2655,7 +2693,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
             biomeSpeedProfile: new BiomePressureProfile(1f, 1f, 0.75f, 1f))]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
-    simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
     var parentId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 5f);
     simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 20f), energy: 7f, generation: 2);
     var seeingCreature = simulation.State.Creatures[0];
@@ -2741,6 +2779,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.MeatResourceCount, "Snapshot meat resource count");
     AssertEqual(1, snapshot.GenomeCount, "Snapshot genome count");
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
+    AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
+    AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot max hidden nodes");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
     AssertClose(12f, snapshot.TotalCreatureEnergy, 0.000001, "Snapshot creature energy");
     AssertClose(6f, snapshot.TotalEggEnergy, 0.000001, "Snapshot egg energy");
@@ -3199,11 +3239,12 @@ static void ScenarioFactorySupportsInitialBrainKinds()
 
     var first = SimulationScenarioFactory.CreateSimulation(scenario);
     var second = SimulationScenarioFactory.CreateSimulation(scenario);
-    var seededBrain = NeuralBrainGenome.CreateSeedForager();
+    var seededBrain = NeuralBrainGenome.CreateSeedForager(scenario.BrainHiddenNodeCount);
     var randomBrain = first.State.Brains[0];
 
     AssertEqual(3, first.State.Brains.Count, "Randomized founder brain count");
     AssertEqual(3, first.State.Creatures.Select(creature => creature.BrainId).Distinct().Count(), "Randomized founder brain IDs");
+    AssertEqual(scenario.BrainHiddenNodeCount, randomBrain.HiddenNodeCount, "Randomized founder hidden nodes");
 
     AssertTrue(
         randomBrain.Weights.Zip(seededBrain.Weights).Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
@@ -3238,7 +3279,7 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     {
         InitialBrainKind = InitialBrainKind.ForagerPredator
     });
-    var predatorBrain = NeuralBrainGenome.CreateForagerPredator();
+    var predatorBrain = NeuralBrainGenome.CreateForagerPredator(scenario.BrainHiddenNodeCount);
 
     AssertEqual(1, predatorSimulation.State.Brains.Count, "Predator founder brain count");
     for (var i = 0; i < predatorBrain.Weights.Length; i++)
@@ -3497,6 +3538,7 @@ static void ScenarioJsonRoundTrips()
         Seed = 1234,
         PipelineKind = SimulationPipelineKind.SimpleForaging,
         InitialBrainKind = InitialBrainKind.ForagerPredator,
+        BrainHiddenNodeCount = 6,
         EnableBiomes = false,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
@@ -3572,6 +3614,7 @@ static void ScenarioJsonRoundTrips()
 
     AssertTrue(json.Contains("\"pipelineKind\": \"simpleForaging\""), "JSON should serialize pipeline as a string");
     AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
+    AssertTrue(json.Contains("\"brainHiddenNodeCount\": 6"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
@@ -3582,6 +3625,7 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
     AssertEqual(scenario.InitialBrainKind, roundTripped.InitialBrainKind, "Scenario initial brain mode");
+    AssertEqual(scenario.BrainHiddenNodeCount, roundTripped.BrainHiddenNodeCount, "Scenario brain hidden nodes");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");

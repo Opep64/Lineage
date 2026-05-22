@@ -13,6 +13,8 @@ public readonly record struct SimulationStatsSnapshot(
     int MeatResourceCount,
     int GenomeCount,
     int BrainCount,
+    float AverageBrainHiddenNodeCount,
+    int MaxBrainHiddenNodeCount,
     int MaxGeneration,
     float TotalCreatureEnergy,
     float TotalEggEnergy,

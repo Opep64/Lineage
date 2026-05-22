@@ -24,6 +24,8 @@ public sealed record SimulationScenario
 
     public InitialBrainKind InitialBrainKind { get; init; } = InitialBrainKind.SeedForager;
 
+    public int BrainHiddenNodeCount { get; init; } = NeuralBrainSchema.DefaultHiddenNodeCount;
+
     /// <summary>
     /// Legacy JSON migration field. New scenarios should use <see cref="InitialBrainKind"/>.
     /// </summary>
@@ -204,6 +206,7 @@ public sealed record SimulationScenario
         EnsurePositive(WorldWidth, nameof(WorldWidth));
         EnsurePositive(WorldHeight, nameof(WorldHeight));
         EnsureEnumDefined(InitialBrainKind, nameof(InitialBrainKind));
+        EnsureHiddenNodeCount(BrainHiddenNodeCount, nameof(BrainHiddenNodeCount));
         EnsurePositive(BiomeCellSize, nameof(BiomeCellSize));
         EnsureNonNegative(ResourceVoidBorderWidth, nameof(ResourceVoidBorderWidth));
         EnsurePositive(FixedDeltaSeconds, nameof(FixedDeltaSeconds));
@@ -371,6 +374,15 @@ public sealed record SimulationScenario
         if (value < 0)
         {
             throw new InvalidOperationException($"{name} must be non-negative.");
+        }
+    }
+
+    private static void EnsureHiddenNodeCount(int value, string name)
+    {
+        if (value < 0 || value > NeuralBrainSchema.MaxHiddenNodeCount)
+        {
+            throw new InvalidOperationException(
+                $"{name} must be between 0 and {NeuralBrainSchema.MaxHiddenNodeCount}.");
         }
     }
 

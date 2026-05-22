@@ -3,6 +3,7 @@
   "seed": 20260519,
   "pipelineKind": "neural",
   "initialBrainKind": "seedForager",
+  "brainHiddenNodeCount": 4,
   "enableBiomes": true,
   "worldWidth": 2000,
   "worldHeight": 2000,

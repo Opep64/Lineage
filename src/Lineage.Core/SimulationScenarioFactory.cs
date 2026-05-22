@@ -195,7 +195,7 @@ public static class SimulationScenarioFactory
             return -1;
         }
 
-        return state.AddBrain(CreateInitialBrain(scenario.InitialBrainKind));
+        return state.AddBrain(CreateInitialBrain(scenario.InitialBrainKind, scenario.BrainHiddenNodeCount));
     }
 
     private static int CreateFounderBrainId(
@@ -220,15 +220,17 @@ public static class SimulationScenarioFactory
         }
 
         // Keep initial brain variation independent of world/resource placement randomness.
-        return state.AddBrain(NeuralBrainGenome.CreateRandom(initialBrainRandom));
+        return state.AddBrain(NeuralBrainGenome.CreateRandom(
+            initialBrainRandom,
+            hiddenNodeCount: scenario.BrainHiddenNodeCount));
     }
 
-    private static NeuralBrainGenome CreateInitialBrain(InitialBrainKind initialBrainKind)
+    private static NeuralBrainGenome CreateInitialBrain(InitialBrainKind initialBrainKind, int hiddenNodeCount)
     {
         return initialBrainKind switch
         {
-            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(),
-            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(),
+            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(hiddenNodeCount),
+            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(hiddenNodeCount),
             InitialBrainKind.RandomPerFounder => throw new ArgumentException("Random-per-founder brains are created individually."),
             _ => throw new ArgumentOutOfRangeException(nameof(initialBrainKind), initialBrainKind, "Unsupported initial brain kind.")
         };

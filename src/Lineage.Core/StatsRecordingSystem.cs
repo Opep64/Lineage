@@ -325,6 +325,18 @@ public sealed class StatsRecordingSystem(
             : 0f;
         var attackerDivisor = Math.Max(1, attackingCreatureCount);
         var nonAttackerDivisor = Math.Max(1, nonAttackingCreatureCount);
+        var totalBrainHiddenNodeCount = 0;
+        var maxBrainHiddenNodeCount = 0;
+        for (var i = 0; i < state.Brains.Count; i++)
+        {
+            var hiddenNodeCount = state.Brains[i].HiddenNodeCount;
+            totalBrainHiddenNodeCount += hiddenNodeCount;
+            maxBrainHiddenNodeCount = Math.Max(maxBrainHiddenNodeCount, hiddenNodeCount);
+        }
+
+        var averageBrainHiddenNodeCount = state.Brains.Count > 0
+            ? totalBrainHiddenNodeCount / (float)state.Brains.Count
+            : 0f;
         state.Stats.RecordSnapshot(new SimulationStatsSnapshot(
             state.Tick,
             state.ElapsedSeconds,
@@ -335,6 +347,8 @@ public sealed class StatsRecordingSystem(
             meatResourceCount,
             state.Genomes.Count,
             state.Brains.Count,
+            averageBrainHiddenNodeCount,
+            maxBrainHiddenNodeCount,
             maxGeneration,
             totalCreatureEnergy,
             totalEggEnergy,

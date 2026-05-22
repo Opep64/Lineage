@@ -824,12 +824,15 @@ public partial class Main : Node2D
         var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
+        var brainText = creature.BrainId >= 0
+            ? $"{creature.BrainId} ({_simulation.State.GetBrain(creature.BrainId).HiddenNodeCount} hidden)"
+            : "none";
 
         return
             $"Selected #{creature.Id.Value}\n" +
             $"{parentText}\n" +
             $"Generation {creature.Generation}\n" +
-            $"Genome {creature.GenomeId}  Brain {creature.BrainId}\n" +
+            $"Genome {creature.GenomeId}  Brain {brainText}\n" +
             $"Energy {creature.Energy:0.0}\n" +
             $"Health {creature.Health:0.00}\n" +
             $"Age {creature.AgeSeconds:0.0}s\n" +
@@ -916,12 +919,15 @@ public partial class Main : Node2D
         var survivalText = damagePerSecond > 0f && egg.Health / damagePerSecond < remainingSeconds
             ? $"fails in {egg.Health / damagePerSecond:0.0}s"
             : "viable at current exposure";
+        var brainText = egg.BrainId >= 0
+            ? $"{egg.BrainId} ({_simulation.State.GetBrain(egg.BrainId).HiddenNodeCount} hidden)"
+            : "none";
 
         return
             $"Selected egg #{egg.Id.Value}\n" +
             $"Parent #{egg.ParentId.Value}\n" +
             $"Generation {egg.Generation}\n" +
-            $"Genome {egg.GenomeId}  Brain {egg.BrainId}\n" +
+            $"Genome {egg.GenomeId}  Brain {brainText}\n" +
             $"Energy {egg.Energy:0.0}\n" +
             $"Health {egg.Health:0.00}/{egg.MaxHealth:0.00} ({healthRatio:P0})\n" +
             $"Investment {egg.InvestmentRatio:0.00}x\n" +
