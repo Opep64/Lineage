@@ -1329,11 +1329,11 @@ static void CreatureSensingReportsVisibleCreatureCues()
 
     var senses = simulation.State.Creatures[0].Senses;
     AssertTrue(senses.CreatureDetected, "Creature should be detected");
-    AssertTrue(senses.MeatDetected, "Visible creature should also count as meat-like food");
-    AssertTrue(senses.FoodDetected, "Meat specialist should treat visible creature as food");
+    AssertTrue(!senses.MeatDetected, "Visible living creature should not become a generic meat cue");
+    AssertTrue(!senses.FoodDetected, "Visible living creature should not become a generic food cue");
     AssertClose(0.125f, senses.VisibleCreatureDensity, 0.000001, "Visible creature density");
-    AssertClose(0.125f, senses.VisibleMeatDensity, 0.000001, "Visible meat density includes visible creatures");
-    AssertClose(0.125f, senses.VisibleFoodDensity, 0.000001, "Visible food density includes visible creatures");
+    AssertClose(0f, senses.VisibleMeatDensity, 0.000001, "Visible meat density excludes living creatures");
+    AssertClose(0f, senses.VisibleFoodDensity, 0.000001, "Visible food density excludes living creatures");
     AssertTrue(senses.CreatureProximity > 0.9f, "Creature proximity should be high");
     AssertTrue(senses.CreatureDirectionForward > 0.99f, "Creature should be in front");
     AssertClose(0f, senses.CreatureDirectionRight, 0.0001, "Creature right direction");

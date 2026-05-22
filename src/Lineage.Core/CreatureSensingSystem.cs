@@ -269,34 +269,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     continue;
                 }
 
-                visibleFoodCount++;
-                visibleMeatCount++;
                 visibleCreatureCount++;
 
                 var distanceSquared = centerDistance * centerDistance;
-                if (distanceSquared < nearestVisibleMeatDistanceSquared)
-                {
-                    nearestVisibleMeatDistanceSquared = distanceSquared;
-                    nearestVisibleMeatKind = FoodContactKind.Creature;
-                    nearestVisibleMeatIndex = otherCreatureIndex;
-                }
-
                 if (distanceSquared < nearestVisibleCreatureDistanceSquared)
                 {
                     nearestVisibleCreatureDistanceSquared = distanceSquared;
                     nearestVisibleCreatureIndex = otherCreatureIndex;
-                }
-
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
-                var foodScore = proximity * meatFoodEfficiency;
-                if (foodScore > bestVisibleFoodScore
-                    || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
-                        && distanceSquared < bestVisibleFoodDistanceSquared))
-                {
-                    bestVisibleFoodScore = foodScore;
-                    bestVisibleFoodDistanceSquared = distanceSquared;
-                    bestVisibleFoodKind = FoodContactKind.Creature;
-                    bestVisibleFoodIndex = otherCreatureIndex;
                 }
             }
 
@@ -327,19 +306,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     right,
                     effectiveSenseRadius);
             }
-            else if (bestVisibleFoodKind == FoodContactKind.Creature && bestVisibleFoodIndex >= 0)
-            {
-                ApplyGenericCreatureSense(
-                    ref senses,
-                    state.Creatures[bestVisibleFoodIndex],
-                    GetCreatureTraits(state, bestVisibleFoodIndex),
-                    GetCreatureTraits(state, i),
-                    creature,
-                    forward,
-                    right,
-                    effectiveSenseRadius);
-            }
-
             if (nearestVisiblePlantIndex >= 0)
             {
                 ApplyPlantSense(
@@ -371,19 +337,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     right,
                     effectiveSenseRadius);
             }
-            else if (nearestVisibleMeatKind == FoodContactKind.Creature && nearestVisibleMeatIndex >= 0)
-            {
-                ApplyMeatCreatureSense(
-                    ref senses,
-                    state.Creatures[nearestVisibleMeatIndex],
-                    GetCreatureTraits(state, nearestVisibleMeatIndex),
-                    GetCreatureTraits(state, i),
-                    creature,
-                    forward,
-                    right,
-                    effectiveSenseRadius);
-            }
-
             if (nearestVisibleCreatureIndex >= 0)
             {
                 ApplyCreatureSense(
@@ -454,30 +407,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.FoodDirectionRight = sense.DirectionRight;
     }
 
-    private static void ApplyGenericCreatureSense(
-        ref CreatureSenseState senses,
-        CreatureState visibleCreature,
-        CreatureSensingTraits visibleTraits,
-        CreatureSensingTraits creatureTraits,
-        CreatureState creature,
-        SimVector2 forward,
-        SimVector2 right,
-        float effectiveSenseRadius)
-    {
-        var sense = CalculateCreatureSense(
-            visibleCreature,
-            visibleTraits,
-            creature,
-            creatureTraits,
-            forward,
-            right,
-            effectiveSenseRadius);
-        senses.FoodDetected = true;
-        senses.FoodProximity = sense.Proximity;
-        senses.FoodDirectionForward = sense.DirectionForward;
-        senses.FoodDirectionRight = sense.DirectionRight;
-    }
-
     private static void ApplyPlantSense(
         ref CreatureSenseState senses,
         ResourcePatchState resource,
@@ -517,30 +446,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float effectiveSenseRadius)
     {
         var sense = CalculateFoodSense(egg.Position, EggPredation.ContactRadius(egg), creature, forward, right, effectiveSenseRadius);
-        senses.MeatDetected = true;
-        senses.MeatProximity = sense.Proximity;
-        senses.MeatDirectionForward = sense.DirectionForward;
-        senses.MeatDirectionRight = sense.DirectionRight;
-    }
-
-    private static void ApplyMeatCreatureSense(
-        ref CreatureSenseState senses,
-        CreatureState visibleCreature,
-        CreatureSensingTraits visibleTraits,
-        CreatureSensingTraits creatureTraits,
-        CreatureState creature,
-        SimVector2 forward,
-        SimVector2 right,
-        float effectiveSenseRadius)
-    {
-        var sense = CalculateCreatureSense(
-            visibleCreature,
-            visibleTraits,
-            creature,
-            creatureTraits,
-            forward,
-            right,
-            effectiveSenseRadius);
         senses.MeatDetected = true;
         senses.MeatProximity = sense.Proximity;
         senses.MeatDirectionForward = sense.DirectionForward;
