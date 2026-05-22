@@ -238,7 +238,8 @@ public sealed class WorldState
         record.DeathElapsedSeconds = ElapsedSeconds;
         record.DeathReason = reason;
         _lineageRecords[index] = record;
-        Stats.RecordCreatureDeath(reason);
+        var lifespanSeconds = MathF.Max(0f, (float)(record.DeathElapsedSeconds.Value - record.BirthElapsedSeconds));
+        Stats.RecordCreatureDeath(reason, lifespanSeconds);
     }
 
     public EntityId SpawnResourcePatch(ResourcePatchState patch)

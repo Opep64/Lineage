@@ -459,6 +459,13 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add local terrain/drag sensing. Creatures now sense `CurrentTerrainDrag` and `ForwardTerrainDrag`, derived only from the current biome-speed profile and sampled locally at the body position plus a short forward probe. The neural schema appends these two inputs with migration support for older brains, and the selected-creature inspector shows the sensed drag values. This gives terrain-aware evolution a cue without revealing biome labels, fertility, resource voids, or global map direction. Done.
 - Defer the large-world terrain-pressure scenario until after the next performance pass. The likely useful scale is `5,000 x 5,000` to `8,000 x 8,000` with larger biome cells and lower resource density, but that should wait until profiling and multicore support reduce the risk that the experiment measures runtime limits more than ecology.
 
+### Future Sensory Balancing
+
+- Current long Godot runs show a recurring drift toward larger vision range and wider vision angle, suggesting the present ecology makes better eyesight broadly useful and not costly or limited enough.
+- Avoid letting bigger vision become an always-best answer. Future sensory balancing should add biologically inspired tradeoffs such as stronger eye/brain upkeep, development or maturity cost, mutation burden, lower returns at long range, visual noise, occlusion from terrain/plants/obstacles, light/weather/season effects, and ecology where smell, touch, hearing, scent trails, or memory can outperform sight in some niches.
+- Treat vision range, vision angle, resolution/detail, and object classification as separable future traits if needed. A creature might see far but coarsely, see nearby with high detail, smell food through occlusion, or rely on recent memory rather than perfect distant visual awareness.
+- Reports should track whether selection is repeatedly pushing sensory traits to their practical limits. If so, add or tune costs/limits before interpreting that as meaningful ecological specialization.
+
 ### Far Future: Self-Sustaining Ecology
 
 - Consider growing the project into a broader ecology simulator where plants are active evolving populations rather than only spawned/regrowing calorie patches.

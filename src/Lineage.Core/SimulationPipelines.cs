@@ -39,7 +39,11 @@ public static class SimulationPipelines
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
-        float movementSpeedCostExponent = 1f)
+        float movementSpeedCostExponent = 1f,
+        float reproductivePrimeAgeSeconds = 240f,
+        float reproductiveSenescenceAgeSeconds = 900f,
+        float senescentFertilityMultiplier = 0.18f,
+        float crowdingFertilityPenalty = 0.65f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -71,7 +75,11 @@ public static class SimulationPipelines
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
             new DigestionSystem(),
-            new ReproductionSystem(),
+            new ReproductionSystem(
+                reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
+                reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
+                senescentFertilityMultiplier: senescentFertilityMultiplier,
+                crowdingFertilityPenalty: crowdingFertilityPenalty),
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
@@ -113,7 +121,11 @@ public static class SimulationPipelines
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
-        float movementSpeedCostExponent = 1f)
+        float movementSpeedCostExponent = 1f,
+        float reproductivePrimeAgeSeconds = 240f,
+        float reproductiveSenescenceAgeSeconds = 900f,
+        float senescentFertilityMultiplier = 0.18f,
+        float crowdingFertilityPenalty = 0.65f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -151,7 +163,12 @@ public static class SimulationPipelines
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex, requireEatIntent: true),
             new DigestionSystem(),
-            new ReproductionSystem(requireReproductionIntent: true),
+            new ReproductionSystem(
+                requireReproductionIntent: true,
+                reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
+                reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
+                senescentFertilityMultiplier: senescentFertilityMultiplier,
+                crowdingFertilityPenalty: crowdingFertilityPenalty),
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new CreatureAttackSystem(

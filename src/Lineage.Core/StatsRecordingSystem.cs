@@ -307,7 +307,6 @@ public sealed class StatsRecordingSystem(
             : 0f;
         var attackerDivisor = Math.Max(1, attackingCreatureCount);
         var nonAttackerDivisor = Math.Max(1, nonAttackingCreatureCount);
-
         state.Stats.RecordSnapshot(new SimulationStatsSnapshot(
             state.Tick,
             state.ElapsedSeconds,
@@ -392,6 +391,8 @@ public sealed class StatsRecordingSystem(
             freshMeatCaloriesEatenPerSecond,
             staleMeatCaloriesEatenPerSecond,
             freshMeatCaloriesEatenShare,
-            staleMeatCaloriesEatenShare));
+            staleMeatCaloriesEatenShare,
+            state.Stats.AverageDeadCreatureLifespanSeconds,
+            state.Stats.MedianDeadCreatureLifespanSeconds));
     }
 }

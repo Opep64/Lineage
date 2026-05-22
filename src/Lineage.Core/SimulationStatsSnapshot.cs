@@ -87,4 +87,6 @@ public readonly record struct SimulationStatsSnapshot(
     float TotalFreshMeatCaloriesEatenPerSecond,
     float TotalStaleMeatCaloriesEatenPerSecond,
     float FreshMeatCaloriesEatenShare,
-    float StaleMeatCaloriesEatenShare);
+    float StaleMeatCaloriesEatenShare,
+    float AverageLifespanSeconds,
+    float MedianLifespanSeconds);

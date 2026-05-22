@@ -152,6 +152,14 @@ public sealed record SimulationScenario
 
     public float ReproductionCooldownSeconds { get; init; } = 7f;
 
+    public float ReproductivePrimeAgeSeconds { get; init; } = 240f;
+
+    public float ReproductiveSenescenceAgeSeconds { get; init; } = 900f;
+
+    public float SenescentFertilityMultiplier { get; init; } = 0.18f;
+
+    public float CrowdingFertilityPenalty { get; init; } = 0.65f;
+
     public float DietaryAdaptation { get; init; } = 0.1f;
 
     public float CarrionAdaptation { get; init; } = 0f;
@@ -237,6 +245,10 @@ public sealed record SimulationScenario
         EnsureNonNegative(EggIncubationSeconds, nameof(EggIncubationSeconds));
         EnsureNonNegative(MaturityAgeSeconds, nameof(MaturityAgeSeconds));
         EnsureNonNegative(ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
+        EnsureNonNegative(ReproductivePrimeAgeSeconds, nameof(ReproductivePrimeAgeSeconds));
+        EnsureNonNegative(ReproductiveSenescenceAgeSeconds, nameof(ReproductiveSenescenceAgeSeconds));
+        EnsureRange(SenescentFertilityMultiplier, 0f, 1f, nameof(SenescentFertilityMultiplier));
+        EnsureRange(CrowdingFertilityPenalty, 0f, 1f, nameof(CrowdingFertilityPenalty));
         EnsureProbability(DietaryAdaptation, nameof(DietaryAdaptation));
         EnsureProbability(CarrionAdaptation, nameof(CarrionAdaptation));
         EnsurePositive(BiteStrength, nameof(BiteStrength));
@@ -267,6 +279,11 @@ public sealed record SimulationScenario
         if (ReproductionEnergyThreshold < OffspringEnergyInvestment)
         {
             throw new InvalidOperationException("Reproduction threshold must be at least the offspring investment.");
+        }
+
+        if (ReproductiveSenescenceAgeSeconds < ReproductivePrimeAgeSeconds)
+        {
+            throw new InvalidOperationException("Reproductive senescence age must be greater than or equal to prime age.");
         }
 
         return this;

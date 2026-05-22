@@ -5,6 +5,9 @@ namespace Lineage.Core;
 /// </summary>
 public sealed class SimulationStats
 {
+    private readonly List<float> _deadCreatureLifespans = [];
+    private float _deadCreatureLifespanTotalSeconds;
+
     public int CreatureBirthCount { get; private set; }
 
     public int FounderCreatureCount { get; private set; }
@@ -23,6 +26,26 @@ public sealed class SimulationStats
 
     public int InjuryDeathCount { get; private set; }
 
+    public float AverageDeadCreatureLifespanSeconds => _deadCreatureLifespans.Count == 0
+        ? 0f
+        : _deadCreatureLifespanTotalSeconds / _deadCreatureLifespans.Count;
+
+    public float MedianDeadCreatureLifespanSeconds
+    {
+        get
+        {
+            if (_deadCreatureLifespans.Count == 0)
+            {
+                return 0f;
+            }
+
+            var middle = _deadCreatureLifespans.Count / 2;
+            return _deadCreatureLifespans.Count % 2 == 1
+                ? _deadCreatureLifespans[middle]
+                : (_deadCreatureLifespans[middle - 1] + _deadCreatureLifespans[middle]) * 0.5f;
+        }
+    }
+
     public List<SimulationStatsSnapshot> Snapshots { get; } = [];
 
     internal void RecordCreatureBirth(CreatureLineageRecord record)
@@ -35,9 +58,10 @@ public sealed class SimulationStats
         }
     }
 
-    internal void RecordCreatureDeath(CreatureDeathReason reason)
+    internal void RecordCreatureDeath(CreatureDeathReason reason, float lifespanSeconds)
     {
         CreatureDeathCount++;
+        AddDeadCreatureLifespan(lifespanSeconds);
 
         switch (reason)
         {
@@ -74,6 +98,22 @@ public sealed class SimulationStats
         Snapshots.Add(snapshot);
     }
 
+    internal void RestoreDeadCreatureLifespans(IEnumerable<CreatureLineageRecord> lineageRecords)
+    {
+        _deadCreatureLifespans.Clear();
+        _deadCreatureLifespanTotalSeconds = 0f;
+
+        foreach (var record in lineageRecords)
+        {
+            if (record.DeathElapsedSeconds is null)
+            {
+                continue;
+            }
+
+            AddDeadCreatureLifespan(MathF.Max(0f, (float)(record.DeathElapsedSeconds.Value - record.BirthElapsedSeconds)));
+        }
+    }
+
     internal void Restore(
         int creatureBirthCount,
         int founderCreatureCount,
@@ -97,5 +137,20 @@ public sealed class SimulationStats
         InjuryDeathCount = injuryDeathCount;
         Snapshots.Clear();
         Snapshots.AddRange(snapshots);
+    }
+
+    private void AddDeadCreatureLifespan(float lifespanSeconds)
+    {
+        var normalized = float.IsFinite(lifespanSeconds) && lifespanSeconds > 0f
+            ? lifespanSeconds
+            : 0f;
+        var insertIndex = _deadCreatureLifespans.BinarySearch(normalized);
+        if (insertIndex < 0)
+        {
+            insertIndex = ~insertIndex;
+        }
+
+        _deadCreatureLifespans.Insert(insertIndex, normalized);
+        _deadCreatureLifespanTotalSeconds += normalized;
     }
 }

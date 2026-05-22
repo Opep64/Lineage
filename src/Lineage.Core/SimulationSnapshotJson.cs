@@ -101,6 +101,7 @@ public static class SimulationSnapshotJson
             snapshot.StarvationDeathCount,
             snapshot.InjuryDeathCount,
             snapshot.StatsSnapshots);
+        state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 
     private static SimulationSnapshot Validate(SimulationSnapshot snapshot)

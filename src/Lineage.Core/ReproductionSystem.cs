@@ -3,8 +3,22 @@ namespace Lineage.Core;
 /// <summary>
 /// Builds egg reserves and lays mutated eggs once enough energy is committed.
 /// </summary>
-public sealed class ReproductionSystem(bool requireReproductionIntent = false) : ISimulationSystem
+public sealed class ReproductionSystem(
+    bool requireReproductionIntent = false,
+    float reproductivePrimeAgeSeconds = 240f,
+    float reproductiveSenescenceAgeSeconds = 900f,
+    float senescentFertilityMultiplier = 0.18f,
+    float crowdingFertilityPenalty = 0.65f) : ISimulationSystem
 {
+    private readonly float _reproductivePrimeAgeSeconds =
+        ValidateNonNegative(reproductivePrimeAgeSeconds, nameof(reproductivePrimeAgeSeconds));
+    private readonly float _reproductiveSenescenceAgeSeconds =
+        ValidateNonNegative(reproductiveSenescenceAgeSeconds, nameof(reproductiveSenescenceAgeSeconds));
+    private readonly float _senescentFertilityMultiplier =
+        ValidateUnitInterval(senescentFertilityMultiplier, nameof(senescentFertilityMultiplier));
+    private readonly float _crowdingFertilityPenalty =
+        ValidateUnitInterval(crowdingFertilityPenalty, nameof(crowdingFertilityPenalty));
+
     public void Update(WorldState state, float deltaSeconds)
     {
         var startingCreatureCount = state.Creatures.Count;
@@ -24,14 +38,16 @@ public sealed class ReproductionSystem(bool requireReproductionIntent = false) :
                 parent.ReproductiveEnergy,
                 0f,
                 parentGenome.OffspringEnergyInvestment);
+            var fertilityMultiplier = CalculateFertilityMultiplier(parent, parentGenome);
 
             if (parent.ReproductiveEnergy < parentGenome.OffspringEnergyInvestment
                 && parent.Energy >= parentGenome.ReproductionEnergyThreshold)
             {
                 var availableEnergy = Math.Max(0f, parent.Energy - parentGenome.ReproductionEnergyThreshold);
                 var remainingEggEnergy = parentGenome.OffspringEnergyInvestment - parent.ReproductiveEnergy;
+                var eggProductionRate = parentGenome.EggProductionEnergyPerSecond * fertilityMultiplier;
                 var transfer = Math.Min(
-                    Math.Min(parentGenome.EggProductionEnergyPerSecond * deltaSeconds, availableEnergy),
+                    Math.Min(eggProductionRate * deltaSeconds, availableEnergy),
                     remainingEggEnergy);
 
                 if (transfer <= 0f)
@@ -85,5 +101,58 @@ public sealed class ReproductionSystem(bool requireReproductionIntent = false) :
                 incubationSeconds: childGenome.EggIncubationSeconds,
                 generation: parent.Generation + 1);
         }
+    }
+
+    private float CalculateFertilityMultiplier(CreatureState parent, CreatureGenome genome)
+    {
+        var ageMultiplier = CalculateAgeFertilityMultiplier(parent, genome);
+        var crowdingMultiplier = CalculateCrowdingFertilityMultiplier(parent);
+        return Math.Clamp(ageMultiplier * crowdingMultiplier, 0f, 1f);
+    }
+
+    private float CalculateAgeFertilityMultiplier(CreatureState parent, CreatureGenome genome)
+    {
+        var matureAge = Math.Max(0f, genome.MaturityAgeSeconds);
+        if (parent.AgeSeconds < matureAge)
+        {
+            return 0f;
+        }
+
+        var primeAge = Math.Max(matureAge, _reproductivePrimeAgeSeconds);
+        if (parent.AgeSeconds <= primeAge)
+        {
+            return 1f;
+        }
+
+        var senescenceAge = Math.Max(primeAge, _reproductiveSenescenceAgeSeconds);
+        if (senescenceAge <= primeAge)
+        {
+            return _senescentFertilityMultiplier;
+        }
+
+        var progress = Math.Clamp((parent.AgeSeconds - primeAge) / (senescenceAge - primeAge), 0f, 1f);
+        var smoothProgress = progress * progress * (3f - 2f * progress);
+        return 1f + (_senescentFertilityMultiplier - 1f) * smoothProgress;
+    }
+
+    private float CalculateCrowdingFertilityMultiplier(CreatureState parent)
+    {
+        var density = Math.Clamp(parent.Senses.VisibleCreatureDensity, 0f, 1f);
+        var smoothedDensity = density * density * (3f - 2f * density);
+        return Math.Clamp(1f - _crowdingFertilityPenalty * smoothedDensity, 0f, 1f);
+    }
+
+    private static float ValidateNonNegative(float value, string name)
+    {
+        return float.IsFinite(value) && value >= 0f
+            ? value
+            : throw new ArgumentOutOfRangeException(name, "Fertility age must be finite and non-negative.");
+    }
+
+    private static float ValidateUnitInterval(float value, string name)
+    {
+        return float.IsFinite(value) && value is >= 0f and <= 1f
+            ? value
+            : throw new ArgumentOutOfRangeException(name, "Fertility multiplier must be finite and between 0 and 1.");
     }
 }

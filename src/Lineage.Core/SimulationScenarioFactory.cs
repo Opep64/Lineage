@@ -64,7 +64,11 @@ public static class SimulationScenarioFactory
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
                 scenario.CreateBiomeSpeedProfile(),
-                scenario.MovementSpeedCostExponent),
+                scenario.MovementSpeedCostExponent,
+                scenario.ReproductivePrimeAgeSeconds,
+                scenario.ReproductiveSenescenceAgeSeconds,
+                scenario.SenescentFertilityMultiplier,
+                scenario.CrowdingFertilityPenalty),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -99,7 +103,11 @@ public static class SimulationScenarioFactory
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
                 scenario.CreateBiomeSpeedProfile(),
-                scenario.MovementSpeedCostExponent),
+                scenario.MovementSpeedCostExponent,
+                scenario.ReproductivePrimeAgeSeconds,
+                scenario.ReproductiveSenescenceAgeSeconds,
+                scenario.SenescentFertilityMultiplier,
+                scenario.CrowdingFertilityPenalty),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }

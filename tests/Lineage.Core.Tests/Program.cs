@@ -34,6 +34,8 @@ var tests = new (string Name, Action Body)[]
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
+    ("Reproduction fertility declines with age", ReproductionFertilityDeclinesWithAge),
+    ("Reproduction fertility declines with crowding", ReproductionFertilityDeclinesWithCrowding),
     ("Reproduction lays mutated eggs", ReproductionCreatesOffspring),
     ("Eggs hatch into offspring", EggsHatchIntoOffspring),
     ("Egg environmental damage follows void and biome pressure", EggEnvironmentalDamageFollowsVoidAndBiomePressure),
@@ -66,6 +68,7 @@ var tests = new (string Name, Action Body)[]
     ("Offspring lineage records parent and generation", OffspringLineageRecordsParentAndGeneration),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
+    ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
@@ -1182,6 +1185,76 @@ static void ReproductionBuildsEggReserveBeforeLaying()
     AssertClose(60f, simulation.State.Creatures[0].Energy, 0.000001, "Parent energy after egg is laid");
     AssertClose(0f, simulation.State.Creatures[0].ReproductiveEnergy, 0.000001, "Egg reserve after laying");
     AssertClose(20f, simulation.State.Eggs[0].Energy, 0.000001, "Egg energy from reserve");
+}
+
+static void ReproductionFertilityDeclinesWithAge()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 501,
+        systems:
+        [
+            new ReproductionSystem(
+                reproductivePrimeAgeSeconds: 10f,
+                reproductiveSenescenceAgeSeconds: 20f,
+                senescentFertilityMultiplier: 0.25f,
+                crowdingFertilityPenalty: 0f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 50f,
+        OffspringEnergyInvestment = 20f,
+        EggProductionEnergyPerSecond = 8f,
+        MaturityAgeSeconds = 0f,
+        ReproductionCooldownSeconds = 0f,
+        MutationStrength = 0.01f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 100f);
+    var oldAdult = simulation.State.Creatures[0];
+    oldAdult.AgeSeconds = 25f;
+    simulation.State.Creatures[0] = oldAdult;
+
+    simulation.Step();
+
+    AssertClose(98f, simulation.State.Creatures[0].Energy, 0.000001, "Old adult energy after reduced transfer");
+    AssertClose(2f, simulation.State.Creatures[0].ReproductiveEnergy, 0.000001, "Old adult egg reserve transfer");
+}
+
+static void ReproductionFertilityDeclinesWithCrowding()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 502,
+        systems:
+        [
+            new ReproductionSystem(
+                reproductivePrimeAgeSeconds: 0f,
+                reproductiveSenescenceAgeSeconds: 100f,
+                senescentFertilityMultiplier: 1f,
+                crowdingFertilityPenalty: 0.5f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 50f,
+        OffspringEnergyInvestment = 20f,
+        EggProductionEnergyPerSecond = 8f,
+        MaturityAgeSeconds = 0f,
+        ReproductionCooldownSeconds = 0f,
+        MutationStrength = 0.01f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 100f);
+    var crowdedAdult = simulation.State.Creatures[0];
+    crowdedAdult.Senses = new CreatureSenseState { VisibleCreatureDensity = 1f };
+    simulation.State.Creatures[0] = crowdedAdult;
+
+    simulation.Step();
+
+    AssertClose(96f, simulation.State.Creatures[0].Energy, 0.000001, "Crowded adult energy after reduced transfer");
+    AssertClose(4f, simulation.State.Creatures[0].ReproductiveEnergy, 0.000001, "Crowded adult egg reserve transfer");
 }
 
 static void ReproductionCreatesOffspring()
@@ -2672,6 +2745,36 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.EggDeathCount, "Snapshot egg death count");
     AssertEqual(0, snapshot.EggPredationDeathCount, "Snapshot egg predation death count");
     AssertEqual(0, snapshot.CreatureDeathCount, "Snapshot death count");
+    AssertClose(0f, snapshot.AverageLifespanSeconds, 0.000001, "Snapshot average lifespan without deaths");
+    AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
+}
+
+static void StatsRecordingReportsLifespanSummary()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 131,
+        systems:
+        [
+            new MetabolismSystem(),
+            new DeathSystem(meatCaloriesPerBodyRadius: 0f),
+            new StatsRecordingSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 1f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(10f, 10f), energy: 2f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 10f), energy: 4f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 10f), energy: 6f);
+
+    simulation.RunSteps(7);
+
+    var snapshot = simulation.State.Stats.Snapshots[^1];
+    AssertEqual(3, snapshot.CreatureDeathCount, "Lifespan death count");
+    AssertClose(3f, snapshot.AverageLifespanSeconds, 0.000001, "Average dead-creature lifespan");
+    AssertClose(3f, snapshot.MedianLifespanSeconds, 0.000001, "Median dead-creature lifespan");
 }
 
 static void StatsRecordingHonorsSampleInterval()
@@ -3326,6 +3429,10 @@ static void ScenarioJsonRoundTrips()
         EggProductionEnergyPerSecond = 3.75f,
         EggIncubationSeconds = 19f,
         MaturityAgeSeconds = 33f,
+        ReproductivePrimeAgeSeconds = 180f,
+        ReproductiveSenescenceAgeSeconds = 720f,
+        SenescentFertilityMultiplier = 0.2f,
+        CrowdingFertilityPenalty = 0.55f,
         DietaryAdaptation = 0.42f,
         CarrionAdaptation = 0.37f,
         BiteStrength = 0.7f,
@@ -3406,6 +3513,10 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.EggProductionEnergyPerSecond, roundTripped.EggProductionEnergyPerSecond, 0.000001, "Scenario egg production");
     AssertClose(scenario.EggIncubationSeconds, roundTripped.EggIncubationSeconds, 0.000001, "Scenario egg incubation");
     AssertClose(scenario.MaturityAgeSeconds, roundTripped.MaturityAgeSeconds, 0.000001, "Scenario maturity age");
+    AssertClose(scenario.ReproductivePrimeAgeSeconds, roundTripped.ReproductivePrimeAgeSeconds, 0.000001, "Scenario prime fertility age");
+    AssertClose(scenario.ReproductiveSenescenceAgeSeconds, roundTripped.ReproductiveSenescenceAgeSeconds, 0.000001, "Scenario senescence age");
+    AssertClose(scenario.SenescentFertilityMultiplier, roundTripped.SenescentFertilityMultiplier, 0.000001, "Scenario senescent fertility");
+    AssertClose(scenario.CrowdingFertilityPenalty, roundTripped.CrowdingFertilityPenalty, 0.000001, "Scenario crowding fertility");
     AssertClose(scenario.DietaryAdaptation, roundTripped.DietaryAdaptation, 0.000001, "Scenario dietary adaptation");
     AssertClose(scenario.CarrionAdaptation, roundTripped.CarrionAdaptation, 0.000001, "Scenario carrion adaptation");
     AssertClose(scenario.BiteStrength, roundTripped.BiteStrength, 0.000001, "Scenario bite strength");
