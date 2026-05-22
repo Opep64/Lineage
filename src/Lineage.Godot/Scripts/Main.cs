@@ -18,7 +18,7 @@ public partial class Main : Node2D
 {
     private const string StartupScenarioFileName = "balanced-foraging.json";
     private const float LauncherPanelWidth = 520f;
-    private const float CollapsedLauncherPanelWidth = 190f;
+    private const float CollapsedLauncherPanelWidth = 230f;
     private const float RightPanelWidth = 300f;
     private const float ViewMargin = 24f;
     private const int GraphSampleCount = 240;
@@ -79,6 +79,7 @@ public partial class Main : Node2D
     private bool _isPanning;
     private bool _followSelected;
     private bool _showBiomeOverlay = true;
+    private bool _renderMap = true;
     private Vector2 _lastPanPosition;
     private ResourceRenderCache _resourceRenderCache = new();
     private ulong _resourceCacheLastRefreshMilliseconds;
@@ -129,6 +130,7 @@ public partial class Main : Node2D
         AddChild(_scaleBarLabel);
         CreateScenarioLauncher();
         _scenarioEditor.SetScenario(_scenario);
+        _scenarioEditor.SetMapVisible(_renderMap);
 
         ResetSimulation(resetView: true);
     }
@@ -162,21 +164,29 @@ public partial class Main : Node2D
     public override void _Draw()
     {
         DrawRect(GetViewportRect(), _backgroundColor, filled: true);
-        DrawRect(_worldRect, _worldColor, filled: true);
-        if (_showBiomeOverlay)
-        {
-            DrawBiomeOverlay();
-        }
 
         DrawRect(new Rect2(_worldRect.Position + new Vector2(_worldRect.Size.X + 12f, 0f), new Vector2(RightPanelWidth, _worldRect.Size.Y)), _panelColor, filled: true);
 
-        DrawResources();
-        DrawEggs();
-        DrawCreatures();
-        DrawSelectedEggOverlay();
+        if (_renderMap)
+        {
+            DrawRect(_worldRect, _worldColor, filled: true);
+            if (_showBiomeOverlay)
+            {
+                DrawBiomeOverlay();
+            }
+
+            DrawResources();
+            DrawEggs();
+            DrawCreatures();
+            DrawSelectedEggOverlay();
+            DrawScaleBar();
+        }
+        else
+        {
+            ClearMapRenderStats();
+        }
 
         DrawStatsGraph();
-        DrawScaleBar();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -217,6 +227,9 @@ public partial class Main : Node2D
                     break;
                 case Key.B:
                     _showBiomeOverlay = !_showBiomeOverlay;
+                    break;
+                case Key.M:
+                    SetMapVisible(!_renderMap);
                     break;
                 case Key.C:
                     CycleColorMode();
@@ -298,6 +311,30 @@ public partial class Main : Node2D
         {
             _stepAccumulator = Math.Min(_stepAccumulator, _simulation.Config.FixedDeltaSeconds);
         }
+    }
+
+    private void SetMapVisible(bool renderMap)
+    {
+        _renderMap = renderMap;
+        _scenarioEditor.SetMapVisible(_renderMap);
+        _scaleBarLabel.Visible = _renderMap;
+
+        if (!_renderMap)
+        {
+            ClearMapRenderStats();
+        }
+    }
+
+    private void ClearMapRenderStats()
+    {
+        _visibleResourceEstimate = 0;
+        _drawnResourceCount = 0;
+        _drawnResourceAggregateCount = 0;
+        _resourceRenderMode = ResourceRenderMode.Individual;
+        _visibleCreatureEstimate = 0;
+        _drawnCreatureCount = 0;
+        _drawnCreatureAggregateCount = 0;
+        _creatureRenderMode = CreatureRenderMode.Individual;
     }
 
     private void LaunchScenarioFromEditor()
@@ -692,7 +729,7 @@ public partial class Main : Node2D
             $"Attacking {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.00}/s  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
             $"Meal gap {snapshot.AverageSecondsSinceLastMeal:0.0}s  Vision {snapshot.AverageVisionRange:0}/{ToDegrees(snapshot.AverageVisionAngleRadians):0}deg\n" +
             $"Search {snapshot.TotalDistanceTraveledPerSecond:0}u/s  meal dist {snapshot.AverageDistanceSinceLastMeal:0}u  kcal/u {snapshot.CaloriesEatenPerDistance:0.00}\n" +
-            $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}\n" +
+            $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}  Map {(_renderMap ? "on" : "off")}\n" +
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
@@ -702,6 +739,7 @@ public partial class Main : Node2D
             $"Arrows pan  G follows\n" +
             $"B toggles biomes\n" +
             $"C changes color mode\n" +
+            $"M toggles map\n" +
             $"{launcherHint}";
 
         _inspector.Text = BuildInspectorText();
@@ -2039,7 +2077,7 @@ public partial class Main : Node2D
 
     private void UpdateScaleBarLayout()
     {
-        if (_worldScale <= 0f || _worldRect.Size.X <= 0f)
+        if (!_renderMap || _worldScale <= 0f || _worldRect.Size.X <= 0f)
         {
             _scaleBarLabel.Visible = false;
             _scaleBarRect = default;
@@ -2176,6 +2214,7 @@ public partial class Main : Node2D
         _scenarioEditor.LoadSnapshotFileRequested += OpenLoadSnapshotDialog;
         _scenarioEditor.LoadCheckpointFileRequested += OpenLoadCheckpointDialog;
         _scenarioEditor.LoadSnapshotRequested += LoadSnapshotFromPath;
+        _scenarioEditor.MapToggleRequested += () => SetMapVisible(!_renderMap);
         _scenarioEditor.CloseRequested += _scenarioEditor.ToggleCollapsed;
         AddChild(_scenarioEditor);
 
@@ -2237,16 +2276,20 @@ public partial class Main : Node2D
         {
             var workspaceRoot = GetRepositoryRoot();
             var request = _scenarioEditor.ReadCliRunRequest();
+            var statsPath = ResolveWorkspacePath(request.OutputPath, workspaceRoot);
             var reportPath = ResolveWorkspacePath(request.ReportPath, workspaceRoot);
+            var snapshotPath = ResolveWorkspacePath(request.SnapshotPath, workspaceRoot);
 
-            ViewerReportWriter.Write(reportPath, _scenario, _simulation);
-            _scenarioEditor.SetLastReportPath(reportPath);
-            _scenarioEditor.SetStatus($"Viewer report written: {System.IO.Path.GetFileName(reportPath)}");
+            var result = GodotRunExportWriter.Write(statsPath, reportPath, snapshotPath, _scenario, _simulation);
+            _scenarioEditor.SetLastReportPath(result.ReportPath);
+            _scenarioEditor.SetLastSnapshotPath(result.SnapshotPath);
+            _scenarioEditor.SetStatus($"Current run exported: {result.FileCount} files. Open the report or load the snapshot from the CLI tab.");
         }
         catch (Exception ex)
         {
             _scenarioEditor.SetLastReportPath(null);
-            _scenarioEditor.SetStatus($"Report failed: {ex.Message}");
+            _scenarioEditor.SetLastSnapshotPath(null);
+            _scenarioEditor.SetStatus($"Export failed: {ex.Message}");
         }
     }
 

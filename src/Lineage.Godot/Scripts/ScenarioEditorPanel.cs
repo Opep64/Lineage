@@ -17,7 +17,7 @@ namespace Lineage.Viewer;
 public sealed partial class ScenarioEditorPanel : PanelContainer
 {
     private const float ExpandedPanelWidth = 520f;
-    private const float CollapsedPanelWidth = 190f;
+    private const float CollapsedPanelWidth = 230f;
     private const float FieldLabelWidth = 250f;
 
     private static readonly PropertyInfo[] ScenarioProperties = typeof(SimulationScenario)
@@ -35,6 +35,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private Label _lastReportLabel = null!;
     private Label _lastSnapshotLabel = null!;
     private Label _lastCheckpointLabel = null!;
+    private Button _mapToggleButton = null!;
+    private Button _collapsedMapToggleButton = null!;
     private Button _openReportButton = null!;
     private Button _loadSnapshotButton = null!;
     private Button _loadCheckpointButton = null!;
@@ -62,6 +64,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     public event Action? CliRunRequested;
 
     public event Action? ReportRequested;
+
+    public event Action? MapToggleRequested;
 
     public event Action<string>? OpenReportRequested;
 
@@ -162,6 +166,20 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _loadCheckpointButton.Disabled = _lastCheckpointPath is null;
     }
 
+    public void SetMapVisible(bool isVisible)
+    {
+        if (_mapToggleButton is not null)
+        {
+            _mapToggleButton.Text = isVisible ? "Hide Map" : "Show Map";
+        }
+
+        if (_collapsedMapToggleButton is not null)
+        {
+            _collapsedMapToggleButton.Text = "Map";
+            _collapsedMapToggleButton.TooltipText = isVisible ? "Hide map drawing" : "Show map drawing";
+        }
+    }
+
     public void ToggleCollapsed()
     {
         SetCollapsed(!IsCollapsed);
@@ -211,6 +229,9 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             SizeFlagsHorizontal = SizeFlags.ExpandFill
         });
         row.AddChild(CreateButton("Expand", () => SetCollapsed(isCollapsed: false)));
+        _collapsedMapToggleButton = CreateButton("Map", () => MapToggleRequested?.Invoke());
+        _collapsedMapToggleButton.TooltipText = "Show or hide map drawing";
+        row.AddChild(_collapsedMapToggleButton);
         return margin;
     }
 
@@ -233,8 +254,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             CreateButton("Save", () => SaveRequested?.Invoke()),
             CreateButton("Save As", () => SaveAsRequested?.Invoke())));
 
+        _mapToggleButton = CreateButton("Hide Map", () => MapToggleRequested?.Invoke());
         root.AddChild(BuildButtonRow(
             CreateButton("Run CLI", () => CliRunRequested?.Invoke()),
+            CreateButton("Export Current", () => ReportRequested?.Invoke()),
+            _mapToggleButton,
             CreateButton("Collapse", () => CloseRequested?.Invoke())));
 
         _statusLabel = new Label
@@ -310,7 +334,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         root.AddChild(CreateFieldRow("Snapshot JSON", _cliSnapshotInput));
         root.AddChild(CreateFieldRow("Checkpoint interval", _cliCheckpointIntervalInput));
         root.AddChild(CreateFieldRow("Checkpoint folder", _cliCheckpointDirectoryInput));
-        root.AddChild(CreateButton("Write Current Report", () => ReportRequested?.Invoke()));
+        root.AddChild(CreateButton("Export Current Run", () => ReportRequested?.Invoke()));
         root.AddChild(CreateButton("Load Snapshot File", () => LoadSnapshotFileRequested?.Invoke()));
         root.AddChild(CreateButton("Load Checkpoint File", () => LoadCheckpointFileRequested?.Invoke(_lastCheckpointDirectory)));
 
@@ -344,7 +368,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         var note = new Label
         {
-            Text = "Run CLI reruns the edited scenario through Lineage.Cli. A checkpoint interval of 0 disables periodic checkpoint snapshots.",
+            Text = "Run CLI reruns the edited scenario through Lineage.Cli. Export Current Run writes CSV sidecars, an HTML report, and a reloadable snapshot from the live Godot simulation.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         root.AddChild(note);
