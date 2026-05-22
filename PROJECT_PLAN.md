@@ -420,6 +420,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - First meat-freshness probe on 2026-05-22 ran Scavenger, Omnivore, and Predation for 10k ticks across seeds 42, 43, and 44. No freshness tuning was applied afterward. Average meat resources remained moderately fresh (`75-82%` freshness), carcass intake was mostly fresh rather than stale, and stale carcass intake was visible but not dominant. Probe files: `out/meat_freshness_probe_20260522.csv` and `.html`. Done.
 - Add tail-window metrics to lightweight probes. Probe CSVs now include last-quarter snapshot averages for population, diet, meat/fresh-kill intake, meat freshness, fresh/stale carcass intake, meat energy share, attack share, death rates, and search efficiency. Probe HTML summaries show the high-signal tail fields so tuning is not driven by a single final snapshot. Done.
 - Tail meat probe on 2026-05-22 reran Scavenger, Omnivore, and Predation for 10k ticks across seeds 42, 43, and 44. Tail-window meat intake was about `18.4%`, `14.5%`, and `21.4%` respectively; tail stale-carcass share was `11.2%`, `17.2%`, and `4.9%`; tail diet remained near founder-biased values at `0.10`, `0.12`, and `0.15`. Probe files: `out/tail_meat_probe_20260522.csv` and `.html`. Done.
+- Retune Scavenger Pressure for more persistent carrion. A 2026-05-22 10k tick, three-seed probe compared the current preset against a carcass-persistence variant and a harsher plant-scarcity variant. The selected persistence variant changes death meat body calories `9 -> 12`, death meat energy fraction `0.60 -> 0.75`, and meat decay `0.010 -> 0.004` kcal/s. It raised tail stale-carcass share from `11.2%` to `16.8%` while keeping average final population near the current value (`417 -> 437`) and avoiding the extra harshness of plant scarcity. Probe files: `out/scavenger_carrion_probe_20260522.csv` and `.html`. Done.
 
 ### Phase 14: Terrain, Climate, And World Editing
 
@@ -541,7 +542,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: make stale/fresh meat pressure more evolvable. The current freshness curve is acceptable, and tail metrics show old carcasses are visible but not yet a major driver. The next useful move is a small ecological pressure pass that makes old carcasses matter more, or adding a first carrion-specialization gene once that pressure exists.
+Next practical step: decide whether carrion specialization should be represented as a separate gene or as a refinement of the existing dietary adaptation gene. Scavenger Pressure now has enough persistent carrion to make that next biology layer measurable.
 
 ## Current Implementation State
 
@@ -823,6 +824,7 @@ Build, 58 core tests, CLI source-feeding smoke/report/snapshot/traits, and Godot
 Build, 68 core tests, CLI meat-quality smoke/report, `git diff --check`, and Godot headless `--quit` passed on 2026-05-22 after adding age-based meat freshness and fresh/stale meat telemetry.
 Build and a 10k tick, three-seed Scavenger/Omnivore/Predation meat-freshness probe passed on 2026-05-22 after extending the lightweight probe CSV/report with fresh/stale carcass metrics.
 Build, probe smoke, and a 10k tick, three-seed Scavenger/Omnivore/Predation tail-metrics probe passed on 2026-05-22 after adding last-quarter probe metrics.
+Build, 68 core tests, `git diff --check`, and a 10k tick three-seed Scavenger carrion-variant probe passed on 2026-05-22 after tuning Scavenger Pressure toward more persistent carrion.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 
