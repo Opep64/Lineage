@@ -116,6 +116,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Average lifespan", $"{snapshot.AverageLifespanSeconds:0.###} seconds");
         WriteMetric(writer, "Median lifespan", $"{snapshot.MedianLifespanSeconds:0.###} seconds");
         WriteMetric(writer, "Max generation", snapshot.MaxGeneration.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg hidden input weight", snapshot.AverageBrainHiddenInputWeightMagnitude.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg hidden output weight", snapshot.AverageBrainHiddenOutputWeightMagnitude.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Active hidden outputs", FormatPercent(snapshot.ActiveBrainHiddenOutputShare));
         WriteMetric(writer, "Avg movement biome cost", $"{snapshot.AverageBiomeMovementCostMultiplier:0.###}x");
         WriteMetric(writer, "Avg basal biome cost", $"{snapshot.AverageBiomeBasalCostMultiplier:0.###}x");
         WriteMetric(writer, "Avg biome speed", $"{snapshot.AverageBiomeSpeedMultiplier:0.###}x");

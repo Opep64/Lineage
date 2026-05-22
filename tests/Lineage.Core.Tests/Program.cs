@@ -2156,6 +2156,11 @@ static void NeuralBrainSupportsHiddenNodes()
     AssertTrue(outputs[NeuralBrainSchema.MoveForwardOutput] > 0.9f, "Hidden node should influence output");
     AssertClose(2f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.BiasInput), 0.000001, "Hidden input weight");
     AssertClose(2f, brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0), 0.000001, "Hidden output weight");
+    AssertEqual(hiddenNodeCount * NeuralBrainSchema.InputCount, brain.HiddenInputWeightCount, "Hidden input weight count");
+    AssertEqual(hiddenNodeCount * NeuralBrainSchema.OutputCount, brain.HiddenOutputWeightCount, "Hidden output weight count");
+    AssertClose(2f, brain.SumAbsoluteHiddenInputWeights(), 0.000001, "Hidden input weight magnitude");
+    AssertClose(2f, brain.SumAbsoluteHiddenOutputWeights(), 0.000001, "Hidden output weight magnitude");
+    AssertEqual(1, brain.CountActiveHiddenOutputWeights(0.05f), "Active hidden output count");
 
     var seedBrain = NeuralBrainGenome.CreateSeedForager(hiddenNodeCount);
     AssertEqual(hiddenNodeCount, seedBrain.HiddenNodeCount, "Seed hidden node count");
@@ -2781,6 +2786,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
     AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot max hidden nodes");
+    AssertClose(14.2f / 140f, snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
+    AssertClose(0f, snapshot.AverageBrainHiddenOutputWeightMagnitude, 0.000001, "Snapshot hidden output weight magnitude");
+    AssertClose(0f, snapshot.ActiveBrainHiddenOutputShare, 0.000001, "Snapshot active hidden output share");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
     AssertClose(12f, snapshot.TotalCreatureEnergy, 0.000001, "Snapshot creature energy");
     AssertClose(6f, snapshot.TotalEggEnergy, 0.000001, "Snapshot egg energy");

@@ -9,6 +9,8 @@ public sealed class StatsRecordingSystem(
     BiomePressureProfile? biomeBasalCostProfile = null,
     BiomePressureProfile? biomeSpeedProfile = null) : ISimulationSystem
 {
+    private const float ActiveHiddenOutputWeightThreshold = 0.05f;
+
     private readonly int _sampleIntervalTicks = sampleIntervalTicks > 0
         ? sampleIntervalTicks
         : throw new ArgumentOutOfRangeException(nameof(sampleIntervalTicks), "Stats sample interval must be positive.");
@@ -327,15 +329,35 @@ public sealed class StatsRecordingSystem(
         var nonAttackerDivisor = Math.Max(1, nonAttackingCreatureCount);
         var totalBrainHiddenNodeCount = 0;
         var maxBrainHiddenNodeCount = 0;
+        var totalHiddenInputWeightMagnitude = 0f;
+        var totalHiddenOutputWeightMagnitude = 0f;
+        var hiddenInputWeightCount = 0;
+        var hiddenOutputWeightCount = 0;
+        var activeHiddenOutputWeightCount = 0;
         for (var i = 0; i < state.Brains.Count; i++)
         {
-            var hiddenNodeCount = state.Brains[i].HiddenNodeCount;
+            var brain = state.Brains[i];
+            var hiddenNodeCount = brain.HiddenNodeCount;
             totalBrainHiddenNodeCount += hiddenNodeCount;
             maxBrainHiddenNodeCount = Math.Max(maxBrainHiddenNodeCount, hiddenNodeCount);
+            totalHiddenInputWeightMagnitude += brain.SumAbsoluteHiddenInputWeights();
+            totalHiddenOutputWeightMagnitude += brain.SumAbsoluteHiddenOutputWeights();
+            hiddenInputWeightCount += brain.HiddenInputWeightCount;
+            hiddenOutputWeightCount += brain.HiddenOutputWeightCount;
+            activeHiddenOutputWeightCount += brain.CountActiveHiddenOutputWeights(ActiveHiddenOutputWeightThreshold);
         }
 
         var averageBrainHiddenNodeCount = state.Brains.Count > 0
             ? totalBrainHiddenNodeCount / (float)state.Brains.Count
+            : 0f;
+        var averageHiddenInputWeightMagnitude = hiddenInputWeightCount > 0
+            ? totalHiddenInputWeightMagnitude / hiddenInputWeightCount
+            : 0f;
+        var averageHiddenOutputWeightMagnitude = hiddenOutputWeightCount > 0
+            ? totalHiddenOutputWeightMagnitude / hiddenOutputWeightCount
+            : 0f;
+        var activeHiddenOutputShare = hiddenOutputWeightCount > 0
+            ? activeHiddenOutputWeightCount / (float)hiddenOutputWeightCount
             : 0f;
         state.Stats.RecordSnapshot(new SimulationStatsSnapshot(
             state.Tick,
@@ -349,6 +371,9 @@ public sealed class StatsRecordingSystem(
             state.Brains.Count,
             averageBrainHiddenNodeCount,
             maxBrainHiddenNodeCount,
+            averageHiddenInputWeightMagnitude,
+            averageHiddenOutputWeightMagnitude,
+            activeHiddenOutputShare,
             maxGeneration,
             totalCreatureEnergy,
             totalEggEnergy,

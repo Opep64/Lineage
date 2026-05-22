@@ -200,6 +200,60 @@ public sealed class NeuralBrainGenome
         return Weights[GetHiddenOutputWeightIndex(HiddenNodeCount, outputIndex, hiddenIndex)];
     }
 
+    public int HiddenInputWeightCount => HiddenNodeCount * NeuralBrainSchema.InputCount;
+
+    public int HiddenOutputWeightCount => HiddenNodeCount * NeuralBrainSchema.OutputCount;
+
+    public float SumAbsoluteHiddenInputWeights()
+    {
+        var sum = 0f;
+        var hiddenInputWeightCount = HiddenInputWeightCount;
+        var offset = DirectWeightCount;
+
+        for (var i = 0; i < hiddenInputWeightCount; i++)
+        {
+            sum += Math.Abs(Weights[offset + i]);
+        }
+
+        return sum;
+    }
+
+    public float SumAbsoluteHiddenOutputWeights()
+    {
+        var sum = 0f;
+        var hiddenOutputWeightCount = HiddenOutputWeightCount;
+        var offset = DirectWeightCount + HiddenInputWeightCount;
+
+        for (var i = 0; i < hiddenOutputWeightCount; i++)
+        {
+            sum += Math.Abs(Weights[offset + i]);
+        }
+
+        return sum;
+    }
+
+    public int CountActiveHiddenOutputWeights(float threshold)
+    {
+        if (!float.IsFinite(threshold) || threshold < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(threshold), "Hidden output threshold must be finite and non-negative.");
+        }
+
+        var count = 0;
+        var hiddenOutputWeightCount = HiddenOutputWeightCount;
+        var offset = DirectWeightCount + HiddenInputWeightCount;
+
+        for (var i = 0; i < hiddenOutputWeightCount; i++)
+        {
+            if (Math.Abs(Weights[offset + i]) >= threshold)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public void Evaluate(ReadOnlySpan<float> inputs, Span<float> outputs)
     {
         if (inputs.Length != NeuralBrainSchema.InputCount)
