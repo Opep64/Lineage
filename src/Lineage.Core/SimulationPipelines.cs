@@ -40,6 +40,7 @@ public static class SimulationPipelines
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
         float movementSpeedCostExponent = 1f,
+        bool requireReproductionIntent = true,
         float reproductivePrimeAgeSeconds = 240f,
         float reproductiveSenescenceAgeSeconds = 900f,
         float senescentFertilityMultiplier = 0.18f,
@@ -76,6 +77,7 @@ public static class SimulationPipelines
             new EatingSystem(spatialIndex),
             new DigestionSystem(),
             new ReproductionSystem(
+                requireReproductionIntent: requireReproductionIntent,
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
                 reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
                 senescentFertilityMultiplier: senescentFertilityMultiplier,
@@ -122,6 +124,7 @@ public static class SimulationPipelines
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
         float movementSpeedCostExponent = 1f,
+        bool requireReproductionIntent = true,
         float reproductivePrimeAgeSeconds = 240f,
         float reproductiveSenescenceAgeSeconds = 900f,
         float senescentFertilityMultiplier = 0.18f,
@@ -164,7 +167,7 @@ public static class SimulationPipelines
             new EatingSystem(spatialIndex, requireEatIntent: true),
             new DigestionSystem(),
             new ReproductionSystem(
-                requireReproductionIntent: true,
+                requireReproductionIntent: requireReproductionIntent,
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
                 reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
                 senescentFertilityMultiplier: senescentFertilityMultiplier,

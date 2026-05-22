@@ -96,6 +96,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource fullness", resourceCapacity > 0f ? $"{totalResourceCalories / resourceCapacity * 100f:0.0}%" : "n/a");
         WriteMetric(writer, "Births", state.Stats.CreatureBirthCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Eggs laid", state.Stats.EggLaidCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Reproduction attempts", state.Stats.ReproductionAttemptCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Attempt success", FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount)));
         WriteMetric(writer, "Eggs hatched", state.Stats.EggHatchedCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Egg deaths", state.Stats.EggDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Egg predation deaths", state.Stats.EggPredationDeathCount.ToString(CultureInfo.InvariantCulture));
@@ -103,6 +105,11 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Offspring alive", FormatPercent(Share(state.Creatures.Count(creature => creature.Generation > 0), state.Stats.EggHatchedCount)));
         WriteMetric(writer, "Egg health", $"{snapshot.AverageEggHealthRatio * 100f:0.0}%");
         WriteMetric(writer, "Birth investment", $"{snapshot.AverageBirthInvestmentRatio:0.###}x");
+        WriteMetric(writer, "Reproduction intent", FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Ready to lay", FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
+        WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
+        WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starvation deaths", state.Stats.StarvationDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average lifespan", $"{snapshot.AverageLifespanSeconds:0.###} seconds");
@@ -636,6 +643,15 @@ public static class ViewerReportWriter
             snapshots,
             new ChartSeries("Average", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageLifespanSeconds).ToArray()),
             new ChartSeries("Median", "#8f4cb8", snapshots.Select(snapshot => snapshot.MedianLifespanSeconds).ToArray()));
+        WriteLineChart(
+            writer,
+            "Reproduction state",
+            "%",
+            snapshots,
+            new ChartSeries("Intent", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Ready", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Reserve", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageEggReserveRatio * 100f).ToArray()),
+            new ChartSeries("Surplus", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageEnergySurplusRatio * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Resource calories",

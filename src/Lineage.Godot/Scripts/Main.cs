@@ -717,9 +717,11 @@ public partial class Main : Node2D
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
             $"Resources/M {resourceDensity:0.00}\n" +
             $"Births {state.Stats.CreatureBirthCount}  Eggs laid {state.Stats.EggLaidCount}\n" +
+            $"Repro attempts {state.Stats.ReproductionAttemptCount}  success {FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount))}\n" +
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +
             $"Egg health {snapshot.AverageEggHealthRatio * 100f:0}%  Birth inv {snapshot.AverageBirthInvestmentRatio:0.00}x\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
+            $"Repro intent {FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount))}  ready {FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount))}\n" +
             $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
             $"Max gen {snapshot.MaxGeneration}\n" +
             $"Food seen {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  P {FormatPercent(Share(snapshot.PlantDetectedCreatureCount, snapshot.CreatureCount))}  M {FormatPercent(Share(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount))}\n" +
@@ -855,6 +857,7 @@ public partial class Main : Node2D
             $"Bite str {CreatureGrowth.EffectiveBiteStrength(creature, genome):0.00}/{genome.BiteStrength:0.00}\n" +
             $"Damage resist {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
+            $"Energy surplus {senses.EnergySurplusRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +
             $"Lay ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}\n" +
             $"Egg incubation {genome.EggIncubationSeconds:0.0}s\n" +

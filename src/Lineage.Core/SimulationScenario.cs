@@ -152,6 +152,8 @@ public sealed record SimulationScenario
 
     public float ReproductionCooldownSeconds { get; init; } = 7f;
 
+    public bool RequireReproductionIntent { get; init; } = true;
+
     public float ReproductivePrimeAgeSeconds { get; init; } = 240f;
 
     public float ReproductiveSenescenceAgeSeconds { get; init; } = 900f;

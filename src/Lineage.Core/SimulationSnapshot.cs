@@ -46,6 +46,8 @@ public sealed record SimulationSnapshot
 
     public int EggLaidCount { get; init; }
 
+    public int ReproductionAttemptCount { get; init; }
+
     public int EggHatchedCount { get; init; }
 
     public int EggDeathCount { get; init; }
@@ -79,6 +81,7 @@ public sealed record SimulationSnapshot
             FounderCreatureCount = state.Stats.FounderCreatureCount,
             CreatureDeathCount = state.Stats.CreatureDeathCount,
             EggLaidCount = state.Stats.EggLaidCount,
+            ReproductionAttemptCount = state.Stats.ReproductionAttemptCount,
             EggHatchedCount = state.Stats.EggHatchedCount,
             EggDeathCount = state.Stats.EggDeathCount,
             EggPredationDeathCount = state.Stats.EggPredationDeathCount,

@@ -12,6 +12,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumScentStrength = 0.001f;
     private const float MinimumTerrainProbeDistance = 24f;
     private const float MaximumTerrainProbeDistance = 160f;
+    private const float MinimumExpectedFoodTransfer = 0.001f;
 
     private readonly UniformSpatialIndex _spatialIndex;
     private readonly BiomePressureProfile _biomeSpeedProfile;
@@ -136,6 +137,17 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             var energyRatio = Math.Clamp(creature.Energy / genome.ReproductionEnergyThreshold, 0f, 1f);
             var eggReserveRatio = Math.Clamp(creature.ReproductiveEnergy / genome.OffspringEnergyInvestment, 0f, 1f);
+            var energySurplusRatio = Math.Clamp(
+                (creature.Energy - genome.ReproductionEnergyThreshold) / Math.Max(1f, genome.OffspringEnergyInvestment),
+                0f,
+                1f);
+            var expectedFoodTransfer = Math.Max(
+                MinimumExpectedFoodTransfer,
+                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * Math.Max(0f, deltaSeconds));
+            var recentFoodSuccess = Math.Clamp(
+                (creature.LastCaloriesEaten + creature.LastCaloriesDigested) / expectedFoodTransfer,
+                0f,
+                1f);
             var isReadyToLay =
                 eggReserveRatio >= 1f
                 && creature.AgeSeconds >= genome.MaturityAgeSeconds
@@ -145,6 +157,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 EnergyRatio = energyRatio,
                 Hunger = 1f - energyRatio,
                 EggReserveRatio = eggReserveRatio,
+                EnergySurplusRatio = energySurplusRatio,
+                RecentFoodSuccess = recentFoodSuccess,
                 ReproductionReadiness = isReadyToLay ? 1f : 0f
             };
             ApplyTerrainDragSense(ref senses, state, creature, forward, right, effectiveSenseRadius);

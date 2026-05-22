@@ -88,5 +88,7 @@ public sealed class NeuralControllerSystem(
         inputs[NeuralBrainSchema.ForwardTerrainDragInput] = senses.ForwardTerrainDrag;
         inputs[NeuralBrainSchema.LeftTerrainDragInput] = senses.LeftTerrainDrag;
         inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
+        inputs[NeuralBrainSchema.EnergySurplusInput] = senses.EnergySurplusRatio;
+        inputs[NeuralBrainSchema.RecentFoodSuccessInput] = senses.RecentFoodSuccess;
     }
 }

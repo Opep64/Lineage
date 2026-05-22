@@ -19,6 +19,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutCreatureRelations = 25;
     private const int LegacyInputCountWithoutTerrainDrag = 29;
     private const int LegacyInputCountWithoutLateralTerrainDrag = 31;
+    private const int LegacyInputCountWithoutReproductiveContext = 33;
     private const int LegacyOutputCountWithoutAttack = 4;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
@@ -109,8 +110,11 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.BiasInput, -2.5f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.FoodProximityInput, 4f);
 
-        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.BiasInput, -1f);
-        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput, 3f);
+        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.BiasInput, -2f);
+        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput, 2.75f);
+        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.EnergySurplusInput, 0.75f);
+        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.RecentFoodSuccessInput, 0.35f);
+        Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.VisibleCreatureDensityInput, -1.2f);
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
 
@@ -228,6 +232,16 @@ public sealed class NeuralBrainGenome
         if (weights.Length == NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount)
         {
             return weights;
+        }
+
+        if (weights.Length == LegacyInputCountWithoutReproductiveContext * NeuralBrainSchema.OutputCount)
+        {
+            return NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutReproductiveContext,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput);
         }
 
         if (weights.Length == LegacyInputCountWithoutLateralTerrainDrag * NeuralBrainSchema.OutputCount)

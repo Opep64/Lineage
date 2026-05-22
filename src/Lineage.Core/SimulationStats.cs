@@ -16,6 +16,8 @@ public sealed class SimulationStats
 
     public int EggLaidCount { get; private set; }
 
+    public int ReproductionAttemptCount { get; private set; }
+
     public int EggHatchedCount { get; private set; }
 
     public int EggDeathCount { get; private set; }
@@ -79,6 +81,11 @@ public sealed class SimulationStats
         EggLaidCount++;
     }
 
+    internal void RecordReproductionAttempt()
+    {
+        ReproductionAttemptCount++;
+    }
+
     internal void RecordEggHatched()
     {
         EggHatchedCount++;
@@ -124,12 +131,14 @@ public sealed class SimulationStats
         int eggPredationDeathCount,
         int starvationDeathCount,
         int injuryDeathCount,
-        IEnumerable<SimulationStatsSnapshot> snapshots)
+        IEnumerable<SimulationStatsSnapshot> snapshots,
+        int reproductionAttemptCount = 0)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
         CreatureDeathCount = creatureDeathCount;
         EggLaidCount = eggLaidCount;
+        ReproductionAttemptCount = reproductionAttemptCount;
         EggHatchedCount = eggHatchedCount;
         EggDeathCount = eggDeathCount;
         EggPredationDeathCount = eggPredationDeathCount;

@@ -49,6 +49,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
+    ("Creature sensing reports reproductive context", CreatureSensingReportsReproductiveContext),
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
@@ -57,6 +58,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
+    ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
@@ -81,6 +83,7 @@ var tests = new (string Name, Action Body)[]
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
+    ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
@@ -1863,6 +1866,39 @@ static void CreatureSensingReportsEggReserveReadiness()
     AssertClose(1f, senses.ReproductionReadiness, 0.000001, "Full egg should be ready to lay");
 }
 
+static void CreatureSensingReportsReproductiveContext()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 508,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 100f,
+        OffspringEnergyInvestment = 20f,
+        EatCaloriesPerSecond = 10f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 115f);
+    var creature = simulation.State.Creatures[0];
+    creature.LastCaloriesEaten = 0.25f;
+    creature.LastCaloriesDigested = 0.5f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertClose(0.75f, senses.EnergySurplusRatio, 0.000001, "Energy surplus ratio");
+    AssertClose(0.75f, senses.RecentFoodSuccess, 0.000001, "Recent food success");
+}
+
 static void CreatureVisionConeHidesFoodBehindIt()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 32f);
@@ -2069,6 +2105,30 @@ static void BehaviorAssaySummarizesLateralTerrainResponse()
     AssertTrue(summary.EasierTerrainLeft.Turn < -0.9f, "Probe brain should turn toward easier terrain on the left");
     AssertTrue(summary.EasierTerrainRight.Turn > 0.9f, "Probe brain should turn toward easier terrain on the right");
     AssertEqual("steers toward easier terrain", summary.TerrainResponse, "Lateral terrain response classification");
+}
+
+static void NeuralBrainMigratesReproductiveContextInputs()
+{
+    var legacyInputCount = NeuralBrainSchema.InputCount - 2;
+    var legacyWeights = new float[legacyInputCount * NeuralBrainSchema.OutputCount];
+    legacyWeights[NeuralBrainSchema.ReproduceOutput * legacyInputCount + NeuralBrainSchema.ReproductionReadinessInput] = 2.5f;
+    legacyWeights[NeuralBrainSchema.TurnOutput * legacyInputCount + NeuralBrainSchema.RightTerrainDragInput] = -1.25f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount, brain.Weights.Length, "Migrated brain weight count");
+    AssertClose(
+        2.5f,
+        brain.GetWeight(NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput),
+        0.000001,
+        "Migrated reproduction readiness weight");
+    AssertClose(
+        -1.25f,
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RightTerrainDragInput),
+        0.000001,
+        "Migrated terrain drag weight");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.EnergySurplusInput), 0.000001, "New energy surplus weight starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.RecentFoodSuccessInput), 0.000001, "New food success weight starts neutral");
 }
 
 static void ForagerPredatorStarterBrainHuntsCreatureCues()
@@ -2386,6 +2446,7 @@ static void IntentGatedReproductionMutatesBrain()
     AssertEqual(1, simulation.State.Creatures.Count, "Creature count without reproduction intent");
     AssertEqual(0, simulation.State.Eggs.Count, "Egg count without reproduction intent");
     AssertClose(20f, simulation.State.Creatures[0].ReproductiveEnergy, 0.000001, "Reserve should build without reproduction intent");
+    AssertEqual(0, simulation.State.Stats.ReproductionAttemptCount, "Reproduction attempt count without intent");
     AssertEqual(1, simulation.State.Brains.Count, "Brain count before egg is laid");
 
     var parent = simulation.State.Creatures[0];
@@ -2397,6 +2458,7 @@ static void IntentGatedReproductionMutatesBrain()
     AssertEqual(1, simulation.State.Creatures.Count, "Creature count with reproduction intent");
     AssertEqual(1, simulation.State.Eggs.Count, "Egg count with reproduction intent");
     AssertClose(0f, simulation.State.Creatures[0].ReproductiveEnergy, 0.000001, "Reserve should clear after egg is laid");
+    AssertEqual(1, simulation.State.Stats.ReproductionAttemptCount, "Reproduction attempt count with intent");
     AssertEqual(2, simulation.State.Brains.Count, "Brain count after reproduction");
     AssertEqual(parentId, simulation.State.Eggs[0].ParentId, "Egg parent id");
     AssertEqual(1, simulation.State.Eggs[0].Generation, "Egg generation");
@@ -2607,8 +2669,13 @@ static void StatsRecordingCapturesAggregateSnapshot()
         MeatScentDetected = true,
         MeatScentDensity = 0.3f,
         CreatureDetected = true,
-        VisibleCreatureDensity = 0.05f
+        VisibleCreatureDensity = 0.05f,
+        EggReserveRatio = 0.5f,
+        EnergySurplusRatio = 0.25f,
+        RecentFoodSuccess = 0.75f,
+        ReproductionReadiness = 1f
     };
+    seeingCreature.Actions = new CreatureActionState { WantsReproduce = true };
     seeingCreature.IsTouchingFood = true;
     seeingCreature.LastCaloriesEaten = 4.25f;
     seeingCreature.LastPlantCaloriesEaten = 2.5f;
@@ -2636,7 +2703,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleMeatDensity = 0.2f,
         MeatScentDetected = true,
         MeatScentDensity = 0.7f,
-        VisibleCreatureDensity = 0.15f
+        VisibleCreatureDensity = 0.15f,
+        EggReserveRatio = 0.25f,
+        EnergySurplusRatio = 0.05f,
+        RecentFoodSuccess = 0.25f
     };
     searchingCreature.SecondsSinceLastMeal = 6f;
     searchingCreature.LastDistanceTraveled = 5f;
@@ -2692,6 +2762,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.CreatureDetectedCreatureCount, "Creature detected count");
     AssertEqual(1, snapshot.FoodContactCreatureCount, "Food contact count");
     AssertEqual(1, snapshot.EatingCreatureCount, "Eating creature count");
+    AssertEqual(1, snapshot.ReproductionReadyCreatureCount, "Reproduction ready count");
+    AssertEqual(1, snapshot.ReproductionIntentCreatureCount, "Reproduction intent count");
     AssertClose(0.375f, snapshot.AverageVisibleFoodDensity, 0.000001, "Average visible food density");
     AssertClose(0.225f, snapshot.AverageVisiblePlantDensity, 0.000001, "Average visible plant density");
     AssertClose(0.15f, snapshot.AverageVisibleMeatDensity, 0.000001, "Average visible meat density");
@@ -2735,6 +2807,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(3.5f / 8f, snapshot.CaloriesDigestedPerDistance, 0.000001, "Calories digested per distance");
     AssertClose(4.25f / 2f, snapshot.CaloriesEatenPerFoodVisionEvent, 0.000001, "Calories eaten per food vision event");
     AssertClose(1f, snapshot.AverageBirthInvestmentRatio, 0.000001, "Average birth investment");
+    AssertClose(0.375f, snapshot.AverageEggReserveRatio, 0.000001, "Average egg reserve ratio");
+    AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
+    AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");
     AssertClose(1f, snapshot.AverageEggHealthRatio, 0.000001, "Average egg health ratio");
     var expectedVisionRange = CreatureGrowth.EffectiveSenseRadius(simulation.State.Creatures[0], CreatureGenome.Baseline);
     AssertClose(expectedVisionRange, snapshot.AverageVisionRange, 0.000001, "Average vision range");
@@ -3172,6 +3247,45 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     }
 }
 
+static void ScenarioFactoryHonorsReproductionIntentToggle()
+{
+    var gated = CreateIntentToggleSimulation(requireIntent: true);
+    var ungated = CreateIntentToggleSimulation(requireIntent: false);
+
+    gated.Step();
+    ungated.Step();
+
+    AssertEqual(0, gated.State.Eggs.Count, "Intent-gated scenario should not lay without reproduce output");
+    AssertEqual(1, ungated.State.Eggs.Count, "Ungated scenario should lay when egg reserve is ready");
+}
+
+static Simulation CreateIntentToggleSimulation(bool requireIntent)
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 700,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        RequireReproductionIntent = requireIntent,
+        BasalEnergyPerSecond = 0f,
+        ReproductionEnergyThreshold = 50f,
+        OffspringEnergyInvestment = 20f,
+        EggProductionEnergyPerSecond = 20f,
+        MaturityAgeSeconds = 0f,
+        ReproductionCooldownSeconds = 0f,
+        MutationStrength = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var creature = simulation.State.Creatures[0];
+    simulation.State.Brains[creature.BrainId] = NeuralBrainGenome.CreateZero();
+    creature.AgeSeconds = 10f;
+    creature.Energy = 100f;
+    creature.ReproductiveEnergy = 20f;
+    simulation.State.Creatures[0] = creature;
+    return simulation;
+}
+
 static void SimulationSnapshotsRestoreExactContinuation()
 {
     var scenario = new SimulationScenario
@@ -3429,6 +3543,7 @@ static void ScenarioJsonRoundTrips()
         EggProductionEnergyPerSecond = 3.75f,
         EggIncubationSeconds = 19f,
         MaturityAgeSeconds = 33f,
+        RequireReproductionIntent = false,
         ReproductivePrimeAgeSeconds = 180f,
         ReproductiveSenescenceAgeSeconds = 720f,
         SenescentFertilityMultiplier = 0.2f,
@@ -3513,6 +3628,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.EggProductionEnergyPerSecond, roundTripped.EggProductionEnergyPerSecond, 0.000001, "Scenario egg production");
     AssertClose(scenario.EggIncubationSeconds, roundTripped.EggIncubationSeconds, 0.000001, "Scenario egg incubation");
     AssertClose(scenario.MaturityAgeSeconds, roundTripped.MaturityAgeSeconds, 0.000001, "Scenario maturity age");
+    AssertEqual(scenario.RequireReproductionIntent, roundTripped.RequireReproductionIntent, "Scenario reproduction intent gate");
     AssertClose(scenario.ReproductivePrimeAgeSeconds, roundTripped.ReproductivePrimeAgeSeconds, 0.000001, "Scenario prime fertility age");
     AssertClose(scenario.ReproductiveSenescenceAgeSeconds, roundTripped.ReproductiveSenescenceAgeSeconds, 0.000001, "Scenario senescence age");
     AssertClose(scenario.SenescentFertilityMultiplier, roundTripped.SenescentFertilityMultiplier, 0.000001, "Scenario senescent fertility");

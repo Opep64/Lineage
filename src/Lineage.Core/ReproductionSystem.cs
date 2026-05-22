@@ -34,6 +34,11 @@ public sealed class ReproductionSystem(
                 continue;
             }
 
+            if (parent.Actions.WantsReproduce)
+            {
+                state.Stats.RecordReproductionAttempt();
+            }
+
             parent.ReproductiveEnergy = Math.Clamp(
                 parent.ReproductiveEnergy,
                 0f,

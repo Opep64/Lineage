@@ -50,6 +50,9 @@ public sealed class StatsRecordingSystem(
         var totalDistanceTraveled = 0f;
         var totalDistanceSinceLastMeal = 0f;
         var totalBirthInvestmentRatio = 0f;
+        var totalEggReserveRatio = 0f;
+        var totalEnergySurplusRatio = 0f;
+        var totalRecentFoodSuccess = 0f;
         var totalVisionRange = 0f;
         var totalVisionAngle = 0f;
         var totalDietaryAdaptation = 0f;
@@ -73,6 +76,8 @@ public sealed class StatsRecordingSystem(
         var foodContactCreatureCount = 0;
         var eatingCreatureCount = 0;
         var attackingCreatureCount = 0;
+        var reproductionReadyCreatureCount = 0;
+        var reproductionIntentCreatureCount = 0;
         var nonAttackingCreatureCount = 0;
         var barrenCreatureCount = 0;
         var sparseCreatureCount = 0;
@@ -116,6 +121,9 @@ public sealed class StatsRecordingSystem(
             totalDistanceTraveled += creature.LastDistanceTraveled;
             totalDistanceSinceLastMeal += creature.DistanceSinceLastMeal;
             totalBirthInvestmentRatio += OffspringDevelopment.NormalizeInvestmentRatio(creature.BirthInvestmentRatio);
+            totalEggReserveRatio += creature.Senses.EggReserveRatio;
+            totalEnergySurplusRatio += creature.Senses.EnergySurplusRatio;
+            totalRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
             totalVisionRange += CreatureGrowth.EffectiveSenseRadius(creature, genome);
             totalVisionAngle += CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
             totalDietaryAdaptation += genome.DietaryAdaptation;
@@ -192,6 +200,16 @@ public sealed class StatsRecordingSystem(
                 nonAttackerTotalDietaryAdaptation += genome.DietaryAdaptation;
                 nonAttackerTotalBiteStrength += genome.BiteStrength;
                 nonAttackerTotalDamageResistance += genome.DamageResistance;
+            }
+
+            if (creature.Senses.ReproductionReadiness > 0.5f)
+            {
+                reproductionReadyCreatureCount++;
+            }
+
+            if (creature.Actions.WantsReproduce)
+            {
+                reproductionIntentCreatureCount++;
             }
         }
 
@@ -367,6 +385,7 @@ public sealed class StatsRecordingSystem(
             totalVisionAngle / divisor,
             state.Stats.CreatureBirthCount,
             state.Stats.EggLaidCount,
+            state.Stats.ReproductionAttemptCount,
             state.Stats.EggHatchedCount,
             state.Stats.EggDeathCount,
             state.Stats.EggPredationDeathCount,
@@ -393,6 +412,11 @@ public sealed class StatsRecordingSystem(
             freshMeatCaloriesEatenShare,
             staleMeatCaloriesEatenShare,
             state.Stats.AverageDeadCreatureLifespanSeconds,
-            state.Stats.MedianDeadCreatureLifespanSeconds));
+            state.Stats.MedianDeadCreatureLifespanSeconds,
+            reproductionReadyCreatureCount,
+            reproductionIntentCreatureCount,
+            totalEggReserveRatio / divisor,
+            totalEnergySurplusRatio / divisor,
+            totalRecentFoodSuccess / divisor));
     }
 }

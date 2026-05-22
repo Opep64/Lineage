@@ -63,6 +63,7 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageVisionAngleRadians,
     int CreatureBirthCount,
     int EggLaidCount,
+    int ReproductionAttemptCount,
     int EggHatchedCount,
     int EggDeathCount,
     int EggPredationDeathCount,
@@ -89,4 +90,9 @@ public readonly record struct SimulationStatsSnapshot(
     float FreshMeatCaloriesEatenShare,
     float StaleMeatCaloriesEatenShare,
     float AverageLifespanSeconds,
-    float MedianLifespanSeconds);
+    float MedianLifespanSeconds,
+    int ReproductionReadyCreatureCount,
+    int ReproductionIntentCreatureCount,
+    float AverageEggReserveRatio,
+    float AverageEnergySurplusRatio,
+    float AverageRecentFoodSuccess);

@@ -432,7 +432,9 @@ public static class BehaviorAssay
         {
             EnergyRatio = 1f,
             EggReserveRatio = 1f,
-            ReproductionReadiness = 1f
+            EnergySurplusRatio = 1f,
+            ReproductionReadiness = 1f,
+            RecentFoodSuccess = 1f
         };
     }
 
@@ -472,6 +474,8 @@ public static class BehaviorAssay
         inputs[NeuralBrainSchema.ForwardTerrainDragInput] = senses.ForwardTerrainDrag;
         inputs[NeuralBrainSchema.LeftTerrainDragInput] = senses.LeftTerrainDrag;
         inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
+        inputs[NeuralBrainSchema.EnergySurplusInput] = senses.EnergySurplusRatio;
+        inputs[NeuralBrainSchema.RecentFoodSuccessInput] = senses.RecentFoodSuccess;
     }
 
     private static string ClassifyMovement(BehaviorAssaySummary summary)

@@ -64,6 +64,7 @@
   "eggIncubationSeconds": 30,
   "maturityAgeSeconds": 140,
   "reproductionCooldownSeconds": 35,
+  "requireReproductionIntent": true,
   "reproductivePrimeAgeSeconds": 360,
   "reproductiveSenescenceAgeSeconds": 1200,
   "senescentFertilityMultiplier": 0.18,
