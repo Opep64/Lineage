@@ -13,8 +13,11 @@ public sealed class MetabolismSystem(
     float gutCapacityEnergyCostPerSecond = 0f,
     float digestionRateEnergyCostPerSecond = 0f,
     float biteStrengthEnergyCostPerSecond = 0f,
-    float damageResistanceEnergyCostPerSecond = 0f) : ISimulationSystem
+    float damageResistanceEnergyCostPerSecond = 0f,
+    BiomePressureProfile? biomeBasalCostProfile = null) : ISimulationSystem
 {
+    private readonly BiomePressureProfile _biomeBasalCostProfile =
+        BiomePressureProfile.Validate(biomeBasalCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeBasalCostProfile));
     private readonly float _bodyRadiusEnergyCostPerSecond =
         ValidateCost(bodyRadiusEnergyCostPerSecond, nameof(bodyRadiusEnergyCostPerSecond));
     private readonly float _maxSpeedEnergyCostPerSecond =
@@ -59,7 +62,8 @@ public sealed class MetabolismSystem(
                 + CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond
                 + CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond
                 + CreatureGrowth.EffectiveDamageResistance(creature, genome) * _damageResistanceEnergyCostPerSecond;
-            creature.Energy -= (genome.BasalEnergyPerSecond + traitUpkeep) * deltaSeconds;
+            var biomeBasalCostMultiplier = _biomeBasalCostProfile.For(state.Biomes.GetKindAt(creature.Position));
+            creature.Energy -= (genome.BasalEnergyPerSecond * biomeBasalCostMultiplier + traitUpkeep) * deltaSeconds;
 
             state.Creatures[i] = creature;
         }

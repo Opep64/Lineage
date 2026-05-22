@@ -6,6 +6,7 @@ var tests = new (string Name, Action Body)[]
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
+    ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
@@ -22,6 +23,7 @@ var tests = new (string Name, Action Body)[]
     ("Dead creatures leave meat resources", DeadCreaturesLeaveMeatResources),
     ("Metabolism can charge body-size upkeep", MetabolismChargesBodySizeUpkeep),
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
+    ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
     ("Reproduction lays mutated eggs", ReproductionCreatesOffspring),
     ("Eggs hatch into offspring", EggsHatchIntoOffspring),
@@ -184,6 +186,34 @@ static void MovementRecordsSearchDistance()
     AssertClose(6f, moved.LastDistanceTraveled, 0.000001, "Last movement distance");
     AssertClose(6f, moved.DistanceSinceLastMeal, 0.000001, "Distance since meal accumulates");
     AssertClose(26f, moved.Position.X, 0.000001, "Movement x position");
+}
+
+static void MovementCostFollowsBiomeMultiplier()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 22,
+        systems: [new MovementSystem(new BiomePressureProfile(1f, 1f, 1.75f, 1f))]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 10f,
+        MovementEnergyPerSecond = 2f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(10f, 0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertClose(16.5f, simulation.State.Creatures[0].Energy, 0.000001, "Movement biome cost");
 }
 
 static void InvalidConfigurationIsRejected()
@@ -761,6 +791,26 @@ static void MetabolismChargesTraitUpkeep()
     simulation.Step();
 
     AssertClose(8.525f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after trait upkeep");
+}
+
+static void MetabolismBasalCostFollowsBiomeMultiplier()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 132,
+        systems: [new MetabolismSystem(biomeBasalCostProfile: new BiomePressureProfile(1f, 1f, 1.5f, 1f))]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 2f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+
+    simulation.Step();
+
+    AssertClose(7f, simulation.State.Creatures[0].Energy, 0.000001, "Biome basal energy");
 }
 
 static void ReproductionBuildsEggReserveBeforeLaying()
@@ -2027,7 +2077,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 1f },
         seed: 12,
-        systems: [new StatsRecordingSystem()]);
+        systems: [new StatsRecordingSystem(
+            biomeMovementCostProfile: new BiomePressureProfile(1f, 1f, 1.25f, 1f),
+            biomeBasalCostProfile: new BiomePressureProfile(1f, 1f, 1.5f, 1f))]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
     simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
@@ -2114,6 +2166,12 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(8f, snapshot.TotalResourceCalories, 0.000001, "Snapshot resource calories");
     AssertClose(8f, snapshot.TotalPlantCalories, 0.000001, "Snapshot plant calories");
     AssertClose(0f, snapshot.TotalMeatCalories, 0.000001, "Snapshot meat calories");
+    AssertEqual(0, snapshot.BarrenCreatureCount, "Barren creature count");
+    AssertEqual(0, snapshot.SparseCreatureCount, "Sparse creature count");
+    AssertEqual(2, snapshot.GrasslandCreatureCount, "Grassland creature count");
+    AssertEqual(0, snapshot.RichCreatureCount, "Rich creature count");
+    AssertClose(1.25f, snapshot.AverageBiomeMovementCostMultiplier, 0.000001, "Average biome movement cost");
+    AssertClose(1.5f, snapshot.AverageBiomeBasalCostMultiplier, 0.000001, "Average biome basal cost");
     AssertEqual(2, snapshot.FoodDetectedCreatureCount, "Food detected count");
     AssertEqual(1, snapshot.PlantDetectedCreatureCount, "Plant detected count");
     AssertEqual(1, snapshot.MeatDetectedCreatureCount, "Meat detected count");
@@ -2667,6 +2725,14 @@ static void ScenarioJsonRoundTrips()
         InitialResourcesPerMillionArea = 37.5f,
         ResourceClusterStrength = 0.33f,
         ResourceClusterRadius = 123f,
+        BarrenBiomeMovementCostMultiplier = 1.4f,
+        SparseBiomeMovementCostMultiplier = 1.2f,
+        GrasslandBiomeMovementCostMultiplier = 1.05f,
+        RichBiomeMovementCostMultiplier = 0.85f,
+        BarrenBiomeBasalCostMultiplier = 1.3f,
+        SparseBiomeBasalCostMultiplier = 1.1f,
+        GrasslandBiomeBasalCostMultiplier = 1.02f,
+        RichBiomeBasalCostMultiplier = 0.9f,
         BasalEnergyPerSecond = 0.31f,
         BodyRadiusEnergyCostPerSecond = 0.04f,
         MaxSpeedEnergyCostPerSecond = 0.003f,
@@ -2714,6 +2780,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
+    AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
@@ -2728,6 +2795,14 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
+    AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");
+    AssertClose(scenario.SparseBiomeMovementCostMultiplier, roundTripped.SparseBiomeMovementCostMultiplier, 0.000001, "Scenario sparse movement biome cost");
+    AssertClose(scenario.GrasslandBiomeMovementCostMultiplier, roundTripped.GrasslandBiomeMovementCostMultiplier, 0.000001, "Scenario grassland movement biome cost");
+    AssertClose(scenario.RichBiomeMovementCostMultiplier, roundTripped.RichBiomeMovementCostMultiplier, 0.000001, "Scenario rich movement biome cost");
+    AssertClose(scenario.BarrenBiomeBasalCostMultiplier, roundTripped.BarrenBiomeBasalCostMultiplier, 0.000001, "Scenario barren basal biome cost");
+    AssertClose(scenario.SparseBiomeBasalCostMultiplier, roundTripped.SparseBiomeBasalCostMultiplier, 0.000001, "Scenario sparse basal biome cost");
+    AssertClose(scenario.GrasslandBiomeBasalCostMultiplier, roundTripped.GrasslandBiomeBasalCostMultiplier, 0.000001, "Scenario grassland basal biome cost");
+    AssertClose(scenario.RichBiomeBasalCostMultiplier, roundTripped.RichBiomeBasalCostMultiplier, 0.000001, "Scenario rich basal biome cost");
     AssertClose(scenario.BasalEnergyPerSecond, roundTripped.BasalEnergyPerSecond, 0.000001, "Scenario basal energy");
     AssertClose(scenario.BodyRadiusEnergyCostPerSecond, roundTripped.BodyRadiusEnergyCostPerSecond, 0.000001, "Scenario body-size energy");
     AssertClose(scenario.MaxSpeedEnergyCostPerSecond, roundTripped.MaxSpeedEnergyCostPerSecond, 0.000001, "Scenario max-speed energy");

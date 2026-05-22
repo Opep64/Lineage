@@ -91,6 +91,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starvation deaths", state.Stats.StarvationDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Max generation", snapshot.MaxGeneration.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg movement biome cost", $"{snapshot.AverageBiomeMovementCostMultiplier:0.###}x");
+        WriteMetric(writer, "Avg basal biome cost", $"{snapshot.AverageBiomeBasalCostMultiplier:0.###}x");
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -171,6 +173,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Depleted resources relocate", scenario.RelocateDepletedResources ? "Yes" : "No");
         WriteMetric(writer, "Resource clustering", FormatPercent(scenario.ResourceClusterStrength));
         WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
+        WriteMetric(writer, "Biome movement costs", FormatBiomePressureProfile(scenario.CreateBiomeMovementCostProfile()));
+        WriteMetric(writer, "Biome basal costs", FormatBiomePressureProfile(scenario.CreateBiomeBasalCostProfile()));
         WriteMetric(writer, "Basal upkeep", $"{scenario.BasalEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Body radius upkeep", $"{scenario.BodyRadiusEnergyCostPerSecond:0.###} energy/radius/s");
         WriteMetric(writer, "Max speed upkeep", $"{scenario.MaxSpeedEnergyCostPerSecond:0.######} energy/speed/s");
@@ -215,22 +219,31 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Resources</th><th>Resources/M</th><th>Calories</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Move Cost</th><th>Basal Cost</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
         writer.WriteLine("<tbody>");
+        var movementCostProfile = scenario.CreateBiomeMovementCostProfile();
+        var basalCostProfile = scenario.CreateBiomeBasalCostProfile();
         foreach (var summary in biomeSummaries)
         {
             var resourcesPerMillion = summary.Area > 0f
                 ? summary.ResourceCount / summary.Area * SimulationScenario.ResourceDensityAreaUnits
                 : 0f;
+            var livingCreatureCount = CreatureCountForBiome(snapshot, summary.Kind);
+            var movementCost = movementCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
+            var basalCost = basalCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             writer.WriteLine(
                 "<tr>" +
                 $"<td>{Html(summary.Kind)}</td>" +
                 $"<td>{Html(FormatPercent(summary.Area / worldArea))}</td>" +
                 $"<td>{Html(summary.ResourceDensityMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.ResourceRegrowthMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html($"{movementCost}x")}</td>" +
+                $"<td>{Html($"{basalCost}x")}</td>" +
                 $"<td>{Html(summary.ResourceCount)}</td>" +
                 $"<td>{Html(resourcesPerMillion.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.ResourceCalories.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(livingCreatureCount)}</td>" +
+                $"<td>{Html(FormatPercent(Share(livingCreatureCount, snapshot.CreatureCount)))}</td>" +
                 "</tr>");
         }
 
@@ -577,6 +590,22 @@ public static class ViewerReportWriter
             new ChartSeries("Meat", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalMeatCalories).ToArray()));
         WriteLineChart(
             writer,
+            "Biome occupancy",
+            "%",
+            snapshots,
+            new ChartSeries("Barren", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Sparse", "#7f8f3a", snapshots.Select(snapshot => Share(snapshot.SparseCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Grassland", "#35a862", snapshots.Select(snapshot => Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => Share(snapshot.RichCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Biome costs",
+            "x",
+            snapshots,
+            new ChartSeries("Move cost", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageBiomeMovementCostMultiplier).ToArray()),
+            new ChartSeries("Basal cost", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageBiomeBasalCostMultiplier).ToArray()));
+        WriteLineChart(
+            writer,
             "Foraging signals",
             "%",
             snapshots,
@@ -842,12 +871,31 @@ public static class ViewerReportWriter
         };
     }
 
+    private static string FormatBiomePressureProfile(BiomePressureProfile profile)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Barren {profile.Barren:0.###}x, Sparse {profile.Sparse:0.###}x, Grassland {profile.Grassland:0.###}x, Rich {profile.Rich:0.###}x");
+    }
+
+    private static int CreatureCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
+    {
+        return biome switch
+        {
+            BiomeKind.Barren => snapshot.BarrenCreatureCount,
+            BiomeKind.Sparse => snapshot.SparseCreatureCount,
+            BiomeKind.Rich => snapshot.RichCreatureCount,
+            _ => snapshot.GrasslandCreatureCount
+        };
+    }
+
     private static string FormatChartValue(float value, string unit)
     {
         return unit switch
         {
             "%" => $"{value:0.#}%",
             " kcal" => $"{value:0.#} kcal",
+            "x" => $"{value:0.###}x",
             _ => value.ToString("0.###", CultureInfo.InvariantCulture)
         };
     }

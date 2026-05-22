@@ -3,11 +3,18 @@ namespace Lineage.Core;
 /// <summary>
 /// Captures aggregate simulation metrics after a tick's behavioral systems run.
 /// </summary>
-public sealed class StatsRecordingSystem(int sampleIntervalTicks = 1) : ISimulationSystem
+public sealed class StatsRecordingSystem(
+    int sampleIntervalTicks = 1,
+    BiomePressureProfile? biomeMovementCostProfile = null,
+    BiomePressureProfile? biomeBasalCostProfile = null) : ISimulationSystem
 {
     private readonly int _sampleIntervalTicks = sampleIntervalTicks > 0
         ? sampleIntervalTicks
         : throw new ArgumentOutOfRangeException(nameof(sampleIntervalTicks), "Stats sample interval must be positive.");
+    private readonly BiomePressureProfile _biomeMovementCostProfile =
+        BiomePressureProfile.Validate(biomeMovementCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeMovementCostProfile));
+    private readonly BiomePressureProfile _biomeBasalCostProfile =
+        BiomePressureProfile.Validate(biomeBasalCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeBasalCostProfile));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -43,6 +50,8 @@ public sealed class StatsRecordingSystem(int sampleIntervalTicks = 1) : ISimulat
         var totalDietaryAdaptation = 0f;
         var totalBiteStrength = 0f;
         var totalDamageResistance = 0f;
+        var totalBiomeMovementCostMultiplier = 0f;
+        var totalBiomeBasalCostMultiplier = 0f;
         var attackerTotalDietaryAdaptation = 0f;
         var attackerTotalBiteStrength = 0f;
         var attackerTotalDamageResistance = 0f;
@@ -58,6 +67,10 @@ public sealed class StatsRecordingSystem(int sampleIntervalTicks = 1) : ISimulat
         var eatingCreatureCount = 0;
         var attackingCreatureCount = 0;
         var nonAttackingCreatureCount = 0;
+        var barrenCreatureCount = 0;
+        var sparseCreatureCount = 0;
+        var grasslandCreatureCount = 0;
+        var richCreatureCount = 0;
         var maxGeneration = 0;
 
         for (var i = 0; i < state.Creatures.Count; i++)
@@ -99,6 +112,25 @@ public sealed class StatsRecordingSystem(int sampleIntervalTicks = 1) : ISimulat
             totalDietaryAdaptation += genome.DietaryAdaptation;
             totalBiteStrength += genome.BiteStrength;
             totalDamageResistance += genome.DamageResistance;
+            var biome = state.Biomes.GetKindAt(creature.Position);
+            totalBiomeMovementCostMultiplier += _biomeMovementCostProfile.For(biome);
+            totalBiomeBasalCostMultiplier += _biomeBasalCostProfile.For(biome);
+            switch (biome)
+            {
+                case BiomeKind.Barren:
+                    barrenCreatureCount++;
+                    break;
+                case BiomeKind.Sparse:
+                    sparseCreatureCount++;
+                    break;
+                case BiomeKind.Rich:
+                    richCreatureCount++;
+                    break;
+                default:
+                    grasslandCreatureCount++;
+                    break;
+            }
+
             maxGeneration = Math.Max(maxGeneration, creature.Generation);
 
             if (creature.Senses.FoodDetected)
@@ -257,6 +289,12 @@ public sealed class StatsRecordingSystem(int sampleIntervalTicks = 1) : ISimulat
             totalResourceCalories,
             totalPlantCalories,
             totalMeatCalories,
+            barrenCreatureCount,
+            sparseCreatureCount,
+            grasslandCreatureCount,
+            richCreatureCount,
+            totalBiomeMovementCostMultiplier / divisor,
+            totalBiomeBasalCostMultiplier / divisor,
             foodDetectedCreatureCount,
             plantDetectedCreatureCount,
             meatDetectedCreatureCount,

@@ -31,7 +31,9 @@ public static class SimulationPipelines
         float biteRangePadding = 1f,
         bool relocateDepletedResources = true,
         float resourceClusterStrength = 0f,
-        float resourceClusterRadius = 180f)
+        float resourceClusterRadius = 180f,
+        BiomePressureProfile? biomeMovementCostProfile = null,
+        BiomePressureProfile? biomeBasalCostProfile = null)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -48,10 +50,11 @@ public static class SimulationPipelines
                 gutCapacityEnergyCostPerSecond,
                 digestionRateEnergyCostPerSecond,
                 biteStrengthEnergyCostPerSecond,
-                damageResistanceEnergyCostPerSecond),
+                damageResistanceEnergyCostPerSecond,
+                biomeBasalCostProfile),
             new SpatialIndexRebuildSystem(spatialIndex),
             new SimpleForagingSystem(spatialIndex),
-            new MovementSystem(),
+            new MovementSystem(biomeMovementCostProfile),
             new SpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
             new DigestionSystem(),
@@ -59,7 +62,7 @@ public static class SimulationPipelines
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
-            new StatsRecordingSystem(statsSnapshotIntervalTicks)
+            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile)
         ];
     }
 
@@ -89,7 +92,9 @@ public static class SimulationPipelines
         float biteRangePadding = 1f,
         bool relocateDepletedResources = true,
         float resourceClusterStrength = 0f,
-        float resourceClusterRadius = 180f)
+        float resourceClusterRadius = 180f,
+        BiomePressureProfile? biomeMovementCostProfile = null,
+        BiomePressureProfile? biomeBasalCostProfile = null)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -106,7 +111,8 @@ public static class SimulationPipelines
                 gutCapacityEnergyCostPerSecond,
                 digestionRateEnergyCostPerSecond,
                 biteStrengthEnergyCostPerSecond,
-                damageResistanceEnergyCostPerSecond),
+                damageResistanceEnergyCostPerSecond,
+                biomeBasalCostProfile),
             new SpatialIndexRebuildSystem(spatialIndex),
             new CreatureSensingSystem(
                 spatialIndex,
@@ -114,7 +120,7 @@ public static class SimulationPipelines
                 meatScentCaloriesForFullStrength,
                 meatScentDensitySaturation),
             new NeuralControllerSystem(),
-            new MovementSystem(),
+            new MovementSystem(biomeMovementCostProfile),
             new SpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex, requireEatIntent: true),
             new DigestionSystem(),
@@ -128,7 +134,7 @@ public static class SimulationPipelines
                 biteRangePadding,
                 requireAttackIntent: true),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
-            new StatsRecordingSystem(statsSnapshotIntervalTicks)
+            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile)
         ];
     }
 }

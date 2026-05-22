@@ -693,6 +693,8 @@ public partial class Main : Node2D
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
+            $"Biome pop B {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} S {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} R {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Biome cost move {snapshot.AverageBiomeMovementCostMultiplier:0.00}x basal {snapshot.AverageBiomeBasalCostMultiplier:0.00}x\n" +
             $"Color {FormatColorMode(_colorMode)}\n" +
             $"Arrows pan  G follows\n" +
             $"B toggles biomes\n" +
@@ -760,6 +762,9 @@ public partial class Main : Node2D
         var maturityText = CreatureGrowth.IsMature(creature, genome)
             ? "adult"
             : $"juvenile {maturityProgress:P0}";
+        var biome = _simulation.State.Biomes.GetKindAt(creature.Position);
+        var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
+        var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
 
         return
             $"Selected #{creature.Id.Value}\n" +
@@ -771,7 +776,7 @@ public partial class Main : Node2D
             $"Age {creature.AgeSeconds:0.0}s\n" +
             $"Growth {maturityText} ({growthFactor:P0})\n" +
             $"Birth inv {creature.BirthInvestmentRatio:0.00}x\n" +
-            $"Biome {FormatBiomeKind(_simulation.State.Biomes.GetKindAt(creature.Position))}\n" +
+            $"Biome {FormatBiomeKind(biome)}  move {movementCostMultiplier:0.00}x basal {basalCostMultiplier:0.00}x\n" +
             $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
             $"Actual speed {creature.Velocity.Length:0.0}\n" +
             $"Desired speed {creature.DesiredVelocity.Length:0.0}\n" +

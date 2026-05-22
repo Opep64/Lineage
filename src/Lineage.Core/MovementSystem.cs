@@ -3,8 +3,11 @@ namespace Lineage.Core;
 /// <summary>
 /// Resolves desired creature movement and charges movement energy.
 /// </summary>
-public sealed class MovementSystem : ISimulationSystem
+public sealed class MovementSystem(BiomePressureProfile? biomeMovementCostProfile = null) : ISimulationSystem
 {
+    private readonly BiomePressureProfile _biomeMovementCostProfile =
+        BiomePressureProfile.Validate(biomeMovementCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeMovementCostProfile));
+
     public void Update(WorldState state, float deltaSeconds)
     {
         for (var i = 0; i < state.Creatures.Count; i++)
@@ -25,7 +28,12 @@ public sealed class MovementSystem : ISimulationSystem
             var effort = effectiveMaxSpeed > 0f
                 ? desiredVelocity.Length / effectiveMaxSpeed
                 : 0f;
-            creature.Energy -= genome.MovementEnergyPerSecond * CreatureGrowth.GrowthFactor(creature, genome) * effort * deltaSeconds;
+            var biomeMovementCostMultiplier = _biomeMovementCostProfile.For(state.Biomes.GetKindAt(creature.Position));
+            creature.Energy -= genome.MovementEnergyPerSecond
+                * biomeMovementCostMultiplier
+                * CreatureGrowth.GrowthFactor(creature, genome)
+                * effort
+                * deltaSeconds;
 
             state.Creatures[i] = creature;
         }

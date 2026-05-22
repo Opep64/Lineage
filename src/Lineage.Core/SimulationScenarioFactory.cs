@@ -56,7 +56,9 @@ public static class SimulationScenarioFactory
                 scenario.BiteRangePadding,
                 scenario.RelocateDepletedResources,
                 scenario.ResourceClusterStrength,
-                scenario.ResourceClusterRadius),
+                scenario.ResourceClusterRadius,
+                scenario.CreateBiomeMovementCostProfile(),
+                scenario.CreateBiomeBasalCostProfile()),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -83,7 +85,9 @@ public static class SimulationScenarioFactory
                 scenario.BiteRangePadding,
                 scenario.RelocateDepletedResources,
                 scenario.ResourceClusterStrength,
-                scenario.ResourceClusterRadius),
+                scenario.ResourceClusterRadius,
+                scenario.CreateBiomeMovementCostProfile(),
+                scenario.CreateBiomeBasalCostProfile()),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }

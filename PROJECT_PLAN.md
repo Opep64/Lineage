@@ -322,6 +322,8 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add scenario-backed biome toggle and biome cell size. Done.
 - Spawn and relocate resources with biome density weighting. Done.
 - Apply biome regrowth multiplier to seeded resource patches. Done.
+- Add scenario-backed biome movement and basal metabolism cost multipliers. Done.
+- Track living-creature biome occupancy plus average biome cost in snapshots, CSVs, Godot HUD, and HTML reports. Done.
 - Add Godot biome underlay toggle. Done.
 - Add biome distribution to CLI and viewer HTML reports. Done.
 - Later: expose local biome cues to creature senses while keeping biomes/fertility distinct from terrain, obstacles, hazards, and climate.
@@ -412,7 +414,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ### Phase 14: Terrain, Climate, And World Editing
 
-- Add a terrain layer separate from biomes. Biomes currently control plant density/regrowth; terrain should control traversal pressure such as movement cost, speed penalties, fatigue, visibility modifiers, and possibly scent/sound spread.
+- Add a terrain layer separate from biomes if biome-only movement pressure becomes too coarse. Biomes currently control plant density/regrowth plus broad movement and basal cost; terrain should eventually control finer traversal pressure such as speed penalties, fatigue, visibility modifiers, and possibly scent/sound spread.
 - Terrain examples:
   - plains: baseline current movement cost
   - hills or wetlands: moderately higher movement cost
@@ -671,8 +673,9 @@ Core types currently present:
 - `NeuralBrainGenome`: first evolvable direct-weight neural brain.
 - `NeuralBrainSchema`: stable input/output layout for the current brain model.
 - `BehaviorAssay`: standardized non-mutating neural probes used by reports to summarize likely responses to food, visible-creature, small/large-creature risk, and reproduction cues globally and by top living founder lineage.
+- `BiomePressureProfile`: scenario-backed per-biome multipliers for indirect movement and basal metabolism pressure.
 - `SimulationStats`: aggregate counters and snapshot history.
-- `SimulationStatsSnapshot`: per-sample population/resource/lineage/egg metrics plus foraging, gut/digestion, and predator/prey diagnostics.
+- `SimulationStatsSnapshot`: per-sample population/resource/lineage/egg metrics plus biome occupancy, environmental cost, foraging, gut/digestion, and predator/prey diagnostics.
 - `SimulationSnapshot`: full world snapshot for saving and loading an interesting run state.
 - `SimulationSnapshotJson`: JSON serializer/restorer for deterministic snapshot continuation.
 - `SimulationPipelines`: factory for the current minimal life-loop system sequence.
@@ -681,13 +684,13 @@ Current simulation systems:
 
 - `ResourceRegrowthSystem`, including plant regrowth/no-regrowth handling inside resource void borders and meat decay/removal
 - depleted resource relocation before regrowth, including optional clustering controlled by scenario settings
-- `MetabolismSystem`, including optional growth-scaled body-size, speed, turn-rate, sense-radius, vision-angle, eat-rate, gut-capacity, and digestion-rate upkeep pressure
+- `MetabolismSystem`, including optional biome basal-cost pressure plus growth-scaled body-size, speed, turn-rate, sense-radius, vision-angle, eat-rate, gut-capacity, and digestion-rate upkeep pressure
 - combat trait upkeep for bite strength and damage resistance
 - `SpatialIndexRebuildSystem`
 - `SimpleForagingSystem`
 - `CreatureSensingSystem`
 - `NeuralControllerSystem`
-- `MovementSystem`, using growth-scaled effective max speed
+- `MovementSystem`, using growth-scaled effective max speed and biome movement-cost pressure
 - `EatingSystem`, using growth-scaled contact range and eating rate to move raw food into gut stores; eggs are edible meat-like contacts
 - `DigestionSystem`, converting raw gut contents into usable energy over time with diet-dependent efficiency
 - `ReproductionSystem`, including adult maturity gating and egg laying
