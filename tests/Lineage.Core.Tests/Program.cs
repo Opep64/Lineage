@@ -40,7 +40,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
-    ("Neural controller turns creature proximity into attack intent", NeuralControllerTurnsCreatureProximityIntoAttackIntent),
+    ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
@@ -1529,7 +1529,7 @@ static void NeuralControllerTurnsSensesIntoActions()
     AssertTrue(creature.DesiredVelocity.X > 0f, "Desired velocity should face food");
 }
 
-static void NeuralControllerTurnsCreatureProximityIntoAttackIntent()
+static void ForagerPredatorTurnsCreatureProximityIntoAttackIntent()
 {
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
@@ -1543,7 +1543,7 @@ static void NeuralControllerTurnsCreatureProximityIntoAttackIntent()
         DietaryAdaptation = 1f,
         MaturityAgeSeconds = 0f
     });
-    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator());
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
     var creature = simulation.State.Creatures[0];
     creature.Senses = new CreatureSenseState
@@ -1557,7 +1557,7 @@ static void NeuralControllerTurnsCreatureProximityIntoAttackIntent()
 
     simulation.Step();
 
-    AssertTrue(simulation.State.Creatures[0].Actions.WantsAttack, "Seed brain should attack when a visible creature is very close");
+    AssertTrue(simulation.State.Creatures[0].Actions.WantsAttack, "Forager predator should attack when a visible creature is very close");
 }
 
 static void SeedForagerSlowsDownNearFood()
@@ -1595,7 +1595,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
-    AssertTrue(summary.CreatureAhead.AttackShare > 0f, "Meat-biased seed creature should attack close visible creatures");
+    AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
 }
 
 static void ForagerPredatorStarterBrainHuntsCreatureCues()

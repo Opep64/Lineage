@@ -110,11 +110,7 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.BiasInput, -1f);
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput, 3f);
 
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -3.4f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.HungerInput, 1.2f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 2.5f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.5f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.4f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
 
         return weights;
     }
