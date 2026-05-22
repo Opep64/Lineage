@@ -79,6 +79,16 @@ public struct CreatureSenseState
     /// </summary>
     public float CreatureFacingAlignment { get; set; }
 
+    /// <summary>
+    /// Local traversal drag at the creature's current body position. Neutral terrain is 0, slower terrain is positive.
+    /// </summary>
+    public float CurrentTerrainDrag { get; set; }
+
+    /// <summary>
+    /// Local traversal drag sampled a short distance in front of the creature's heading.
+    /// </summary>
+    public float ForwardTerrainDrag { get; set; }
+
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }
 

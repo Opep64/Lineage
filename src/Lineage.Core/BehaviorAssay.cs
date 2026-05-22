@@ -383,6 +383,8 @@ public static class BehaviorAssay
         inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = senses.CreatureRelativeSpeed;
         inputs[NeuralBrainSchema.CreatureApproachRateInput] = senses.CreatureApproachRate;
         inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = senses.CreatureFacingAlignment;
+        inputs[NeuralBrainSchema.CurrentTerrainDragInput] = senses.CurrentTerrainDrag;
+        inputs[NeuralBrainSchema.ForwardTerrainDragInput] = senses.ForwardTerrainDrag;
     }
 
     private static string ClassifyMovement(BehaviorAssaySummary summary)

@@ -447,6 +447,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Keep authored terrain/climate controls deterministic and inspectable so CLI runs, reports, snapshots, and viewer state all agree.
 - Add a first biome speed/drag layer. Scenarios now include per-biome speed multipliers separate from movement-energy and basal-energy multipliers. `MovementSystem` scales actual displacement by the local biome speed multiplier, while stats, CLI CSV/probe output, CLI/Godot HTML reports, and the Godot HUD/inspector expose average speed pressure. Starter scenarios currently use barren `0.55x`, sparse `0.80x`, grassland `1.0x`, and rich `1.0x` so bad terrain slows traversal without making rich cells a movement bonus. A 2026-05-22 5k two-seed probe across Balanced, Harsh, Scavenger, and Predation compared base, `drag-medium`, and `drag-hard`; `drag-hard` stayed viable and added modest pressure without the earlier calorie-only side effect where rich-biome discounts made Balanced easier. Probe file: `out/biome_speed_drag_probe_20260522.csv` with matching `.html` report. Done.
 - Confirm selected biome speed/drag values against no-drag baseline. A 2026-05-22 10k, three-seed probe compared the current starter drag values against `no-drag` across Balanced, Harsh, Scavenger, and Predation. All runs completed, and drag reduced average final populations in all four tested scenarios: Balanced `654 -> 647`, Harsh `230 -> 216`, Scavenger `454 -> 427`, and Predation `145 -> 132`. Average realized biome speed stayed modest (`0.954-0.979x`) because creatures do not spend all their time in poor cells. Conclusion: keep biome speed/drag, do not add a separate terrain layer yet, and next add local drag/terrain sensing so creatures can respond to traversal pressure without directly knowing biome fertility or void status. Probe file: `out/biome_speed_drag_confirm_20260522.csv` with matching `.html` report. Done.
+- Add local terrain/drag sensing. Creatures now sense `CurrentTerrainDrag` and `ForwardTerrainDrag`, derived only from the current biome-speed profile and sampled locally at the body position plus a short forward probe. The neural schema appends these two inputs with migration support for older brains, and the selected-creature inspector shows the sensed drag values. This gives terrain-aware evolution a cue without revealing biome labels, fertility, resource voids, or global map direction. Done.
 
 ### Far Future: Self-Sustaining Ecology
 
@@ -549,7 +550,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: add local terrain/drag sensing for creatures, using imperfect local cues such as current drag and forward drag rather than perfect biome, fertility, or void knowledge.
+Next practical step: use the new local terrain/drag sensing in targeted probes to see whether terrain-aware behavior can evolve without giving creatures direct biome, fertility, or void knowledge.
 
 ## Current Implementation State
 
@@ -844,6 +845,7 @@ Build, 69 core tests, `git diff --check`, and a two-row Scavenger probe variant 
 Three biome pressure probe passes completed on 2026-05-22 after adding temporary probe variants. No scenario tuning was applied because stronger energy-only biome movement costs did not consistently improve pressure.
 Build, 70 core tests, CLI biome-speed smoke, Godot headless `--quit`, and a 5k two-seed biome-speed drag probe passed on 2026-05-22 after adding biome speed multipliers and selecting the first shared starter values.
 10k three-seed drag-vs-no-drag confirmation probe passed on 2026-05-22 and supported keeping the selected biome speed multipliers.
+Build, 71 core tests, CLI terrain-drag sensing smoke/report/snapshot, Godot headless `--quit`, and `git diff --check` passed on 2026-05-22 after adding local terrain/drag sensing.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

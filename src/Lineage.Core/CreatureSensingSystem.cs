@@ -7,8 +7,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 {
     private const float DensitySaturationFoodCount = 8f;
     private const float MinimumScentStrength = 0.001f;
+    private const float MinimumTerrainProbeDistance = 24f;
+    private const float MaximumTerrainProbeDistance = 160f;
 
     private readonly UniformSpatialIndex _spatialIndex;
+    private readonly BiomePressureProfile _biomeSpeedProfile;
     private readonly float _meatScentRangeMultiplier;
     private readonly float _meatScentCaloriesForFullStrength;
     private readonly float _meatScentDensitySaturation;
@@ -27,7 +30,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         UniformSpatialIndex spatialIndex,
         float meatScentRangeMultiplier = 2f,
         float meatScentCaloriesForFullStrength = 60f,
-        float meatScentDensitySaturation = 1f)
+        float meatScentDensitySaturation = 1f,
+        BiomePressureProfile? biomeSpeedProfile = null)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -45,6 +49,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         }
 
         _spatialIndex = spatialIndex;
+        _biomeSpeedProfile = biomeSpeedProfile ?? BiomePressureProfile.Neutral;
         _meatScentRangeMultiplier = meatScentRangeMultiplier;
         _meatScentCaloriesForFullStrength = meatScentCaloriesForFullStrength;
         _meatScentDensitySaturation = meatScentDensitySaturation;
@@ -60,6 +65,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var genome = state.GetGenome(creature.GenomeId);
             var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
             var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
+            var forward = SimVector2.FromAngle(creature.HeadingRadians);
+            var right = new SimVector2(-forward.Y, forward.X);
             var hasLimitedVision = effectiveVisionAngle < MathF.Tau;
             var visionCosThreshold = hasLimitedVision
                 ? MathF.Cos(effectiveVisionAngle * 0.5f)
@@ -100,6 +107,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 EggReserveRatio = eggReserveRatio,
                 ReproductionReadiness = isReadyToLay ? 1f : 0f
             };
+            ApplyTerrainDragSense(ref senses, state, creature, forward, effectiveSenseRadius);
 
             var visibleFoodCount = 0;
             var visiblePlantCount = 0;
@@ -118,8 +126,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
             var nearestVisibleCreatureIndex = -1;
             var nearestVisibleCreatureDistanceSquared = float.PositiveInfinity;
-            var forward = SimVector2.FromAngle(creature.HeadingRadians);
-            var right = new SimVector2(-forward.Y, forward.X);
 
             foreach (var resourceIndex in _scentResourceCandidates)
             {
@@ -356,6 +362,30 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creature.Senses = senses;
             state.Creatures[i] = creature;
         }
+    }
+
+    private void ApplyTerrainDragSense(
+        ref CreatureSenseState senses,
+        WorldState state,
+        CreatureState creature,
+        SimVector2 forward,
+        float effectiveSenseRadius)
+    {
+        var currentSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(creature.Position));
+        var probeDistance = Math.Clamp(
+            effectiveSenseRadius * 0.5f,
+            MinimumTerrainProbeDistance,
+            MaximumTerrainProbeDistance);
+        var forwardPosition = state.Bounds.Clamp(creature.Position + forward * probeDistance);
+        var forwardSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(forwardPosition));
+
+        senses.CurrentTerrainDrag = SpeedMultiplierToDrag(currentSpeedMultiplier);
+        senses.ForwardTerrainDrag = SpeedMultiplierToDrag(forwardSpeedMultiplier);
+    }
+
+    private static float SpeedMultiplierToDrag(float speedMultiplier)
+    {
+        return Math.Clamp(1f - speedMultiplier, -1f, 1f);
     }
 
     private void ApplyMeatScentSense(

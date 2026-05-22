@@ -40,6 +40,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing splits plant and meat cues", CreatureSensingSplitsPlantAndMeatCues),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
+    ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
@@ -1493,6 +1494,44 @@ static void CreatureSensingSmellsMeatBeyondVision()
     AssertTrue(senses.MeatScentDensity > 0.9f, "Meat scent density should be strong in this probe");
     AssertTrue(senses.MeatScentDirectionForward > 0.9f, "Meat scent should bias forward");
     AssertClose(0f, senses.MeatScentDirectionRight, 0.0001, "Meat scent right direction");
+}
+
+static void CreatureSensingReportsLocalTerrainDrag()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 407,
+        WorldWidth = 1_000f,
+        WorldHeight = 700f,
+        BiomeCellSize = 100f,
+        ResourceVoidBorderWidth = 0f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        BarrenBiomeSpeedMultiplier = 0.5f,
+        SparseBiomeSpeedMultiplier = 0.8f,
+        GrasslandBiomeSpeedMultiplier = 1f,
+        RichBiomeSpeedMultiplier = 1.1f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var speedProfile = scenario.CreateBiomeSpeedProfile();
+    var probe = FindAdjacentBiomeDragProbe(simulation.State.Biomes, speedProfile);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, probe.Position, energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = probe.HeadingRadians;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.CurrentBiome)), senses.CurrentTerrainDrag, 0.000001, "Current terrain drag");
+    AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.ForwardBiome)), senses.ForwardTerrainDrag, 0.000001, "Forward terrain drag");
 }
 
 static void CreatureSensingReportsEggReserveReadiness()
@@ -3108,6 +3147,58 @@ static SimVector2 FindBiomeCellCenter(BiomeMap map, BiomeKind kind)
     }
 
     throw new InvalidOperationException($"Biome map did not contain a non-void {kind} cell.");
+}
+
+static (SimVector2 Position, float HeadingRadians, BiomeKind CurrentBiome, BiomeKind ForwardBiome) FindAdjacentBiomeDragProbe(
+    BiomeMap map,
+    BiomePressureProfile speedProfile)
+{
+    for (var y = 0; y < map.CellCountY; y++)
+    {
+        for (var x = 0; x < map.CellCountX - 1; x++)
+        {
+            var current = map.GetKind(x, y);
+            var forward = map.GetKind(x + 1, y);
+            if (Math.Abs(speedProfile.For(current) - speedProfile.For(forward)) <= 0.000001f)
+            {
+                continue;
+            }
+
+            var bounds = map.GetCellBounds(x, y);
+            return (
+                new SimVector2(bounds.X + bounds.Width - 25f, bounds.Y + bounds.Height * 0.5f),
+                0f,
+                current,
+                forward);
+        }
+    }
+
+    for (var y = 0; y < map.CellCountY - 1; y++)
+    {
+        for (var x = 0; x < map.CellCountX; x++)
+        {
+            var current = map.GetKind(x, y);
+            var forward = map.GetKind(x, y + 1);
+            if (Math.Abs(speedProfile.For(current) - speedProfile.For(forward)) <= 0.000001f)
+            {
+                continue;
+            }
+
+            var bounds = map.GetCellBounds(x, y);
+            return (
+                new SimVector2(bounds.X + bounds.Width * 0.5f, bounds.Y + bounds.Height - 25f),
+                MathF.PI * 0.5f,
+                current,
+                forward);
+        }
+    }
+
+    throw new InvalidOperationException("Biome map did not contain adjacent cells with different terrain drag.");
+}
+
+static float SpeedMultiplierToDrag(float speedMultiplier)
+{
+    return Math.Clamp(1f - speedMultiplier, -1f, 1f);
 }
 
 /// <summary>
