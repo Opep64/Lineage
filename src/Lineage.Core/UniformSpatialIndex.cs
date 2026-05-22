@@ -11,6 +11,7 @@ namespace Lineage.Core;
 public sealed class UniformSpatialIndex
 {
     private readonly Dictionary<long, SpatialCell> _cells = [];
+    private readonly List<SpatialCell> _creatureCells = [];
 
     public UniformSpatialIndex(float cellSize)
     {
@@ -30,6 +31,8 @@ public sealed class UniformSpatialIndex
         {
             cell.Clear();
         }
+
+        _creatureCells.Clear();
 
         for (var i = 0; i < state.Resources.Count; i++)
         {
@@ -51,10 +54,12 @@ public sealed class UniformSpatialIndex
 
     public void RebuildCreatures(WorldState state)
     {
-        foreach (var cell in _cells.Values)
+        foreach (var cell in _creatureCells)
         {
             cell.CreatureIndices.Clear();
         }
+
+        _creatureCells.Clear();
 
         for (var i = 0; i < state.Creatures.Count; i++)
         {
@@ -377,7 +382,13 @@ public sealed class UniformSpatialIndex
     {
         var cellX = ToCell(position.X);
         var cellY = ToCell(position.Y);
-        GetOrCreateCell(cellX, cellY).CreatureIndices.Add(creatureIndex);
+        var cell = GetOrCreateCell(cellX, cellY);
+        if (cell.CreatureIndices.Count == 0)
+        {
+            _creatureCells.Add(cell);
+        }
+
+        cell.CreatureIndices.Add(creatureIndex);
     }
 
     private SpatialCell GetOrCreateCell(int cellX, int cellY)
