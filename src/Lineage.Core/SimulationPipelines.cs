@@ -32,6 +32,10 @@ public static class SimulationPipelines
         bool relocateDepletedResources = true,
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
+        float plantRespawnDelaySecondsMin = 0f,
+        float plantRespawnDelaySecondsMax = 0f,
+        float plantRespawnCaloriesMin = 0f,
+        float plantRespawnCaloriesMax = 0f,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
@@ -41,7 +45,14 @@ public static class SimulationPipelines
 
         return
         [
-            new ResourceRegrowthSystem(relocateDepletedResources, resourceClusterStrength, resourceClusterRadius),
+            new ResourceRegrowthSystem(
+                relocateDepletedResources,
+                resourceClusterStrength,
+                resourceClusterRadius,
+                plantRespawnDelaySecondsMin,
+                plantRespawnDelaySecondsMax,
+                plantRespawnCaloriesMin,
+                plantRespawnCaloriesMax),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
                 maxSpeedEnergyCostPerSecond,
@@ -95,6 +106,10 @@ public static class SimulationPipelines
         bool relocateDepletedResources = true,
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
+        float plantRespawnDelaySecondsMin = 0f,
+        float plantRespawnDelaySecondsMax = 0f,
+        float plantRespawnCaloriesMin = 0f,
+        float plantRespawnCaloriesMax = 0f,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
@@ -104,7 +119,14 @@ public static class SimulationPipelines
 
         return
         [
-            new ResourceRegrowthSystem(relocateDepletedResources, resourceClusterStrength, resourceClusterRadius),
+            new ResourceRegrowthSystem(
+                relocateDepletedResources,
+                resourceClusterStrength,
+                resourceClusterRadius,
+                plantRespawnDelaySecondsMin,
+                plantRespawnDelaySecondsMax,
+                plantRespawnCaloriesMin,
+                plantRespawnCaloriesMax),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
                 maxSpeedEnergyCostPerSecond,

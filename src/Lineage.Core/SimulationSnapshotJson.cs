@@ -232,9 +232,20 @@ public static class SimulationSnapshotJson
         if (resource.Kind != ResourceKind.Meat)
         {
             resource.MeatAgeSeconds = 0f;
+            if (!float.IsFinite(resource.RespawnSecondsRemaining) || resource.RespawnSecondsRemaining < 0f)
+            {
+                resource.RespawnSecondsRemaining = 0f;
+            }
+
+            if (resource.Calories > 0f)
+            {
+                resource.RespawnSecondsRemaining = 0f;
+            }
+
             return resource;
         }
 
+        resource.RespawnSecondsRemaining = 0f;
         if (!float.IsFinite(resource.MeatAgeSeconds) || resource.MeatAgeSeconds < 0f)
         {
             resource.MeatAgeSeconds = 0f;

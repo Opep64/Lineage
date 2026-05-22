@@ -11,92 +11,93 @@ Context:
 - Build: Release
 - Command shape: `dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj -c Release --no-build -- --scenario <scenario> --ticks 10000 --seed 42 --no-output`
 - Default spatial cell size: `192`
-- Spatial index mode: array-backed grid cells; persistent dirty resource/egg cells; stamp-array resource/egg candidate dedupe; squared-distance sensing scan filters; specialized visible-creature scan with lazy trait caching; creature cells still rebuild every tick
+- Spatial index mode: array-backed grid cells; persistent dirty resource/egg cells; stamp-array resource/egg candidate dedupe; squared-distance sensing scan filters; specialized visible-creature scan with lazy trait caching; dormant depleted plants stay out of the resource index until respawn; creature cells still rebuild every tick
 - World size for checked-in presets: `2000 x 2000`
 - Date measured: 2026-05-22
 
 | Scenario | Ticks | Seed | Wall time | Final creatures | Eggs | Births | Deaths | Starvation | Injury | Max generation |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gentle Foraging | 10000 | 42 | 17.110s | 1778 | 233 | 2363 | 585 | 585 | 0 | 4 |
-| Balanced Foraging | 10000 | 42 | 5.534s | 702 | 148 | 1012 | 310 | 310 | 0 | 3 |
-| Harsh Foraging | 10000 | 42 | 2.255s | 236 | 50 | 469 | 233 | 233 | 0 | 3 |
-| Scavenger Pressure | 10000 | 42 | 3.577s | 432 | 73 | 724 | 292 | 292 | 0 | 3 |
-| Omnivore Pressure | 10000 | 42 | 2.890s | 286 | 71 | 481 | 195 | 195 | 0 | 3 |
-| Predation Pressure | 10000 | 42 | 2.330s | 174 | 25 | 345 | 171 | 108 | 63 | 2 |
+| Gentle Foraging | 10000 | 42 | 9.983s | 1162 | 234 | 1612 | 450 | 450 | 0 | 4 |
+| Balanced Foraging | 10000 | 42 | 3.731s | 514 | 102 | 708 | 194 | 194 | 0 | 3 |
+| Harsh Foraging | 10000 | 42 | 1.567s | 102 | 21 | 259 | 157 | 157 | 0 | 3 |
+| Scavenger Pressure | 10000 | 42 | 2.460s | 239 | 59 | 411 | 172 | 172 | 0 | 3 |
+| Omnivore Pressure | 10000 | 42 | 1.850s | 223 | 58 | 387 | 164 | 164 | 0 | 3 |
+| Predation Pressure | 10000 | 42 | 1.885s | 144 | 21 | 332 | 188 | 134 | 54 | 2 |
 
-Delta from the prior scan-math baseline:
+Delta from the prior visible-creature scan baseline:
 
-| Scenario | Scan-math wall time | Visible-creature scan wall time | Delta |
+| Scenario | Prior wall time | Plant-dormancy wall time | Delta |
 | --- | ---: | ---: | ---: |
-| Gentle Foraging | 20.227s | 17.110s | -15.4% |
-| Balanced Foraging | 6.019s | 5.534s | -8.1% |
-| Harsh Foraging | 2.325s | 2.255s | -3.0% |
-| Scavenger Pressure | 3.778s | 3.577s | -5.3% |
-| Omnivore Pressure | 3.063s | 2.890s | -5.6% |
-| Predation Pressure | 2.212s | 2.330s | +5.3% |
+| Gentle Foraging | 17.110s | 9.983s | -41.7% |
+| Balanced Foraging | 5.534s | 3.731s | -32.6% |
+| Harsh Foraging | 2.255s | 1.567s | -30.5% |
+| Scavenger Pressure | 3.577s | 2.460s | -31.2% |
+| Omnivore Pressure | 2.890s | 1.850s | -36.0% |
+| Predation Pressure | 2.330s | 1.885s | -19.1% |
 
-The checked scenario outcomes match the prior scan-math baseline for these runs. Predation's single-run wall time was slightly slower, but the larger 20k sensing profile improved materially.
+The checked scenario outcomes intentionally changed because plant density and depleted-plant respawn timing are now part of the ecology model.
 
 ## Balanced Tail Profile
 
 Command:
 
 ```powershell
-dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj -c Release --no-build -- --scenario .\scenarios\balanced-foraging.json --ticks 10000 --seed 42 --profile-start-tick 8000 --profile-output .\out\visible_creature_lazy_traits_balanced_10k_tail_profile.csv --no-output
+dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj -c Release --no-build -- --scenario .\scenarios\balanced-foraging.json --ticks 10000 --seed 42 --profile-start-tick 8000 --profile-output .\out\plant_dormancy_balanced_10k_tail_profile.csv --no-output
 ```
 
 Output files:
 
-- `out\visible_creature_lazy_traits_balanced_10k_tail_profile.csv`
-- `out\visible_creature_lazy_traits_balanced_10k_tail_profile_sensing.csv`
+- `out\plant_dormancy_balanced_10k_tail_profile.csv`
+- `out\plant_dormancy_balanced_10k_tail_profile_sensing.csv`
 
 Tail profile window: ticks `8000-10000`, `2000` profiled steps.
 
 | System | Time | Share | Avg per profiled tick |
 | --- | ---: | ---: | ---: |
-| CreatureSensingSystem | 1896.973ms | 66.4% | 0.9485ms |
-| NeuralControllerSystem | 264.752ms | 9.3% | 0.1324ms |
-| EatingSystem | 222.035ms | 7.8% | 0.1110ms |
-| CreatureAttackSystem | 213.641ms | 7.5% | 0.1068ms |
-| MovementSystem | 61.797ms | 2.2% | 0.0309ms |
-| MetabolismSystem | 61.287ms | 2.1% | 0.0306ms |
-| DigestionSystem | 34.538ms | 1.2% | 0.0173ms |
-| SpatialIndexRebuildSystem | 24.075ms | 0.8% | 0.0120ms |
+| CreatureSensingSystem | 1141.289ms | 65.8% | 0.5706ms |
+| NeuralControllerSystem | 153.780ms | 8.9% | 0.0769ms |
+| EatingSystem | 142.585ms | 8.2% | 0.0713ms |
+| CreatureAttackSystem | 130.862ms | 7.5% | 0.0654ms |
+| MetabolismSystem | 38.631ms | 2.2% | 0.0193ms |
+| MovementSystem | 38.526ms | 2.2% | 0.0193ms |
+| DigestionSystem | 21.931ms | 1.3% | 0.0110ms |
+| ResourceRegrowthSystem | 18.413ms | 1.1% | 0.0092ms |
 
 Sensing tail profile:
 
 | Phase | Time | Candidates/query | Notes |
 | --- | ---: | ---: | --- |
-| Resource query | 369.132ms | 5.81 | Plant 4.29/query, meat 1.52/query |
-| Resource scan | 283.202ms | 5.81 | Visible plants 2069503, visible meat 142955 |
-| Egg query/scan | 365.651ms | 1.49 | Visible eggs 462414 |
-| Creature query/scan | 426.541ms | 7.77 | Visible creatures 2280739; combined direct visibility scan |
+| Resource query | 201.784ms | 4.72 | Plant 3.88/query, meat 0.83/query |
+| Resource scan | 150.796ms | 4.72 | Visible plants 1105370, visible meat 41589 |
+| Egg query/scan | 240.716ms | 1.58 | Visible eggs 330054 |
+| Creature query/scan | 255.032ms | 7.63 | Visible creatures 1484152; combined direct visibility scan |
 
-Targeted visible-creature scan comparison:
+Targeted plant-dormancy comparison:
 
-| Measurement | Scan-math baseline | Visible-creature scan baseline | Delta |
+| Measurement | Prior baseline | Plant-dormancy baseline | Delta |
 | --- | ---: | ---: | ---: |
-| Profiled system time, balanced tail | 3175.712ms | 2857.365ms | -10.0% |
-| `CreatureSensingSystem`, balanced tail | 2165.105ms | 1896.973ms | -12.4% |
-| Resource scan time, sensing tail | 287.517ms | 283.202ms | -1.5% |
-| Egg query/scan time, sensing tail | 366.733ms | 365.651ms | -0.3% |
-| Creature query/scan time, sensing tail | 666.014ms | 426.541ms | -36.0% |
+| Profiled system time, balanced tail | 2857.365ms | 1734.359ms | -39.3% |
+| `CreatureSensingSystem`, balanced tail | 1896.973ms | 1141.289ms | -39.8% |
+| Resource query time, sensing tail | 369.132ms | 201.784ms | -45.3% |
+| Resource scan time, sensing tail | 283.202ms | 150.796ms | -46.8% |
+| Egg query/scan time, sensing tail | 365.651ms | 240.716ms | -34.2% |
+| Creature query/scan time, sensing tail | 426.541ms | 255.032ms | -40.2% |
 
 ## Profiling Exercise Comparison
 
-These are broader comparisons from the start of the profiling exercise to the current implementation. They include multiple accepted changes, especially the resource/meat query split, the `192` cell-size baseline, persistent dirty resource/egg indexing, array-backed grid cells, stamp-array resource/egg candidate dedupe, squared-distance sensing scan filters, and the specialized visible-creature scan.
+These are broader comparisons from the start of the profiling exercise to the current implementation. They include multiple accepted changes, especially the resource/meat query split, the `192` cell-size baseline, persistent dirty resource/egg indexing, array-backed grid cells, stamp-array resource/egg candidate dedupe, squared-distance sensing scan filters, the specialized visible-creature scan, and dormant depleted-plant respawn.
 
 | Run | Start-of-profiling number | Current number | Delta |
 | --- | ---: | ---: | ---: |
-| Balanced Foraging, 5000 ticks, no profile | 3.495s | 1.204s | -65.6% |
-| Balanced Foraging, 20000 ticks, full profile | 69.434s | 20.445s | -70.6% |
-| `CreatureSensingSystem`, 20000-tick profile | 56888.488ms | 13411.890ms | -76.4% |
-| `SpatialIndexRebuildSystem`, 20000-tick profile | 2147.808ms | 172.390ms | -92.0% |
+| Balanced Foraging, 5000 ticks, no profile | 3.495s | 0.946s | -72.9% |
+| Balanced Foraging, 20000 ticks, full profile | 69.434s | 16.756s | -75.9% |
+| `CreatureSensingSystem`, 20000-tick profile | 56888.488ms | 10688.174ms | -81.2% |
+| `SpatialIndexRebuildSystem`, 20000-tick profile | 2147.808ms | 124.358ms | -94.2% |
 
 Current 20000-tick profile output files:
 
-- `out\visible_creature_lazy_traits_balanced_20k_profile.csv`
-- `out\visible_creature_lazy_traits_balanced_20k_profile_sensing.csv`
+- `out\plant_dormancy_balanced_20k_profile.csv`
+- `out\plant_dormancy_balanced_20k_profile_sensing.csv`
 
 ## Cell Size Benchmark
 

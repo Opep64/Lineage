@@ -658,8 +658,11 @@ public partial class Main : Node2D
     {
         var state = _simulation.State;
         var snapshot = state.Stats.Snapshots.Count > 0 ? state.Stats.Snapshots[^1] : default;
+        var activeResourceCount = state.Stats.Snapshots.Count > 0
+            ? snapshot.ResourceCount
+            : CountActiveResources(state.Resources);
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
-        var resourceDensity = state.Resources.Count / worldArea * 1_000_000f;
+        var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
         var launcherHint = _scenarioEditor.IsCollapsed
@@ -673,7 +676,7 @@ public partial class Main : Node2D
             $"Seed {_currentSeed}\n" +
             $"Tick {state.Tick}  Time {state.ElapsedSeconds:0.0}s\n" +
             $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}\n" +
-            $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {state.Resources.Count}\n" +
+            $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
             $"Resources/M {resourceDensity:0.00}\n" +
             $"Births {state.Stats.CreatureBirthCount}  Eggs laid {state.Stats.EggLaidCount}\n" +
@@ -711,6 +714,20 @@ public partial class Main : Node2D
             $"Attack {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.0}/s\n" +
             $"Eat {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
             $"Deaths {state.Stats.CreatureDeathCount}";
+    }
+
+    private static int CountActiveResources(IReadOnlyList<ResourcePatchState> resources)
+    {
+        var count = 0;
+        for (var i = 0; i < resources.Count; i++)
+        {
+            if (resources[i].Calories > 0f)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private string BuildInspectorText()

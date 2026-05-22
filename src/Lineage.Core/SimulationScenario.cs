@@ -70,6 +70,10 @@ public sealed record SimulationScenario
 
     public bool RelocateDepletedResources { get; init; } = true;
 
+    public float PlantRespawnDelaySecondsMin { get; init; } = 0f;
+
+    public float PlantRespawnDelaySecondsMax { get; init; } = 0f;
+
     public float ResourceClusterStrength { get; init; } = 0.2f;
 
     public float ResourceClusterRadius { get; init; } = 180f;
@@ -202,6 +206,7 @@ public sealed record SimulationScenario
         EnsureRange(ResourceCaloriesMin, ResourceCaloriesMax, nameof(ResourceCaloriesMin), nameof(ResourceCaloriesMax));
         EnsurePositive(ResourceMaxCalories, nameof(ResourceMaxCalories));
         EnsureRange(ResourceRegrowthMin, ResourceRegrowthMax, nameof(ResourceRegrowthMin), nameof(ResourceRegrowthMax));
+        EnsureNonNegativeRange(PlantRespawnDelaySecondsMin, PlantRespawnDelaySecondsMax, nameof(PlantRespawnDelaySecondsMin), nameof(PlantRespawnDelaySecondsMax));
         EnsureProbability(ResourceClusterStrength, nameof(ResourceClusterStrength));
         EnsurePositive(ResourceClusterRadius, nameof(ResourceClusterRadius));
         _ = BiomePressureProfile.Validate(CreateBiomeMovementCostProfile(), "BiomeMovementCostProfile");
@@ -354,6 +359,17 @@ public sealed record SimulationScenario
     {
         EnsureNonNegative(min, minName);
         EnsurePositive(max, maxName);
+
+        if (max < min)
+        {
+            throw new InvalidOperationException($"{maxName} must be greater than or equal to {minName}.");
+        }
+    }
+
+    private static void EnsureNonNegativeRange(float min, float max, string minName, string maxName)
+    {
+        EnsureNonNegative(min, minName);
+        EnsureNonNegative(max, maxName);
 
         if (max < min)
         {

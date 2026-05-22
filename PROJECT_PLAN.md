@@ -158,6 +158,14 @@ Performance-pass notes from 2026-05-20:
   - defer 8k-by-8k and larger terrain-pressure experiments until after profiling plus multicore support make large worlds practical enough to compare cleanly
 - If multithreading is added, preserve an explicit deterministic single-threaded execution mode for tests, debugging, exact replay, and controlled setting comparisons. Parallel modes should either match deterministic ordering or be clearly marked as fast/non-replayable.
 
+Performance/ecology update from 2026-05-22:
+
+- Depleted plants now enter a dormant respawn period instead of immediately becoming edible again.
+- Dormant plants are kept out of the resource spatial index, which lowers resource query/scan cost and makes local depletion matter more.
+- Checked-in scenarios now use lower starting plant densities plus per-scenario plant respawn delay ranges.
+- Current baseline numbers live in `PERFORMANCE_BASELINES.md`; after the plant dormancy pass, Balanced Foraging 20k with full profiling is about 16.756 seconds on the current machine.
+- This changed scenario outcomes intentionally, so future comparisons should use the plant-dormancy baseline rather than the pre-dormancy counts.
+
 ## Initial Scope
 
 The first real milestone should prove the core loop:

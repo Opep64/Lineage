@@ -27,6 +27,11 @@ public struct ResourcePatchState
     public float DecayCaloriesPerSecond { get; set; }
 
     /// <summary>
+    /// Remaining dormant time before a depleted plant can reappear as edible food.
+    /// </summary>
+    public float RespawnSecondsRemaining { get; set; }
+
+    /// <summary>
     /// Seconds since this meat patch was created. Freshness falls as meat ages.
     /// </summary>
     public float MeatAgeSeconds { get; set; }

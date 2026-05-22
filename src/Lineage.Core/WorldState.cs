@@ -273,6 +273,11 @@ public sealed class WorldState
             throw new ArgumentOutOfRangeException(nameof(patch), "Resource decay must be finite and non-negative.");
         }
 
+        if (!float.IsFinite(patch.RespawnSecondsRemaining) || patch.RespawnSecondsRemaining < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(patch), "Resource respawn timer must be finite and non-negative.");
+        }
+
         if (!float.IsFinite(patch.FreshKillSecondsRemaining) || patch.FreshKillSecondsRemaining < 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(patch), "Resource fresh-kill timer must be finite and non-negative.");
@@ -290,6 +295,15 @@ public sealed class WorldState
         if (patch.Kind != ResourceKind.Meat)
         {
             patch.MeatAgeSeconds = 0f;
+        }
+        else
+        {
+            patch.RespawnSecondsRemaining = 0f;
+        }
+
+        if (patch.Kind == ResourceKind.Plant && patch.Calories > 0f)
+        {
+            patch.RespawnSecondsRemaining = 0f;
         }
 
         Resources.Add(patch);

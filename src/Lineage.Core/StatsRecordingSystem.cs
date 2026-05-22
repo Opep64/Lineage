@@ -199,11 +199,18 @@ public sealed class StatsRecordingSystem(
         var totalPlantCalories = 0f;
         var totalMeatCalories = 0f;
         var totalMeatFreshnessWeightedCalories = 0f;
+        var activeResourceCount = 0;
         var plantResourceCount = 0;
         var meatResourceCount = 0;
         for (var i = 0; i < state.Resources.Count; i++)
         {
             var resource = state.Resources[i];
+            if (resource.Calories <= 0f)
+            {
+                continue;
+            }
+
+            activeResourceCount++;
             totalResourceCalories += resource.Calories;
             if (resource.Kind == ResourceKind.Meat)
             {
@@ -306,7 +313,7 @@ public sealed class StatsRecordingSystem(
             state.ElapsedSeconds,
             creatureCount,
             state.Eggs.Count,
-            state.Resources.Count,
+            activeResourceCount,
             plantResourceCount,
             meatResourceCount,
             state.Genomes.Count,

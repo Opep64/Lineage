@@ -15,6 +15,8 @@ var tests = new (string Name, Action Body)[]
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
+    ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
+    ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
     ("Fresh-kill resource credit expires", FreshKillResourceCreditExpires),
     ("Meat freshness reduces digested energy", MeatFreshnessReducesDigestedEnergy),
@@ -453,6 +455,94 @@ static void DepletedResourcesCanRelocateBeforeRegrowing()
     AssertTrue(resource.Position != initialPosition, "Depleted resource should relocate");
     AssertTrue(simulation.State.Bounds.Contains(resource.Position), "Relocated resource should remain inside bounds");
     AssertClose(5f, resource.Calories, 0.000001, "Relocated resource calories after regrowth");
+}
+
+static void DepletedPlantsEnterDormancyBeforeRespawning()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 22,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                relocateDepletedResources: true,
+                plantRespawnDelaySecondsMin: 2f,
+                plantRespawnDelaySecondsMax: 2f,
+                plantRespawnCaloriesMin: 4f,
+                plantRespawnCaloriesMax: 4f)
+        ]);
+
+    var initialPosition = new SimVector2(10f, 10f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = initialPosition,
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 5f
+    });
+
+    simulation.Step();
+
+    var dormant = simulation.State.Resources[0];
+    AssertTrue(dormant.Position != initialPosition, "Dormant plant should choose a new respawn position");
+    AssertClose(0f, dormant.Calories, 0.000001, "Dormant plant should stay inedible");
+    AssertClose(2f, dormant.RespawnSecondsRemaining, 0.000001, "Dormant plant timer");
+
+    simulation.Step();
+    AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Plant should remain dormant before timer completes");
+    AssertClose(1f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Dormant plant countdown");
+
+    simulation.Step();
+    AssertClose(4f, simulation.State.Resources[0].Calories, 0.000001, "Plant should respawn with sampled calories");
+    AssertClose(0f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Respawn timer clears");
+}
+
+static void DormantPlantsAreAbsentFromSpatialIndex()
+{
+    var index = new UniformSpatialIndex(10f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 23,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                plantRespawnDelaySecondsMin: 2f,
+                plantRespawnDelaySecondsMax: 2f,
+                plantRespawnCaloriesMin: 6f,
+                plantRespawnCaloriesMax: 6f),
+            new SpatialIndexRebuildSystem(index)
+        ]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(50f, 50f),
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 5f
+    });
+
+    simulation.Step();
+    AssertEqual(-1, index.FindNearestResourceWithCalories(simulation.State, new SimVector2(50f, 50f), 5f), "Dormant plant should not be indexed");
+
+    simulation.Step();
+    AssertEqual(-1, index.FindNearestResourceWithCalories(simulation.State, new SimVector2(50f, 50f), 5f), "Dormant plant should remain absent while timer runs");
+
+    simulation.Step();
+    AssertEqual(0, index.FindNearestResourceWithCalories(simulation.State, new SimVector2(50f, 50f), 5f), "Respawned plant should return to the spatial index");
 }
 
 static void MeatResourcesDecayAndDisappear()
@@ -3198,6 +3288,8 @@ static void ScenarioJsonRoundTrips()
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
         InitialResourcesPerMillionArea = 37.5f,
+        PlantRespawnDelaySecondsMin = 12f,
+        PlantRespawnDelaySecondsMax = 34f,
         ResourceClusterStrength = 0.33f,
         ResourceClusterRadius = 123f,
         BarrenBiomeMovementCostMultiplier = 1.4f,
@@ -3260,6 +3352,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
+    AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
@@ -3275,6 +3368,8 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
+    AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
+    AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");

@@ -64,6 +64,11 @@ public sealed class UniformSpatialIndex
         for (var i = 0; i < state.Resources.Count; i++)
         {
             var resource = state.Resources[i];
+            if (!ShouldIndexResource(resource))
+            {
+                continue;
+            }
+
             AddResourceToCells(i, resource.Kind, resource.Position, resource.Radius);
         }
     }
@@ -1123,6 +1128,12 @@ public sealed class UniformSpatialIndex
             ResourceKind.Meat => cell.MeatResourceIndices,
             _ => cell.ResourceIndices
         };
+    }
+
+    private static bool ShouldIndexResource(ResourcePatchState resource)
+    {
+        return resource.Calories > 0f
+            && (resource.Kind != ResourceKind.Plant || resource.RespawnSecondsRemaining <= 0f);
     }
 
     private sealed class SpatialCell

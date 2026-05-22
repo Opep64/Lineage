@@ -26,10 +26,23 @@ public static class ViewerReportWriter
         using var writer = new StreamWriter(path);
         var state = simulation.State;
         var snapshot = state.Stats.Snapshots.Count > 0 ? state.Stats.Snapshots[^1] : default;
-        var totalResourceCalories = state.Resources.Sum(resource => resource.Calories);
-        var resourceCapacity = state.Resources.Sum(resource => resource.MaxCalories);
+        var totalResourceCalories = 0f;
+        var resourceCapacity = 0f;
+        var activeResourceCount = 0;
+        foreach (var resource in state.Resources)
+        {
+            if (resource.Calories <= 0f)
+            {
+                continue;
+            }
+
+            activeResourceCount++;
+            totalResourceCalories += resource.Calories;
+            resourceCapacity += MathF.Max(resource.MaxCalories, resource.Calories);
+        }
+
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
-        var resourceDensity = state.Resources.Count / worldArea * 1_000_000f;
+        var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var traitSummary = SummarizeTraits(state);
         var biomeSummaries = state.Biomes.SummarizeResources(state.Resources);
         var founderSummaries = SummarizeFounders(state.LineageRecords)
@@ -72,7 +85,8 @@ public static class ViewerReportWriter
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Living creatures", state.Creatures.Count.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Eggs", state.Eggs.Count.ToString(CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Resource patches", state.Resources.Count.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Active resources", activeResourceCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Resource slots", state.Resources.Count.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plants", snapshot.PlantResourceCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Meat", snapshot.MeatResourceCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Resource calories", totalResourceCalories.ToString("0.###", CultureInfo.InvariantCulture));
@@ -184,6 +198,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource calories", FormatRange(scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax));
         WriteMetric(writer, "Resource regrowth", $"{FormatRange(scenario.ResourceRegrowthMin, scenario.ResourceRegrowthMax)} kcal/s");
         WriteMetric(writer, "Depleted resources relocate", scenario.RelocateDepletedResources ? "Yes" : "No");
+        WriteMetric(writer, "Plant respawn delay", $"{FormatRange(scenario.PlantRespawnDelaySecondsMin, scenario.PlantRespawnDelaySecondsMax)} seconds");
         WriteMetric(writer, "Resource clustering", FormatPercent(scenario.ResourceClusterStrength));
         WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
         WriteMetric(writer, "Biome movement costs", FormatBiomePressureProfile(scenario.CreateBiomeMovementCostProfile()));

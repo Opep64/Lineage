@@ -278,7 +278,7 @@ public sealed class BiomeMap
 
         foreach (var resource in resources)
         {
-            if (resource.Kind != ResourceKind.Plant)
+            if (resource.Kind != ResourceKind.Plant || resource.Calories <= 0f)
             {
                 continue;
             }
