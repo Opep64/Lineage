@@ -12,6 +12,10 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
     private readonly float _plantRespawnDelaySecondsMax;
     private readonly float _plantRespawnCaloriesMin;
     private readonly float _plantRespawnCaloriesMax;
+    private readonly bool _enableSeasons;
+    private readonly float _seasonLengthSeconds;
+    private readonly float _seasonFertilityAmplitude;
+    private readonly float _seasonPhaseOffsetSeconds;
 
     public ResourceRegrowthSystem(
         bool relocateDepletedResources = false,
@@ -20,12 +24,19 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         float plantRespawnDelaySecondsMin = 0f,
         float plantRespawnDelaySecondsMax = 0f,
         float plantRespawnCaloriesMin = 0f,
-        float plantRespawnCaloriesMax = 0f)
+        float plantRespawnCaloriesMax = 0f,
+        bool enableSeasons = false,
+        float seasonLengthSeconds = 900f,
+        float seasonFertilityAmplitude = 0.3f,
+        float seasonPhaseOffsetSeconds = 0f)
     {
         EnsureNonNegative(plantRespawnDelaySecondsMin, nameof(plantRespawnDelaySecondsMin));
         EnsureNonNegative(plantRespawnDelaySecondsMax, nameof(plantRespawnDelaySecondsMax));
         EnsureNonNegative(plantRespawnCaloriesMin, nameof(plantRespawnCaloriesMin));
         EnsureNonNegative(plantRespawnCaloriesMax, nameof(plantRespawnCaloriesMax));
+        EnsurePositive(seasonLengthSeconds, nameof(seasonLengthSeconds));
+        EnsureRange(seasonFertilityAmplitude, 0f, 0.95f, nameof(seasonFertilityAmplitude));
+        EnsureFinite(seasonPhaseOffsetSeconds, nameof(seasonPhaseOffsetSeconds));
 
         if (plantRespawnDelaySecondsMax < plantRespawnDelaySecondsMin)
         {
@@ -44,10 +55,20 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         _plantRespawnDelaySecondsMax = plantRespawnDelaySecondsMax;
         _plantRespawnCaloriesMin = plantRespawnCaloriesMin;
         _plantRespawnCaloriesMax = plantRespawnCaloriesMax;
+        _enableSeasons = enableSeasons;
+        _seasonLengthSeconds = seasonLengthSeconds;
+        _seasonFertilityAmplitude = seasonFertilityAmplitude;
+        _seasonPhaseOffsetSeconds = seasonPhaseOffsetSeconds;
     }
 
     public void Update(WorldState state, float deltaSeconds)
     {
+        var fertilityMultiplier = SeasonalFertility.Calculate(
+            _enableSeasons,
+            state.ElapsedSeconds,
+            _seasonLengthSeconds,
+            _seasonFertilityAmplitude,
+            _seasonPhaseOffsetSeconds).FertilityMultiplier;
         var resourcesDirty = false;
         var writeIndex = 0;
         for (var readIndex = 0; readIndex < state.Resources.Count; readIndex++)
@@ -67,7 +88,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
                 continue;
             }
 
-            resourcesDirty |= UpdatePlant(state, ref resource, deltaSeconds);
+            resourcesDirty |= UpdatePlant(state, ref resource, deltaSeconds, fertilityMultiplier);
             state.Resources[writeIndex++] = resource;
         }
 
@@ -100,13 +121,13 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         return resource.Calories > 0f;
     }
 
-    private bool UpdatePlant(WorldState state, ref ResourcePatchState resource, float deltaSeconds)
+    private bool UpdatePlant(WorldState state, ref ResourcePatchState resource, float deltaSeconds, float fertilityMultiplier)
     {
         var resourcesDirty = false;
 
         if (resource.RespawnSecondsRemaining > 0f)
         {
-            resource.RespawnSecondsRemaining = Math.Max(0f, resource.RespawnSecondsRemaining - deltaSeconds);
+            resource.RespawnSecondsRemaining = Math.Max(0f, resource.RespawnSecondsRemaining - deltaSeconds * fertilityMultiplier);
             if (resource.RespawnSecondsRemaining > 0f)
             {
                 resource.Calories = 0f;
@@ -152,7 +173,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
 
         resource.Calories = Math.Min(
             resource.MaxCalories,
-            resource.Calories + resource.RegrowthCaloriesPerSecond * deltaSeconds);
+            resource.Calories + resource.RegrowthCaloriesPerSecond * fertilityMultiplier * deltaSeconds);
         return resourcesDirty;
     }
 
@@ -187,6 +208,30 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         if (!float.IsFinite(value) || value < 0f)
         {
             throw new ArgumentOutOfRangeException(name, $"{name} must be finite and non-negative.");
+        }
+    }
+
+    private static void EnsurePositive(float value, string name)
+    {
+        if (!float.IsFinite(value) || value <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and positive.");
+        }
+    }
+
+    private static void EnsureRange(float value, float inclusiveMin, float inclusiveMax, string name)
+    {
+        if (!float.IsFinite(value) || value < inclusiveMin || value > inclusiveMax)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and between {inclusiveMin} and {inclusiveMax}.");
+        }
+    }
+
+    private static void EnsureFinite(float value, string name)
+    {
+        if (!float.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite.");
         }
     }
 }

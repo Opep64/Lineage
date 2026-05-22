@@ -700,6 +700,15 @@ public partial class Main : Node2D
             : CountActiveResources(state.Resources);
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
+        var season = SeasonalFertility.Calculate(
+            _scenario.EnableSeasons,
+            state.ElapsedSeconds,
+            _scenario.SeasonLengthSeconds,
+            _scenario.SeasonFertilityAmplitude,
+            _scenario.SeasonPhaseOffsetSeconds);
+        var seasonText = _scenario.EnableSeasons
+            ? $"Season {season.Phase * 100f:0}%  Fertility {season.FertilityMultiplier:0.00}x\n"
+            : string.Empty;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
         var launcherHint = _scenarioEditor.IsCollapsed
@@ -716,6 +725,7 @@ public partial class Main : Node2D
             $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
             $"Resources/M {resourceDensity:0.00}\n" +
+            seasonText +
             $"Births {state.Stats.CreatureBirthCount}  Eggs laid {state.Stats.EggLaidCount}\n" +
             $"Repro attempts {state.Stats.ReproductionAttemptCount}  success {FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount))}\n" +
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +

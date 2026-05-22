@@ -36,6 +36,10 @@ public static class SimulationPipelines
         float plantRespawnDelaySecondsMax = 0f,
         float plantRespawnCaloriesMin = 0f,
         float plantRespawnCaloriesMax = 0f,
+        bool enableSeasons = false,
+        float seasonLengthSeconds = 900f,
+        float seasonFertilityAmplitude = 0.3f,
+        float seasonPhaseOffsetSeconds = 0f,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
@@ -57,7 +61,11 @@ public static class SimulationPipelines
                 plantRespawnDelaySecondsMin,
                 plantRespawnDelaySecondsMax,
                 plantRespawnCaloriesMin,
-                plantRespawnCaloriesMax),
+                plantRespawnCaloriesMax,
+                enableSeasons,
+                seasonLengthSeconds,
+                seasonFertilityAmplitude,
+                seasonPhaseOffsetSeconds),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
                 maxSpeedEnergyCostPerSecond,
@@ -85,7 +93,15 @@ public static class SimulationPipelines
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
-            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile, biomeSpeedProfile)
+            new StatsRecordingSystem(
+                statsSnapshotIntervalTicks,
+                biomeMovementCostProfile,
+                biomeBasalCostProfile,
+                biomeSpeedProfile,
+                enableSeasons,
+                seasonLengthSeconds,
+                seasonFertilityAmplitude,
+                seasonPhaseOffsetSeconds)
         ];
     }
 
@@ -120,6 +136,10 @@ public static class SimulationPipelines
         float plantRespawnDelaySecondsMax = 0f,
         float plantRespawnCaloriesMin = 0f,
         float plantRespawnCaloriesMax = 0f,
+        bool enableSeasons = false,
+        float seasonLengthSeconds = 900f,
+        float seasonFertilityAmplitude = 0.3f,
+        float seasonPhaseOffsetSeconds = 0f,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
@@ -141,7 +161,11 @@ public static class SimulationPipelines
                 plantRespawnDelaySecondsMin,
                 plantRespawnDelaySecondsMax,
                 plantRespawnCaloriesMin,
-                plantRespawnCaloriesMax),
+                plantRespawnCaloriesMax,
+                enableSeasons,
+                seasonLengthSeconds,
+                seasonFertilityAmplitude,
+                seasonPhaseOffsetSeconds),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
                 maxSpeedEnergyCostPerSecond,
@@ -181,7 +205,15 @@ public static class SimulationPipelines
                 biteRangePadding,
                 requireAttackIntent: true),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
-            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile, biomeSpeedProfile)
+            new StatsRecordingSystem(
+                statsSnapshotIntervalTicks,
+                biomeMovementCostProfile,
+                biomeBasalCostProfile,
+                biomeSpeedProfile,
+                enableSeasons,
+                seasonLengthSeconds,
+                seasonFertilityAmplitude,
+                seasonPhaseOffsetSeconds)
         ];
     }
 }

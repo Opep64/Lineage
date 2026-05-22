@@ -80,6 +80,14 @@ public sealed record SimulationScenario
 
     public float ResourceClusterRadius { get; init; } = 180f;
 
+    public bool EnableSeasons { get; init; }
+
+    public float SeasonLengthSeconds { get; init; } = 900f;
+
+    public float SeasonFertilityAmplitude { get; init; } = 0.3f;
+
+    public float SeasonPhaseOffsetSeconds { get; init; } = 0f;
+
     public float BarrenBiomeMovementCostMultiplier { get; init; } = 1.3f;
 
     public float SparseBiomeMovementCostMultiplier { get; init; } = 1.12f;
@@ -222,6 +230,9 @@ public sealed record SimulationScenario
         EnsureNonNegativeRange(PlantRespawnDelaySecondsMin, PlantRespawnDelaySecondsMax, nameof(PlantRespawnDelaySecondsMin), nameof(PlantRespawnDelaySecondsMax));
         EnsureProbability(ResourceClusterStrength, nameof(ResourceClusterStrength));
         EnsurePositive(ResourceClusterRadius, nameof(ResourceClusterRadius));
+        EnsurePositive(SeasonLengthSeconds, nameof(SeasonLengthSeconds));
+        EnsureRange(SeasonFertilityAmplitude, 0f, 0.95f, nameof(SeasonFertilityAmplitude));
+        EnsureFinite(SeasonPhaseOffsetSeconds, nameof(SeasonPhaseOffsetSeconds));
         _ = BiomePressureProfile.Validate(CreateBiomeMovementCostProfile(), "BiomeMovementCostProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeSpeedProfile(), "BiomeSpeedProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
@@ -413,6 +424,14 @@ public sealed record SimulationScenario
         if (!float.IsFinite(value) || value < inclusiveMin || value > inclusiveMax)
         {
             throw new InvalidOperationException($"{name} must be finite and between {inclusiveMin} and {inclusiveMax}.");
+        }
+    }
+
+    private static void EnsureFinite(float value, string name)
+    {
+        if (!float.IsFinite(value))
+        {
+            throw new InvalidOperationException($"{name} must be finite.");
         }
     }
 

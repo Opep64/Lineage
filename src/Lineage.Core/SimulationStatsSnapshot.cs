@@ -6,6 +6,8 @@ namespace Lineage.Core;
 public readonly record struct SimulationStatsSnapshot(
     long Tick,
     double ElapsedSeconds,
+    float SeasonPhase,
+    float SeasonFertilityMultiplier,
     int CreatureCount,
     int EggCount,
     int ResourceCount,

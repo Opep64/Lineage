@@ -78,6 +78,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Tick", state.Tick.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Simulated seconds", state.ElapsedSeconds.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Snapshot interval", $"{scenario.StatsSnapshotIntervalTicks} ticks");
+        WriteMetric(writer, "Seasons", scenario.EnableSeasons ? "Enabled" : "Disabled");
+        WriteMetric(writer, "Season length", $"{scenario.SeasonLengthSeconds:0.###} seconds");
+        WriteMetric(writer, "Season fertility swing", FormatPercent(scenario.SeasonFertilityAmplitude));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -122,6 +125,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Avg movement biome cost", $"{snapshot.AverageBiomeMovementCostMultiplier:0.###}x");
         WriteMetric(writer, "Avg basal biome cost", $"{snapshot.AverageBiomeBasalCostMultiplier:0.###}x");
         WriteMetric(writer, "Avg biome speed", $"{snapshot.AverageBiomeSpeedMultiplier:0.###}x");
+        WriteMetric(writer, "Season phase", FormatPercent(snapshot.SeasonPhase));
+        WriteMetric(writer, "Season fertility", $"{snapshot.SeasonFertilityMultiplier:0.###}x");
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -663,6 +668,12 @@ public static class ViewerReportWriter
             snapshots,
             new ChartSeries("Plants", "#35a862", snapshots.Select(snapshot => snapshot.TotalPlantCalories).ToArray()),
             new ChartSeries("Meat", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalMeatCalories).ToArray()));
+        WriteLineChart(
+            writer,
+            "Season fertility",
+            "x",
+            snapshots,
+            new ChartSeries("Fertility", "#6a8fce", snapshots.Select(snapshot => snapshot.SeasonFertilityMultiplier).ToArray()));
         WriteLineChart(
             writer,
             "Biome occupancy",

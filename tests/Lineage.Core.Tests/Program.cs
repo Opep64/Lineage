@@ -14,6 +14,8 @@ var tests = new (string Name, Action Body)[]
     ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
+    ("Seasonal fertility scales plant regrowth", SeasonalFertilityScalesPlantRegrowth),
+    ("Seasonal fertility scales plant dormancy", SeasonalFertilityScalesPlantDormancy),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
     ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
@@ -432,6 +434,66 @@ static void ResourceRegrowthIsCapped()
     simulation.Step();
 
     AssertClose(10f, simulation.State.Resources[0].Calories, 0.000001, "Capped calories");
+}
+
+static void SeasonalFertilityScalesPlantRegrowth()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 2,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                enableSeasons: true,
+                seasonLengthSeconds: 4f,
+                seasonFertilityAmplitude: 0.5f,
+                seasonPhaseOffsetSeconds: 1f)
+        ]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(10f, 10f),
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 100f,
+        RegrowthCaloriesPerSecond = 10f
+    });
+
+    simulation.Step();
+
+    AssertClose(15f, simulation.State.Resources[0].Calories, 0.000001, "Peak-season regrowth calories");
+}
+
+static void SeasonalFertilityScalesPlantDormancy()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 3,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                enableSeasons: true,
+                seasonLengthSeconds: 4f,
+                seasonFertilityAmplitude: 0.5f,
+                seasonPhaseOffsetSeconds: 1f)
+        ]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(10f, 10f),
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 100f,
+        RegrowthCaloriesPerSecond = 10f,
+        RespawnSecondsRemaining = 3f
+    });
+
+    simulation.Step();
+
+    AssertClose(1.5f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Peak-season dormancy countdown");
+    AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Dormant plant remains inedible");
 }
 
 static void DepletedResourcesCanRelocateBeforeRegrowing()
@@ -2695,7 +2757,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
         systems: [new StatsRecordingSystem(
             biomeMovementCostProfile: new BiomePressureProfile(1f, 1f, 1.25f, 1f),
             biomeBasalCostProfile: new BiomePressureProfile(1f, 1f, 1.5f, 1f),
-            biomeSpeedProfile: new BiomePressureProfile(1f, 1f, 0.75f, 1f))]);
+            biomeSpeedProfile: new BiomePressureProfile(1f, 1f, 0.75f, 1f),
+            enableSeasons: true,
+            seasonLengthSeconds: 4f,
+            seasonFertilityAmplitude: 0.5f,
+            seasonPhaseOffsetSeconds: 1f)]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
     simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
@@ -2777,6 +2843,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, simulation.State.Stats.Snapshots.Count, "Snapshot count");
     var snapshot = simulation.State.Stats.Snapshots[0];
     AssertEqual(0L, snapshot.Tick, "Snapshot tick is captured before clock advance");
+    AssertClose(0.25f, snapshot.SeasonPhase, 0.000001, "Snapshot season phase");
+    AssertClose(1.5f, snapshot.SeasonFertilityMultiplier, 0.000001, "Snapshot season fertility");
     AssertEqual(2, snapshot.CreatureCount, "Snapshot creature count");
     AssertEqual(1, snapshot.EggCount, "Snapshot egg count");
     AssertEqual(1, snapshot.ResourceCount, "Snapshot resource count");
@@ -3557,6 +3625,10 @@ static void ScenarioJsonRoundTrips()
         InitialResourcesPerMillionArea = 37.5f,
         PlantRespawnDelaySecondsMin = 12f,
         PlantRespawnDelaySecondsMax = 34f,
+        EnableSeasons = true,
+        SeasonLengthSeconds = 480f,
+        SeasonFertilityAmplitude = 0.45f,
+        SeasonPhaseOffsetSeconds = 120f,
         ResourceClusterStrength = 0.33f,
         ResourceClusterRadius = 123f,
         BarrenBiomeMovementCostMultiplier = 1.4f,
@@ -3626,6 +3698,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
+    AssertTrue(json.Contains("\"enableSeasons\""), "JSON should serialize season toggle");
+    AssertTrue(json.Contains("\"seasonFertilityAmplitude\""), "JSON should serialize season fertility");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
@@ -3644,6 +3718,10 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
+    AssertEqual(scenario.EnableSeasons, roundTripped.EnableSeasons, "Scenario season toggle");
+    AssertClose(scenario.SeasonLengthSeconds, roundTripped.SeasonLengthSeconds, 0.000001, "Scenario season length");
+    AssertClose(scenario.SeasonFertilityAmplitude, roundTripped.SeasonFertilityAmplitude, 0.000001, "Scenario season fertility amplitude");
+    AssertClose(scenario.SeasonPhaseOffsetSeconds, roundTripped.SeasonPhaseOffsetSeconds, 0.000001, "Scenario season phase offset");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");

@@ -7,7 +7,11 @@ public sealed class StatsRecordingSystem(
     int sampleIntervalTicks = 1,
     BiomePressureProfile? biomeMovementCostProfile = null,
     BiomePressureProfile? biomeBasalCostProfile = null,
-    BiomePressureProfile? biomeSpeedProfile = null) : ISimulationSystem
+    BiomePressureProfile? biomeSpeedProfile = null,
+    bool enableSeasons = false,
+    float seasonLengthSeconds = 900f,
+    float seasonFertilityAmplitude = 0.3f,
+    float seasonPhaseOffsetSeconds = 0f) : ISimulationSystem
 {
     private const float ActiveHiddenOutputWeightThreshold = 0.05f;
 
@@ -20,6 +24,10 @@ public sealed class StatsRecordingSystem(
         BiomePressureProfile.Validate(biomeBasalCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeBasalCostProfile));
     private readonly BiomePressureProfile _biomeSpeedProfile =
         BiomePressureProfile.Validate(biomeSpeedProfile ?? BiomePressureProfile.Neutral, nameof(biomeSpeedProfile));
+    private readonly bool _enableSeasons = enableSeasons;
+    private readonly float _seasonLengthSeconds = EnsurePositive(seasonLengthSeconds, nameof(seasonLengthSeconds));
+    private readonly float _seasonFertilityAmplitude = EnsureRange(seasonFertilityAmplitude, 0f, 0.95f, nameof(seasonFertilityAmplitude));
+    private readonly float _seasonPhaseOffsetSeconds = EnsureFinite(seasonPhaseOffsetSeconds, nameof(seasonPhaseOffsetSeconds));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -359,9 +367,17 @@ public sealed class StatsRecordingSystem(
         var activeHiddenOutputShare = hiddenOutputWeightCount > 0
             ? activeHiddenOutputWeightCount / (float)hiddenOutputWeightCount
             : 0f;
+        var season = SeasonalFertility.Calculate(
+            _enableSeasons,
+            state.ElapsedSeconds,
+            _seasonLengthSeconds,
+            _seasonFertilityAmplitude,
+            _seasonPhaseOffsetSeconds);
         state.Stats.RecordSnapshot(new SimulationStatsSnapshot(
             state.Tick,
             state.ElapsedSeconds,
+            season.Phase,
+            season.FertilityMultiplier,
             creatureCount,
             state.Eggs.Count,
             activeResourceCount,
@@ -457,5 +473,35 @@ public sealed class StatsRecordingSystem(
             totalEggReserveRatio / divisor,
             totalEnergySurplusRatio / divisor,
             totalRecentFoodSuccess / divisor));
+    }
+
+    private static float EnsurePositive(float value, string name)
+    {
+        if (!float.IsFinite(value) || value <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and positive.");
+        }
+
+        return value;
+    }
+
+    private static float EnsureRange(float value, float inclusiveMin, float inclusiveMax, string name)
+    {
+        if (!float.IsFinite(value) || value < inclusiveMin || value > inclusiveMax)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and between {inclusiveMin} and {inclusiveMax}.");
+        }
+
+        return value;
+    }
+
+    private static float EnsureFinite(float value, string name)
+    {
+        if (!float.IsFinite(value))
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite.");
+        }
+
+        return value;
     }
 }
