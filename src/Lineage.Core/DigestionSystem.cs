@@ -22,6 +22,7 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.LastCaloriesDigested = 0f;
             creature.LastPlantDigestedEnergy = 0f;
             creature.LastMeatDigestedEnergy = 0f;
+            NormalizeMeatQuality(ref creature);
             ClampGutToCapacity(ref creature, genome);
 
             var totalGutCalories = creature.GutPlantCalories + creature.GutMeatCalories;
@@ -55,11 +56,16 @@ public sealed class DigestionSystem : ISimulationSystem
                 }
             }
 
+            var meatQuality = creature.GutMeatCalories > 0f
+                ? Math.Clamp(creature.GutMeatQualityCalories / creature.GutMeatCalories, MeatQuality.MinimumFreshness, 1f)
+                : 1f;
+
             creature.GutPlantCalories -= plantDigested;
             creature.GutMeatCalories -= meatDigested;
+            creature.GutMeatQualityCalories = Math.Max(0f, creature.GutMeatQualityCalories - meatDigested * meatQuality);
 
             var plantReleasedEnergy = plantDigested * CreatureDigestion.PlantEfficiency(genome);
-            var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEfficiency(genome);
+            var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEfficiency(genome) * meatQuality;
             var releasedEnergy = plantReleasedEnergy + meatReleasedEnergy;
             creature.Energy += releasedEnergy;
             creature.LastCaloriesDigested = releasedEnergy;
@@ -68,6 +74,26 @@ public sealed class DigestionSystem : ISimulationSystem
 
             state.Creatures[i] = creature;
         }
+    }
+
+    private static void NormalizeMeatQuality(ref CreatureState creature)
+    {
+        if (creature.GutMeatCalories <= 0f)
+        {
+            creature.GutMeatQualityCalories = 0f;
+            return;
+        }
+
+        if (!float.IsFinite(creature.GutMeatQualityCalories) || creature.GutMeatQualityCalories <= 0f)
+        {
+            creature.GutMeatQualityCalories = creature.GutMeatCalories;
+            return;
+        }
+
+        creature.GutMeatQualityCalories = Math.Clamp(
+            creature.GutMeatQualityCalories,
+            creature.GutMeatCalories * MeatQuality.MinimumFreshness,
+            creature.GutMeatCalories);
     }
 
     private static void ClampGutToCapacity(ref CreatureState creature, CreatureGenome genome)
@@ -82,5 +108,6 @@ public sealed class DigestionSystem : ISimulationSystem
         var scale = Math.Max(0f, capacity) / totalGutCalories;
         creature.GutPlantCalories *= scale;
         creature.GutMeatCalories *= scale;
+        creature.GutMeatQualityCalories *= scale;
     }
 }

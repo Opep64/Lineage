@@ -271,10 +271,20 @@ public sealed class WorldState
             throw new ArgumentOutOfRangeException(nameof(patch), "Resource fresh-kill timer must be finite and non-negative.");
         }
 
+        if (!float.IsFinite(patch.MeatAgeSeconds) || patch.MeatAgeSeconds < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(patch), "Resource meat age must be finite and non-negative.");
+        }
+
         var id = CreateEntityId();
         patch.Id = id;
         patch.Position = Bounds.Clamp(patch.Position);
         patch.Calories = Math.Min(patch.Calories, patch.MaxCalories);
+        if (patch.Kind != ResourceKind.Meat)
+        {
+            patch.MeatAgeSeconds = 0f;
+        }
+
         Resources.Add(patch);
         return id;
     }

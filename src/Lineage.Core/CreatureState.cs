@@ -80,6 +80,10 @@ public struct CreatureState
 
     public float LastLivePreyCaloriesEaten { get; set; }
 
+    public float LastFreshMeatCaloriesEaten { get; set; }
+
+    public float LastStaleMeatCaloriesEaten { get; set; }
+
     /// <summary>
     /// World units moved during the most recent movement pass.
     /// </summary>
@@ -102,6 +106,11 @@ public struct CreatureState
     public float GutPlantCalories { get; set; }
 
     public float GutMeatCalories { get; set; }
+
+    /// <summary>
+    /// Meat gut calories weighted by freshness, used to release less energy from stale meat.
+    /// </summary>
+    public float GutMeatQualityCalories { get; set; }
 
     public float LastAttackDamageDealt { get; set; }
 

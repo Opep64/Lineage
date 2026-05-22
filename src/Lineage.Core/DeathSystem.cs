@@ -70,6 +70,7 @@ public sealed class DeathSystem : ISimulationSystem
             MaxCalories = calories,
             RegrowthCaloriesPerSecond = 0f,
             DecayCaloriesPerSecond = _meatDecayCaloriesPerSecond,
+            MeatAgeSeconds = 0f,
             FreshKillAttackerId = reason == CreatureDeathReason.Injury
                 ? creature.LastDamagingCreatureId
                 : default,

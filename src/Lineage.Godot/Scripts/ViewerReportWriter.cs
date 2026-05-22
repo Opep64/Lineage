@@ -78,6 +78,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource calories", totalResourceCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant calories", snapshot.TotalPlantCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Meat calories", snapshot.TotalMeatCalories.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg meat freshness", FormatPercent(snapshot.AverageMeatFreshness));
         WriteMetric(writer, "Resource fullness", resourceCapacity > 0f ? $"{totalResourceCalories / resourceCapacity * 100f:0.0}%" : "n/a");
         WriteMetric(writer, "Births", state.Stats.CreatureBirthCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Eggs laid", state.Stats.EggLaidCount.ToString(CultureInfo.InvariantCulture));
@@ -114,6 +115,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Calories eaten", $"{snapshot.TotalCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Plant eaten", $"{snapshot.TotalPlantCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Carcass eaten", $"{snapshot.TotalCarcassCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Fresh meat eaten", $"{snapshot.TotalFreshMeatCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Stale meat eaten", $"{snapshot.TotalStaleMeatCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Egg eaten", $"{snapshot.TotalEggCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Fresh kill eaten", $"{snapshot.TotalLivePreyCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Calories digested", $"{snapshot.TotalCaloriesDigestedPerSecond:0.###} energy/s");
@@ -146,6 +149,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Injury deaths", state.Stats.InjuryDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Fresh kill share", FormatPercent(snapshot.FreshKillCaloriesEatenShare));
         WriteMetric(writer, "Meat raw share", FormatPercent(snapshot.MeatCaloriesEatenShare));
+        WriteMetric(writer, "Fresh meat share", FormatPercent(snapshot.FreshMeatCaloriesEatenShare));
+        WriteMetric(writer, "Stale meat share", FormatPercent(snapshot.StaleMeatCaloriesEatenShare));
         WriteMetric(writer, "Meat energy share", FormatPercent(snapshot.MeatDigestedEnergyShare));
         WriteMetric(writer, "Average diet", snapshot.AverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average bite", snapshot.AverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
@@ -645,6 +650,8 @@ public static class ViewerReportWriter
             snapshots,
             new ChartSeries("Plant eaten/s", "#35a862", snapshots.Select(snapshot => snapshot.TotalPlantCaloriesEatenPerSecond).ToArray()),
             new ChartSeries("Carcass eaten/s", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalCarcassCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Fresh meat/s", "#e05a47", snapshots.Select(snapshot => snapshot.TotalFreshMeatCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Stale meat/s", "#7d5546", snapshots.Select(snapshot => snapshot.TotalStaleMeatCaloriesEatenPerSecond).ToArray()),
             new ChartSeries("Egg eaten/s", "#d69d2f", snapshots.Select(snapshot => snapshot.TotalEggCaloriesEatenPerSecond).ToArray()),
             new ChartSeries("Fresh kill eaten/s", "#8f4cb8", snapshots.Select(snapshot => snapshot.TotalLivePreyCaloriesEatenPerSecond).ToArray()));
         WriteLineChart(
@@ -655,7 +662,16 @@ public static class ViewerReportWriter
             new ChartSeries("Seeing creatures", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Attacking", "#e05a47", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Fresh kill share", "#8f4cb8", snapshots.Select(snapshot => snapshot.FreshKillCaloriesEatenShare * 100f).ToArray()),
+            new ChartSeries("Fresh meat share", "#d69d2f", snapshots.Select(snapshot => snapshot.FreshMeatCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Meat energy share", "#b84a4a", snapshots.Select(snapshot => snapshot.MeatDigestedEnergyShare * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Meat Freshness",
+            "%",
+            snapshots,
+            new ChartSeries("Avg freshness", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageMeatFreshness * 100f).ToArray()),
+            new ChartSeries("Fresh eaten share", "#35a862", snapshots.Select(snapshot => snapshot.FreshMeatCaloriesEatenShare * 100f).ToArray()),
+            new ChartSeries("Stale eaten share", "#b84a4a", snapshots.Select(snapshot => snapshot.StaleMeatCaloriesEatenShare * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Digested Energy Source",

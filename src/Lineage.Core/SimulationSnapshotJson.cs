@@ -86,7 +86,7 @@ public static class SimulationSnapshotJson
 
         state.Creatures.AddRange(snapshot.Creatures.Select(NormalizeCreature));
         state.Eggs.AddRange(snapshot.Eggs.Select(NormalizeEgg));
-        state.Resources.AddRange(snapshot.Resources);
+        state.Resources.AddRange(snapshot.Resources.Select(NormalizeResource));
         state.RestoreLineageRecords(snapshot.LineageRecords);
         state.Stats.Restore(
             snapshot.CreatureBirthCount,
@@ -186,6 +186,22 @@ public static class SimulationSnapshotJson
             creature.BirthInvestmentRatio = 1f;
         }
 
+        if (creature.GutMeatCalories <= 0f)
+        {
+            creature.GutMeatQualityCalories = 0f;
+        }
+        else if (!float.IsFinite(creature.GutMeatQualityCalories) || creature.GutMeatQualityCalories <= 0f)
+        {
+            creature.GutMeatQualityCalories = creature.GutMeatCalories;
+        }
+        else
+        {
+            creature.GutMeatQualityCalories = Math.Clamp(
+                creature.GutMeatQualityCalories,
+                creature.GutMeatCalories * MeatQuality.MinimumFreshness,
+                creature.GutMeatCalories);
+        }
+
         return creature;
     }
 
@@ -207,6 +223,22 @@ public static class SimulationSnapshotJson
         }
 
         return egg;
+    }
+
+    private static ResourcePatchState NormalizeResource(ResourcePatchState resource)
+    {
+        if (resource.Kind != ResourceKind.Meat)
+        {
+            resource.MeatAgeSeconds = 0f;
+            return resource;
+        }
+
+        if (!float.IsFinite(resource.MeatAgeSeconds) || resource.MeatAgeSeconds < 0f)
+        {
+            resource.MeatAgeSeconds = 0f;
+        }
+
+        return resource;
     }
 
     private static JsonSerializerOptions CreateOptions()

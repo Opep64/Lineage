@@ -47,6 +47,8 @@ public sealed class EatingSystem(
             creature.LastCarcassCaloriesEaten = 0f;
             creature.LastEggCaloriesEaten = 0f;
             creature.LastLivePreyCaloriesEaten = 0f;
+            creature.LastFreshMeatCaloriesEaten = 0f;
+            creature.LastStaleMeatCaloriesEaten = 0f;
 
             var target = FindBestFoodContact(state, creature, genome, contactRadius);
 
@@ -108,6 +110,11 @@ public sealed class EatingSystem(
             }
 
             var efficiency = CreatureDigestion.EfficiencyFor(genome, resource.Kind);
+            if (resource.Kind == ResourceKind.Meat)
+            {
+                efficiency *= MeatQuality.Freshness(resource);
+            }
+
             var distanceSquared = centerDistance * centerDistance;
             if (IsBetterFoodContact(efficiency, edgeDistance, distanceSquared, bestEfficiency, bestEdgeDistance, bestDistanceSquared))
             {
@@ -192,7 +199,10 @@ public sealed class EatingSystem(
         }
 
         resource.Calories -= amount;
-        AddToGut(ref creature, resource.Kind, amount);
+        var meatFreshness = resource.Kind == ResourceKind.Meat
+            ? MeatQuality.Freshness(resource)
+            : 1f;
+        AddToGut(ref creature, resource.Kind, amount, meatFreshness);
         creature.LastCaloriesEaten = amount;
         if (resource.Kind == ResourceKind.Meat)
         {
@@ -203,6 +213,15 @@ public sealed class EatingSystem(
             else
             {
                 creature.LastCarcassCaloriesEaten = amount;
+            }
+
+            if (MeatQuality.IsFresh(meatFreshness))
+            {
+                creature.LastFreshMeatCaloriesEaten = amount;
+            }
+            else
+            {
+                creature.LastStaleMeatCaloriesEaten = amount;
             }
         }
         else
@@ -249,6 +268,7 @@ public sealed class EatingSystem(
         }
 
         creature.GutMeatCalories += amount;
+        creature.GutMeatQualityCalories += amount;
         creature.LastCaloriesEaten = amount;
         creature.LastEggCaloriesEaten = amount;
         creature.SecondsSinceLastMeal = 0f;
@@ -263,11 +283,12 @@ public sealed class EatingSystem(
         return Math.Max(0f, capacity - creature.GutPlantCalories - creature.GutMeatCalories);
     }
 
-    private static void AddToGut(ref CreatureState creature, ResourceKind kind, float amount)
+    private static void AddToGut(ref CreatureState creature, ResourceKind kind, float amount, float meatFreshness)
     {
         if (kind == ResourceKind.Meat)
         {
             creature.GutMeatCalories += amount;
+            creature.GutMeatQualityCalories += amount * Math.Clamp(meatFreshness, MeatQuality.MinimumFreshness, 1f);
         }
         else
         {

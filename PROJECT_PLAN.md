@@ -408,6 +408,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Refactor sensory language away from baked-in "prey" inputs. Living-creature perception is now neutral visible-creature perception; attack/fresh-kill/prey labels remain outcome labels after behavior happens. Done.
 - Attribute injury-death meat as short-lived fresh kills. Meat from attack deaths now carries the prey id, credited attacker id, and a short freshness window; only the credited attacker records this intake as fresh kill, while all other meat eating remains passive carcass scavenging. Done.
 - Add predator/prey outcome diagnostics. Stats snapshots, CSVs, CLI/Godot HTML reports, and the Godot HUD now expose creature-detection share, meat/fresh-kill intake shares, meat-derived energy share, and average diet/bite/resistance traits split across attacking and non-attacking creatures. Done.
+- Add age-based meat freshness. Meat patches now track age; stale meat still fills the gut but releases less usable meat energy, so scavenging old carcasses has an opportunity cost. Stats CSVs plus CLI/Godot HTML reports expose average meat freshness, fresh/stale carcass intake rates, and fresh/stale carcass intake shares. Done.
 - Add heritable combat tradeoffs. `BiteStrength` scales bite damage and bite action cost; `DamageResistance` reduces incoming bite damage; both are growth-scaled so juveniles are weaker and more fragile. Done.
 - Add scenario-backed upkeep costs for bite strength and damage resistance, plus report/trait-summary output and Godot inspection. Done.
 - Tune the first shared combat values. Gentle, balanced, harsh, and test scenarios currently use bite strength `0.55`, damage resistance `1.0`, bite strength upkeep `0.04`, damage resistance upkeep `0.03`, bite damage `0.18`, bite energy cost `0.15`, and bite reach `1.0`. Done.
@@ -416,6 +417,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Tune starter attack behavior after the living-creature sensing split. `SeedForager` now starts with attack strongly biased off, while `ForagerPredator` keeps explicit creature-proximity attack wiring. A 2026-05-22 10k tick probe across Balanced, Scavenger, Omnivore, and Predation with seeds 42-44 showed non-predator starter scenarios dropping to 0% attacking and 0 average injury deaths, while Predation Pressure remained unchanged at about 5.4% attacking and 87 average injury deaths. Follow-up: Balanced population rose from about 732 to 775 average final creatures, so future resource/reproduction pressure tuning may be needed. Done.
 - Retune Balanced reproduction pressure after disabling seed-forager starter attacks. A 2026-05-22 three-seed 10k probe compared current Balanced against a modest reproduction-cost variant and a modest resource-scarcity variant. The selected reproduction variant changes threshold `84 -> 90`, offspring investment `28 -> 30`, egg production `3.0 -> 2.8` kcal/s, and cooldown `7 -> 8` seconds. It reduced average final Balanced population from about `775` to `657` while keeping injury deaths at `0`, meat intake share near `20%`, and improving calories per distance from `0.183` to `0.210`. Probe files: `out/balanced_pressure_variant_probe_20260522.csv` and `.html`. Done.
 - Confirm four-scenario separation after the Balanced reproduction retune. A 2026-05-22 10k tick, three-seed probe across Balanced, Scavenger, Omnivore, and Predation produced average final populations of about `657`, `432`, `332`, and `140` respectively. Non-predator attack stayed at `0%`; Predation stayed at about `5.4%` attacking and `87` average injury deaths. Probe files: `out/four_scenario_probe_tuned_balanced_20260522.csv` and `.html`. Done.
+- First meat-freshness probe on 2026-05-22 ran Scavenger, Omnivore, and Predation for 10k ticks across seeds 42, 43, and 44. No freshness tuning was applied afterward. Average meat resources remained moderately fresh (`75-82%` freshness), carcass intake was mostly fresh rather than stale, and stale carcass intake was visible but not dominant. Probe files: `out/meat_freshness_probe_20260522.csv` and `.html`. Done.
 
 ### Phase 14: Terrain, Climate, And World Editing
 
@@ -510,6 +512,9 @@ Movement should eventually make actual speed matter, not only max-speed potentia
   - nearby egg kin-likeness
 - Let evolution decide what to do with these cues. Similarity should not hard-code friendship. Depending on ecology, the result might be tolerance, grouping, protection, mate preference, territorial defense, aggression, cannibalism, egg guarding, or egg predation.
 - Egg recognition is especially promising because eggs are immobile and vulnerable. Imperfect kin/egg cues could support protecting related eggs, eating unrelated eggs, cannibalism under starvation, nest defense, or parasite-like strategies.
+- Consider parasite-style creature interactions later. Very small creatures could evolve to grab or attach to larger hosts, then feed slowly through small bites or energy drain without immediately killing the host.
+- Parasite behavior would likely need a new grab/attach output, attachment state, host/parasite size rules, feeding-drain mechanics, dislodging or grooming defenses, attachment costs/risks, and telemetry for host-feeding energy share versus direct kills.
+- Possible parasite-related senses include relative host size, contact/attached state, host movement, host weakness, and defensive response cues. Taxonomy reports could classify parasite ecotypes by small body size, high attachment time, low direct-kill rate, and frequent host-derived feeding.
 - Defer this until creature-creature sensing, collision/range rules, and basic interaction/combat/guarding mechanics exist, so the brain has meaningful actions available after detecting similarity.
 
 ## Open Decisions
@@ -534,7 +539,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: use the source-aware feeding telemetry in longer tuned-scent probes and decide whether meat pressure needs a stronger ecological reason to use scent, such as scarcer plant zones, more persistent carcasses, or less egg-dominated meat intake.
+Next practical step: make stale/fresh meat pressure more evolvable. The current freshness curve is acceptable, so the next useful move is either a longer tail-sampled freshness probe or a small ecological pressure pass that makes old carcasses matter more before adding a dedicated carrion/fresh-meat digestion gene.
 
 ## Current Implementation State
 
@@ -813,6 +818,8 @@ Build, 57 core tests, 10k gentle/balanced/harsh digestion probes, 20k balanced/h
 Build, 58 core tests, CLI meat-scent smoke/report/snapshot/traits, and Godot headless `--quit-after 1` passed on 2026-05-21 after adding local meat scent inputs and telemetry.
 Build, 58 core tests, CLI tuned meat-scent smoke/report/snapshot/traits, and Godot headless `--quit-after 1` passed on 2026-05-21 after selecting `2x`/`60 kcal`/`1.0` as the shared scent tuning.
 Build, 58 core tests, CLI source-feeding smoke/report/snapshot/traits, and Godot headless `--quit-after 1` passed on 2026-05-21 after adding plant/carcass/egg/future-prey intake and plant/meat digested-energy telemetry.
+Build, 68 core tests, CLI meat-quality smoke/report, `git diff --check`, and Godot headless `--quit` passed on 2026-05-22 after adding age-based meat freshness and fresh/stale meat telemetry.
+Build and a 10k tick, three-seed Scavenger/Omnivore/Predation meat-freshness probe passed on 2026-05-22 after extending the lightweight probe CSV/report with fresh/stale carcass metrics.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 
@@ -1029,6 +1036,7 @@ The current smoke test runner covers:
 - split plant/meat sensing and diet-weighted generic food targeting
 - local meat scent beyond exact vision
 - source-aware plant, passive carcass, egg, and attacker-credited fresh-kill intake telemetry
+- age-based meat freshness reducing stale-carcass digestion energy and recording fresh/stale carcass intake
 - hiding food behind or outside a creature's vision cone
 - aggregate foraging diagnostics for seeing food, touching food, eating, visible density, calories eaten, time since meal, and effective vision traits
 - aggregate predator/prey outcome diagnostics for creature detection, meat/fresh-kill intake shares, meat-derived energy share, and attacker/non-attacker trait averages

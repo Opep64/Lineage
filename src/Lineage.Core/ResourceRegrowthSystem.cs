@@ -16,6 +16,7 @@ public sealed class ResourceRegrowthSystem(
             var resource = state.Resources[readIndex];
             if (resource.Kind == ResourceKind.Meat)
             {
+                resource.MeatAgeSeconds = Math.Max(0f, resource.MeatAgeSeconds + deltaSeconds);
                 if (resource.FreshKillSecondsRemaining > 0f)
                 {
                     resource.FreshKillSecondsRemaining = Math.Max(0f, resource.FreshKillSecondsRemaining - deltaSeconds);

@@ -34,6 +34,8 @@ public sealed class StatsRecordingSystem(
         var totalCarcassCaloriesEaten = 0f;
         var totalEggCaloriesEaten = 0f;
         var totalLivePreyCaloriesEaten = 0f;
+        var totalFreshMeatCaloriesEaten = 0f;
+        var totalStaleMeatCaloriesEaten = 0f;
         var totalCaloriesDigested = 0f;
         var totalPlantDigestedEnergy = 0f;
         var totalMeatDigestedEnergy = 0f;
@@ -88,6 +90,8 @@ public sealed class StatsRecordingSystem(
             totalCarcassCaloriesEaten += creature.LastCarcassCaloriesEaten;
             totalEggCaloriesEaten += creature.LastEggCaloriesEaten;
             totalLivePreyCaloriesEaten += creature.LastLivePreyCaloriesEaten;
+            totalFreshMeatCaloriesEaten += creature.LastFreshMeatCaloriesEaten;
+            totalStaleMeatCaloriesEaten += creature.LastStaleMeatCaloriesEaten;
             totalCaloriesDigested += creature.LastCaloriesDigested;
             totalPlantDigestedEnergy += creature.LastPlantDigestedEnergy;
             totalMeatDigestedEnergy += creature.LastMeatDigestedEnergy;
@@ -187,6 +191,7 @@ public sealed class StatsRecordingSystem(
         var totalResourceCalories = 0f;
         var totalPlantCalories = 0f;
         var totalMeatCalories = 0f;
+        var totalMeatFreshnessWeightedCalories = 0f;
         var plantResourceCount = 0;
         var meatResourceCount = 0;
         for (var i = 0; i < state.Resources.Count; i++)
@@ -197,6 +202,7 @@ public sealed class StatsRecordingSystem(
             {
                 meatResourceCount++;
                 totalMeatCalories += resource.Calories;
+                totalMeatFreshnessWeightedCalories += resource.Calories * MeatQuality.Freshness(resource);
             }
             else
             {
@@ -235,6 +241,12 @@ public sealed class StatsRecordingSystem(
         var livePreyCaloriesEatenPerSecond = deltaSeconds > 0f
             ? totalLivePreyCaloriesEaten / deltaSeconds
             : 0f;
+        var freshMeatCaloriesEatenPerSecond = deltaSeconds > 0f
+            ? totalFreshMeatCaloriesEaten / deltaSeconds
+            : 0f;
+        var staleMeatCaloriesEatenPerSecond = deltaSeconds > 0f
+            ? totalStaleMeatCaloriesEaten / deltaSeconds
+            : 0f;
         var caloriesDigestedPerSecond = deltaSeconds > 0f
             ? totalCaloriesDigested / deltaSeconds
             : 0f;
@@ -251,11 +263,21 @@ public sealed class StatsRecordingSystem(
             ? totalDistanceTraveled / deltaSeconds
             : 0f;
         var meatCaloriesEaten = totalCarcassCaloriesEaten + totalEggCaloriesEaten + totalLivePreyCaloriesEaten;
+        var carcassMeatCaloriesEaten = totalFreshMeatCaloriesEaten + totalStaleMeatCaloriesEaten;
         var meatCaloriesEatenShare = totalCaloriesEaten > 0f
             ? meatCaloriesEaten / totalCaloriesEaten
             : 0f;
+        var freshMeatCaloriesEatenShare = carcassMeatCaloriesEaten > 0f
+            ? totalFreshMeatCaloriesEaten / carcassMeatCaloriesEaten
+            : 0f;
+        var staleMeatCaloriesEatenShare = carcassMeatCaloriesEaten > 0f
+            ? totalStaleMeatCaloriesEaten / carcassMeatCaloriesEaten
+            : 0f;
         var freshKillCaloriesEatenShare = totalCaloriesEaten > 0f
             ? totalLivePreyCaloriesEaten / totalCaloriesEaten
+            : 0f;
+        var averageMeatFreshness = totalMeatCalories > 0f
+            ? totalMeatFreshnessWeightedCalories / totalMeatCalories
             : 0f;
         var meatDigestedEnergyShare = totalCaloriesDigested > 0f
             ? totalMeatDigestedEnergy / totalCaloriesDigested
@@ -349,6 +371,11 @@ public sealed class StatsRecordingSystem(
             attackerTotalDamageResistance / attackerDivisor,
             nonAttackerTotalDietaryAdaptation / nonAttackerDivisor,
             nonAttackerTotalBiteStrength / nonAttackerDivisor,
-            nonAttackerTotalDamageResistance / nonAttackerDivisor));
+            nonAttackerTotalDamageResistance / nonAttackerDivisor,
+            averageMeatFreshness,
+            freshMeatCaloriesEatenPerSecond,
+            staleMeatCaloriesEatenPerSecond,
+            freshMeatCaloriesEatenShare,
+            staleMeatCaloriesEatenShare));
     }
 }

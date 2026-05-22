@@ -27,6 +27,11 @@ public struct ResourcePatchState
     public float DecayCaloriesPerSecond { get; set; }
 
     /// <summary>
+    /// Seconds since this meat patch was created. Freshness falls as meat ages.
+    /// </summary>
+    public float MeatAgeSeconds { get; set; }
+
+    /// <summary>
     /// Creature credited with creating this meat patch while the fresh-kill window is active.
     /// </summary>
     public EntityId FreshKillAttackerId { get; set; }

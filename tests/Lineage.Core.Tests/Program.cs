@@ -13,6 +13,7 @@ var tests = new (string Name, Action Body)[]
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
     ("Fresh-kill resource credit expires", FreshKillResourceCreditExpires),
+    ("Meat freshness reduces digested energy", MeatFreshnessReducesDigestedEnergy),
     ("Eating transfers resource calories into creature energy", EatingTransfersCalories),
     ("Eating fills gut before digestion", EatingFillsGutBeforeDigestion),
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
@@ -365,6 +366,54 @@ static void FreshKillResourceCreditExpires()
     AssertClose(0f, meat.FreshKillSecondsRemaining, 0.000001, "Fresh-kill timer expires");
     AssertEqual(default(EntityId), meat.FreshKillAttackerId, "Expired fresh-kill attacker clears");
     AssertEqual(default(EntityId), meat.FreshKillPreyId, "Expired fresh-kill prey clears");
+    AssertClose(1f, meat.MeatAgeSeconds, 0.000001, "Meat age advances");
+}
+
+static void MeatFreshnessReducesDigestedEnergy()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 231,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex),
+            new DigestionSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 10f,
+        DigestionCaloriesPerSecond = 10f,
+        DietaryAdaptation = 1f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        DecayCaloriesPerSecond = 0f,
+        MeatAgeSeconds = MeatQuality.StaleAgeSeconds
+    });
+
+    simulation.Step();
+
+    var creature = simulation.State.Creatures[0];
+    var expectedEnergy = 10f * MeatQuality.MinimumFreshness;
+    AssertClose(10f + expectedEnergy, creature.Energy, 0.000001, "Stale meat releases reduced energy");
+    AssertClose(10f, creature.LastCarcassCaloriesEaten, 0.000001, "Stale carcass raw calories eaten");
+    AssertClose(0f, creature.LastFreshMeatCaloriesEaten, 0.000001, "No fresh meat recorded");
+    AssertClose(10f, creature.LastStaleMeatCaloriesEaten, 0.000001, "Stale meat recorded");
+    AssertClose(expectedEnergy, creature.LastMeatDigestedEnergy, 0.000001, "Stale meat digested energy");
+    AssertClose(0f, creature.GutMeatCalories, 0.000001, "Meat gut emptied");
+    AssertClose(0f, creature.GutMeatQualityCalories, 0.000001, "Meat quality gut emptied");
 }
 
 static void EatingTransfersCalories()
@@ -2141,6 +2190,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.LastCarcassCaloriesEaten = 1f;
     seeingCreature.LastEggCaloriesEaten = 0.5f;
     seeingCreature.LastLivePreyCaloriesEaten = 0.25f;
+    seeingCreature.LastFreshMeatCaloriesEaten = 1f;
     seeingCreature.LastCaloriesDigested = 3.5f;
     seeingCreature.LastPlantDigestedEnergy = 2f;
     seeingCreature.LastMeatDigestedEnergy = 1.5f;
@@ -2231,6 +2281,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(1.5f, snapshot.TotalMeatDigestedEnergyPerSecond, 0.000001, "Meat energy digested per second");
     AssertClose(1.75f / 4.25f, snapshot.MeatCaloriesEatenShare, 0.000001, "Meat calories eaten share");
     AssertClose(0.25f / 4.25f, snapshot.FreshKillCaloriesEatenShare, 0.000001, "Fresh kill calories eaten share");
+    AssertClose(0f, snapshot.AverageMeatFreshness, 0.000001, "Average meat freshness without meat resources");
+    AssertClose(1f, snapshot.TotalFreshMeatCaloriesEatenPerSecond, 0.000001, "Fresh meat calories eaten per second");
+    AssertClose(0f, snapshot.TotalStaleMeatCaloriesEatenPerSecond, 0.000001, "Stale meat calories eaten per second");
+    AssertClose(1f, snapshot.FreshMeatCaloriesEatenShare, 0.000001, "Fresh carcass share");
+    AssertClose(0f, snapshot.StaleMeatCaloriesEatenShare, 0.000001, "Stale carcass share");
     AssertClose(1.5f / 3.5f, snapshot.MeatDigestedEnergyShare, 0.000001, "Meat digested energy share");
     AssertClose(0.5f, snapshot.AverageGutFillRatio, 0.000001, "Average gut fill");
     AssertClose(0.4f, snapshot.AverageGutPlantShare, 0.000001, "Average gut plant share");

@@ -80,4 +80,9 @@ public readonly record struct SimulationStatsSnapshot(
     float AttackerAverageDamageResistance,
     float NonAttackerAverageDietaryAdaptation,
     float NonAttackerAverageBiteStrength,
-    float NonAttackerAverageDamageResistance);
+    float NonAttackerAverageDamageResistance,
+    float AverageMeatFreshness,
+    float TotalFreshMeatCaloriesEatenPerSecond,
+    float TotalStaleMeatCaloriesEatenPerSecond,
+    float FreshMeatCaloriesEatenShare,
+    float StaleMeatCaloriesEatenShare);
