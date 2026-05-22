@@ -18,6 +18,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly List<int> _eggCandidates = [];
     private readonly HashSet<int> _seenEggCandidates = [];
     private readonly List<int> _creatureCandidates = [];
+    private float[] _cachedBodyRadii = [];
+    private float[] _cachedMaxSpeeds = [];
+    private int[] _cachedTraitStamps = [];
+    private int _traitCacheStamp;
 
     public CreatureSensingSystem(
         UniformSpatialIndex spatialIndex,
@@ -48,6 +52,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     public void Update(WorldState state, float deltaSeconds)
     {
+        BeginTraitCache(state.Creatures.Count);
+
         for (var i = 0; i < state.Creatures.Count; i++)
         {
             var creature = state.Creatures[i];
@@ -244,8 +250,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     continue;
                 }
 
-                var otherGenome = state.GetGenome(otherCreature.GenomeId);
-                var otherRadius = CreatureGrowth.EffectiveBodyRadius(otherCreature, otherGenome);
+                var otherTraits = GetCreatureTraits(state, otherCreatureIndex);
+                var otherRadius = otherTraits.BodyRadius;
                 var toOther = otherCreature.Position - creature.Position;
                 var centerDistance = toOther.Length;
                 var edgeDistance = Math.Max(0f, centerDistance - otherRadius);
@@ -326,8 +332,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ApplyGenericCreatureSense(
                     ref senses,
                     state.Creatures[bestVisibleFoodIndex],
-                    state.GetGenome(state.Creatures[bestVisibleFoodIndex].GenomeId),
-                    genome,
+                    GetCreatureTraits(state, bestVisibleFoodIndex),
+                    GetCreatureTraits(state, i),
                     creature,
                     forward,
                     right,
@@ -370,8 +376,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ApplyMeatCreatureSense(
                     ref senses,
                     state.Creatures[nearestVisibleMeatIndex],
-                    state.GetGenome(state.Creatures[nearestVisibleMeatIndex].GenomeId),
-                    genome,
+                    GetCreatureTraits(state, nearestVisibleMeatIndex),
+                    GetCreatureTraits(state, i),
                     creature,
                     forward,
                     right,
@@ -383,8 +389,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ApplyCreatureSense(
                     ref senses,
                     state.Creatures[nearestVisibleCreatureIndex],
-                    state.GetGenome(state.Creatures[nearestVisibleCreatureIndex].GenomeId),
-                    genome,
+                    GetCreatureTraits(state, nearestVisibleCreatureIndex),
+                    GetCreatureTraits(state, i),
                     creature,
                     forward,
                     right,
@@ -451,8 +457,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private static void ApplyGenericCreatureSense(
         ref CreatureSenseState senses,
         CreatureState visibleCreature,
-        CreatureGenome visibleCreatureGenome,
-        CreatureGenome creatureGenome,
+        CreatureSensingTraits visibleTraits,
+        CreatureSensingTraits creatureTraits,
         CreatureState creature,
         SimVector2 forward,
         SimVector2 right,
@@ -460,9 +466,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     {
         var sense = CalculateCreatureSense(
             visibleCreature,
-            visibleCreatureGenome,
+            visibleTraits,
             creature,
-            creatureGenome,
+            creatureTraits,
             forward,
             right,
             effectiveSenseRadius);
@@ -520,8 +526,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private static void ApplyMeatCreatureSense(
         ref CreatureSenseState senses,
         CreatureState visibleCreature,
-        CreatureGenome visibleCreatureGenome,
-        CreatureGenome creatureGenome,
+        CreatureSensingTraits visibleTraits,
+        CreatureSensingTraits creatureTraits,
         CreatureState creature,
         SimVector2 forward,
         SimVector2 right,
@@ -529,9 +535,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     {
         var sense = CalculateCreatureSense(
             visibleCreature,
-            visibleCreatureGenome,
+            visibleTraits,
             creature,
-            creatureGenome,
+            creatureTraits,
             forward,
             right,
             effectiveSenseRadius);
@@ -544,8 +550,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private static void ApplyCreatureSense(
         ref CreatureSenseState senses,
         CreatureState visibleCreature,
-        CreatureGenome visibleCreatureGenome,
-        CreatureGenome creatureGenome,
+        CreatureSensingTraits visibleTraits,
+        CreatureSensingTraits creatureTraits,
         CreatureState creature,
         SimVector2 forward,
         SimVector2 right,
@@ -553,9 +559,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     {
         var sense = CalculateCreatureSense(
             visibleCreature,
-            visibleCreatureGenome,
+            visibleTraits,
             creature,
-            creatureGenome,
+            creatureTraits,
             forward,
             right,
             effectiveSenseRadius);
@@ -585,27 +591,27 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private static CreatureVisualSense CalculateCreatureSense(
         CreatureState visibleCreature,
-        CreatureGenome visibleCreatureGenome,
+        CreatureSensingTraits visibleTraits,
         CreatureState creature,
-        CreatureGenome creatureGenome,
+        CreatureSensingTraits creatureTraits,
         SimVector2 forward,
         SimVector2 right,
         float effectiveSenseRadius)
     {
         var contactSense = CalculateFoodSense(
             visibleCreature.Position,
-            CreatureGrowth.EffectiveBodyRadius(visibleCreature, visibleCreatureGenome),
+            visibleTraits.BodyRadius,
             creature,
             forward,
             right,
             effectiveSenseRadius);
-        var selfRadius = CreatureGrowth.EffectiveBodyRadius(creature, creatureGenome);
-        var visibleRadius = CreatureGrowth.EffectiveBodyRadius(visibleCreature, visibleCreatureGenome);
+        var selfRadius = creatureTraits.BodyRadius;
+        var visibleRadius = visibleTraits.BodyRadius;
         var radiusScale = MathF.Max(0.001f, MathF.Max(selfRadius, visibleRadius));
         var relativeBodySize = Math.Clamp((visibleRadius - selfRadius) / radiusScale, -1f, 1f);
 
-        var selfMaxSpeed = MathF.Max(1f, CreatureGrowth.EffectiveMaxSpeed(creature, creatureGenome));
-        var visibleMaxSpeed = MathF.Max(1f, CreatureGrowth.EffectiveMaxSpeed(visibleCreature, visibleCreatureGenome));
+        var selfMaxSpeed = MathF.Max(1f, creatureTraits.MaxSpeed);
+        var visibleMaxSpeed = MathF.Max(1f, visibleTraits.MaxSpeed);
         var relativeSpeed = Math.Clamp(
             (visibleCreature.Velocity.Length - creature.Velocity.Length) / selfMaxSpeed,
             -1f,
@@ -667,10 +673,48 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         return SimVector2.Dot(direction, forward) >= visionCosThreshold;
     }
 
+    private void BeginTraitCache(int creatureCount)
+    {
+        if (_cachedTraitStamps.Length < creatureCount)
+        {
+            Array.Resize(ref _cachedBodyRadii, creatureCount);
+            Array.Resize(ref _cachedMaxSpeeds, creatureCount);
+            Array.Resize(ref _cachedTraitStamps, creatureCount);
+        }
+
+        if (_traitCacheStamp == int.MaxValue)
+        {
+            Array.Clear(_cachedTraitStamps);
+            _traitCacheStamp = 0;
+        }
+
+        _traitCacheStamp++;
+    }
+
+    private CreatureSensingTraits GetCreatureTraits(WorldState state, int creatureIndex)
+    {
+        if (_cachedTraitStamps[creatureIndex] != _traitCacheStamp)
+        {
+            var creature = state.Creatures[creatureIndex];
+            var genome = state.GetGenome(creature.GenomeId);
+            _cachedBodyRadii[creatureIndex] = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+            _cachedMaxSpeeds[creatureIndex] = CreatureGrowth.EffectiveMaxSpeed(creature, genome);
+            _cachedTraitStamps[creatureIndex] = _traitCacheStamp;
+        }
+
+        return new CreatureSensingTraits(
+            _cachedBodyRadii[creatureIndex],
+            _cachedMaxSpeeds[creatureIndex]);
+    }
+
     private readonly record struct ResourceSense(
         float Proximity,
         float DirectionForward,
         float DirectionRight);
+
+    private readonly record struct CreatureSensingTraits(
+        float BodyRadius,
+        float MaxSpeed);
 
     private readonly record struct CreatureVisualSense(
         float Proximity,
