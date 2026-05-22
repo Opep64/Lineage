@@ -5,10 +5,13 @@ namespace Lineage.Core;
 /// </summary>
 public sealed class MovementSystem(
     BiomePressureProfile? biomeMovementCostProfile = null,
+    BiomePressureProfile? biomeSpeedProfile = null,
     float movementSpeedCostExponent = 1f) : ISimulationSystem
 {
     private readonly BiomePressureProfile _biomeMovementCostProfile =
         BiomePressureProfile.Validate(biomeMovementCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeMovementCostProfile));
+    private readonly BiomePressureProfile _biomeSpeedProfile =
+        BiomePressureProfile.Validate(biomeSpeedProfile ?? BiomePressureProfile.Neutral, nameof(biomeSpeedProfile));
     private readonly float _movementSpeedCostExponent = ValidateExponent(
         movementSpeedCostExponent,
         nameof(movementSpeedCostExponent));
@@ -20,9 +23,12 @@ public sealed class MovementSystem(
             var creature = state.Creatures[i];
             var genome = state.GetGenome(creature.GenomeId);
             var effectiveMaxSpeed = CreatureGrowth.EffectiveMaxSpeed(creature, genome);
-            var desiredVelocity = creature.DesiredVelocity.ClampedLength(effectiveMaxSpeed);
             var previousPosition = creature.Position;
-            var nextPosition = state.Bounds.Clamp(previousPosition + desiredVelocity * deltaSeconds);
+            var biome = state.Biomes.GetKindAt(previousPosition);
+            var desiredVelocity = creature.DesiredVelocity.ClampedLength(effectiveMaxSpeed);
+            var biomeSpeedMultiplier = _biomeSpeedProfile.For(biome);
+            var terrainAdjustedVelocity = desiredVelocity * biomeSpeedMultiplier;
+            var nextPosition = state.Bounds.Clamp(previousPosition + terrainAdjustedVelocity * deltaSeconds);
             var distanceTraveled = SimVector2.Distance(previousPosition, nextPosition);
 
             creature.Position = nextPosition;

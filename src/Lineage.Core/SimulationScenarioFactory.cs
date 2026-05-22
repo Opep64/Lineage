@@ -59,6 +59,7 @@ public static class SimulationScenarioFactory
                 scenario.ResourceClusterRadius,
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
+                scenario.CreateBiomeSpeedProfile(),
                 scenario.MovementSpeedCostExponent),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
@@ -89,6 +90,7 @@ public static class SimulationScenarioFactory
                 scenario.ResourceClusterRadius,
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
+                scenario.CreateBiomeSpeedProfile(),
                 scenario.MovementSpeedCostExponent),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };

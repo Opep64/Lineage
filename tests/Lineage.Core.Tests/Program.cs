@@ -7,6 +7,7 @@ var tests = new (string Name, Action Body)[]
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
     ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
+    ("Movement speed follows biome multiplier", MovementSpeedFollowsBiomeMultiplier),
     ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
@@ -218,6 +219,36 @@ static void MovementCostFollowsBiomeMultiplier()
     simulation.Step();
 
     AssertClose(16.5f, simulation.State.Creatures[0].Energy, 0.000001, "Movement biome cost");
+}
+
+static void MovementSpeedFollowsBiomeMultiplier()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 24,
+        systems: [new MovementSystem(biomeSpeedProfile: new BiomePressureProfile(1f, 1f, 0.5f, 1f))]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 24f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(12f, 0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var moved = simulation.State.Creatures[0];
+    AssertClose(26f, moved.Position.X, 0.000001, "Biome speed x position");
+    AssertClose(6f, moved.Velocity.Length, 0.000001, "Biome speed actual velocity");
+    AssertClose(6f, moved.LastDistanceTraveled, 0.000001, "Biome speed distance");
 }
 
 static void MovementSpeedCostIsNonlinear()
@@ -2187,7 +2218,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
         seed: 12,
         systems: [new StatsRecordingSystem(
             biomeMovementCostProfile: new BiomePressureProfile(1f, 1f, 1.25f, 1f),
-            biomeBasalCostProfile: new BiomePressureProfile(1f, 1f, 1.5f, 1f))]);
+            biomeBasalCostProfile: new BiomePressureProfile(1f, 1f, 1.5f, 1f),
+            biomeSpeedProfile: new BiomePressureProfile(1f, 1f, 0.75f, 1f))]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
     simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
@@ -2281,6 +2313,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.RichCreatureCount, "Rich creature count");
     AssertClose(1.25f, snapshot.AverageBiomeMovementCostMultiplier, 0.000001, "Average biome movement cost");
     AssertClose(1.5f, snapshot.AverageBiomeBasalCostMultiplier, 0.000001, "Average biome basal cost");
+    AssertClose(0.75f, snapshot.AverageBiomeSpeedMultiplier, 0.000001, "Average biome speed");
     AssertEqual(2, snapshot.FoodDetectedCreatureCount, "Food detected count");
     AssertEqual(1, snapshot.PlantDetectedCreatureCount, "Plant detected count");
     AssertEqual(1, snapshot.MeatDetectedCreatureCount, "Meat detected count");
@@ -2889,6 +2922,10 @@ static void ScenarioJsonRoundTrips()
         SparseBiomeMovementCostMultiplier = 1.2f,
         GrasslandBiomeMovementCostMultiplier = 1.05f,
         RichBiomeMovementCostMultiplier = 0.85f,
+        BarrenBiomeSpeedMultiplier = 0.7f,
+        SparseBiomeSpeedMultiplier = 0.85f,
+        GrasslandBiomeSpeedMultiplier = 1f,
+        RichBiomeSpeedMultiplier = 1.05f,
         BarrenBiomeBasalCostMultiplier = 1.3f,
         SparseBiomeBasalCostMultiplier = 1.1f,
         GrasslandBiomeBasalCostMultiplier = 1.02f,
@@ -2943,6 +2980,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
+    AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
@@ -2961,6 +2999,10 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.SparseBiomeMovementCostMultiplier, roundTripped.SparseBiomeMovementCostMultiplier, 0.000001, "Scenario sparse movement biome cost");
     AssertClose(scenario.GrasslandBiomeMovementCostMultiplier, roundTripped.GrasslandBiomeMovementCostMultiplier, 0.000001, "Scenario grassland movement biome cost");
     AssertClose(scenario.RichBiomeMovementCostMultiplier, roundTripped.RichBiomeMovementCostMultiplier, 0.000001, "Scenario rich movement biome cost");
+    AssertClose(scenario.BarrenBiomeSpeedMultiplier, roundTripped.BarrenBiomeSpeedMultiplier, 0.000001, "Scenario barren biome speed");
+    AssertClose(scenario.SparseBiomeSpeedMultiplier, roundTripped.SparseBiomeSpeedMultiplier, 0.000001, "Scenario sparse biome speed");
+    AssertClose(scenario.GrasslandBiomeSpeedMultiplier, roundTripped.GrasslandBiomeSpeedMultiplier, 0.000001, "Scenario grassland biome speed");
+    AssertClose(scenario.RichBiomeSpeedMultiplier, roundTripped.RichBiomeSpeedMultiplier, 0.000001, "Scenario rich biome speed");
     AssertClose(scenario.BarrenBiomeBasalCostMultiplier, roundTripped.BarrenBiomeBasalCostMultiplier, 0.000001, "Scenario barren basal biome cost");
     AssertClose(scenario.SparseBiomeBasalCostMultiplier, roundTripped.SparseBiomeBasalCostMultiplier, 0.000001, "Scenario sparse basal biome cost");
     AssertClose(scenario.GrasslandBiomeBasalCostMultiplier, roundTripped.GrasslandBiomeBasalCostMultiplier, 0.000001, "Scenario grassland basal biome cost");

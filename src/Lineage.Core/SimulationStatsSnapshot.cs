@@ -26,6 +26,7 @@ public readonly record struct SimulationStatsSnapshot(
     int RichCreatureCount,
     float AverageBiomeMovementCostMultiplier,
     float AverageBiomeBasalCostMultiplier,
+    float AverageBiomeSpeedMultiplier,
     int FoodDetectedCreatureCount,
     int PlantDetectedCreatureCount,
     int MeatDetectedCreatureCount,

@@ -445,6 +445,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add hazards as zone/world entities or terrain overlays. Examples include fire, disease pressure, toxin zones, freezing areas, flooding, drought, radiation/ash, predators later, and other local dangers. Hazards should have detectable cues where appropriate.
 - Expand the Godot scenario editor from numeric scenario fields into a world-editing tool that can inspect and alter zones, terrain types, fertility, movement cost, temperature, obstacles, and hazards. This should eventually support painting/editing cells or regions and saving the result as part of a scenario or snapshot.
 - Keep authored terrain/climate controls deterministic and inspectable so CLI runs, reports, snapshots, and viewer state all agree.
+- Add a first biome speed/drag layer. Scenarios now include per-biome speed multipliers separate from movement-energy and basal-energy multipliers. `MovementSystem` scales actual displacement by the local biome speed multiplier, while stats, CLI CSV/probe output, CLI/Godot HTML reports, and the Godot HUD/inspector expose average speed pressure. Starter scenarios currently use barren `0.55x`, sparse `0.80x`, grassland `1.0x`, and rich `1.0x` so bad terrain slows traversal without making rich cells a movement bonus. A 2026-05-22 5k two-seed probe across Balanced, Harsh, Scavenger, and Predation compared base, `drag-medium`, and `drag-hard`; `drag-hard` stayed viable and added modest pressure without the earlier calorie-only side effect where rich-biome discounts made Balanced easier. Probe file: `out/biome_speed_drag_probe_20260522.csv` with matching `.html` report. Done.
 
 ### Far Future: Self-Sustaining Ecology
 
@@ -547,7 +548,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: add a small biome speed/drag pressure layer, then compare it with probe variants before deciding whether a separate terrain layer is necessary. The goal is for costly areas to feel spatially meaningful, not just as a background calorie tax.
+Next practical step: run a longer confirmation probe on the selected biome speed/drag values, then decide whether to add local terrain sensing or a separate terrain layer.
 
 ## Current Implementation State
 
@@ -666,7 +667,7 @@ Core types currently present:
 
 - `Simulation`: the root update boundary for Godot, CLI tools, and tests.
 - `SimulationConfig`: validated scenario-level settings.
-- `SimulationScenario`: reproducible setup parameters shared by Godot and CLI, including food pressure, resource clustering, resource void border, starting energy-trait knobs, trait upkeep costs, egg exposure pressure, and initial brain mode.
+- `SimulationScenario`: reproducible setup parameters shared by Godot and CLI, including food pressure, resource clustering, resource void border, biome movement/basal/speed pressure, starting energy-trait knobs, trait upkeep costs, egg exposure pressure, and initial brain mode.
 - `SimulationScenarioJson`: JSON load/save helpers for scenario files.
 - `SimulationScenarioFactory`: creates and seeds simulations from scenarios.
 - `ResourcePlacement`: shared initial/relocated plant placement rules, including biome-weighted fallback and optional clustering around live plants.
@@ -840,6 +841,7 @@ Build, 69 core tests, CLI smoke/report/traits, Godot headless `--quit`, `git dif
 Build, 69 core tests, Godot headless `--quit`, `git diff --check`, a pre-tune 15k Scavenger/Omnivore probe, a 30k Scavenger seed-42 diagnostic run, and a matched post-tune 15k Scavenger/Omnivore probe passed on 2026-05-22 after tuning carrion effect size and mutation ramp.
 Build, 69 core tests, `git diff --check`, and a two-row Scavenger probe variant smoke passed on 2026-05-22 after adding temporary probe variants.
 Three biome pressure probe passes completed on 2026-05-22 after adding temporary probe variants. No scenario tuning was applied because stronger energy-only biome movement costs did not consistently improve pressure.
+Build, 70 core tests, CLI biome-speed smoke, Godot headless `--quit`, and a 5k two-seed biome-speed drag probe passed on 2026-05-22 after adding biome speed multipliers and selecting the first shared starter values.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

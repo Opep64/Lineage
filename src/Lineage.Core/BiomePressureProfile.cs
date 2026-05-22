@@ -1,7 +1,7 @@
 namespace Lineage.Core;
 
 /// <summary>
-/// Per-biome cost multipliers for environmental pressure that creatures experience indirectly.
+/// Per-biome multipliers for environmental pressure that creatures experience indirectly.
 /// </summary>
 public readonly record struct BiomePressureProfile(
     float Barren,

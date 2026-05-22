@@ -94,6 +94,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Max generation", snapshot.MaxGeneration.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Avg movement biome cost", $"{snapshot.AverageBiomeMovementCostMultiplier:0.###}x");
         WriteMetric(writer, "Avg basal biome cost", $"{snapshot.AverageBiomeBasalCostMultiplier:0.###}x");
+        WriteMetric(writer, "Avg biome speed", $"{snapshot.AverageBiomeSpeedMultiplier:0.###}x");
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -187,6 +188,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
         WriteMetric(writer, "Biome movement costs", FormatBiomePressureProfile(scenario.CreateBiomeMovementCostProfile()));
         WriteMetric(writer, "Biome basal costs", FormatBiomePressureProfile(scenario.CreateBiomeBasalCostProfile()));
+        WriteMetric(writer, "Biome speed", FormatBiomePressureProfile(scenario.CreateBiomeSpeedProfile()));
         WriteMetric(writer, "Basal upkeep", $"{scenario.BasalEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Body radius upkeep", $"{scenario.BodyRadiusEnergyCostPerSecond:0.###} energy/radius/s");
         WriteMetric(writer, "Max speed upkeep", $"{scenario.MaxSpeedEnergyCostPerSecond:0.######} energy/speed/s");
@@ -235,10 +237,11 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Move Cost</th><th>Basal Cost</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Move Cost</th><th>Basal Cost</th><th>Speed</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
         writer.WriteLine("<tbody>");
         var movementCostProfile = scenario.CreateBiomeMovementCostProfile();
         var basalCostProfile = scenario.CreateBiomeBasalCostProfile();
+        var speedProfile = scenario.CreateBiomeSpeedProfile();
         foreach (var summary in biomeSummaries)
         {
             var resourcesPerMillion = summary.Area > 0f
@@ -247,6 +250,7 @@ public static class ViewerReportWriter
             var livingCreatureCount = CreatureCountForBiome(snapshot, summary.Kind);
             var movementCost = movementCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             var basalCost = basalCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
+            var speed = speedProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             writer.WriteLine(
                 "<tr>" +
                 $"<td>{Html(summary.Kind)}</td>" +
@@ -255,6 +259,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(summary.ResourceRegrowthMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html($"{movementCost}x")}</td>" +
                 $"<td>{Html($"{basalCost}x")}</td>" +
+                $"<td>{Html($"{speed}x")}</td>" +
                 $"<td>{Html(summary.ResourceCount)}</td>" +
                 $"<td>{Html(resourcesPerMillion.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.ResourceCalories.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
@@ -621,11 +626,12 @@ public static class ViewerReportWriter
             new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => Share(snapshot.RichCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
-            "Biome costs",
+            "Biome pressure",
             "x",
             snapshots,
             new ChartSeries("Move cost", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageBiomeMovementCostMultiplier).ToArray()),
-            new ChartSeries("Basal cost", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageBiomeBasalCostMultiplier).ToArray()));
+            new ChartSeries("Basal cost", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageBiomeBasalCostMultiplier).ToArray()),
+            new ChartSeries("Speed", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageBiomeSpeedMultiplier).ToArray()));
         WriteLineChart(
             writer,
             "Foraging signals",

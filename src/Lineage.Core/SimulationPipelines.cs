@@ -34,6 +34,7 @@ public static class SimulationPipelines
         float resourceClusterRadius = 180f,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
+        BiomePressureProfile? biomeSpeedProfile = null,
         float movementSpeedCostExponent = 1f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
@@ -55,7 +56,7 @@ public static class SimulationPipelines
                 biomeBasalCostProfile),
             new SpatialIndexRebuildSystem(spatialIndex),
             new SimpleForagingSystem(spatialIndex),
-            new MovementSystem(biomeMovementCostProfile, movementSpeedCostExponent),
+            new MovementSystem(biomeMovementCostProfile, biomeSpeedProfile, movementSpeedCostExponent),
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
             new DigestionSystem(),
@@ -63,7 +64,7 @@ public static class SimulationPipelines
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
-            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile)
+            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile, biomeSpeedProfile)
         ];
     }
 
@@ -96,6 +97,7 @@ public static class SimulationPipelines
         float resourceClusterRadius = 180f,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
+        BiomePressureProfile? biomeSpeedProfile = null,
         float movementSpeedCostExponent = 1f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
@@ -122,7 +124,7 @@ public static class SimulationPipelines
                 meatScentCaloriesForFullStrength,
                 meatScentDensitySaturation),
             new NeuralControllerSystem(),
-            new MovementSystem(biomeMovementCostProfile, movementSpeedCostExponent),
+            new MovementSystem(biomeMovementCostProfile, biomeSpeedProfile, movementSpeedCostExponent),
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex, requireEatIntent: true),
             new DigestionSystem(),
@@ -136,7 +138,7 @@ public static class SimulationPipelines
                 biteRangePadding,
                 requireAttackIntent: true),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
-            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile)
+            new StatsRecordingSystem(statsSnapshotIntervalTicks, biomeMovementCostProfile, biomeBasalCostProfile, biomeSpeedProfile)
         ];
     }
 }

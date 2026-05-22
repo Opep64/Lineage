@@ -82,6 +82,14 @@ public sealed record SimulationScenario
 
     public float RichBiomeMovementCostMultiplier { get; init; } = 0.92f;
 
+    public float BarrenBiomeSpeedMultiplier { get; init; } = 1f;
+
+    public float SparseBiomeSpeedMultiplier { get; init; } = 1f;
+
+    public float GrasslandBiomeSpeedMultiplier { get; init; } = 1f;
+
+    public float RichBiomeSpeedMultiplier { get; init; } = 1f;
+
     public float BarrenBiomeBasalCostMultiplier { get; init; } = 1.18f;
 
     public float SparseBiomeBasalCostMultiplier { get; init; } = 1.06f;
@@ -197,6 +205,7 @@ public sealed record SimulationScenario
         EnsureProbability(ResourceClusterStrength, nameof(ResourceClusterStrength));
         EnsurePositive(ResourceClusterRadius, nameof(ResourceClusterRadius));
         _ = BiomePressureProfile.Validate(CreateBiomeMovementCostProfile(), "BiomeMovementCostProfile");
+        _ = BiomePressureProfile.Validate(CreateBiomeSpeedProfile(), "BiomeSpeedProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
         EnsureNonNegative(BodyRadiusEnergyCostPerSecond, nameof(BodyRadiusEnergyCostPerSecond));
@@ -274,6 +283,15 @@ public sealed record SimulationScenario
             SparseBiomeBasalCostMultiplier,
             GrasslandBiomeBasalCostMultiplier,
             RichBiomeBasalCostMultiplier);
+    }
+
+    public BiomePressureProfile CreateBiomeSpeedProfile()
+    {
+        return new BiomePressureProfile(
+            BarrenBiomeSpeedMultiplier,
+            SparseBiomeSpeedMultiplier,
+            GrasslandBiomeSpeedMultiplier,
+            RichBiomeSpeedMultiplier);
     }
 
     public int CalculateInitialResourceCount()
