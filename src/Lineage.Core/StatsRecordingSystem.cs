@@ -70,6 +70,20 @@ public sealed class StatsRecordingSystem(
         var totalEnergySurplusRatio = 0f;
         var totalRecentFoodSuccess = 0f;
         var totalMemoryStrength = 0f;
+        var memoryUserCaloriesEaten = 0f;
+        var nonMemoryUserCaloriesEaten = 0f;
+        var memoryUserDistanceTraveled = 0f;
+        var nonMemoryUserDistanceTraveled = 0f;
+        var memoryUserSecondsSinceLastMeal = 0f;
+        var nonMemoryUserSecondsSinceLastMeal = 0f;
+        var memoryUserDistanceSinceLastMeal = 0f;
+        var nonMemoryUserDistanceSinceLastMeal = 0f;
+        var memoryUserRecentFoodSuccess = 0f;
+        var nonMemoryUserRecentFoodSuccess = 0f;
+        var memoryUserGenerationTotal = 0;
+        var nonMemoryUserGenerationTotal = 0;
+        var memoryUserMaxXReachedTotal = 0f;
+        var nonMemoryUserMaxXReachedTotal = 0f;
         var totalVisionRange = 0f;
         var totalVisionAngle = 0f;
         var totalDietaryAdaptation = 0f;
@@ -100,6 +114,13 @@ public sealed class StatsRecordingSystem(
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
         var activeMemoryCreatureCount = 0;
+        var nonMemoryCreatureCount = 0;
+        var memoryUserFoodContactCount = 0;
+        var nonMemoryUserFoodContactCount = 0;
+        var memoryUserEatingCount = 0;
+        var nonMemoryUserEatingCount = 0;
+        var memoryUserRightRegionCount = 0;
+        var nonMemoryUserRightRegionCount = 0;
         var nonAttackingCreatureCount = 0;
         var barrenCreatureCount = 0;
         var sparseCreatureCount = 0;
@@ -158,9 +179,46 @@ public sealed class StatsRecordingSystem(
             totalRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
             var memoryStrength = Math.Clamp(creature.MemoryVector.Length, 0f, 1f);
             totalMemoryStrength += memoryStrength;
-            if (memoryStrength > 0.05f)
+            var isActiveMemoryUser = memoryStrength > 0.05f;
+            if (isActiveMemoryUser)
             {
                 activeMemoryCreatureCount++;
+                memoryUserCaloriesEaten += creature.LastCaloriesEaten;
+                memoryUserDistanceTraveled += creature.LastDistanceTraveled;
+                memoryUserSecondsSinceLastMeal += creature.SecondsSinceLastMeal;
+                memoryUserDistanceSinceLastMeal += creature.DistanceSinceLastMeal;
+                memoryUserRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
+                memoryUserGenerationTotal += creature.Generation;
+                memoryUserMaxXReachedTotal += creature.MaxXReached;
+                if (creature.IsTouchingFood)
+                {
+                    memoryUserFoodContactCount++;
+                }
+
+                if (creature.LastCaloriesEaten > 0f)
+                {
+                    memoryUserEatingCount++;
+                }
+            }
+            else
+            {
+                nonMemoryCreatureCount++;
+                nonMemoryUserCaloriesEaten += creature.LastCaloriesEaten;
+                nonMemoryUserDistanceTraveled += creature.LastDistanceTraveled;
+                nonMemoryUserSecondsSinceLastMeal += creature.SecondsSinceLastMeal;
+                nonMemoryUserDistanceSinceLastMeal += creature.DistanceSinceLastMeal;
+                nonMemoryUserRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
+                nonMemoryUserGenerationTotal += creature.Generation;
+                nonMemoryUserMaxXReachedTotal += creature.MaxXReached;
+                if (creature.IsTouchingFood)
+                {
+                    nonMemoryUserFoodContactCount++;
+                }
+
+                if (creature.LastCaloriesEaten > 0f)
+                {
+                    nonMemoryUserEatingCount++;
+                }
             }
 
             totalVisionRange += CreatureGrowth.EffectiveSenseRadius(creature, genome);
@@ -196,7 +254,20 @@ public sealed class StatsRecordingSystem(
                     break;
             }
 
-            switch (GetHorizontalRegion(state.Bounds, creature.Position))
+            var horizontalRegion = GetHorizontalRegion(state.Bounds, creature.Position);
+            if (horizontalRegion == HorizontalRegion.Right)
+            {
+                if (isActiveMemoryUser)
+                {
+                    memoryUserRightRegionCount++;
+                }
+                else
+                {
+                    nonMemoryUserRightRegionCount++;
+                }
+            }
+
+            switch (horizontalRegion)
             {
                 case HorizontalRegion.Left:
                     leftRegionCreatureCount++;
@@ -432,6 +503,20 @@ public sealed class StatsRecordingSystem(
         var caloriesEatenPerFoodVisionEvent = foodDetectedCreatureCount > 0
             ? totalCaloriesEaten / foodDetectedCreatureCount
             : 0f;
+        var memoryUserDivisor = Math.Max(1, activeMemoryCreatureCount);
+        var nonMemoryUserDivisor = Math.Max(1, nonMemoryCreatureCount);
+        var memoryUserCaloriesEatenPerDistance = memoryUserDistanceTraveled > 0f
+            ? memoryUserCaloriesEaten / memoryUserDistanceTraveled
+            : 0f;
+        var nonMemoryUserCaloriesEatenPerDistance = nonMemoryUserDistanceTraveled > 0f
+            ? nonMemoryUserCaloriesEaten / nonMemoryUserDistanceTraveled
+            : 0f;
+        var memoryUserAverageMaxXProgressShare = activeMemoryCreatureCount > 0
+            ? EastProgressShare(memoryUserMaxXReachedTotal / activeMemoryCreatureCount, state.Bounds)
+            : 0f;
+        var nonMemoryUserAverageMaxXProgressShare = nonMemoryCreatureCount > 0
+            ? EastProgressShare(nonMemoryUserMaxXReachedTotal / nonMemoryCreatureCount, state.Bounds)
+            : 0f;
         var attackerDivisor = Math.Max(1, attackingCreatureCount);
         var nonAttackerDivisor = Math.Max(1, nonAttackingCreatureCount);
         var totalBrainHiddenNodeCount = 0;
@@ -601,6 +686,24 @@ public sealed class StatsRecordingSystem(
             totalRecentFoodSuccess / divisor,
             activeMemoryCreatureCount,
             totalMemoryStrength / divisor,
+            memoryUserFoodContactCount / (float)memoryUserDivisor,
+            nonMemoryUserFoodContactCount / (float)nonMemoryUserDivisor,
+            memoryUserEatingCount / (float)memoryUserDivisor,
+            nonMemoryUserEatingCount / (float)nonMemoryUserDivisor,
+            memoryUserCaloriesEatenPerDistance,
+            nonMemoryUserCaloriesEatenPerDistance,
+            memoryUserSecondsSinceLastMeal / memoryUserDivisor,
+            nonMemoryUserSecondsSinceLastMeal / nonMemoryUserDivisor,
+            memoryUserDistanceSinceLastMeal / memoryUserDivisor,
+            nonMemoryUserDistanceSinceLastMeal / nonMemoryUserDivisor,
+            memoryUserRecentFoodSuccess / memoryUserDivisor,
+            nonMemoryUserRecentFoodSuccess / nonMemoryUserDivisor,
+            memoryUserGenerationTotal / (float)memoryUserDivisor,
+            nonMemoryUserGenerationTotal / (float)nonMemoryUserDivisor,
+            memoryUserAverageMaxXProgressShare,
+            nonMemoryUserAverageMaxXProgressShare,
+            memoryUserRightRegionCount / (float)memoryUserDivisor,
+            nonMemoryUserRightRegionCount / (float)nonMemoryUserDivisor,
             leftRegionCreatureCount,
             middleRegionCreatureCount,
             rightRegionCreatureCount,

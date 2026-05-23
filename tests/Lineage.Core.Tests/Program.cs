@@ -3037,6 +3037,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.SecondsSinceLastMeal = 2f;
     seeingCreature.LastDistanceTraveled = 3f;
     seeingCreature.DistanceSinceLastMeal = 8f;
+    seeingCreature.MemoryVector = new SimVector2(0.2f, 0f);
     simulation.State.Creatures[0] = seeingCreature;
     var searchingCreature = simulation.State.Creatures[1];
     searchingCreature.Senses = new CreatureSenseState
@@ -3176,8 +3177,26 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.375f, snapshot.AverageEggReserveRatio, 0.000001, "Average egg reserve ratio");
     AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
     AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");
-    AssertEqual(0, snapshot.ActiveMemoryCreatureCount, "Active memory creature count");
-    AssertClose(0f, snapshot.AverageMemoryStrength, 0.000001, "Average memory strength");
+    AssertEqual(1, snapshot.ActiveMemoryCreatureCount, "Active memory creature count");
+    AssertClose(0.1f, snapshot.AverageMemoryStrength, 0.000001, "Average memory strength");
+    AssertClose(1f, snapshot.MemoryUserFoodContactShare, 0.000001, "Memory food contact share");
+    AssertClose(0f, snapshot.NonMemoryUserFoodContactShare, 0.000001, "Non-memory food contact share");
+    AssertClose(1f, snapshot.MemoryUserEatingShare, 0.000001, "Memory eating share");
+    AssertClose(0f, snapshot.NonMemoryUserEatingShare, 0.000001, "Non-memory eating share");
+    AssertClose(4.25f / 3f, snapshot.MemoryUserCaloriesEatenPerDistance, 0.000001, "Memory calories per distance");
+    AssertClose(0f, snapshot.NonMemoryUserCaloriesEatenPerDistance, 0.000001, "Non-memory calories per distance");
+    AssertClose(2f, snapshot.MemoryUserAverageSecondsSinceLastMeal, 0.000001, "Memory seconds since meal");
+    AssertClose(6f, snapshot.NonMemoryUserAverageSecondsSinceLastMeal, 0.000001, "Non-memory seconds since meal");
+    AssertClose(8f, snapshot.MemoryUserAverageDistanceSinceLastMeal, 0.000001, "Memory distance since meal");
+    AssertClose(12f, snapshot.NonMemoryUserAverageDistanceSinceLastMeal, 0.000001, "Non-memory distance since meal");
+    AssertClose(0.75f, snapshot.MemoryUserAverageRecentFoodSuccess, 0.000001, "Memory recent food success");
+    AssertClose(0.25f, snapshot.NonMemoryUserAverageRecentFoodSuccess, 0.000001, "Non-memory recent food success");
+    AssertClose(0f, snapshot.MemoryUserAverageGeneration, 0.000001, "Memory average generation");
+    AssertClose(2f, snapshot.NonMemoryUserAverageGeneration, 0.000001, "Non-memory average generation");
+    AssertClose(0.02f, snapshot.MemoryUserAverageMaxXProgressShare, 0.000001, "Memory average max x progress");
+    AssertClose(0.03f, snapshot.NonMemoryUserAverageMaxXProgressShare, 0.000001, "Non-memory average max x progress");
+    AssertClose(0f, snapshot.MemoryUserRightRegionShare, 0.000001, "Memory right region share");
+    AssertClose(0f, snapshot.NonMemoryUserRightRegionShare, 0.000001, "Non-memory right region share");
     AssertClose(1f, snapshot.AverageEggHealthRatio, 0.000001, "Average egg health ratio");
     var expectedVisionRange = CreatureGrowth.EffectiveSenseRadius(simulation.State.Creatures[0], CreatureGenome.Baseline);
     AssertClose(expectedVisionRange, snapshot.AverageVisionRange, 0.000001, "Average vision range");

@@ -120,6 +120,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
         WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
         WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
+        WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
+        WriteMetric(writer, "Memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starvation deaths", state.Stats.StarvationDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average lifespan", $"{snapshot.AverageLifespanSeconds:0.###} seconds");
@@ -192,6 +194,23 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Raw per food vision", $"{snapshot.CaloriesEatenPerFoodVisionEvent:0.###} kcal/event");
         WriteMetric(writer, "Average vision range", snapshot.AverageVisionRange.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average vision angle", $"{ToDegrees(snapshot.AverageVisionAngleRadians):0.###} degrees");
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Memory Diagnostics</h2>");
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
+        WriteMetric(writer, "Avg memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Food contact", $"{FormatPercent(snapshot.MemoryUserFoodContactShare)} memory / {FormatPercent(snapshot.NonMemoryUserFoodContactShare)} non");
+        WriteMetric(writer, "Eating", $"{FormatPercent(snapshot.MemoryUserEatingShare)} memory / {FormatPercent(snapshot.NonMemoryUserEatingShare)} non");
+        WriteMetric(writer, "Food success", $"{FormatPercent(snapshot.MemoryUserAverageRecentFoodSuccess)} memory / {FormatPercent(snapshot.NonMemoryUserAverageRecentFoodSuccess)} non");
+        WriteMetric(writer, "Raw per distance", $"{snapshot.MemoryUserCaloriesEatenPerDistance:0.###} memory / {snapshot.NonMemoryUserCaloriesEatenPerDistance:0.###} non");
+        WriteMetric(writer, "Meal gap", $"{snapshot.MemoryUserAverageSecondsSinceLastMeal:0.###}s memory / {snapshot.NonMemoryUserAverageSecondsSinceLastMeal:0.###}s non");
+        WriteMetric(writer, "Meal distance", $"{snapshot.MemoryUserAverageDistanceSinceLastMeal:0.###}u memory / {snapshot.NonMemoryUserAverageDistanceSinceLastMeal:0.###}u non");
+        WriteMetric(writer, "Generation", $"{snapshot.MemoryUserAverageGeneration:0.###} memory / {snapshot.NonMemoryUserAverageGeneration:0.###} non");
+        WriteMetric(writer, "Avg max-X progress", $"{FormatPercent(snapshot.MemoryUserAverageMaxXProgressShare)} memory / {FormatPercent(snapshot.NonMemoryUserAverageMaxXProgressShare)} non");
+        WriteMetric(writer, "Right-region share", $"{FormatPercent(snapshot.MemoryUserRightRegionShare)} memory / {FormatPercent(snapshot.NonMemoryUserRightRegionShare)} non");
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
