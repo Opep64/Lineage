@@ -67,6 +67,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
+    ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
     ("Explorer forager keeps searching without food cues", ExplorerForagerKeepsSearchingWithoutFoodCues),
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
@@ -2498,6 +2499,39 @@ static void BehaviorAssayDetectsRottenScentAvoidance()
 
     AssertTrue(summary.RottenScentAvoidanceScore > 0.8f, "Rot-scent-sensitive probe should prefer clean meat scent");
     AssertEqual("avoids rot scent", summary.RottenMeatResponse, "Rot-scent-sensitive rot response");
+}
+
+static void BrainInputDiagnosticsSummarizeFreshnessWiring()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 405, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var weights = new float[NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount: 1)];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 2f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = -1f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentForwardInput] = -4f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentRightInput] = -3f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 0.5f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.RottenMeatScentDensityInput] = -0.75f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    var founderId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BrainInputDiagnostics.Analyze(simulation.State);
+    var lineages = BrainInputDiagnostics.AnalyzeTopFounderLineages(simulation.State, 10);
+
+    AssertEqual(1, summary.EvaluatedCreatureCount, "Brain diagnostic evaluated count");
+    AssertClose(3f / NeuralBrainSchema.OutputCount, summary.DirectFreshnessWeightMagnitude, 0.000001, "Direct freshness magnitude");
+    AssertClose(7f / (NeuralBrainSchema.OutputCount * 3f), summary.DirectRotScentWeightMagnitude, 0.000001, "Direct rot magnitude");
+    AssertClose(0.5f, summary.HiddenFreshnessWeightMagnitude, 0.000001, "Hidden freshness magnitude");
+    AssertClose(0.25f, summary.HiddenRotScentWeightMagnitude, 0.000001, "Hidden rot magnitude");
+    AssertClose(2f, summary.MoveFreshnessWeight, 0.000001, "Move freshness weight");
+    AssertClose(-1f, summary.EatFreshnessWeight, 0.000001, "Eat freshness weight");
+    AssertClose(-4f, summary.MoveRotScentForwardWeight, 0.000001, "Move rot forward weight");
+    AssertClose(-3f, summary.TurnRotScentRightWeight, 0.000001, "Turn rot right weight");
+
+    AssertEqual(1, lineages.Count, "Lineage diagnostic count");
+    AssertEqual(founderId, lineages[0].FounderId, "Lineage diagnostic founder");
+    AssertClose(summary.DirectRotScentWeightMagnitude, lineages[0].Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Lineage rot magnitude");
 }
 
 static void ExplorerForagerKeepsSearchingWithoutFoodCues()

@@ -56,6 +56,8 @@ public static class ViewerReportWriter
             .ToArray();
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
+        var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
+        var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
         var seasonPressure = SeasonPressureAnalysis.Analyze(scenario, snapshots);
 
         WriteDocumentStart(writer, $"Lineage Viewer Report - {scenario.Name}");
@@ -378,6 +380,8 @@ public static class ViewerReportWriter
         WriteChartsSection(writer, state.Stats.Snapshots);
         WriteBehaviorAssaySection(writer, behaviorSummary);
         WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
+        WriteBrainInputDiagnosticsSection(writer, brainInputDiagnostics);
+        WriteLineageBrainInputDiagnosticsSection(writer, lineageBrainInputDiagnostics);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Final Living Traits</h2>");
@@ -1152,6 +1156,70 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteBrainInputDiagnosticsSection(StreamWriter writer, BrainInputDiagnosticSummary summary)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Freshness Brain Wiring</h2>");
+        if (summary.EvaluatedCreatureCount == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living neural creatures were available for brain-input diagnostics.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Brains evaluated", summary.EvaluatedCreatureCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Direct freshness magnitude", FormatBrainWeight(summary.DirectFreshnessWeightMagnitude));
+        WriteMetric(writer, "Direct rot-scent magnitude", FormatBrainWeight(summary.DirectRotScentWeightMagnitude));
+        WriteMetric(writer, "Hidden freshness magnitude", FormatBrainWeight(summary.HiddenFreshnessWeightMagnitude));
+        WriteMetric(writer, "Hidden rot-scent magnitude", FormatBrainWeight(summary.HiddenRotScentWeightMagnitude));
+        WriteMetric(writer, "Move from freshness", FormatSignedBrainWeight(summary.MoveFreshnessWeight));
+        WriteMetric(writer, "Eat from freshness", FormatSignedBrainWeight(summary.EatFreshnessWeight));
+        WriteMetric(writer, "Move from rot ahead", FormatSignedBrainWeight(summary.MoveRotScentForwardWeight));
+        WriteMetric(writer, "Turn from rot right", FormatSignedBrainWeight(summary.TurnRotScentRightWeight));
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteLineageBrainInputDiagnosticsSection(
+        StreamWriter writer,
+        IReadOnlyList<LineageBrainInputDiagnosticSummary> summaries)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Lineage Freshness Wiring</h2>");
+        if (summaries.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living founder lineages were available for brain-input diagnostics.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Fresh Direct</th><th>Rot Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Ahead</th><th>Turn Rot Right</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in summaries)
+        {
+            var diagnostics = summary.Diagnostics;
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>#{Html(summary.FounderId.Value)}</td>" +
+                $"<td>{Html(summary.LivingCreatures)}</td>" +
+                $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectFreshnessWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenFreshnessWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentForwardWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
     private static void WriteTraitRow(StreamWriter writer, string name, FloatAccumulator summary)
     {
         writer.WriteLine(
@@ -1258,6 +1326,16 @@ public static class ViewerReportWriter
     private static string FormatPercent(float value)
     {
         return $"{value * 100f:0.0}%";
+    }
+
+    private static string FormatBrainWeight(float value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatSignedBrainWeight(float value)
+    {
+        return value.ToString("+0.###;-0.###;0", CultureInfo.InvariantCulture);
     }
 
     private static float Share(int count, int total)
