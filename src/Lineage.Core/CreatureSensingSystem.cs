@@ -170,6 +170,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var visibleCreatureCount = creatureVisibility.VisibleCount;
             var totalMeatScentStrength = 0f;
             var meatScentVector = SimVector2.Zero;
+            var totalRottenMeatScentStrength = 0f;
+            var rottenMeatScentVector = SimVector2.Zero;
             var bestVisibleFoodKind = FoodContactKind.None;
             var bestVisibleFoodIndex = -1;
             var bestVisibleFoodScore = float.NegativeInfinity;
@@ -179,6 +181,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var nearestVisibleMeatKind = FoodContactKind.None;
             var nearestVisibleMeatIndex = -1;
             var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
+            var nearestVisibleMeatFreshness = 0f;
             var nearestVisibleCreatureIndex = creatureVisibility.NearestIndex;
 
             var resourceScanStartedAt = sensingProfile is not null
@@ -248,6 +251,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                             : forward;
                         totalMeatScentStrength += scentStrength;
                         meatScentVector += scentDirection * scentStrength;
+
+                        var staleStrength = scentStrength * MeatQuality.Staleness(resource);
+                        if (staleStrength > MinimumScentStrength)
+                        {
+                            totalRottenMeatScentStrength += staleStrength;
+                            rottenMeatScentVector += scentDirection * staleStrength;
+                        }
                     }
                 }
 
@@ -266,6 +276,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     nearestVisibleMeatDistanceSquared = distanceSquared;
                     nearestVisibleMeatKind = FoodContactKind.Resource;
                     nearestVisibleMeatIndex = resourceIndex;
+                    nearestVisibleMeatFreshness = MeatQuality.Freshness(resource);
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
@@ -318,6 +329,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     nearestVisibleMeatDistanceSquared = distanceSquared;
                     nearestVisibleMeatKind = FoodContactKind.Egg;
                     nearestVisibleMeatIndex = eggIndex;
+                    nearestVisibleMeatFreshness = 1f;
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
@@ -343,6 +355,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
             ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
+            ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
 
             if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
             {
@@ -377,6 +390,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             if (nearestVisibleMeatKind == FoodContactKind.Resource && nearestVisibleMeatIndex >= 0)
             {
+                senses.VisibleMeatFreshness = nearestVisibleMeatFreshness;
                 ApplyMeatSense(
                     ref senses,
                     state.Resources[nearestVisibleMeatIndex],
@@ -387,6 +401,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             }
             else if (nearestVisibleMeatKind == FoodContactKind.Egg && nearestVisibleMeatIndex >= 0)
             {
+                senses.VisibleMeatFreshness = nearestVisibleMeatFreshness;
                 ApplyMeatEggSense(
                     ref senses,
                     state.Eggs[nearestVisibleMeatIndex],
@@ -482,6 +497,28 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.MeatScentDensity = density;
         senses.MeatScentDirectionForward = Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
         senses.MeatScentDirectionRight = Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
+    }
+
+    private void ApplyRottenMeatScentSense(
+        ref CreatureSenseState senses,
+        SimVector2 scentVector,
+        float totalScentStrength,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        if (totalScentStrength <= MinimumScentStrength || scentVector.LengthSquared <= 0.000001f)
+        {
+            return;
+        }
+
+        var density = Math.Clamp(totalScentStrength / _meatScentDensitySaturation, 0f, 1f);
+        var direction = scentVector.Normalized();
+        var directionalConfidence = Math.Clamp(scentVector.Length / totalScentStrength, 0f, 1f) * density;
+
+        senses.RottenMeatScentDetected = true;
+        senses.RottenMeatScentDensity = density;
+        senses.RottenMeatScentDirectionForward = Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
+        senses.RottenMeatScentDirectionRight = Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 
     private static void ApplyGenericFoodSense(

@@ -164,6 +164,7 @@ Performance/ecology update from 2026-05-22:
 - Dormant plants are kept out of the resource spatial index, which lowers resource query/scan cost and makes local depletion matter more.
 - Checked-in scenarios now use lower starting plant densities plus per-scenario plant respawn delay ranges.
 - Rotten meat now has a configurable digestion-time health risk that scales with carcass staleness and is reduced by carrion adaptation, with CSV/report diagnostics for damage and affected creatures.
+- Rotten meat is now locally perceptible but imperfect: visible meat exposes a freshness cue, stale carcasses emit a separate rot scent, neural brains receive freshness/rot-scent inputs, and CSV/HTML/Godot diagnostics report fresh meat seen, stale meat seen, stale seen-but-not-eaten, rot scent, and rot scent density.
 - Current baseline numbers live in `PERFORMANCE_BASELINES.md`; after the plant dormancy pass, Balanced Foraging 20k with full profiling is about 16.756 seconds on the current machine.
 - This changed scenario outcomes intentionally, so future comparisons should use the plant-dormancy baseline rather than the pre-dormancy counts.
 
@@ -423,7 +424,8 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Attribute injury-death meat as short-lived fresh kills. Meat from attack deaths now carries the prey id, credited attacker id, and a short freshness window; only the credited attacker records this intake as fresh kill, while all other meat eating remains passive carcass scavenging. Done.
 - Add predator/prey outcome diagnostics. Stats snapshots, CSVs, CLI/Godot HTML reports, and the Godot HUD now expose creature-detection share, meat/fresh-kill intake shares, meat-derived energy share, and average diet/bite/resistance traits split across attacking and non-attacking creatures. Done.
 - Add age-based meat freshness. Meat patches now track age; stale meat still fills the gut but releases less usable meat energy, so scavenging old carcasses has an opportunity cost. Stats CSVs plus CLI/Godot HTML reports expose average meat freshness, fresh/stale carcass intake rates, and fresh/stale carcass intake shares. Done.
-- Later, make sufficiently decayed meat actively risky for creatures that are not adapted to it. Eating old carcasses could cause sickness through health loss, energy loss, digestion disruption, or temporary debuffs, while carrion-specialized lineages can tolerate or benefit from it. This will need creatures to detect decayed/stale meat, probably through smell or a freshness/rot scent cue, so carrion eaters can evolve around rotten food rather than being given perfect knowledge.
+- Make sufficiently decayed meat actively risky for creatures that are not adapted to it. Eating old carcasses causes digestion-time health loss, while carrion-specialized lineages can tolerate most of that damage. Done.
+- Add imperfect stale-meat perception. Visible meat now carries a freshness cue and stale carcasses emit a distinct rot scent, letting carrion eaters evolve around rotten food without giving creatures a global or exact meat-age value. Done.
 - Add heritable combat tradeoffs. `BiteStrength` scales bite damage and bite action cost; `DamageResistance` reduces incoming bite damage; both are growth-scaled so juveniles are weaker and more fragile. Done.
 - Add scenario-backed upkeep costs for bite strength and damage resistance, plus report/trait-summary output and Godot inspection. Done.
 - Tune the first shared combat values. Gentle, balanced, harsh, and test scenarios currently use bite strength `0.55`, damage resistance `1.0`, bite strength upkeep `0.04`, damage resistance upkeep `0.03`, bite damage `0.18`, bite energy cost `0.15`, and bite reach `1.0`. Done.
@@ -824,6 +826,10 @@ Current neural brain inputs:
 - meat scent density
 - meat scent direction forward
 - meat scent direction right
+- visible meat freshness
+- rotten meat scent density
+- rotten meat scent direction forward
+- rotten meat scent direction right
 - dietary meat bias
 - egg reserve ratio
 - reproduction readiness
@@ -939,6 +945,7 @@ Build, 103 core tests, `git diff --check`, a compact 5k two-seed Terrain Pressur
 Build, 103 core tests, `git diff --check`, a compact 5k two-seed Terrain Pressure crossing probe, and a 20k seed-42 Terrain Pressure full report passed on 2026-05-23 after adding creature max-X tracking, run eastward-progress metrics, probe crossing columns, an eastward-progress report graph, and a founder exploration table. The 5k probe showed no-drag reaching `59.6%` average run east progress versus `38.2%` base and `37.7%` drag-hard. The 20k seed-42 base run reached `50.3%` run east progress with `25` creatures in the middle third and `0` in the right third.
 Build, 103 core tests, `git diff --check`, and terrain-pressure tuning probes passed on 2026-05-23 after adding a `VerticalEdgeWideCorridorBands` comparison map and selecting neutral biome speed multipliers for `scenarios/terrain-pressure.json`. The original 20k two-seed base averaged `56.1%` run east progress with `0` right-third creatures. The selected no-speed-drag setup averaged `83.9%` run east progress with `7` right-third creatures, while keeping terrain energy/basal costs active. Softer speed-drag compromises improved progress but were less reliably crossable.
 Build, 106 core tests, `git diff --check`, CLI memory smoke/report/snapshot, and Godot headless `--quit` passed on 2026-05-23 after adding the first spatial-memory slice. The change adds one persistent memory vector per creature, memory direction/strength neural inputs, memory write outputs, active-memory upkeep, selected-creature memory display, stats CSV columns, and migration for pre-memory direct and hidden-node brains.
+Build, 111 core tests, CLI scavenger-pressure rotten-sensing smoke/report/snapshot, and Godot headless `--quit` passed on 2026-05-23 after adding visible meat freshness, rot scent inputs, behavior-assay classification, neural migration for 38-input brains, and stale-meat diagnostics in CSV/HTML/Godot.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

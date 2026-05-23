@@ -9,7 +9,7 @@ public static class NeuralBrainSchema
 
     public const int MaxHiddenNodeCount = 64;
 
-    public const int InputCount = 38;
+    public const int InputCount = 42;
 
     public const int OutputCount = 7;
 
@@ -88,6 +88,14 @@ public static class NeuralBrainSchema
     public const int MemoryRightInput = 36;
 
     public const int MemoryStrengthInput = 37;
+
+    public const int VisibleMeatFreshnessInput = 38;
+
+    public const int RottenMeatScentDensityInput = 39;
+
+    public const int RottenMeatScentForwardInput = 40;
+
+    public const int RottenMeatScentRightInput = 41;
 
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 

@@ -165,7 +165,12 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Seeing food", FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Seeing plants", FormatPercent(Share(snapshot.PlantDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Seeing meat", FormatPercent(Share(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Seeing fresh meat", FormatPercent(Share(snapshot.FreshMeatDetectedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Seeing stale meat", FormatPercent(Share(snapshot.StaleMeatDetectedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Stale seen but not eaten", FormatPercent(Share(snapshot.StaleMeatAvoidedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Visible meat freshness", FormatPercent(snapshot.AverageVisibleMeatFreshness));
         WriteMetric(writer, "Smelling meat", FormatPercent(Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Smelling rot", FormatPercent(Share(snapshot.RottenMeatScentDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Seeing creatures", FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Touching food", FormatPercent(Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Eating this tick", FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount)));
@@ -173,6 +178,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Visible plant density", snapshot.AverageVisiblePlantDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible meat density", snapshot.AverageVisibleMeatDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Meat scent density", snapshot.AverageMeatScentDensity.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Rot scent density", snapshot.AverageRottenMeatScentDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible creature density", snapshot.AverageVisibleCreatureDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Calories eaten", $"{snapshot.TotalCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Plant eaten", $"{snapshot.TotalPlantCaloriesEatenPerSecond:0.###} raw kcal/s");
@@ -893,6 +899,7 @@ public static class ViewerReportWriter
             snapshots,
             new ChartSeries("Seeing food", "#2f7d4f", snapshots.Select(snapshot => Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Smelling meat", "#b84a4a", snapshots.Select(snapshot => Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Smelling rot", "#7d5546", snapshots.Select(snapshot => Share(snapshot.RottenMeatScentDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Touching food", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Eating", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.EatingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
@@ -947,8 +954,11 @@ public static class ViewerReportWriter
             "%",
             snapshots,
             new ChartSeries("Avg freshness", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageMeatFreshness * 100f).ToArray()),
+            new ChartSeries("Visible freshness", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageVisibleMeatFreshness * 100f).ToArray()),
             new ChartSeries("Fresh eaten share", "#35a862", snapshots.Select(snapshot => snapshot.FreshMeatCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Stale eaten share", "#b84a4a", snapshots.Select(snapshot => snapshot.StaleMeatCaloriesEatenShare * 100f).ToArray()),
+            new ChartSeries("Stale seen", "#7d5546", snapshots.Select(snapshot => Share(snapshot.StaleMeatDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Stale avoided", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.StaleMeatAvoidedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Rotten affected", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.RottenMeatDamagedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
@@ -1078,6 +1088,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Risk response", summary.RiskResponse);
         WriteMetric(writer, "Terrain response", summary.TerrainResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
+        WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
         writer.WriteLine("</div>");
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -1112,7 +1123,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -1124,6 +1135,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
                 $"<td>{Html(behavior.Ecotype)}</td>" +
                 $"<td>{Html(behavior.ForagingBias)}</td>" +
+                $"<td>{Html(behavior.RottenMeatResponse)}</td>" +
                 $"<td>{Html(behavior.RiskResponse)}</td>" +
                 $"<td>{Html(behavior.TerrainResponse)}</td>" +
                 $"<td>{Html(behavior.PredatorTendency)}</td>" +

@@ -26,6 +26,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutLateralTerrainDrag = 31;
     private const int LegacyInputCountWithoutReproductiveContext = 33;
     private const int LegacyInputCountWithoutMemory = 35;
+    private const int LegacyInputCountWithoutRottenMeatSensing = 38;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
 
@@ -500,6 +501,21 @@ public sealed class NeuralBrainGenome
         if (TryInferCurrentWeightLayout(weights.Length, out var hiddenNodeCount))
         {
             return (weights, hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
+            LegacyInputCountWithoutRottenMeatSensing,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutRottenMeatSensing,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
         }
 
         if (TryInferLegacyWeightLayout(

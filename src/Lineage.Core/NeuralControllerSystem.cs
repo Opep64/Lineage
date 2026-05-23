@@ -118,6 +118,10 @@ public sealed class NeuralControllerSystem(
         inputs[NeuralBrainSchema.MemoryForwardInput] = senses.MemoryDirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = senses.MemoryDirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = senses.MemoryStrength;
+        inputs[NeuralBrainSchema.VisibleMeatFreshnessInput] = senses.VisibleMeatFreshness;
+        inputs[NeuralBrainSchema.RottenMeatScentDensityInput] = senses.RottenMeatScentDensity;
+        inputs[NeuralBrainSchema.RottenMeatScentForwardInput] = senses.RottenMeatScentDirectionForward;
+        inputs[NeuralBrainSchema.RottenMeatScentRightInput] = senses.RottenMeatScentDirectionRight;
     }
 
     private static SimVector2 UpdateMemoryVector(

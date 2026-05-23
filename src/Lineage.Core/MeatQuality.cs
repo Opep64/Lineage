@@ -33,4 +33,14 @@ public static class MeatQuality
     {
         return freshness >= FreshThreshold;
     }
+
+    public static float Staleness(ResourcePatchState resource)
+    {
+        return Staleness(Freshness(resource));
+    }
+
+    public static float Staleness(float freshness)
+    {
+        return Math.Clamp((1f - freshness) / (1f - MinimumFreshness), 0f, 1f);
+    }
 }

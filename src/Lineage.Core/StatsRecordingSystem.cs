@@ -46,7 +46,9 @@ public sealed class StatsRecordingSystem(
         var totalVisibleFoodDensity = 0f;
         var totalVisiblePlantDensity = 0f;
         var totalVisibleMeatDensity = 0f;
+        var totalVisibleMeatFreshness = 0f;
         var totalMeatScentDensity = 0f;
+        var totalRottenMeatScentDensity = 0f;
         var totalVisibleCreatureDensity = 0f;
         var totalCaloriesEaten = 0f;
         var totalPlantCaloriesEaten = 0f;
@@ -107,8 +109,12 @@ public sealed class StatsRecordingSystem(
         var foodDetectedCreatureCount = 0;
         var plantDetectedCreatureCount = 0;
         var meatDetectedCreatureCount = 0;
+        var freshMeatDetectedCreatureCount = 0;
+        var staleMeatDetectedCreatureCount = 0;
+        var staleMeatAvoidedCreatureCount = 0;
         var creatureDetectedCreatureCount = 0;
         var meatScentDetectedCreatureCount = 0;
+        var rottenMeatScentDetectedCreatureCount = 0;
         var foodContactCreatureCount = 0;
         var eatingCreatureCount = 0;
         var rottenMeatDamagedCreatureCount = 0;
@@ -148,7 +154,11 @@ public sealed class StatsRecordingSystem(
             totalVisibleFoodDensity += creature.Senses.VisibleFoodDensity;
             totalVisiblePlantDensity += creature.Senses.VisiblePlantDensity;
             totalVisibleMeatDensity += creature.Senses.VisibleMeatDensity;
+            totalVisibleMeatFreshness += creature.Senses.MeatDetected
+                ? creature.Senses.VisibleMeatFreshness
+                : 0f;
             totalMeatScentDensity += creature.Senses.MeatScentDensity;
+            totalRottenMeatScentDensity += creature.Senses.RottenMeatScentDensity;
             totalVisibleCreatureDensity += creature.Senses.VisibleCreatureDensity;
             totalCaloriesEaten += creature.LastCaloriesEaten;
             totalPlantCaloriesEaten += creature.LastPlantCaloriesEaten;
@@ -306,6 +316,18 @@ public sealed class StatsRecordingSystem(
             if (creature.Senses.MeatDetected)
             {
                 meatDetectedCreatureCount++;
+                if (MeatQuality.IsFresh(creature.Senses.VisibleMeatFreshness))
+                {
+                    freshMeatDetectedCreatureCount++;
+                }
+                else
+                {
+                    staleMeatDetectedCreatureCount++;
+                    if (creature.LastStaleMeatCaloriesEaten <= 0f)
+                    {
+                        staleMeatAvoidedCreatureCount++;
+                    }
+                }
             }
 
             if (creature.Senses.CreatureDetected)
@@ -316,6 +338,11 @@ public sealed class StatsRecordingSystem(
             if (creature.Senses.MeatScentDetected)
             {
                 meatScentDetectedCreatureCount++;
+            }
+
+            if (creature.Senses.RottenMeatScentDetected)
+            {
+                rottenMeatScentDetectedCreatureCount++;
             }
 
             if (creature.IsTouchingFood)
@@ -516,6 +543,7 @@ public sealed class StatsRecordingSystem(
             : 0f;
         var memoryUserDivisor = Math.Max(1, activeMemoryCreatureCount);
         var nonMemoryUserDivisor = Math.Max(1, nonMemoryCreatureCount);
+        var visibleMeatDivisor = Math.Max(1, meatDetectedCreatureCount);
         var memoryUserCaloriesEatenPerDistance = memoryUserDistanceTraveled > 0f
             ? memoryUserCaloriesEaten / memoryUserDistanceTraveled
             : 0f;
@@ -634,8 +662,14 @@ public sealed class StatsRecordingSystem(
             totalVisibleFoodDensity / divisor,
             totalVisiblePlantDensity / divisor,
             totalVisibleMeatDensity / divisor,
+            freshMeatDetectedCreatureCount,
+            staleMeatDetectedCreatureCount,
+            staleMeatAvoidedCreatureCount,
+            totalVisibleMeatFreshness / visibleMeatDivisor,
             meatScentDetectedCreatureCount,
             totalMeatScentDensity / divisor,
+            rottenMeatScentDetectedCreatureCount,
+            totalRottenMeatScentDensity / divisor,
             totalVisibleCreatureDensity / divisor,
             caloriesEatenPerSecond,
             plantCaloriesEatenPerSecond,

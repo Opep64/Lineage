@@ -53,6 +53,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing splits plant and meat cues", CreatureSensingSplitsPlantAndMeatCues),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
+    ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
@@ -71,6 +72,7 @@ var tests = new (string Name, Action Body)[]
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
     ("Neural brain migrates memory inputs and outputs", NeuralBrainMigratesMemoryInputsAndOutputs),
+    ("Neural brain migrates rotten meat sensing inputs", NeuralBrainMigratesRottenMeatSensingInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -2002,6 +2004,57 @@ static void CreatureSensingSmellsMeatBeyondVision()
     AssertClose(0f, senses.MeatScentDirectionRight, 0.0001, "Meat scent right direction");
 }
 
+static void CreatureSensingReportsRottenMeatCues()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 308,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                meatScentRangeMultiplier: 2f,
+                meatScentCaloriesForFullStrength: 40f,
+                meatScentDensitySaturation: 0.1f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(40f, 20f),
+        Radius = 1f,
+        Calories = 80f,
+        MaxCalories = 80f,
+        RegrowthCaloriesPerSecond = 0f,
+        MeatAgeSeconds = MeatQuality.StaleAgeSeconds
+    });
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(senses.MeatDetected, "Stale meat should be visibly detected");
+    AssertClose(MeatQuality.MinimumFreshness, senses.VisibleMeatFreshness, 0.000001, "Visible stale meat freshness");
+    AssertTrue(senses.MeatScentDetected, "Generic meat scent should be detected");
+    AssertTrue(senses.RottenMeatScentDetected, "Rotten meat scent should be detected");
+    AssertTrue(senses.RottenMeatScentDensity > 0.9f, "Rotten scent density should be strong in this probe");
+    AssertTrue(senses.RottenMeatScentDirectionForward > 0.9f, "Rotten scent should bias forward");
+    AssertClose(0f, senses.RottenMeatScentDirectionRight, 0.0001, "Rotten scent right direction");
+}
+
 static void CreatureSensingReportsLocalTerrainDrag()
 {
     var scenario = new SimulationScenario
@@ -2391,12 +2444,13 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(23, summary.Results.Count, "Assay result count");
+    AssertEqual(25, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
     AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
+    AssertEqual("little freshness differentiation", summary.RottenMeatResponse, "Seed forager should not arrive with built-in rot response");
 }
 
 static void ExplorerForagerKeepsSearchingWithoutFoodCues()
@@ -2527,6 +2581,36 @@ static void NeuralBrainMigratesMemoryInputsAndOutputs()
     AssertClose(-2.5f, brain.GetHiddenOutputWeight(NeuralBrainSchema.TurnOutput, 0), 0.000001, "Migrated hidden output weight");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MemoryForwardInput), 0.000001, "New memory input remains neutral");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MemoryRightOutput, NeuralBrainSchema.BiasInput), 0.000001, "New memory output remains neutral");
+}
+
+static void NeuralBrainMigratesRottenMeatSensingInputs()
+{
+    const int legacyInputCount = 38;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 4;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.MemoryStrengthInput] = 0.8f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.RecentFoodSuccessInput] = -1.5f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MemoryForwardOutput * hiddenNodeCount] = 2.25f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Rotten sensing migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Rotten sensing migrated weight count");
+    AssertClose(
+        0.8f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MemoryStrengthInput),
+        0.000001,
+        "Existing memory-strength direct weight remains in place");
+    AssertClose(-1.5f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentFoodSuccessInput), 0.000001, "Existing hidden input remains in place");
+    AssertClose(2.25f, brain.GetHiddenOutputWeight(NeuralBrainSchema.MemoryForwardOutput, 0), 0.000001, "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisibleMeatFreshnessInput), 0.000001, "New visible meat freshness input starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentDensityInput), 0.000001, "New rotten meat scent density input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.RottenMeatScentForwardInput), 0.000001, "New hidden rotten scent direction input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -3136,6 +3220,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleMeatDensity = 0.1f,
         MeatScentDetected = true,
         MeatScentDensity = 0.3f,
+        RottenMeatScentDetected = true,
+        RottenMeatScentDensity = 0.1f,
         CreatureDetected = true,
         VisibleCreatureDensity = 0.05f,
         EggReserveRatio = 0.5f,
@@ -3171,8 +3257,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleFoodDensity = 0.25f,
         VisiblePlantDensity = 0.05f,
         VisibleMeatDensity = 0.2f,
+        VisibleMeatFreshness = MeatQuality.MinimumFreshness,
         MeatScentDetected = true,
         MeatScentDensity = 0.7f,
+        RottenMeatScentDetected = true,
+        RottenMeatScentDensity = 0.5f,
         VisibleCreatureDensity = 0.15f,
         EggReserveRatio = 0.25f,
         EnergySurplusRatio = 0.05f,
@@ -3215,7 +3304,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
     AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot max hidden nodes");
-    AssertClose(14.2f / 152f, snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
+    AssertClose(14.2f / 168f, snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
     AssertClose(0f, snapshot.AverageBrainHiddenOutputWeightMagnitude, 0.000001, "Snapshot hidden output weight magnitude");
     AssertClose(0f, snapshot.ActiveBrainHiddenOutputShare, 0.000001, "Snapshot active hidden output share");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
@@ -3258,7 +3347,13 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.375f, snapshot.AverageVisibleFoodDensity, 0.000001, "Average visible food density");
     AssertClose(0.225f, snapshot.AverageVisiblePlantDensity, 0.000001, "Average visible plant density");
     AssertClose(0.15f, snapshot.AverageVisibleMeatDensity, 0.000001, "Average visible meat density");
+    AssertEqual(0, snapshot.FreshMeatDetectedCreatureCount, "Fresh meat detected count");
+    AssertEqual(1, snapshot.StaleMeatDetectedCreatureCount, "Stale meat detected count");
+    AssertEqual(1, snapshot.StaleMeatAvoidedCreatureCount, "Stale meat avoided count");
+    AssertClose(MeatQuality.MinimumFreshness, snapshot.AverageVisibleMeatFreshness, 0.000001, "Average visible meat freshness");
     AssertClose(0.5f, snapshot.AverageMeatScentDensity, 0.000001, "Average meat scent density");
+    AssertEqual(2, snapshot.RottenMeatScentDetectedCreatureCount, "Rotten meat scent detected count");
+    AssertClose(0.3f, snapshot.AverageRottenMeatScentDensity, 0.000001, "Average rotten meat scent density");
     AssertClose(0.1f, snapshot.AverageVisibleCreatureDensity, 0.000001, "Average visible creature density");
     AssertClose(4.25f, snapshot.TotalCaloriesEatenPerSecond, 0.000001, "Calories eaten per second");
     AssertClose(2.5f, snapshot.TotalPlantCaloriesEatenPerSecond, 0.000001, "Plant calories eaten per second");

@@ -771,7 +771,8 @@ public partial class Main : Node2D
             $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
             $"Max gen {snapshot.MaxGeneration}\n" +
             $"Food seen {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  P {FormatPercent(Share(snapshot.PlantDetectedCreatureCount, snapshot.CreatureCount))}  M {FormatPercent(Share(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Meat scent {FormatPercent(Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageMeatScentDensity:0.00}\n" +
+            $"Meat scent {FormatPercent(Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount))}  rot {FormatPercent(Share(snapshot.RottenMeatScentDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageMeatScentDensity:0.00}/{snapshot.AverageRottenMeatScentDensity:0.00}\n" +
+            $"Meat seen fresh {FormatPercent(Share(snapshot.FreshMeatDetectedCreatureCount, snapshot.CreatureCount))} stale {FormatPercent(Share(snapshot.StaleMeatDetectedCreatureCount, snapshot.CreatureCount))} avoided {FormatPercent(Share(snapshot.StaleMeatAvoidedCreatureCount, snapshot.CreatureCount))}\n" +
             $"Eating {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Raw {snapshot.TotalCaloriesEatenPerSecond:0.0}/s  Digest {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s\n" +
             $"Food src P {snapshot.TotalPlantCaloriesEatenPerSecond:0.0}/s  C {snapshot.TotalCarcassCaloriesEatenPerSecond:0.0}/s  Egg {snapshot.TotalEggCaloriesEatenPerSecond:0.0}/s\n" +
             $"Creatures seen {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageVisibleCreatureDensity:0.00}\n" +
@@ -950,8 +951,11 @@ public partial class Main : Node2D
             $"Plant prox {senses.PlantProximity:0.00}  fwd {senses.PlantDirectionForward:0.00}  right {senses.PlantDirectionRight:0.00}\n" +
             $"Meat {(senses.MeatDetected ? "yes" : "no")}  density {senses.VisibleMeatDensity:0.00}\n" +
             $"Meat prox {senses.MeatProximity:0.00}  fwd {senses.MeatDirectionForward:0.00}  right {senses.MeatDirectionRight:0.00}\n" +
+            $"Meat fresh {senses.VisibleMeatFreshness:P0}\n" +
             $"Meat scent {(senses.MeatScentDetected ? "yes" : "no")}  density {senses.MeatScentDensity:0.00}\n" +
             $"Scent fwd {senses.MeatScentDirectionForward:0.00}  right {senses.MeatScentDirectionRight:0.00}\n" +
+            $"Rot scent {(senses.RottenMeatScentDetected ? "yes" : "no")}  density {senses.RottenMeatScentDensity:0.00}\n" +
+            $"Rot fwd {senses.RottenMeatScentDirectionForward:0.00}  right {senses.RottenMeatScentDirectionRight:0.00}\n" +
             $"Creature {(senses.CreatureDetected ? "yes" : "no")}  density {senses.VisibleCreatureDensity:0.00}\n" +
             $"Creature prox {senses.CreatureProximity:0.00}  fwd {senses.CreatureDirectionForward:0.00}  right {senses.CreatureDirectionRight:0.00}\n" +
             $"Creature size {senses.CreatureRelativeBodySize:0.00}  speed {senses.CreatureRelativeSpeed:0.00}  approach {senses.CreatureApproachRate:0.00}\n" +

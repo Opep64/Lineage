@@ -32,8 +32,10 @@ public static class BehaviorAssay
         var plantRight = new BehaviorAssayAccumulator();
         var meatAhead = new BehaviorAssayAccumulator();
         var meatRight = new BehaviorAssayAccumulator();
+        var rottenMeatAhead = new BehaviorAssayAccumulator();
         var meatScentAhead = new BehaviorAssayAccumulator();
         var meatScentRight = new BehaviorAssayAccumulator();
+        var rottenMeatScentAhead = new BehaviorAssayAccumulator();
         var creatureAhead = new BehaviorAssayAccumulator();
         var creatureRight = new BehaviorAssayAccumulator();
         var smallCreatureAhead = new BehaviorAssayAccumulator();
@@ -66,8 +68,10 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreatePlantRightSenses(), inputs, outputs, ref plantRight);
             Accumulate(brain, genome, CreateMeatAheadSenses(), inputs, outputs, ref meatAhead);
             Accumulate(brain, genome, CreateMeatRightSenses(), inputs, outputs, ref meatRight);
+            Accumulate(brain, genome, CreateRottenMeatAheadSenses(), inputs, outputs, ref rottenMeatAhead);
             Accumulate(brain, genome, CreateMeatScentAheadSenses(), inputs, outputs, ref meatScentAhead);
             Accumulate(brain, genome, CreateMeatScentRightSenses(), inputs, outputs, ref meatScentRight);
+            Accumulate(brain, genome, CreateRottenMeatScentAheadSenses(), inputs, outputs, ref rottenMeatScentAhead);
             Accumulate(brain, genome, CreateCreatureAheadSenses(), inputs, outputs, ref creatureAhead);
             Accumulate(brain, genome, CreateCreatureRightSenses(), inputs, outputs, ref creatureRight);
             Accumulate(brain, genome, CreateSmallCreatureAheadSenses(), inputs, outputs, ref smallCreatureAhead);
@@ -93,8 +97,10 @@ public static class BehaviorAssay
             plantRight.ToResult("Plant right"),
             meatAhead.ToResult("Meat ahead"),
             meatRight.ToResult("Meat right"),
+            rottenMeatAhead.ToResult("Rotten meat ahead"),
             meatScentAhead.ToResult("Meat scent ahead"),
             meatScentRight.ToResult("Meat scent right"),
+            rottenMeatScentAhead.ToResult("Rotten meat scent ahead"),
             creatureAhead.ToResult("Creature ahead"),
             creatureRight.ToResult("Creature right"),
             smallCreatureAhead.ToResult("Small creature ahead"),
@@ -119,7 +125,8 @@ public static class BehaviorAssay
             RiskResponse = ClassifyRiskResponse(summary),
             Ecotype = ClassifyEcotype(summary),
             TerrainResponse = ClassifyTerrainResponse(summary),
-            ReproductionTendency = ClassifyReproductionTendency(summary)
+            ReproductionTendency = ClassifyReproductionTendency(summary),
+            RottenMeatResponse = ClassifyRottenMeatResponse(summary)
         };
     }
 
@@ -264,7 +271,8 @@ public static class BehaviorAssay
             MeatDetected = true,
             MeatProximity = 0.82f,
             MeatDirectionForward = 1f,
-            VisibleMeatDensity = 0.25f
+            VisibleMeatDensity = 0.25f,
+            VisibleMeatFreshness = 1f
         };
     }
 
@@ -279,7 +287,27 @@ public static class BehaviorAssay
             MeatDetected = true,
             MeatProximity = 0.65f,
             MeatDirectionRight = 1f,
-            VisibleMeatDensity = 0.2f
+            VisibleMeatDensity = 0.2f,
+            VisibleMeatFreshness = 1f
+        };
+    }
+
+    private static CreatureSenseState CreateRottenMeatAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            FoodDetected = true,
+            FoodProximity = 0.82f,
+            FoodDirectionForward = 1f,
+            VisibleFoodDensity = 0.25f,
+            MeatDetected = true,
+            MeatProximity = 0.82f,
+            MeatDirectionForward = 1f,
+            VisibleMeatDensity = 0.25f,
+            VisibleMeatFreshness = MeatQuality.MinimumFreshness,
+            RottenMeatScentDetected = true,
+            RottenMeatScentDensity = 0.55f,
+            RottenMeatScentDirectionForward = 0.55f
         };
     }
 
@@ -314,6 +342,19 @@ public static class BehaviorAssay
             MeatScentDetected = true,
             MeatScentDensity = 0.45f,
             MeatScentDirectionRight = 0.45f
+        };
+    }
+
+    private static CreatureSenseState CreateRottenMeatScentAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            MeatScentDetected = true,
+            MeatScentDensity = 0.45f,
+            MeatScentDirectionForward = 0.45f,
+            RottenMeatScentDetected = true,
+            RottenMeatScentDensity = 0.65f,
+            RottenMeatScentDirectionForward = 0.65f
         };
     }
 
@@ -506,6 +547,10 @@ public static class BehaviorAssay
         inputs[NeuralBrainSchema.MemoryForwardInput] = senses.MemoryDirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = senses.MemoryDirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = senses.MemoryStrength;
+        inputs[NeuralBrainSchema.VisibleMeatFreshnessInput] = senses.VisibleMeatFreshness;
+        inputs[NeuralBrainSchema.RottenMeatScentDensityInput] = senses.RottenMeatScentDensity;
+        inputs[NeuralBrainSchema.RottenMeatScentForwardInput] = senses.RottenMeatScentDirectionForward;
+        inputs[NeuralBrainSchema.RottenMeatScentRightInput] = senses.RottenMeatScentDirectionRight;
     }
 
     private static string ClassifyMovement(BehaviorAssaySummary summary)
@@ -733,6 +778,34 @@ public static class BehaviorAssay
         };
     }
 
+    private static string ClassifyRottenMeatResponse(BehaviorAssaySummary summary)
+    {
+        var freshVisibleScore = AheadCueScore(summary.MeatAhead);
+        var staleVisibleScore = AheadCueScore(summary.RottenMeatAhead);
+        var meatScentScore = AheadCueScore(summary.MeatScentAhead);
+        var rottenScentScore = AheadCueScore(summary.RottenMeatScentAhead);
+
+        if (freshVisibleScore > staleVisibleScore + 0.25f
+            && meatScentScore >= rottenScentScore - 0.1f)
+        {
+            return "prefers fresh meat";
+        }
+
+        if (staleVisibleScore > freshVisibleScore + 0.25f
+            || rottenScentScore > meatScentScore + 0.25f)
+        {
+            return "seeks stale meat";
+        }
+
+        return "little freshness differentiation";
+    }
+
+    private static float AheadCueScore(BehaviorAssayResult ahead)
+    {
+        return Math.Clamp(ahead.MoveForward, 0f, 1f)
+            + ahead.EatShare * 0.5f;
+    }
+
     private static float CueScore(BehaviorAssayResult ahead, BehaviorAssayResult right)
     {
         return Math.Clamp(ahead.MoveForward, 0f, 1f)
@@ -838,8 +911,10 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult PlantRight,
     BehaviorAssayResult MeatAhead,
     BehaviorAssayResult MeatRight,
+    BehaviorAssayResult RottenMeatAhead,
     BehaviorAssayResult MeatScentAhead,
     BehaviorAssayResult MeatScentRight,
+    BehaviorAssayResult RottenMeatScentAhead,
     BehaviorAssayResult CreatureAhead,
     BehaviorAssayResult CreatureRight,
     BehaviorAssayResult SmallCreatureAhead,
@@ -871,6 +946,8 @@ public readonly record struct BehaviorAssaySummary(
 
     public string ReproductionTendency { get; init; } = "not evaluated";
 
+    public string RottenMeatResponse { get; init; } = "not evaluated";
+
     public IReadOnlyList<BehaviorAssayResult> Results =>
     [
         Baseline,
@@ -880,8 +957,10 @@ public readonly record struct BehaviorAssaySummary(
         PlantRight,
         MeatAhead,
         MeatRight,
+        RottenMeatAhead,
         MeatScentAhead,
         MeatScentRight,
+        RottenMeatScentAhead,
         CreatureAhead,
         CreatureRight,
         SmallCreatureAhead,

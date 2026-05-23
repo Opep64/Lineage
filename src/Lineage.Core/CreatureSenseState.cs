@@ -41,6 +41,11 @@ public struct CreatureSenseState
 
     public float VisibleMeatDensity { get; set; }
 
+    /// <summary>
+    /// Freshness of the nearest visible meat-like food. Fresh meat or eggs are near 1; old carcasses trend lower.
+    /// </summary>
+    public float VisibleMeatFreshness { get; set; }
+
     public bool MeatScentDetected { get; set; }
 
     public float MeatScentDensity { get; set; }
@@ -48,6 +53,14 @@ public struct CreatureSenseState
     public float MeatScentDirectionForward { get; set; }
 
     public float MeatScentDirectionRight { get; set; }
+
+    public bool RottenMeatScentDetected { get; set; }
+
+    public float RottenMeatScentDensity { get; set; }
+
+    public float RottenMeatScentDirectionForward { get; set; }
+
+    public float RottenMeatScentDirectionRight { get; set; }
 
     public bool CreatureDetected { get; set; }
 
