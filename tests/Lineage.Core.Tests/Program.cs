@@ -16,6 +16,7 @@ var tests = new (string Name, Action Body)[]
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
     ("Seasonal fertility scales plant regrowth", SeasonalFertilityScalesPlantRegrowth),
     ("Seasonal fertility scales plant dormancy", SeasonalFertilityScalesPlantDormancy),
+    ("Opposed seasonal fertility alternates world halves", OpposedSeasonalFertilityAlternatesWorldHalves),
     ("Biome seasonal response scales plant regrowth", BiomeSeasonalResponseScalesPlantRegrowth),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
@@ -77,15 +78,20 @@ var tests = new (string Name, Action Body)[]
     ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
+    ("Scenario factory honors initial spawn region", ScenarioFactoryHonorsInitialSpawnRegion),
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
+    ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
+    ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
+    ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
     ("Persistent spatial rebuild removes decayed resources", PersistentSpatialRebuildRemovesDecayedResources),
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
+    ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
@@ -495,6 +501,32 @@ static void SeasonalFertilityScalesPlantDormancy()
 
     AssertClose(1.5f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Peak-season dormancy countdown");
     AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Dormant plant remains inedible");
+}
+
+static void OpposedSeasonalFertilityAlternatesWorldHalves()
+{
+    var bounds = new WorldBounds(100f, 50f);
+    var left = SeasonalFertility.CalculateAt(
+        enabled: true,
+        elapsedSeconds: 0,
+        seasonLengthSeconds: 4f,
+        fertilityAmplitude: 0.5f,
+        phaseOffsetSeconds: 1f,
+        SeasonPhaseMode.HorizontalOpposed,
+        bounds,
+        new SimVector2(10f, 25f));
+    var right = SeasonalFertility.CalculateAt(
+        enabled: true,
+        elapsedSeconds: 0,
+        seasonLengthSeconds: 4f,
+        fertilityAmplitude: 0.5f,
+        phaseOffsetSeconds: 1f,
+        SeasonPhaseMode.HorizontalOpposed,
+        bounds,
+        new SimVector2(90f, 25f));
+
+    AssertClose(1.5f, left.FertilityMultiplier, 0.000001, "Left half should be in summer");
+    AssertClose(0.5f, right.FertilityMultiplier, 0.000001, "Right half should be in winter");
 }
 
 static void BiomeSeasonalResponseScalesPlantRegrowth()
@@ -3050,6 +3082,31 @@ static void ScenarioFactorySeedsRequestedWorld()
     }
 }
 
+static void ScenarioFactoryHonorsInitialSpawnRegion()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 141,
+        WorldWidth = 900f,
+        WorldHeight = 600f,
+        ResourceVoidBorderWidth = 30f,
+        InitialCreatureCount = 20,
+        InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.LeftThird,
+        InitialResourcesPerMillionArea = 0f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+
+    AssertEqual(20, simulation.State.Creatures.Count, "Spawn-region creature count");
+    foreach (var creature in simulation.State.Creatures)
+    {
+        AssertTrue(creature.Position.X >= 30f, $"Creature {creature.Id.Value} should avoid left resource void");
+        AssertTrue(creature.Position.X < 300f, $"Creature {creature.Id.Value} should spawn in left third");
+        AssertTrue(creature.Position.Y >= 30f, $"Creature {creature.Id.Value} should avoid top resource void");
+        AssertTrue(creature.Position.Y <= 570f, $"Creature {creature.Id.Value} should avoid bottom resource void");
+    }
+}
+
 static void ScenarioResourceDensityScalesWithWorldArea()
 {
     var smallWorld = SimulationScenarioFactory.CreateSimulation(new SimulationScenario
@@ -3123,6 +3180,96 @@ static void GeneratedSmallBiomeMapsContainVisibleVariety()
     AssertTrue(kinds.Count > 1, "Small generated biome maps should not collapse to one biome");
     AssertTrue(kinds.Contains(BiomeKind.Barren), "Small generated biome maps should include a low-fertility biome");
     AssertTrue(kinds.Contains(BiomeKind.Rich), "Small generated biome maps should include a high-fertility biome");
+}
+
+static void BandedBiomeMapsCreateBroadRegions()
+{
+    var vertical = BiomeMap.GenerateBands(
+        new WorldBounds(800f, 300f),
+        cellSize: 100f,
+        BiomeMapKind.VerticalBands);
+
+    AssertEqual(8, vertical.CellCountX, "Vertical band count x");
+    AssertEqual(3, vertical.CellCountY, "Vertical band count y");
+    AssertEqual(BiomeKind.Barren, vertical.GetKind(0, 0), "Left edge biome");
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(3, 0), "Center-left biome");
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(4, 0), "Center-right biome");
+    AssertEqual(BiomeKind.Barren, vertical.GetKind(7, 0), "Right edge biome");
+
+    for (var y = 1; y < vertical.CellCountY; y++)
+    {
+        for (var x = 0; x < vertical.CellCountX; x++)
+        {
+            AssertEqual(vertical.GetKind(x, 0), vertical.GetKind(x, y), $"Vertical band {x},{y}");
+        }
+    }
+
+    var horizontal = BiomeMap.GenerateBands(
+        new WorldBounds(300f, 800f),
+        cellSize: 100f,
+        BiomeMapKind.HorizontalBands);
+
+    AssertEqual(BiomeKind.Barren, horizontal.GetKind(0, 0), "Top edge biome");
+    AssertEqual(BiomeKind.Rich, horizontal.GetKind(0, 3), "Center-top biome");
+    AssertEqual(BiomeKind.Rich, horizontal.GetKind(0, 4), "Center-bottom biome");
+    AssertEqual(BiomeKind.Barren, horizontal.GetKind(0, 7), "Bottom edge biome");
+}
+
+static void EdgeBandBiomeMapsCreateProductiveEnds()
+{
+    var vertical = BiomeMap.GenerateBands(
+        new WorldBounds(800f, 300f),
+        cellSize: 100f,
+        BiomeMapKind.VerticalEdgeBands);
+
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(0, 0), "Left edge should be rich");
+    AssertEqual(BiomeKind.Grassland, vertical.GetKind(1, 0), "Left inner band should be grassland");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(2, 0), "Left middle band should be sparse");
+    AssertEqual(BiomeKind.Barren, vertical.GetKind(3, 0), "Center-left band should be barren");
+    AssertEqual(BiomeKind.Barren, vertical.GetKind(4, 0), "Center-right band should be barren");
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(7, 0), "Right edge should be rich");
+
+    for (var y = 1; y < vertical.CellCountY; y++)
+    {
+        for (var x = 0; x < vertical.CellCountX; x++)
+        {
+            AssertEqual(vertical.GetKind(x, 0), vertical.GetKind(x, y), $"Vertical edge band {x},{y}");
+        }
+    }
+
+    var horizontal = BiomeMap.GenerateBands(
+        new WorldBounds(300f, 800f),
+        cellSize: 100f,
+        BiomeMapKind.HorizontalEdgeBands);
+
+    AssertEqual(BiomeKind.Rich, horizontal.GetKind(0, 0), "Top edge should be rich");
+    AssertEqual(BiomeKind.Barren, horizontal.GetKind(0, 3), "Center-top should be barren");
+    AssertEqual(BiomeKind.Barren, horizontal.GetKind(0, 4), "Center-bottom should be barren");
+    AssertEqual(BiomeKind.Rich, horizontal.GetKind(0, 7), "Bottom edge should be rich");
+}
+
+static void EdgeLadderBiomeMapsKeepPoorCentersCrossable()
+{
+    var vertical = BiomeMap.GenerateBands(
+        new WorldBounds(800f, 300f),
+        cellSize: 100f,
+        BiomeMapKind.VerticalEdgeLadderBands);
+
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(0, 0), "Left edge should be rich");
+    AssertEqual(BiomeKind.Grassland, vertical.GetKind(1, 0), "Left inner band should be grassland");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(2, 0), "Left middle should be sparse");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(3, 0), "Center-left should be sparse");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(4, 0), "Center-right should be sparse");
+    AssertEqual(BiomeKind.Grassland, vertical.GetKind(6, 0), "Right inner band should be grassland");
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(7, 0), "Right edge should be rich");
+
+    for (var y = 1; y < vertical.CellCountY; y++)
+    {
+        for (var x = 0; x < vertical.CellCountX; x++)
+        {
+            AssertEqual(vertical.GetKind(x, 0), vertical.GetKind(x, y), $"Vertical ladder band {x},{y}");
+        }
+    }
 }
 
 static void BiomeMapSamplesResourcesByDensity()
@@ -3332,6 +3479,26 @@ static void ScenarioFactoryCreatesDeterministicBiomes()
         AssertClose(first.State.Resources[i].Position.Y, second.State.Resources[i].Position.Y, 0.000001, $"Resource {i} y");
         AssertClose(first.State.Resources[i].RegrowthCaloriesPerSecond, second.State.Resources[i].RegrowthCaloriesPerSecond, 0.000001, $"Resource {i} regrowth");
     }
+}
+
+static void ScenarioFactoryHonorsBiomeMapKind()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 19,
+        BiomeMapKind = BiomeMapKind.VerticalBands,
+        WorldWidth = 800f,
+        WorldHeight = 400f,
+        BiomeCellSize = 100f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+
+    AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(0, 0), "Vertical band left edge");
+    AssertEqual(BiomeKind.Rich, simulation.State.Biomes.GetKind(3, 0), "Vertical band rich center");
+    AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(7, 0), "Vertical band right edge");
 }
 
 static void ScenarioFactorySupportsInitialBrainKinds()
@@ -3647,12 +3814,14 @@ static void ScenarioJsonRoundTrips()
         InitialBrainKind = InitialBrainKind.ForagerPredator,
         BrainHiddenNodeCount = 6,
         EnableBiomes = false,
+        BiomeMapKind = BiomeMapKind.HorizontalBands,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
         WorldWidth = 500f,
         WorldHeight = 300f,
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
+        InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.RightThird,
         InitialResourcesPerMillionArea = 37.5f,
         PlantRespawnDelaySecondsMin = 12f,
         PlantRespawnDelaySecondsMax = 34f,
@@ -3660,6 +3829,7 @@ static void ScenarioJsonRoundTrips()
         SeasonLengthSeconds = 480f,
         SeasonFertilityAmplitude = 0.45f,
         SeasonPhaseOffsetSeconds = 120f,
+        SeasonPhaseMode = SeasonPhaseMode.HorizontalOpposed,
         BarrenBiomeSeasonalAmplitudeMultiplier = 0.4f,
         SparseBiomeSeasonalAmplitudeMultiplier = 0.8f,
         GrasslandBiomeSeasonalAmplitudeMultiplier = 1.1f,
@@ -3731,10 +3901,13 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
     AssertTrue(json.Contains("\"brainHiddenNodeCount\": 6"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
+    AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
+    AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
     AssertTrue(json.Contains("\"enableSeasons\""), "JSON should serialize season toggle");
     AssertTrue(json.Contains("\"seasonFertilityAmplitude\""), "JSON should serialize season fertility");
+    AssertTrue(json.Contains("\"seasonPhaseMode\": \"horizontalOpposed\""), "JSON should serialize season phase mode");
     AssertTrue(json.Contains("\"barrenBiomeSeasonalAmplitudeMultiplier\""), "JSON should serialize biome seasonal response");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
@@ -3745,12 +3918,14 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.InitialBrainKind, roundTripped.InitialBrainKind, "Scenario initial brain mode");
     AssertEqual(scenario.BrainHiddenNodeCount, roundTripped.BrainHiddenNodeCount, "Scenario brain hidden nodes");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
+    AssertEqual(scenario.BiomeMapKind, roundTripped.BiomeMapKind, "Scenario biome map kind");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");
     AssertClose(scenario.WorldWidth, roundTripped.WorldWidth, 0.000001, "Scenario world width");
     AssertClose(scenario.WorldHeight, roundTripped.WorldHeight, 0.000001, "Scenario world height");
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
+    AssertEqual(scenario.InitialCreatureSpawnRegion, roundTripped.InitialCreatureSpawnRegion, "Scenario initial spawn region");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
@@ -3758,6 +3933,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.SeasonLengthSeconds, roundTripped.SeasonLengthSeconds, 0.000001, "Scenario season length");
     AssertClose(scenario.SeasonFertilityAmplitude, roundTripped.SeasonFertilityAmplitude, 0.000001, "Scenario season fertility amplitude");
     AssertClose(scenario.SeasonPhaseOffsetSeconds, roundTripped.SeasonPhaseOffsetSeconds, 0.000001, "Scenario season phase offset");
+    AssertEqual(scenario.SeasonPhaseMode, roundTripped.SeasonPhaseMode, "Scenario season phase mode");
     AssertClose(scenario.BarrenBiomeSeasonalAmplitudeMultiplier, roundTripped.BarrenBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario barren biome seasonal response");
     AssertClose(scenario.SparseBiomeSeasonalAmplitudeMultiplier, roundTripped.SparseBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario sparse biome seasonal response");
     AssertClose(scenario.GrasslandBiomeSeasonalAmplitudeMultiplier, roundTripped.GrasslandBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario grassland biome seasonal response");

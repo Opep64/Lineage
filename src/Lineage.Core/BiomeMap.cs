@@ -132,6 +132,56 @@ public sealed class BiomeMap
         return new BiomeMap(bounds, cellSize, cellCountX, cellCountY, cells, resourceVoidBorderWidth);
     }
 
+    public static BiomeMap GenerateBands(
+        WorldBounds bounds,
+        float cellSize,
+        BiomeMapKind mapKind,
+        float resourceVoidBorderWidth = 0f)
+    {
+        ValidateBounds(bounds);
+        ValidateCellSize(cellSize);
+        ValidateResourceVoidBorderWidth(bounds, resourceVoidBorderWidth);
+
+        if (mapKind is not BiomeMapKind.HorizontalBands
+            and not BiomeMapKind.VerticalBands
+            and not BiomeMapKind.HorizontalEdgeBands
+            and not BiomeMapKind.VerticalEdgeBands
+            and not BiomeMapKind.HorizontalEdgeLadderBands
+            and not BiomeMapKind.VerticalEdgeLadderBands)
+        {
+            throw new ArgumentException("Banded biome generation requires a band map kind.", nameof(mapKind));
+        }
+
+        var cellCountX = Math.Max(1, (int)MathF.Ceiling(bounds.Width / cellSize));
+        var cellCountY = Math.Max(1, (int)MathF.Ceiling(bounds.Height / cellSize));
+        var cells = new BiomeKind[cellCountX * cellCountY];
+
+        for (var y = 0; y < cellCountY; y++)
+        {
+            for (var x = 0; x < cellCountX; x++)
+            {
+                var vertical = mapKind is BiomeMapKind.VerticalBands
+                    or BiomeMapKind.VerticalEdgeBands
+                    or BiomeMapKind.VerticalEdgeLadderBands;
+                var edgeRich = mapKind is BiomeMapKind.HorizontalEdgeBands
+                    or BiomeMapKind.VerticalEdgeBands
+                    or BiomeMapKind.HorizontalEdgeLadderBands
+                    or BiomeMapKind.VerticalEdgeLadderBands;
+                var edgeLadder = mapKind is BiomeMapKind.HorizontalEdgeLadderBands
+                    or BiomeMapKind.VerticalEdgeLadderBands;
+                var bandIndex = vertical ? x : y;
+                var bandCount = vertical ? cellCountX : cellCountY;
+                cells[y * cellCountX + x] = edgeLadder
+                    ? BiomeKindForEdgeLadderBand(bandIndex, bandCount)
+                    : edgeRich
+                    ? BiomeKindForEdgeBand(bandIndex, bandCount)
+                    : BiomeKindForCenterBand(bandIndex, bandCount);
+            }
+        }
+
+        return new BiomeMap(bounds, cellSize, cellCountX, cellCountY, cells, resourceVoidBorderWidth);
+    }
+
     public BiomeKind GetKind(int cellX, int cellY)
     {
         if ((uint)cellX >= (uint)CellCountX || (uint)cellY >= (uint)CellCountY)
@@ -345,6 +395,59 @@ public sealed class BiomeMap
             < 0.42f => BiomeKind.Sparse,
             > 0.82f => BiomeKind.Rich,
             _ => BiomeKind.Grassland
+        };
+    }
+
+    private static BiomeKind BiomeKindForCenterBand(int bandIndex, int bandCount)
+    {
+        if (bandCount <= 1)
+        {
+            return BiomeKind.Grassland;
+        }
+
+        var phase = (bandIndex + 0.5f) / bandCount;
+        var distanceFromCenter = MathF.Abs(phase - 0.5f) * 2f;
+        return distanceFromCenter switch
+        {
+            > 0.84f => BiomeKind.Barren,
+            > 0.58f => BiomeKind.Sparse,
+            > 0.28f => BiomeKind.Grassland,
+            _ => BiomeKind.Rich
+        };
+    }
+
+    private static BiomeKind BiomeKindForEdgeBand(int bandIndex, int bandCount)
+    {
+        if (bandCount <= 1)
+        {
+            return BiomeKind.Grassland;
+        }
+
+        var phase = (bandIndex + 0.5f) / bandCount;
+        var distanceFromNearestEdge = MathF.Min(phase, 1f - phase) * 2f;
+        return distanceFromNearestEdge switch
+        {
+            < 0.18f => BiomeKind.Rich,
+            < 0.40f => BiomeKind.Grassland,
+            < 0.70f => BiomeKind.Sparse,
+            _ => BiomeKind.Barren
+        };
+    }
+
+    private static BiomeKind BiomeKindForEdgeLadderBand(int bandIndex, int bandCount)
+    {
+        if (bandCount <= 1)
+        {
+            return BiomeKind.Grassland;
+        }
+
+        var phase = (bandIndex + 0.5f) / bandCount;
+        var distanceFromNearestEdge = MathF.Min(phase, 1f - phase) * 2f;
+        return distanceFromNearestEdge switch
+        {
+            < 0.18f => BiomeKind.Rich,
+            < 0.44f => BiomeKind.Grassland,
+            _ => BiomeKind.Sparse
         };
     }
 

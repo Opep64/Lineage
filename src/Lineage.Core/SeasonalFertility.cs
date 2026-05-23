@@ -32,6 +32,25 @@ public static class SeasonalFertility
         return new SeasonalFertilityState(phase, multiplier);
     }
 
+    public static SeasonalFertilityState CalculateAt(
+        bool enabled,
+        double elapsedSeconds,
+        float seasonLengthSeconds,
+        float fertilityAmplitude,
+        float phaseOffsetSeconds,
+        SeasonPhaseMode phaseMode,
+        WorldBounds bounds,
+        SimVector2 position)
+    {
+        var spatialOffsetSeconds = CalculateSpatialPhaseOffsetSeconds(phaseMode, bounds, position, seasonLengthSeconds);
+        return Calculate(
+            enabled,
+            elapsedSeconds,
+            seasonLengthSeconds,
+            fertilityAmplitude,
+            phaseOffsetSeconds + spatialOffsetSeconds);
+    }
+
     public static BiomeSeasonalFertilityMultipliers CalculateBiomeMultipliers(
         bool enabled,
         double elapsedSeconds,
@@ -55,6 +74,33 @@ public static class SeasonalFertility
             CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Rich));
     }
 
+    public static float CalculateBiomeMultiplierAt(
+        bool enabled,
+        double elapsedSeconds,
+        float seasonLengthSeconds,
+        float fertilityAmplitude,
+        float phaseOffsetSeconds,
+        SeasonPhaseMode phaseMode,
+        WorldBounds bounds,
+        SimVector2 position,
+        BiomeKind biome,
+        BiomePressureProfile biomeAmplitudeProfile)
+    {
+        var effectiveAmplitude = Math.Clamp(
+            fertilityAmplitude * biomeAmplitudeProfile.For(biome),
+            0f,
+            MaxEffectiveAmplitude);
+        return CalculateAt(
+            enabled,
+            elapsedSeconds,
+            seasonLengthSeconds,
+            effectiveAmplitude,
+            phaseOffsetSeconds,
+            phaseMode,
+            bounds,
+            position).FertilityMultiplier;
+    }
+
     private static float CalculateBiomeMultiplier(
         bool enabled,
         double elapsedSeconds,
@@ -73,6 +119,27 @@ public static class SeasonalFertility
             seasonLengthSeconds,
             effectiveAmplitude,
             phaseOffsetSeconds).FertilityMultiplier;
+    }
+
+    private static float CalculateSpatialPhaseOffsetSeconds(
+        SeasonPhaseMode phaseMode,
+        WorldBounds bounds,
+        SimVector2 position,
+        float seasonLengthSeconds)
+    {
+        if (seasonLengthSeconds <= 0f)
+        {
+            return 0f;
+        }
+
+        return phaseMode switch
+        {
+            SeasonPhaseMode.HorizontalOpposed when bounds.Width > 0f && position.X >= bounds.Width * 0.5f =>
+                seasonLengthSeconds * 0.5f,
+            SeasonPhaseMode.VerticalOpposed when bounds.Height > 0f && position.Y >= bounds.Height * 0.5f =>
+                seasonLengthSeconds * 0.5f,
+            _ => 0f
+        };
     }
 }
 

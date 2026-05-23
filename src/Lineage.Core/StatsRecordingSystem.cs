@@ -11,7 +11,8 @@ public sealed class StatsRecordingSystem(
     bool enableSeasons = false,
     float seasonLengthSeconds = 900f,
     float seasonFertilityAmplitude = 0.3f,
-    float seasonPhaseOffsetSeconds = 0f) : ISimulationSystem
+    float seasonPhaseOffsetSeconds = 0f,
+    SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global) : ISimulationSystem
 {
     private const float ActiveHiddenOutputWeightThreshold = 0.05f;
 
@@ -28,6 +29,7 @@ public sealed class StatsRecordingSystem(
     private readonly float _seasonLengthSeconds = EnsurePositive(seasonLengthSeconds, nameof(seasonLengthSeconds));
     private readonly float _seasonFertilityAmplitude = EnsureRange(seasonFertilityAmplitude, 0f, 0.95f, nameof(seasonFertilityAmplitude));
     private readonly float _seasonPhaseOffsetSeconds = EnsureFinite(seasonPhaseOffsetSeconds, nameof(seasonPhaseOffsetSeconds));
+    private readonly SeasonPhaseMode _seasonPhaseMode = seasonPhaseMode;
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -93,6 +95,12 @@ public sealed class StatsRecordingSystem(
         var sparseCreatureCount = 0;
         var grasslandCreatureCount = 0;
         var richCreatureCount = 0;
+        var leftRegionCreatureCount = 0;
+        var middleRegionCreatureCount = 0;
+        var rightRegionCreatureCount = 0;
+        var leftRegionGenerationTotal = 0;
+        var middleRegionGenerationTotal = 0;
+        var rightRegionGenerationTotal = 0;
         var maxGeneration = 0;
 
         for (var i = 0; i < state.Creatures.Count; i++)
@@ -157,6 +165,22 @@ public sealed class StatsRecordingSystem(
                     break;
                 default:
                     grasslandCreatureCount++;
+                    break;
+            }
+
+            switch (GetHorizontalRegion(state.Bounds, creature.Position))
+            {
+                case HorizontalRegion.Left:
+                    leftRegionCreatureCount++;
+                    leftRegionGenerationTotal += creature.Generation;
+                    break;
+                case HorizontalRegion.Right:
+                    rightRegionCreatureCount++;
+                    rightRegionGenerationTotal += creature.Generation;
+                    break;
+                default:
+                    middleRegionCreatureCount++;
+                    middleRegionGenerationTotal += creature.Generation;
                     break;
             }
 
@@ -230,6 +254,12 @@ public sealed class StatsRecordingSystem(
         var activeResourceCount = 0;
         var plantResourceCount = 0;
         var meatResourceCount = 0;
+        var leftRegionPlantCalories = 0f;
+        var middleRegionPlantCalories = 0f;
+        var rightRegionPlantCalories = 0f;
+        var leftRegionMeatCalories = 0f;
+        var middleRegionMeatCalories = 0f;
+        var rightRegionMeatCalories = 0f;
         for (var i = 0; i < state.Resources.Count; i++)
         {
             var resource = state.Resources[i];
@@ -240,22 +270,28 @@ public sealed class StatsRecordingSystem(
 
             activeResourceCount++;
             totalResourceCalories += resource.Calories;
+            var region = GetHorizontalRegion(state.Bounds, resource.Position);
             if (resource.Kind == ResourceKind.Meat)
             {
                 meatResourceCount++;
                 totalMeatCalories += resource.Calories;
                 totalMeatFreshnessWeightedCalories += resource.Calories * MeatQuality.Freshness(resource);
+                AddRegionValue(region, resource.Calories, ref leftRegionMeatCalories, ref middleRegionMeatCalories, ref rightRegionMeatCalories);
             }
             else
             {
                 plantResourceCount++;
                 totalPlantCalories += resource.Calories;
+                AddRegionValue(region, resource.Calories, ref leftRegionPlantCalories, ref middleRegionPlantCalories, ref rightRegionPlantCalories);
             }
         }
 
         var totalEggEnergy = 0f;
         var totalEggHealth = 0f;
         var totalEggHealthRatio = 0f;
+        var leftRegionEggCount = 0;
+        var middleRegionEggCount = 0;
+        var rightRegionEggCount = 0;
         for (var i = 0; i < state.Eggs.Count; i++)
         {
             var egg = state.Eggs[i];
@@ -264,6 +300,18 @@ public sealed class StatsRecordingSystem(
             totalEggHealthRatio += egg.MaxHealth > 0f
                 ? Math.Clamp(egg.Health / egg.MaxHealth, 0f, 1f)
                 : 1f;
+            switch (GetHorizontalRegion(state.Bounds, egg.Position))
+            {
+                case HorizontalRegion.Left:
+                    leftRegionEggCount++;
+                    break;
+                case HorizontalRegion.Right:
+                    rightRegionEggCount++;
+                    break;
+                default:
+                    middleRegionEggCount++;
+                    break;
+            }
         }
 
         var creatureCount = state.Creatures.Count;
@@ -373,6 +421,9 @@ public sealed class StatsRecordingSystem(
             _seasonLengthSeconds,
             _seasonFertilityAmplitude,
             _seasonPhaseOffsetSeconds);
+        var leftRegionSeason = CalculateRegionSeason(state, 1f / 6f);
+        var middleRegionSeason = CalculateRegionSeason(state, 0.5f);
+        var rightRegionSeason = CalculateRegionSeason(state, 5f / 6f);
         state.Stats.RecordSnapshot(new SimulationStatsSnapshot(
             state.Tick,
             state.ElapsedSeconds,
@@ -472,7 +523,89 @@ public sealed class StatsRecordingSystem(
             reproductionIntentCreatureCount,
             totalEggReserveRatio / divisor,
             totalEnergySurplusRatio / divisor,
-            totalRecentFoodSuccess / divisor));
+            totalRecentFoodSuccess / divisor,
+            leftRegionCreatureCount,
+            middleRegionCreatureCount,
+            rightRegionCreatureCount,
+            leftRegionEggCount,
+            middleRegionEggCount,
+            rightRegionEggCount,
+            leftRegionPlantCalories,
+            middleRegionPlantCalories,
+            rightRegionPlantCalories,
+            leftRegionMeatCalories,
+            middleRegionMeatCalories,
+            rightRegionMeatCalories,
+            AverageRegionGeneration(leftRegionGenerationTotal, leftRegionCreatureCount),
+            AverageRegionGeneration(middleRegionGenerationTotal, middleRegionCreatureCount),
+            AverageRegionGeneration(rightRegionGenerationTotal, rightRegionCreatureCount),
+            leftRegionSeason.FertilityMultiplier,
+            middleRegionSeason.FertilityMultiplier,
+            rightRegionSeason.FertilityMultiplier));
+    }
+
+    private SeasonalFertilityState CalculateRegionSeason(WorldState state, float xFraction)
+    {
+        var position = new SimVector2(
+            Math.Clamp(state.Bounds.Width * xFraction, 0f, state.Bounds.Width),
+            state.Bounds.Height * 0.5f);
+        return SeasonalFertility.CalculateAt(
+            _enableSeasons,
+            state.ElapsedSeconds,
+            _seasonLengthSeconds,
+            _seasonFertilityAmplitude,
+            _seasonPhaseOffsetSeconds,
+            _seasonPhaseMode,
+            state.Bounds,
+            position);
+    }
+
+    private static float AverageRegionGeneration(int generationTotal, int creatureCount)
+    {
+        return creatureCount > 0
+            ? generationTotal / (float)creatureCount
+            : 0f;
+    }
+
+    private static HorizontalRegion GetHorizontalRegion(WorldBounds bounds, SimVector2 position)
+    {
+        var third = bounds.Width / 3f;
+        if (position.X < third)
+        {
+            return HorizontalRegion.Left;
+        }
+
+        return position.X >= third * 2f
+            ? HorizontalRegion.Right
+            : HorizontalRegion.Middle;
+    }
+
+    private static void AddRegionValue(
+        HorizontalRegion region,
+        float value,
+        ref float left,
+        ref float middle,
+        ref float right)
+    {
+        switch (region)
+        {
+            case HorizontalRegion.Left:
+                left += value;
+                break;
+            case HorizontalRegion.Right:
+                right += value;
+                break;
+            default:
+                middle += value;
+                break;
+        }
+    }
+
+    private enum HorizontalRegion
+    {
+        Left,
+        Middle,
+        Right
     }
 
     private static float EnsurePositive(float value, string name)

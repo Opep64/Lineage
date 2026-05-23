@@ -16,6 +16,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
     private readonly float _seasonLengthSeconds;
     private readonly float _seasonFertilityAmplitude;
     private readonly float _seasonPhaseOffsetSeconds;
+    private readonly SeasonPhaseMode _seasonPhaseMode;
     private readonly BiomePressureProfile _biomeSeasonalAmplitudeProfile;
 
     public ResourceRegrowthSystem(
@@ -30,6 +31,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         float seasonLengthSeconds = 900f,
         float seasonFertilityAmplitude = 0.3f,
         float seasonPhaseOffsetSeconds = 0f,
+        SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
         BiomePressureProfile? biomeSeasonalAmplitudeProfile = null)
     {
         EnsureNonNegative(plantRespawnDelaySecondsMin, nameof(plantRespawnDelaySecondsMin));
@@ -61,6 +63,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         _seasonLengthSeconds = seasonLengthSeconds;
         _seasonFertilityAmplitude = seasonFertilityAmplitude;
         _seasonPhaseOffsetSeconds = seasonPhaseOffsetSeconds;
+        _seasonPhaseMode = seasonPhaseMode;
         _biomeSeasonalAmplitudeProfile = BiomePressureProfile.Validate(
             biomeSeasonalAmplitudeProfile ?? BiomePressureProfile.Neutral,
             nameof(biomeSeasonalAmplitudeProfile));
@@ -68,13 +71,6 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
 
     public void Update(WorldState state, float deltaSeconds)
     {
-        var fertilityMultipliers = SeasonalFertility.CalculateBiomeMultipliers(
-            _enableSeasons,
-            state.ElapsedSeconds,
-            _seasonLengthSeconds,
-            _seasonFertilityAmplitude,
-            _seasonPhaseOffsetSeconds,
-            _biomeSeasonalAmplitudeProfile);
         var resourcesDirty = false;
         var writeIndex = 0;
         for (var readIndex = 0; readIndex < state.Resources.Count; readIndex++)
@@ -94,7 +90,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
                 continue;
             }
 
-            resourcesDirty |= UpdatePlant(state, ref resource, deltaSeconds, fertilityMultipliers);
+            resourcesDirty |= UpdatePlant(state, ref resource, deltaSeconds);
             state.Resources[writeIndex++] = resource;
         }
 
@@ -130,11 +126,10 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
     private bool UpdatePlant(
         WorldState state,
         ref ResourcePatchState resource,
-        float deltaSeconds,
-        BiomeSeasonalFertilityMultipliers fertilityMultipliers)
+        float deltaSeconds)
     {
         var resourcesDirty = false;
-        var fertilityMultiplier = fertilityMultipliers.For(state.Biomes.GetKindAt(resource.Position));
+        var fertilityMultiplier = CalculatePlantFertilityMultiplier(state, resource.Position);
 
         if (resource.RespawnSecondsRemaining > 0f)
         {
@@ -182,10 +177,27 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             return resourcesDirty;
         }
 
+        fertilityMultiplier = CalculatePlantFertilityMultiplier(state, resource.Position);
         resource.Calories = Math.Min(
             resource.MaxCalories,
             resource.Calories + resource.RegrowthCaloriesPerSecond * fertilityMultiplier * deltaSeconds);
         return resourcesDirty;
+    }
+
+    private float CalculatePlantFertilityMultiplier(WorldState state, SimVector2 position)
+    {
+        var biome = state.Biomes.GetKindAt(position);
+        return SeasonalFertility.CalculateBiomeMultiplierAt(
+            _enableSeasons,
+            state.ElapsedSeconds,
+            _seasonLengthSeconds,
+            _seasonFertilityAmplitude,
+            _seasonPhaseOffsetSeconds,
+            _seasonPhaseMode,
+            state.Bounds,
+            position,
+            biome,
+            _biomeSeasonalAmplitudeProfile);
     }
 
     private bool HasPlantRespawnDelay => _plantRespawnDelaySecondsMax > 0f;

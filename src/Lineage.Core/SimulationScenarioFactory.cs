@@ -65,6 +65,7 @@ public static class SimulationScenarioFactory
                 scenario.SeasonLengthSeconds,
                 scenario.SeasonFertilityAmplitude,
                 scenario.SeasonPhaseOffsetSeconds,
+                scenario.SeasonPhaseMode,
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
                 scenario.CreateBiomeSpeedProfile(),
@@ -110,6 +111,7 @@ public static class SimulationScenarioFactory
                 scenario.SeasonLengthSeconds,
                 scenario.SeasonFertilityAmplitude,
                 scenario.SeasonPhaseOffsetSeconds,
+                scenario.SeasonPhaseMode,
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
                 scenario.CreateBiomeSpeedProfile(),
@@ -180,7 +182,7 @@ public static class SimulationScenarioFactory
             var brainId = CreateFounderBrainId(state, scenario, sharedBrainId, initialBrainRandom);
             state.SpawnCreature(
                 genomeId,
-                RandomPosition(state),
+                RandomCreaturePosition(state, scenario.InitialCreatureSpawnRegion),
                 energy: RandomRange(
                     state,
                     scenario.InitialCreatureEnergyMin,
@@ -192,9 +194,29 @@ public static class SimulationScenarioFactory
     private static BiomeMap CreateBiomeMap(SimulationScenario scenario)
     {
         var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
-        return scenario.EnableBiomes
-            ? BiomeMap.Generate(bounds, scenario.BiomeCellSize, scenario.Seed, scenario.ResourceVoidBorderWidth)
-            : BiomeMap.CreateUniform(bounds, MathF.Max(scenario.WorldWidth, scenario.WorldHeight), BiomeKind.Grassland, scenario.ResourceVoidBorderWidth);
+        if (!scenario.EnableBiomes)
+        {
+            return BiomeMap.CreateUniform(
+                bounds,
+                MathF.Max(scenario.WorldWidth, scenario.WorldHeight),
+                BiomeKind.Grassland,
+                scenario.ResourceVoidBorderWidth);
+        }
+
+        return scenario.BiomeMapKind switch
+        {
+            BiomeMapKind.HorizontalBands
+                or BiomeMapKind.VerticalBands
+                or BiomeMapKind.HorizontalEdgeBands
+                or BiomeMapKind.VerticalEdgeBands
+                or BiomeMapKind.HorizontalEdgeLadderBands
+                or BiomeMapKind.VerticalEdgeLadderBands => BiomeMap.GenerateBands(
+                bounds,
+                scenario.BiomeCellSize,
+                scenario.BiomeMapKind,
+                scenario.ResourceVoidBorderWidth),
+            _ => BiomeMap.Generate(bounds, scenario.BiomeCellSize, scenario.Seed, scenario.ResourceVoidBorderWidth)
+        };
     }
 
     private static int CreateSharedInitialBrainId(WorldState state, SimulationScenario scenario)
@@ -246,11 +268,67 @@ public static class SimulationScenarioFactory
         };
     }
 
-    private static SimVector2 RandomPosition(WorldState state)
+    private static SimVector2 RandomCreaturePosition(WorldState state, InitialCreatureSpawnRegion spawnRegion)
     {
+        var bounds = ResolveCreatureSpawnBounds(state, spawnRegion);
         return new SimVector2(
-            state.Random.NextSingle(0f, state.Bounds.Width),
-            state.Random.NextSingle(0f, state.Bounds.Height));
+            RandomRange(state, bounds.Left, bounds.Right),
+            RandomRange(state, bounds.Top, bounds.Bottom));
+    }
+
+    private static CreatureSpawnBounds ResolveCreatureSpawnBounds(WorldState state, InitialCreatureSpawnRegion spawnRegion)
+    {
+        var left = 0f;
+        var top = 0f;
+        var right = state.Bounds.Width;
+        var bottom = state.Bounds.Height;
+        var thirdWidth = state.Bounds.Width / 3f;
+        var thirdHeight = state.Bounds.Height / 3f;
+
+        switch (spawnRegion)
+        {
+            case InitialCreatureSpawnRegion.LeftThird:
+                right = thirdWidth;
+                break;
+            case InitialCreatureSpawnRegion.MiddleThird:
+                left = thirdWidth;
+                right = thirdWidth * 2f;
+                break;
+            case InitialCreatureSpawnRegion.RightThird:
+                left = thirdWidth * 2f;
+                break;
+            case InitialCreatureSpawnRegion.TopThird:
+                bottom = thirdHeight;
+                break;
+            case InitialCreatureSpawnRegion.BottomThird:
+                top = thirdHeight * 2f;
+                break;
+        }
+
+        if (spawnRegion != InitialCreatureSpawnRegion.Uniform)
+        {
+            var padding = MathF.Min(
+                state.Biomes.ResourceVoidBorderWidth,
+                MathF.Min(state.Bounds.Width, state.Bounds.Height) * 0.45f);
+            left = MathF.Max(left, padding);
+            top = MathF.Max(top, padding);
+            right = MathF.Min(right, state.Bounds.Width - padding);
+            bottom = MathF.Min(bottom, state.Bounds.Height - padding);
+        }
+
+        if (right <= left)
+        {
+            left = 0f;
+            right = state.Bounds.Width;
+        }
+
+        if (bottom <= top)
+        {
+            top = 0f;
+            bottom = state.Bounds.Height;
+        }
+
+        return new CreatureSpawnBounds(left, top, right, bottom);
     }
 
     private static float RandomRange(WorldState state, float inclusiveMin, float exclusiveMax)
@@ -259,4 +337,6 @@ public static class SimulationScenarioFactory
             ? inclusiveMin
             : state.Random.NextSingle(inclusiveMin, exclusiveMax);
     }
+
+    private readonly record struct CreatureSpawnBounds(float Left, float Top, float Right, float Bottom);
 }

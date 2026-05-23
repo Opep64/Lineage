@@ -701,21 +701,28 @@ public partial class Main : Node2D
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
-        var season = SeasonalFertility.Calculate(
-            _scenario.EnableSeasons,
-            state.ElapsedSeconds,
-            _scenario.SeasonLengthSeconds,
-            _scenario.SeasonFertilityAmplitude,
-            _scenario.SeasonPhaseOffsetSeconds);
-        var biomeSeason = SeasonalFertility.CalculateBiomeMultipliers(
+        var season = SeasonalFertility.CalculateAt(
             _scenario.EnableSeasons,
             state.ElapsedSeconds,
             _scenario.SeasonLengthSeconds,
             _scenario.SeasonFertilityAmplitude,
             _scenario.SeasonPhaseOffsetSeconds,
+            _scenario.SeasonPhaseMode,
+            state.Bounds,
+            _viewCenter);
+        var biomeSeason = SeasonalFertility.CalculateBiomeMultiplierAt(
+            _scenario.EnableSeasons,
+            state.ElapsedSeconds,
+            _scenario.SeasonLengthSeconds,
+            _scenario.SeasonFertilityAmplitude,
+            _scenario.SeasonPhaseOffsetSeconds,
+            _scenario.SeasonPhaseMode,
+            state.Bounds,
+            _viewCenter,
+            centerBiome,
             _scenario.CreateBiomeSeasonalAmplitudeProfile());
         var seasonText = _scenario.EnableSeasons
-            ? $"Season {season.Phase * 100f:0}%  Global {season.FertilityMultiplier:0.00}x  Here {biomeSeason.For(centerBiome):0.00}x\n"
+            ? $"Season {season.Phase * 100f:0}%  Here {season.FertilityMultiplier:0.00}x  Biome {biomeSeason:0.00}x\n"
             : string.Empty;
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
         var launcherHint = _scenarioEditor.IsCollapsed
@@ -752,7 +759,7 @@ public partial class Main : Node2D
             $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}  Map {(_renderMap ? "on" : "off")}\n" +
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
-            $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
+            $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
             $"Biome pop B {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} S {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} R {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
             $"Biome move {snapshot.AverageBiomeMovementCostMultiplier:0.00}x basal {snapshot.AverageBiomeBasalCostMultiplier:0.00}x speed {snapshot.AverageBiomeSpeedMultiplier:0.00}x\n" +
             $"Color {FormatColorMode(_colorMode)}\n" +
@@ -841,13 +848,17 @@ public partial class Main : Node2D
         var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
-        var seasonalFertility = SeasonalFertility.CalculateBiomeMultipliers(
+        var seasonalFertility = SeasonalFertility.CalculateBiomeMultiplierAt(
             _scenario.EnableSeasons,
             _simulation.State.ElapsedSeconds,
             _scenario.SeasonLengthSeconds,
             _scenario.SeasonFertilityAmplitude,
             _scenario.SeasonPhaseOffsetSeconds,
-            _scenario.CreateBiomeSeasonalAmplitudeProfile()).For(biome);
+            _scenario.SeasonPhaseMode,
+            _simulation.State.Bounds,
+            creature.Position,
+            biome,
+            _scenario.CreateBiomeSeasonalAmplitudeProfile());
         var brainText = creature.BrainId >= 0
             ? $"{creature.BrainId} ({_simulation.State.GetBrain(creature.BrainId).HiddenNodeCount} hidden)"
             : "none";
@@ -2477,6 +2488,20 @@ public partial class Main : Node2D
     private static string FormatBiomeKind(BiomeKind biome)
     {
         return biome.ToString().ToLowerInvariant();
+    }
+
+    private static string FormatBiomeMapKind(BiomeMapKind mapKind)
+    {
+        return mapKind switch
+        {
+            BiomeMapKind.HorizontalBands => "horizontal bands",
+            BiomeMapKind.VerticalBands => "vertical bands",
+            BiomeMapKind.HorizontalEdgeBands => "horizontal edge bands",
+            BiomeMapKind.VerticalEdgeBands => "vertical edge bands",
+            BiomeMapKind.HorizontalEdgeLadderBands => "horizontal ladder bands",
+            BiomeMapKind.VerticalEdgeLadderBands => "vertical ladder bands",
+            _ => "noise"
+        };
     }
 
     private static string FormatResourceKind(ResourceKind kind)

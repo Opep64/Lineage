@@ -34,6 +34,8 @@ public sealed record SimulationScenario
 
     public bool EnableBiomes { get; init; } = true;
 
+    public BiomeMapKind BiomeMapKind { get; init; } = BiomeMapKind.GeneratedNoise;
+
     public float WorldWidth { get; init; } = 2_000f;
 
     public float WorldHeight { get; init; } = 2_000f;
@@ -49,6 +51,8 @@ public sealed record SimulationScenario
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 
     public int InitialCreatureCount { get; init; } = 80;
+
+    public InitialCreatureSpawnRegion InitialCreatureSpawnRegion { get; init; } = InitialCreatureSpawnRegion.Uniform;
 
     public float InitialResourcesPerMillionArea { get; init; } = 165f;
 
@@ -87,6 +91,8 @@ public sealed record SimulationScenario
     public float SeasonFertilityAmplitude { get; init; } = 0.3f;
 
     public float SeasonPhaseOffsetSeconds { get; init; } = 0f;
+
+    public SeasonPhaseMode SeasonPhaseMode { get; init; } = SeasonPhaseMode.Global;
 
     public float BarrenBiomeSeasonalAmplitudeMultiplier { get; init; } = 0.5f;
 
@@ -222,6 +228,7 @@ public sealed record SimulationScenario
         EnsurePositive(WorldWidth, nameof(WorldWidth));
         EnsurePositive(WorldHeight, nameof(WorldHeight));
         EnsureEnumDefined(InitialBrainKind, nameof(InitialBrainKind));
+        EnsureEnumDefined(BiomeMapKind, nameof(BiomeMapKind));
         EnsureHiddenNodeCount(BrainHiddenNodeCount, nameof(BrainHiddenNodeCount));
         EnsurePositive(BiomeCellSize, nameof(BiomeCellSize));
         EnsureNonNegative(ResourceVoidBorderWidth, nameof(ResourceVoidBorderWidth));
@@ -229,6 +236,7 @@ public sealed record SimulationScenario
         EnsurePositive(SpatialCellSize, nameof(SpatialCellSize));
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsureNonNegative(InitialCreatureCount, nameof(InitialCreatureCount));
+        EnsureEnumDefined(InitialCreatureSpawnRegion, nameof(InitialCreatureSpawnRegion));
         EnsureNonNegative(InitialResourcesPerMillionArea, nameof(InitialResourcesPerMillionArea));
         EnsureRange(InitialCreatureEnergyMin, InitialCreatureEnergyMax, nameof(InitialCreatureEnergyMin), nameof(InitialCreatureEnergyMax));
         EnsureRange(ResourceRadiusMin, ResourceRadiusMax, nameof(ResourceRadiusMin), nameof(ResourceRadiusMax));
@@ -241,6 +249,7 @@ public sealed record SimulationScenario
         EnsurePositive(SeasonLengthSeconds, nameof(SeasonLengthSeconds));
         EnsureRange(SeasonFertilityAmplitude, 0f, 0.95f, nameof(SeasonFertilityAmplitude));
         EnsureFinite(SeasonPhaseOffsetSeconds, nameof(SeasonPhaseOffsetSeconds));
+        EnsureEnumDefined(SeasonPhaseMode, nameof(SeasonPhaseMode));
         EnsureRange(BarrenBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(BarrenBiomeSeasonalAmplitudeMultiplier));
         EnsureRange(SparseBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(SparseBiomeSeasonalAmplitudeMultiplier));
         EnsureRange(GrasslandBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(GrasslandBiomeSeasonalAmplitudeMultiplier));

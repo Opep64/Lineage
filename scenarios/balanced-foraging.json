@@ -5,6 +5,7 @@
   "initialBrainKind": "seedForager",
   "brainHiddenNodeCount": 4,
   "enableBiomes": true,
+  "biomeMapKind": "generatedNoise",
   "worldWidth": 2000,
   "worldHeight": 2000,
   "biomeCellSize": 500,

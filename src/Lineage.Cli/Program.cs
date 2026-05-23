@@ -1787,7 +1787,7 @@ internal static class StatsCsvWriter
     public static void Write(string path, IReadOnlyList<SimulationStatsSnapshot> snapshots)
     {
         using var writer = CreateWriter(path);
-        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,avg_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_recent_food_success");
+        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,avg_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_recent_food_success,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility");
 
         foreach (var snapshot in snapshots)
         {
@@ -1905,7 +1905,28 @@ internal static class StatsCsvWriter
                 FormatShare(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount),
                 snapshot.AverageEggReserveRatio.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageEnergySurplusRatio.ToString("0.######", CultureInfo.InvariantCulture),
-                snapshot.AverageRecentFoodSuccess.ToString("0.######", CultureInfo.InvariantCulture)));
+                snapshot.AverageRecentFoodSuccess.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.LeftRegionCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.LeftRegionCreatureCount, snapshot.CreatureCount),
+                snapshot.MiddleRegionCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.MiddleRegionCreatureCount, snapshot.CreatureCount),
+                snapshot.RightRegionCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.RightRegionCreatureCount, snapshot.CreatureCount),
+                snapshot.LeftRegionEggCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.MiddleRegionEggCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.RightRegionEggCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.LeftRegionPlantCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MiddleRegionPlantCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.RightRegionPlantCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.LeftRegionMeatCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MiddleRegionMeatCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.RightRegionMeatCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.LeftRegionAverageGeneration.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MiddleRegionAverageGeneration.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.RightRegionAverageGeneration.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.LeftRegionSeasonFertilityMultiplier.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MiddleRegionSeasonFertilityMultiplier.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.RightRegionSeasonFertilityMultiplier.ToString("0.######", CultureInfo.InvariantCulture)));
         }
     }
 
@@ -3151,9 +3172,11 @@ internal static class RunReportWriter
         writer.WriteLine("<h2>Pressure Settings</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Initial creatures", scenario.InitialCreatureCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Initial creature spawn", scenario.InitialCreatureSpawnRegion.ToString());
         WriteMetric(writer, "Initial resource density", $"{scenario.InitialResourcesPerMillionArea:0.###} per 1M area");
         WriteMetric(writer, "Initial resource patches", scenario.CalculateInitialResourceCount().ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");
+        WriteMetric(writer, "Biome map", scenario.BiomeMapKind.ToString());
         WriteMetric(writer, "Biome cell size", scenario.BiomeCellSize.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Resource void border", $"{scenario.ResourceVoidBorderWidth:0.###} world units");
         WriteMetric(writer, "Resource calories", FormatRange(scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax));
@@ -3164,6 +3187,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Season length", $"{scenario.SeasonLengthSeconds:0.###} seconds");
         WriteMetric(writer, "Season fertility swing", FormatPercent(scenario.SeasonFertilityAmplitude));
         WriteMetric(writer, "Season phase offset", $"{scenario.SeasonPhaseOffsetSeconds:0.###} seconds");
+        WriteMetric(writer, "Season phase mode", scenario.SeasonPhaseMode.ToString());
         WriteMetric(writer, "Biome season response", FormatBiomePressureProfile(scenario.CreateBiomeSeasonalAmplitudeProfile()));
         WriteMetric(writer, "Resource clustering", FormatPercent(scenario.ResourceClusterStrength));
         WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
@@ -3262,6 +3286,20 @@ internal static class RunReportWriter
         WriteMetric(writer, "Avg biome speed", $"{finalSnapshot.AverageBiomeSpeedMultiplier:0.###}x");
         WriteMetric(writer, "Season phase", FormatPercent(finalSnapshot.SeasonPhase));
         WriteMetric(writer, "Season fertility", $"{finalSnapshot.SeasonFertilityMultiplier:0.###}x");
+        WriteMetric(writer, "Region season fertility", FormatRegionValues(
+            finalSnapshot.LeftRegionSeasonFertilityMultiplier,
+            finalSnapshot.MiddleRegionSeasonFertilityMultiplier,
+            finalSnapshot.RightRegionSeasonFertilityMultiplier,
+            "0.###x"));
+        WriteMetric(writer, "Region population", FormatRegionCounts(
+            finalSnapshot.LeftRegionCreatureCount,
+            finalSnapshot.MiddleRegionCreatureCount,
+            finalSnapshot.RightRegionCreatureCount));
+        WriteMetric(writer, "Region plant kcal", FormatRegionValues(
+            finalSnapshot.LeftRegionPlantCalories,
+            finalSnapshot.MiddleRegionPlantCalories,
+            finalSnapshot.RightRegionPlantCalories,
+            "0"));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -3926,7 +3964,26 @@ internal static class RunReportWriter
             "Season fertility",
             "x",
             snapshots,
-            new ChartSeries("Fertility", "#6a8fce", snapshots.Select(snapshot => snapshot.SeasonFertilityMultiplier).ToArray()));
+            new ChartSeries("Global", "#6a8fce", snapshots.Select(snapshot => snapshot.SeasonFertilityMultiplier).ToArray()),
+            new ChartSeries("Left", "#35a862", snapshots.Select(snapshot => snapshot.LeftRegionSeasonFertilityMultiplier).ToArray()),
+            new ChartSeries("Middle", "#d69d2f", snapshots.Select(snapshot => snapshot.MiddleRegionSeasonFertilityMultiplier).ToArray()),
+            new ChartSeries("Right", "#8f4cb8", snapshots.Select(snapshot => snapshot.RightRegionSeasonFertilityMultiplier).ToArray()));
+        WriteLineChart(
+            writer,
+            "Migration regions",
+            "%",
+            snapshots,
+            new ChartSeries("Left", "#35a862", snapshots.Select(snapshot => Share(snapshot.LeftRegionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Middle", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.MiddleRegionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Right", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.RightRegionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Regional plant calories",
+            " kcal",
+            snapshots,
+            new ChartSeries("Left", "#35a862", snapshots.Select(snapshot => snapshot.LeftRegionPlantCalories).ToArray()),
+            new ChartSeries("Middle", "#d69d2f", snapshots.Select(snapshot => snapshot.MiddleRegionPlantCalories).ToArray()),
+            new ChartSeries("Right", "#8f4cb8", snapshots.Select(snapshot => snapshot.RightRegionPlantCalories).ToArray()));
         WriteLineChart(
             writer,
             "Biome occupancy",
@@ -4327,6 +4384,20 @@ internal static class RunReportWriter
         return string.Create(
             CultureInfo.InvariantCulture,
             $"Barren {profile.Barren:0.###}x, Sparse {profile.Sparse:0.###}x, Grassland {profile.Grassland:0.###}x, Rich {profile.Rich:0.###}x");
+    }
+
+    private static string FormatRegionCounts(int left, int middle, int right)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Left {left}, Middle {middle}, Right {right}");
+    }
+
+    private static string FormatRegionValues(float left, float middle, float right, string format)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Left {left.ToString(format, CultureInfo.InvariantCulture)}, Middle {middle.ToString(format, CultureInfo.InvariantCulture)}, Right {right.ToString(format, CultureInfo.InvariantCulture)}");
     }
 
     private static int CreatureCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)

@@ -85,6 +85,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Seasons", scenario.EnableSeasons ? "Enabled" : "Disabled");
         WriteMetric(writer, "Season length", $"{scenario.SeasonLengthSeconds:0.###} seconds");
         WriteMetric(writer, "Season fertility swing", FormatPercent(scenario.SeasonFertilityAmplitude));
+        WriteMetric(writer, "Season phase mode", scenario.SeasonPhaseMode.ToString());
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -131,6 +132,20 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Avg biome speed", $"{snapshot.AverageBiomeSpeedMultiplier:0.###}x");
         WriteMetric(writer, "Season phase", FormatPercent(snapshot.SeasonPhase));
         WriteMetric(writer, "Season fertility", $"{snapshot.SeasonFertilityMultiplier:0.###}x");
+        WriteMetric(writer, "Region season fertility", FormatRegionValues(
+            snapshot.LeftRegionSeasonFertilityMultiplier,
+            snapshot.MiddleRegionSeasonFertilityMultiplier,
+            snapshot.RightRegionSeasonFertilityMultiplier,
+            "0.###x"));
+        WriteMetric(writer, "Region population", FormatRegionCounts(
+            snapshot.LeftRegionCreatureCount,
+            snapshot.MiddleRegionCreatureCount,
+            snapshot.RightRegionCreatureCount));
+        WriteMetric(writer, "Region plant kcal", FormatRegionValues(
+            snapshot.LeftRegionPlantCalories,
+            snapshot.MiddleRegionPlantCalories,
+            snapshot.RightRegionPlantCalories,
+            "0"));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -218,9 +233,11 @@ public static class ViewerReportWriter
         writer.WriteLine("<h2>Pressure Settings</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Initial creatures", scenario.InitialCreatureCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Initial creature spawn", scenario.InitialCreatureSpawnRegion.ToString());
         WriteMetric(writer, "Initial resource density", $"{scenario.InitialResourcesPerMillionArea:0.###} per 1M area");
         WriteMetric(writer, "Initial resource patches", scenario.CalculateInitialResourceCount().ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");
+        WriteMetric(writer, "Biome map", scenario.BiomeMapKind.ToString());
         WriteMetric(writer, "Biome cell size", scenario.BiomeCellSize.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Resource void border", $"{scenario.ResourceVoidBorderWidth:0.###} world units");
         WriteMetric(writer, "Resource calories", FormatRange(scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax));
@@ -802,7 +819,26 @@ public static class ViewerReportWriter
             "Season fertility",
             "x",
             snapshots,
-            new ChartSeries("Fertility", "#6a8fce", snapshots.Select(snapshot => snapshot.SeasonFertilityMultiplier).ToArray()));
+            new ChartSeries("Global", "#6a8fce", snapshots.Select(snapshot => snapshot.SeasonFertilityMultiplier).ToArray()),
+            new ChartSeries("Left", "#35a862", snapshots.Select(snapshot => snapshot.LeftRegionSeasonFertilityMultiplier).ToArray()),
+            new ChartSeries("Middle", "#d69d2f", snapshots.Select(snapshot => snapshot.MiddleRegionSeasonFertilityMultiplier).ToArray()),
+            new ChartSeries("Right", "#8f4cb8", snapshots.Select(snapshot => snapshot.RightRegionSeasonFertilityMultiplier).ToArray()));
+        WriteLineChart(
+            writer,
+            "Migration regions",
+            "%",
+            snapshots,
+            new ChartSeries("Left", "#35a862", snapshots.Select(snapshot => Share(snapshot.LeftRegionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Middle", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.MiddleRegionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Right", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.RightRegionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Regional plant calories",
+            " kcal",
+            snapshots,
+            new ChartSeries("Left", "#35a862", snapshots.Select(snapshot => snapshot.LeftRegionPlantCalories).ToArray()),
+            new ChartSeries("Middle", "#d69d2f", snapshots.Select(snapshot => snapshot.MiddleRegionPlantCalories).ToArray()),
+            new ChartSeries("Right", "#8f4cb8", snapshots.Select(snapshot => snapshot.RightRegionPlantCalories).ToArray()));
         WriteLineChart(
             writer,
             "Biome occupancy",
@@ -1112,6 +1148,20 @@ public static class ViewerReportWriter
         return string.Create(
             CultureInfo.InvariantCulture,
             $"Barren {profile.Barren:0.###}x, Sparse {profile.Sparse:0.###}x, Grassland {profile.Grassland:0.###}x, Rich {profile.Rich:0.###}x");
+    }
+
+    private static string FormatRegionCounts(int left, int middle, int right)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Left {left}, Middle {middle}, Right {right}");
+    }
+
+    private static string FormatRegionValues(float left, float middle, float right, string format)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Left {left.ToString(format, CultureInfo.InvariantCulture)}, Middle {middle.ToString(format, CultureInfo.InvariantCulture)}, Right {right.ToString(format, CultureInfo.InvariantCulture)}");
     }
 
     private static int CreatureCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)

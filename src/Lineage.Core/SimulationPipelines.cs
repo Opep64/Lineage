@@ -40,6 +40,7 @@ public static class SimulationPipelines
         float seasonLengthSeconds = 900f,
         float seasonFertilityAmplitude = 0.3f,
         float seasonPhaseOffsetSeconds = 0f,
+        SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
@@ -67,6 +68,7 @@ public static class SimulationPipelines
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
                 seasonPhaseOffsetSeconds,
+                seasonPhaseMode,
                 biomeSeasonalAmplitudeProfile),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
@@ -103,7 +105,8 @@ public static class SimulationPipelines
                 enableSeasons,
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
-                seasonPhaseOffsetSeconds)
+                seasonPhaseOffsetSeconds,
+                seasonPhaseMode)
         ];
     }
 
@@ -142,6 +145,7 @@ public static class SimulationPipelines
         float seasonLengthSeconds = 900f,
         float seasonFertilityAmplitude = 0.3f,
         float seasonPhaseOffsetSeconds = 0f,
+        SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
         BiomePressureProfile? biomeSpeedProfile = null,
@@ -169,6 +173,7 @@ public static class SimulationPipelines
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
                 seasonPhaseOffsetSeconds,
+                seasonPhaseMode,
                 biomeSeasonalAmplitudeProfile),
             new MetabolismSystem(
                 bodyRadiusEnergyCostPerSecond,
@@ -217,7 +222,8 @@ public static class SimulationPipelines
                 enableSeasons,
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
-                seasonPhaseOffsetSeconds)
+                seasonPhaseOffsetSeconds,
+                seasonPhaseMode)
         ];
     }
 }
