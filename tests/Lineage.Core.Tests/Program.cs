@@ -96,6 +96,8 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
+    ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
+    ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
@@ -3679,6 +3681,96 @@ static Simulation CreateIntentToggleSimulation(bool requireIntent)
     creature.ReproductiveEnergy = 20f;
     simulation.State.Creatures[0] = creature;
     return simulation;
+}
+
+static void SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains()
+{
+    var scenario = new SimulationScenario
+    {
+        Name = "Profile Export Probe",
+        Seed = 900,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ScavengerForager,
+        BrainHiddenNodeCount = 4,
+        InitialCreatureCount = 4,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    simulation.RunSteps(2);
+
+    var creature = simulation.State.Creatures[0];
+    var profile = SpeciesProfileExporter.ExportCreature(
+        scenario,
+        simulation.State,
+        creature.Id,
+        "Probe species",
+        "Round-trip test");
+    var roundTripped = SpeciesProfileJson.FromJson(SpeciesProfileJson.ToJson(profile));
+
+    AssertEqual("Probe species", roundTripped.Name, "Profile name");
+    AssertEqual("Round-trip test", roundTripped.Notes, "Profile notes");
+    AssertEqual(creature.Id.Value, roundTripped.Source.CreatureId, "Profile source creature");
+    AssertEqual(creature.Generation, roundTripped.Source.Generation, "Profile source generation");
+    AssertEqual(4, roundTripped.BrainHiddenNodeCount, "Profile hidden node count");
+    AssertClose(
+        simulation.State.GetGenome(creature.GenomeId).BodyRadius,
+        roundTripped.Genome.BodyRadius,
+        0.000001,
+        "Profile genome body radius");
+
+    var sourceBrain = simulation.State.GetBrain(creature.BrainId);
+    var loadedBrain = roundTripped.CreateBrain();
+    AssertEqual(sourceBrain.Weights.Length, loadedBrain.Weights.Length, "Profile brain weight count");
+    for (var i = 0; i < sourceBrain.Weights.Length; i++)
+    {
+        AssertClose(sourceBrain.Weights[i], loadedBrain.Weights[i], 0.000001, $"Profile brain weight {i}");
+    }
+}
+
+static void SpeciesProfileInjectionCreatesFounderCreatures()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Name = "Species Source",
+        Seed = 901,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ExplorerForager,
+        InitialCreatureCount = 3,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(sourceScenario, source.State, "Explorer sample");
+
+    var targetScenario = new SimulationScenario
+    {
+        Seed = 902,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        ResourceVoidBorderWidth = 20f
+    };
+    var target = SimulationScenarioFactory.CreateSimulation(targetScenario);
+    var genomeCountBefore = target.State.Genomes.Count;
+    var brainCountBefore = target.State.Brains.Count;
+    var result = SpeciesProfileInjector.Inject(
+        target.State,
+        profile,
+        new SpeciesInjectionOptions(5, InitialCreatureSpawnRegion.LeftThird, EnergyOverride: 33f));
+
+    AssertEqual("Explorer sample", result.SpeciesName, "Injected species name");
+    AssertEqual(5, result.CreatureIds.Count, "Injected creature count");
+    AssertEqual(5, target.State.Creatures.Count, "Target living creature count");
+    AssertEqual(5, target.State.Stats.FounderCreatureCount, "Injected founder count");
+    AssertEqual(genomeCountBefore + 1, target.State.Genomes.Count, "Injected genome count");
+    AssertEqual(brainCountBefore + 1, target.State.Brains.Count, "Injected brain count");
+
+    foreach (var creature in target.State.Creatures)
+    {
+        AssertEqual(default(EntityId), creature.ParentId, "Injected creature should be a founder");
+        AssertEqual(0, creature.Generation, "Injected creature generation");
+        AssertClose(33f, creature.Energy, 0.000001, "Injected creature energy");
+        AssertTrue(creature.Position.X >= 20f && creature.Position.X <= target.State.Bounds.Width / 3f, "Injected creature should spawn in left third away from void");
+    }
 }
 
 static void SimulationSnapshotsRestoreExactContinuation()

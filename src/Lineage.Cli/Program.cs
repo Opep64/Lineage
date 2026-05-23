@@ -50,6 +50,7 @@ static void PrintHelp()
 
         Options:
           --scenario <path>          Load scenario JSON.
+          --load-snapshot <path>     Load a saved simulation snapshot instead of starting from a scenario.
           --save-scenario <path>     Save the resolved scenario JSON before running.
           --ticks <n>                Number of simulation ticks to run. Default: 5000
           --seed <n>                 Override scenario seed.
@@ -73,6 +74,15 @@ static void PrintHelp()
           --save-snapshot <path>     Save final simulation snapshot JSON.
           --checkpoint-interval <n>  Save loadable snapshot checkpoints every n ticks.
           --checkpoint-dir <dir>      Directory for checkpoint JSON files.
+          --inject-species <path>    Inject a species profile JSON as new founders before running. Can repeat.
+          --inject-species-count <n> Founder count per injected profile. Default: 10
+          --inject-species-region <region> Spawn region for injected species. Default: uniform
+          --inject-species-energy <n> Override starting energy for injected founders.
+          --export-species <path>    Export a species profile from the final living population.
+          --export-species-creature <id> Export this living creature ID instead of the dominant lineage.
+          --export-species-founder <id> Export a representative from this founder lineage.
+          --export-species-name <text> Name for the exported species profile.
+          --export-species-notes <text> Notes for the exported species profile.
           --batch-scenario <path>    Add a scenario to a batch comparison. Can repeat.
           --batch-report <path>      HTML comparison report output path.
           --batch-output-dir <dir>   Per-run batch output directory. Default: out/batch
@@ -99,13 +109,13 @@ static void PrintHelp()
 
 static RunResult RunSingle(RunOptions options)
 {
-    var scenario = options.CreateScenario();
+    var (scenario, simulation) = CreateSimulationRun(options);
     if (options.SaveScenarioPath is not null)
     {
         SimulationScenarioJson.Save(options.SaveScenarioPath, scenario);
     }
 
-    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var speciesInjections = InjectSpeciesProfiles(options, simulation);
     if (options.ProfileEnabled)
     {
         simulation.Profile = new SimulationProfile();
@@ -124,7 +134,92 @@ static RunResult RunSingle(RunOptions options)
 
     WriteRunOutputs(options, scenario, simulation, stopwatch.Elapsed, outputPaths, checkpoints);
 
-    return new RunResult(options, scenario, simulation, stopwatch.Elapsed, outputPaths, checkpoints);
+    SpeciesProfile? exportedSpecies = null;
+    if (options.ExportSpeciesPath is not null)
+    {
+        exportedSpecies = ExportSpeciesProfile(options, scenario, simulation.State);
+        SpeciesProfileJson.Save(options.ExportSpeciesPath, exportedSpecies);
+    }
+
+    return new RunResult(
+        options,
+        scenario,
+        simulation,
+        stopwatch.Elapsed,
+        outputPaths,
+        checkpoints,
+        speciesInjections,
+        options.ExportSpeciesPath,
+        exportedSpecies);
+}
+
+static (SimulationScenario Scenario, Simulation Simulation) CreateSimulationRun(RunOptions options)
+{
+    if (options.LoadSnapshotPath is not null)
+    {
+        var restored = SimulationSnapshotJson.LoadSimulation(options.LoadSnapshotPath);
+        return (restored.Scenario, restored.Simulation);
+    }
+
+    var scenario = options.CreateScenario();
+    return (scenario, SimulationScenarioFactory.CreateSimulation(scenario));
+}
+
+static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions options, Simulation simulation)
+{
+    if (options.InjectSpeciesPaths.Count == 0)
+    {
+        return Array.Empty<SpeciesInjectionResult>();
+    }
+
+    var results = new List<SpeciesInjectionResult>(options.InjectSpeciesPaths.Count);
+    foreach (var path in options.InjectSpeciesPaths)
+    {
+        var profile = SpeciesProfileJson.Load(path);
+        results.Add(SpeciesProfileInjector.Inject(
+            simulation.State,
+            profile,
+            new SpeciesInjectionOptions(
+                options.InjectSpeciesCount,
+                options.InjectSpeciesRegion,
+                options.InjectSpeciesEnergy)));
+    }
+
+    return results;
+}
+
+static SpeciesProfile ExportSpeciesProfile(RunOptions options, SimulationScenario scenario, WorldState state)
+{
+    if (options.ExportSpeciesCreatureId is not null && options.ExportSpeciesFounderId is not null)
+    {
+        throw new ArgumentException("--export-species-creature and --export-species-founder cannot both be used.");
+    }
+
+    if (options.ExportSpeciesCreatureId is not null)
+    {
+        return SpeciesProfileExporter.ExportCreature(
+            scenario,
+            state,
+            new EntityId(options.ExportSpeciesCreatureId.Value),
+            options.ExportSpeciesName,
+            options.ExportSpeciesNotes);
+    }
+
+    if (options.ExportSpeciesFounderId is not null)
+    {
+        return SpeciesProfileExporter.ExportFounderLineageRepresentative(
+            scenario,
+            state,
+            new EntityId(options.ExportSpeciesFounderId.Value),
+            options.ExportSpeciesName,
+            options.ExportSpeciesNotes);
+    }
+
+    return SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
+        scenario,
+        state,
+        options.ExportSpeciesName,
+        options.ExportSpeciesNotes);
 }
 
 static IReadOnlyList<CheckpointArtifact> RunSimulation(
@@ -389,6 +484,11 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Scenario file: {Path.GetFullPath(options.ScenarioPath)}");
     }
 
+    if (options.LoadSnapshotPath is not null)
+    {
+        Console.WriteLine($"Loaded snapshot: {Path.GetFullPath(options.LoadSnapshotPath)}");
+    }
+
     Console.WriteLine($"Pipeline: {scenario.PipelineKind}");
     Console.WriteLine($"Seed: {scenario.Seed}");
     Console.WriteLine($"Ticks: {options.Ticks}");
@@ -415,6 +515,13 @@ static void PrintSummary(RunResult result)
     if (options.SaveScenarioPath is not null)
     {
         Console.WriteLine($"Saved scenario: {Path.GetFullPath(options.SaveScenarioPath)}");
+    }
+
+    foreach (var injection in result.SpeciesInjections)
+    {
+        Console.WriteLine(
+            $"Injected species: {injection.SpeciesName} x{injection.CreatureIds.Count} " +
+            $"(genome {injection.GenomeId}, brain {injection.BrainId})");
     }
 
     if (outputPaths.StatsPath is not null)
@@ -450,6 +557,13 @@ static void PrintSummary(RunResult result)
     if (options.SaveSnapshotPath is not null)
     {
         Console.WriteLine($"Snapshot: {Path.GetFullPath(options.SaveSnapshotPath)}");
+    }
+
+    if (result.ExportedSpeciesPath is not null && result.ExportedSpecies is not null)
+    {
+        Console.WriteLine(
+            $"Exported species: {result.ExportedSpecies.Name} from creature " +
+            $"{result.ExportedSpecies.Source.CreatureId} to {Path.GetFullPath(result.ExportedSpeciesPath)}");
     }
 
     if (outputPaths.CheckpointDirectory is not null)
@@ -559,6 +673,8 @@ internal sealed record RunOptions
 
     public string? ScenarioPath { get; init; }
 
+    public string? LoadSnapshotPath { get; init; }
+
     public IReadOnlyList<string> BatchScenarioPaths { get; init; } = Array.Empty<string>();
 
     public string? SaveScenarioPath { get; init; }
@@ -604,6 +720,24 @@ internal sealed record RunOptions
     public int? CheckpointIntervalTicks { get; init; }
 
     public string? CheckpointDirectory { get; init; }
+
+    public IReadOnlyList<string> InjectSpeciesPaths { get; init; } = Array.Empty<string>();
+
+    public int InjectSpeciesCount { get; init; } = 10;
+
+    public InitialCreatureSpawnRegion InjectSpeciesRegion { get; init; } = InitialCreatureSpawnRegion.Uniform;
+
+    public float? InjectSpeciesEnergy { get; init; }
+
+    public string? ExportSpeciesPath { get; init; }
+
+    public int? ExportSpeciesCreatureId { get; init; }
+
+    public int? ExportSpeciesFounderId { get; init; }
+
+    public string? ExportSpeciesName { get; init; }
+
+    public string? ExportSpeciesNotes { get; init; }
 
     public string? BatchReportPath { get; init; }
 
@@ -770,6 +904,9 @@ internal sealed record RunOptions
                 case "--scenario":
                     options = options with { ScenarioPath = ReadValue(args, ref i, arg) };
                     break;
+                case "--load-snapshot":
+                    options = options with { LoadSnapshotPath = ReadValue(args, ref i, arg) };
+                    break;
                 case "--batch-scenario":
                     options = options with { BatchScenarioPaths = Append(options.BatchScenarioPaths, ReadValue(args, ref i, arg)) };
                     break;
@@ -777,7 +914,7 @@ internal sealed record RunOptions
                     options = options with { SaveScenarioPath = ReadValue(args, ref i, arg) };
                     break;
                 case "--ticks":
-                    options = options with { Ticks = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    options = options with { Ticks = ParseNonNegativeInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--seed":
                     options = options with { SeedOverride = ParseSeed(ReadValue(args, ref i, arg), arg) };
@@ -841,6 +978,33 @@ internal sealed record RunOptions
                     break;
                 case "--checkpoint-dir":
                     options = options with { CheckpointDirectory = ReadValue(args, ref i, arg) };
+                    break;
+                case "--inject-species":
+                    options = options with { InjectSpeciesPaths = Append(options.InjectSpeciesPaths, ReadValue(args, ref i, arg)) };
+                    break;
+                case "--inject-species-count":
+                    options = options with { InjectSpeciesCount = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--inject-species-region":
+                    options = options with { InjectSpeciesRegion = ParseSpawnRegion(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--inject-species-energy":
+                    options = options with { InjectSpeciesEnergy = ParsePositiveFloat(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--export-species":
+                    options = options with { ExportSpeciesPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--export-species-creature":
+                    options = options with { ExportSpeciesCreatureId = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--export-species-founder":
+                    options = options with { ExportSpeciesFounderId = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--export-species-name":
+                    options = options with { ExportSpeciesName = ReadValue(args, ref i, arg) };
+                    break;
+                case "--export-species-notes":
+                    options = options with { ExportSpeciesNotes = ReadValue(args, ref i, arg) };
                     break;
                 case "--batch-report":
                     options = options with { BatchReportPath = ReadValue(args, ref i, arg) };
@@ -1043,6 +1207,19 @@ internal sealed record RunOptions
             _ => throw new ArgumentException("--pipeline must be 'neural' or 'simple'.")
         };
     }
+
+    private static InitialCreatureSpawnRegion ParseSpawnRegion(string value, string optionName)
+    {
+        var normalized = value.Replace("-", string.Empty, StringComparison.OrdinalIgnoreCase);
+        if (Enum.TryParse<InitialCreatureSpawnRegion>(normalized, ignoreCase: true, out var parsed)
+            && Enum.IsDefined(parsed))
+        {
+            return parsed;
+        }
+
+        var choices = string.Join(", ", Enum.GetNames<InitialCreatureSpawnRegion>());
+        throw new ArgumentException($"{optionName} must be one of: {choices}.");
+    }
 }
 
 internal readonly record struct RunResult(
@@ -1051,7 +1228,10 @@ internal readonly record struct RunResult(
     Simulation Simulation,
     TimeSpan Elapsed,
     OutputPaths OutputPaths,
-    IReadOnlyList<CheckpointArtifact> Checkpoints);
+    IReadOnlyList<CheckpointArtifact> Checkpoints,
+    IReadOnlyList<SpeciesInjectionResult> SpeciesInjections,
+    string? ExportedSpeciesPath,
+    SpeciesProfile? ExportedSpecies);
 
 internal readonly record struct OutputPaths(
     string? StatsPath,
