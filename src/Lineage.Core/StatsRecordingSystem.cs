@@ -74,6 +74,10 @@ public sealed class StatsRecordingSystem(
         var totalBiomeMovementCostMultiplier = 0f;
         var totalBiomeBasalCostMultiplier = 0f;
         var totalBiomeSpeedMultiplier = 0f;
+        var barrenCaloriesEaten = 0f;
+        var sparseCaloriesEaten = 0f;
+        var grasslandCaloriesEaten = 0f;
+        var richCaloriesEaten = 0f;
         var attackerTotalDietaryAdaptation = 0f;
         var attackerTotalBiteStrength = 0f;
         var attackerTotalDamageResistance = 0f;
@@ -152,6 +156,13 @@ public sealed class StatsRecordingSystem(
             totalBiomeMovementCostMultiplier += _biomeMovementCostProfile.For(biome);
             totalBiomeBasalCostMultiplier += _biomeBasalCostProfile.For(biome);
             totalBiomeSpeedMultiplier += _biomeSpeedProfile.For(biome);
+            AddBiomeValue(
+                biome,
+                creature.LastCaloriesEaten,
+                ref barrenCaloriesEaten,
+                ref sparseCaloriesEaten,
+                ref grasslandCaloriesEaten,
+                ref richCaloriesEaten);
             switch (biome)
             {
                 case BiomeKind.Barren:
@@ -260,6 +271,14 @@ public sealed class StatsRecordingSystem(
         var leftRegionMeatCalories = 0f;
         var middleRegionMeatCalories = 0f;
         var rightRegionMeatCalories = 0f;
+        var barrenPlantCalories = 0f;
+        var sparsePlantCalories = 0f;
+        var grasslandPlantCalories = 0f;
+        var richPlantCalories = 0f;
+        var barrenMeatCalories = 0f;
+        var sparseMeatCalories = 0f;
+        var grasslandMeatCalories = 0f;
+        var richMeatCalories = 0f;
         for (var i = 0; i < state.Resources.Count; i++)
         {
             var resource = state.Resources[i];
@@ -271,18 +290,33 @@ public sealed class StatsRecordingSystem(
             activeResourceCount++;
             totalResourceCalories += resource.Calories;
             var region = GetHorizontalRegion(state.Bounds, resource.Position);
+            var biome = state.Biomes.GetKindAt(resource.Position);
             if (resource.Kind == ResourceKind.Meat)
             {
                 meatResourceCount++;
                 totalMeatCalories += resource.Calories;
                 totalMeatFreshnessWeightedCalories += resource.Calories * MeatQuality.Freshness(resource);
                 AddRegionValue(region, resource.Calories, ref leftRegionMeatCalories, ref middleRegionMeatCalories, ref rightRegionMeatCalories);
+                AddBiomeValue(
+                    biome,
+                    resource.Calories,
+                    ref barrenMeatCalories,
+                    ref sparseMeatCalories,
+                    ref grasslandMeatCalories,
+                    ref richMeatCalories);
             }
             else
             {
                 plantResourceCount++;
                 totalPlantCalories += resource.Calories;
                 AddRegionValue(region, resource.Calories, ref leftRegionPlantCalories, ref middleRegionPlantCalories, ref rightRegionPlantCalories);
+                AddBiomeValue(
+                    biome,
+                    resource.Calories,
+                    ref barrenPlantCalories,
+                    ref sparsePlantCalories,
+                    ref grasslandPlantCalories,
+                    ref richPlantCalories);
             }
         }
 
@@ -455,6 +489,22 @@ public sealed class StatsRecordingSystem(
             totalBiomeMovementCostMultiplier / divisor,
             totalBiomeBasalCostMultiplier / divisor,
             totalBiomeSpeedMultiplier / divisor,
+            barrenPlantCalories,
+            sparsePlantCalories,
+            grasslandPlantCalories,
+            richPlantCalories,
+            barrenMeatCalories,
+            sparseMeatCalories,
+            grasslandMeatCalories,
+            richMeatCalories,
+            Rate(barrenCaloriesEaten, deltaSeconds),
+            Rate(sparseCaloriesEaten, deltaSeconds),
+            Rate(grasslandCaloriesEaten, deltaSeconds),
+            Rate(richCaloriesEaten, deltaSeconds),
+            state.Stats.BarrenDeathCount,
+            state.Stats.SparseDeathCount,
+            state.Stats.GrasslandDeathCount,
+            state.Stats.RichDeathCount,
             foodDetectedCreatureCount,
             plantDetectedCreatureCount,
             meatDetectedCreatureCount,
@@ -599,6 +649,36 @@ public sealed class StatsRecordingSystem(
                 middle += value;
                 break;
         }
+    }
+
+    private static void AddBiomeValue(
+        BiomeKind biome,
+        float value,
+        ref float barren,
+        ref float sparse,
+        ref float grassland,
+        ref float rich)
+    {
+        switch (biome)
+        {
+            case BiomeKind.Barren:
+                barren += value;
+                break;
+            case BiomeKind.Sparse:
+                sparse += value;
+                break;
+            case BiomeKind.Rich:
+                rich += value;
+                break;
+            default:
+                grassland += value;
+                break;
+        }
+    }
+
+    private static float Rate(float value, float seconds)
+    {
+        return seconds > 0f ? value / seconds : 0f;
     }
 
     private enum HorizontalRegion

@@ -77,6 +77,7 @@ var tests = new (string Name, Action Body)[]
     ("Offspring lineage records parent and generation", OffspringLineageRecordsParentAndGeneration),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
+    ("Stats recording reports biome pressure telemetry", StatsRecordingReportsBiomePressureTelemetry),
     ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
@@ -87,6 +88,7 @@ var tests = new (string Name, Action Body)[]
     ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
+    ("Edge corridor biome maps create harsh crossings", EdgeCorridorBiomeMapsCreateHarshCrossings),
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
@@ -2993,6 +2995,13 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(1.25f, snapshot.AverageBiomeMovementCostMultiplier, 0.000001, "Average biome movement cost");
     AssertClose(1.5f, snapshot.AverageBiomeBasalCostMultiplier, 0.000001, "Average biome basal cost");
     AssertClose(0.75f, snapshot.AverageBiomeSpeedMultiplier, 0.000001, "Average biome speed");
+    AssertClose(0f, snapshot.BarrenPlantCalories, 0.000001, "Barren plant calories");
+    AssertClose(8f, snapshot.GrasslandPlantCalories, 0.000001, "Grassland plant calories");
+    AssertClose(0f, snapshot.RichMeatCalories, 0.000001, "Rich meat calories");
+    AssertClose(0f, snapshot.BarrenCaloriesEatenPerSecond, 0.000001, "Barren calories eaten per second");
+    AssertClose(4.25f, snapshot.GrasslandCaloriesEatenPerSecond, 0.000001, "Grassland calories eaten per second");
+    AssertEqual(0, snapshot.BarrenDeathCount, "Barren death count");
+    AssertEqual(0, snapshot.GrasslandDeathCount, "Grassland death count");
     AssertEqual(2, snapshot.FoodDetectedCreatureCount, "Food detected count");
     AssertEqual(1, snapshot.PlantDetectedCreatureCount, "Plant detected count");
     AssertEqual(1, snapshot.MeatDetectedCreatureCount, "Meat detected count");
@@ -3060,6 +3069,68 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.CreatureDeathCount, "Snapshot death count");
     AssertClose(0f, snapshot.AverageLifespanSeconds, 0.000001, "Snapshot average lifespan without deaths");
     AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
+}
+
+static void StatsRecordingReportsBiomePressureTelemetry()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 137,
+        EnableBiomes = true,
+        BiomeMapKind = BiomeMapKind.VerticalEdgeBands,
+        WorldWidth = 800f,
+        WorldHeight = 200f,
+        BiomeCellSize = 100f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(350f, 50f), energy: 10f);
+    var richCreature = simulation.State.Creatures[0];
+    richCreature.LastCaloriesEaten = 3f;
+    simulation.State.Creatures[0] = richCreature;
+    var barrenCreature = simulation.State.Creatures[1];
+    barrenCreature.LastCaloriesEaten = 5f;
+    simulation.State.Creatures[1] = barrenCreature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(50f, 60f),
+        Radius = 2f,
+        Calories = 11f,
+        MaxCalories = 12f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(350f, 60f),
+        Radius = 2f,
+        Calories = 7f,
+        MaxCalories = 7f
+    });
+
+    var dyingCreatureId = simulation.State.SpawnCreature(genomeId, new SimVector2(350f, 80f), energy: 1f);
+    var dyingCreature = simulation.State.Creatures.Single(creature => creature.Id == dyingCreatureId);
+    dyingCreature.Energy = 0f;
+    simulation.State.Creatures[^1] = dyingCreature;
+    new DeathSystem(meatCaloriesPerBodyRadius: 0f, meatEnergyFraction: 0f).Update(simulation.State, 1f);
+
+    new StatsRecordingSystem(
+        biomeSpeedProfile: scenario.CreateBiomeSpeedProfile()).Update(simulation.State, 1f);
+
+    var snapshot = simulation.State.Stats.Snapshots.Single();
+    AssertEqual(1, snapshot.RichCreatureCount, "Rich creature count");
+    AssertEqual(1, snapshot.BarrenCreatureCount, "Barren creature count");
+    AssertClose(11f, snapshot.RichPlantCalories, 0.000001, "Rich plant calories");
+    AssertClose(7f, snapshot.BarrenMeatCalories, 0.000001, "Barren meat calories");
+    AssertClose(3f, snapshot.RichCaloriesEatenPerSecond, 0.000001, "Rich calories eaten per second");
+    AssertClose(5f, snapshot.BarrenCaloriesEatenPerSecond, 0.000001, "Barren calories eaten per second");
+    AssertEqual(1, snapshot.BarrenDeathCount, "Barren death count");
+    AssertEqual(0, snapshot.RichDeathCount, "Rich death count");
 }
 
 static void StatsRecordingReportsLifespanSummary()
@@ -3329,6 +3400,24 @@ static void EdgeLadderBiomeMapsKeepPoorCentersCrossable()
             AssertEqual(vertical.GetKind(x, 0), vertical.GetKind(x, y), $"Vertical ladder band {x},{y}");
         }
     }
+}
+
+static void EdgeCorridorBiomeMapsCreateHarshCrossings()
+{
+    var vertical = BiomeMap.GenerateBands(
+        new WorldBounds(800f, 500f),
+        cellSize: 100f,
+        BiomeMapKind.VerticalEdgeCorridorBands);
+
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(0, 0), "Left edge should be rich");
+    AssertEqual(BiomeKind.Grassland, vertical.GetKind(1, 0), "Left inner band should be grassland");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(2, 0), "Left approach band should be sparse");
+    AssertEqual(BiomeKind.Barren, vertical.GetKind(3, 0), "Upper center should remain barren");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(3, 1), "Corridor shoulder should be sparse");
+    AssertEqual(BiomeKind.Grassland, vertical.GetKind(3, 2), "Center corridor should be grassland");
+    AssertEqual(BiomeKind.Sparse, vertical.GetKind(4, 3), "Lower corridor shoulder should be sparse");
+    AssertEqual(BiomeKind.Barren, vertical.GetKind(4, 4), "Lower center should remain barren");
+    AssertEqual(BiomeKind.Rich, vertical.GetKind(7, 0), "Right edge should be rich");
 }
 
 static void BiomeMapSamplesResourcesByDensity()

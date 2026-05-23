@@ -28,6 +28,14 @@ public sealed class SimulationStats
 
     public int InjuryDeathCount { get; private set; }
 
+    public int BarrenDeathCount { get; private set; }
+
+    public int SparseDeathCount { get; private set; }
+
+    public int GrasslandDeathCount { get; private set; }
+
+    public int RichDeathCount { get; private set; }
+
     public float AverageDeadCreatureLifespanSeconds => _deadCreatureLifespans.Count == 0
         ? 0f
         : _deadCreatureLifespanTotalSeconds / _deadCreatureLifespans.Count;
@@ -60,7 +68,7 @@ public sealed class SimulationStats
         }
     }
 
-    internal void RecordCreatureDeath(CreatureDeathReason reason, float lifespanSeconds)
+    internal void RecordCreatureDeath(CreatureDeathReason reason, float lifespanSeconds, BiomeKind biome)
     {
         CreatureDeathCount++;
         AddDeadCreatureLifespan(lifespanSeconds);
@@ -72,6 +80,22 @@ public sealed class SimulationStats
                 break;
             case CreatureDeathReason.Injury:
                 InjuryDeathCount++;
+                break;
+        }
+
+        switch (biome)
+        {
+            case BiomeKind.Barren:
+                BarrenDeathCount++;
+                break;
+            case BiomeKind.Sparse:
+                SparseDeathCount++;
+                break;
+            case BiomeKind.Rich:
+                RichDeathCount++;
+                break;
+            default:
+                GrasslandDeathCount++;
                 break;
         }
     }
@@ -132,7 +156,11 @@ public sealed class SimulationStats
         int starvationDeathCount,
         int injuryDeathCount,
         IEnumerable<SimulationStatsSnapshot> snapshots,
-        int reproductionAttemptCount = 0)
+        int reproductionAttemptCount = 0,
+        int barrenDeathCount = 0,
+        int sparseDeathCount = 0,
+        int grasslandDeathCount = 0,
+        int richDeathCount = 0)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
@@ -144,6 +172,10 @@ public sealed class SimulationStats
         EggPredationDeathCount = eggPredationDeathCount;
         StarvationDeathCount = starvationDeathCount;
         InjuryDeathCount = injuryDeathCount;
+        BarrenDeathCount = barrenDeathCount;
+        SparseDeathCount = sparseDeathCount;
+        GrasslandDeathCount = grasslandDeathCount;
+        RichDeathCount = richDeathCount;
         Snapshots.Clear();
         Snapshots.AddRange(snapshots);
     }

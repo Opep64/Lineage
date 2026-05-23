@@ -101,7 +101,11 @@ public static class SimulationSnapshotJson
             snapshot.StarvationDeathCount,
             snapshot.InjuryDeathCount,
             snapshot.StatsSnapshots,
-            snapshot.ReproductionAttemptCount);
+            snapshot.ReproductionAttemptCount,
+            snapshot.BarrenDeathCount,
+            snapshot.SparseDeathCount,
+            snapshot.GrasslandDeathCount,
+            snapshot.RichDeathCount);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 

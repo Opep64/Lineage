@@ -465,7 +465,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add a first biome speed/drag layer. Scenarios now include per-biome speed multipliers separate from movement-energy and basal-energy multipliers. `MovementSystem` scales actual displacement by the local biome speed multiplier, while stats, CLI CSV/probe output, CLI/Godot HTML reports, and the Godot HUD/inspector expose average speed pressure. Starter scenarios currently use barren `0.55x`, sparse `0.80x`, grassland `1.0x`, and rich `1.0x` so bad terrain slows traversal without making rich cells a movement bonus. A 2026-05-22 5k two-seed probe across Balanced, Harsh, Scavenger, and Predation compared base, `drag-medium`, and `drag-hard`; `drag-hard` stayed viable and added modest pressure without the earlier calorie-only side effect where rich-biome discounts made Balanced easier. Probe file: `out/biome_speed_drag_probe_20260522.csv` with matching `.html` report. Done.
 - Confirm selected biome speed/drag values against no-drag baseline. A 2026-05-22 10k, three-seed probe compared the current starter drag values against `no-drag` across Balanced, Harsh, Scavenger, and Predation. All runs completed, and drag reduced average final populations in all four tested scenarios: Balanced `654 -> 647`, Harsh `230 -> 216`, Scavenger `454 -> 427`, and Predation `145 -> 132`. Average realized biome speed stayed modest (`0.954-0.979x`) because creatures do not spend all their time in poor cells. Conclusion: keep biome speed/drag, do not add a separate terrain layer yet, and next add local drag/terrain sensing so creatures can respond to traversal pressure without directly knowing biome fertility or void status. Probe file: `out/biome_speed_drag_confirm_20260522.csv` with matching `.html` report. Done.
 - Add local terrain/drag sensing. Creatures now sense `CurrentTerrainDrag` and `ForwardTerrainDrag`, derived only from the current biome-speed profile and sampled locally at the body position plus a short forward probe. The neural schema appends these two inputs with migration support for older brains, and the selected-creature inspector shows the sensed drag values. This gives terrain-aware evolution a cue without revealing biome labels, fertility, resource voids, or global map direction. Done.
-- Defer the large-world terrain-pressure scenario until after the next performance pass. The likely useful scale is `5,000 x 5,000` to `8,000 x 8,000` with larger biome cells and lower resource density, but that should wait until profiling and multicore support reduce the risk that the experiment measures runtime limits more than ecology.
+- Add a first moderate terrain-pressure scenario. `scenarios/terrain-pressure.json` uses `VerticalEdgeCorridorBands` on a `6,000 x 4,000` world: rich bands at the left/right ends, a rough barren/sparse center, and a grassland/sparse corridor through the center. It is intentionally smaller than the future 8k+ migration experiments while still making terrain traversal visible. Done.
 
 ### Future Sensory Balancing
 
@@ -587,7 +587,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: strengthen terrain-pressure scenario design if we want terrain-aware behavior to matter. The first compact drag probe showed the mechanics are measurable, but current starter behavior still shows little terrain differentiation.
+Next practical step: use `scenarios/terrain-pressure.json` as the first terrain-aware behavior laboratory. The scenario is stable and reaches reproduction, but the first 20k seed-42 run stayed on the starting side of the map, so the next pressure/tuning question is whether crossing behavior needs a stronger route reward, a more exploratory starter/roster, memory, or longer/larger runs.
 
 ## Current Implementation State
 
@@ -656,6 +656,7 @@ Starter scenarios:
 - `scenarios/scavenger-pressure.json`
 - `scenarios/omnivore-pressure.json`
 - `scenarios/predation-pressure.json`
+- `scenarios/terrain-pressure.json`
 - `scenarios/mixed-starter-roster.json`
 
 Starter species profiles:
@@ -745,6 +746,7 @@ Core types currently present:
 - `SimulationPipelineKind`: named pipeline selection for scenario runners.
 - `BiomeMap`: deterministic low-resolution biome grid used for resource density, resource void-border exclusion, and reports.
 - `BiomeKind`: coarse biome categories for barren, sparse, grassland, and rich regions.
+- `BiomeMapKind.VerticalEdgeCorridorBands`: rich ends with a harsher center and a crossable corridor, used by the first terrain-pressure scenario.
 - `WorldState`: mutable tick/time/entity state.
 - `DeterministicRandom`: replay-friendly random source.
 - `SimVector2`: core-owned 2D vector type, avoiding Godot types.
@@ -771,7 +773,7 @@ Core types currently present:
 - `BehaviorAssay`: standardized non-mutating neural probes used by reports to summarize likely responses to food, visible-creature, small/large-creature risk, and reproduction cues globally and by top living founder lineage.
 - `BiomePressureProfile`: scenario-backed per-biome multipliers for indirect movement and basal metabolism pressure.
 - `SimulationStats`: aggregate counters and snapshot history.
-- `SimulationStatsSnapshot`: per-sample population/resource/lineage/egg metrics plus biome occupancy, environmental cost, foraging, gut/digestion, and predator/prey diagnostics.
+- `SimulationStatsSnapshot`: per-sample population/resource/lineage/egg metrics plus biome occupancy, per-biome plant/meat calories, per-biome eating, per-biome deaths, environmental cost, foraging, gut/digestion, and predator/prey diagnostics.
 - `SimulationSnapshot`: full world snapshot for saving and loading an interesting run state.
 - `SimulationSnapshotJson`: JSON serializer/restorer for deterministic snapshot continuation.
 - `SimulationPipelines`: factory for the current minimal life-loop system sequence.
@@ -920,6 +922,7 @@ Build, 71 core tests, CLI terrain-drag sensing smoke/report/snapshot, Godot head
 Build, 100 core tests, starter species profile generation, and Godot headless `--quit` passed on 2026-05-22 after adding species profile export/import and the dedicated `species/` profile folder.
 Build, 101 core tests, CLI `mixed-starter-roster` smoke with 100 roster-seeded founders, Godot headless `--quit`, and `git diff --check` passed on 2026-05-22 after adding scenario species rosters.
 Build, 101 core tests, `git diff --check`, and a compact 5k two-seed terrain drag probe passed on 2026-05-22 after adding terrain-assay fields to the lightweight probe CSV/report. Balanced and Scavenger Pressure remained viable across base/no-drag/harder-drag variants, but behavior assays still reported little terrain differentiation.
+Build, 103 core tests, `git diff --check`, a compact 5k two-seed Terrain Pressure base/no-drag/harder-drag probe, and 5k plus 20k seed-42 Terrain Pressure full reports passed on 2026-05-22 after adding the first corridor terrain scenario and per-biome foraging/death telemetry. The 20k run reached generation 1 and stayed viable, but no creatures reached the right region by the final snapshot.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

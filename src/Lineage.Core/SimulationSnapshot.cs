@@ -58,6 +58,14 @@ public sealed record SimulationSnapshot
 
     public int InjuryDeathCount { get; init; }
 
+    public int BarrenDeathCount { get; init; }
+
+    public int SparseDeathCount { get; init; }
+
+    public int GrasslandDeathCount { get; init; }
+
+    public int RichDeathCount { get; init; }
+
     public BiomeSnapshot Biomes { get; init; } = new();
 
     public static SimulationSnapshot Capture(SimulationScenario scenario, Simulation simulation)
@@ -87,6 +95,10 @@ public sealed record SimulationSnapshot
             EggPredationDeathCount = state.Stats.EggPredationDeathCount,
             StarvationDeathCount = state.Stats.StarvationDeathCount,
             InjuryDeathCount = state.Stats.InjuryDeathCount,
+            BarrenDeathCount = state.Stats.BarrenDeathCount,
+            SparseDeathCount = state.Stats.SparseDeathCount,
+            GrasslandDeathCount = state.Stats.GrasslandDeathCount,
+            RichDeathCount = state.Stats.RichDeathCount,
             Biomes = BiomeSnapshot.Capture(state.Biomes)
         };
     }

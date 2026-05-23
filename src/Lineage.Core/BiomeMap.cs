@@ -147,7 +147,8 @@ public sealed class BiomeMap
             and not BiomeMapKind.HorizontalEdgeBands
             and not BiomeMapKind.VerticalEdgeBands
             and not BiomeMapKind.HorizontalEdgeLadderBands
-            and not BiomeMapKind.VerticalEdgeLadderBands)
+            and not BiomeMapKind.VerticalEdgeLadderBands
+            and not BiomeMapKind.VerticalEdgeCorridorBands)
         {
             throw new ArgumentException("Banded biome generation requires a band map kind.", nameof(mapKind));
         }
@@ -162,16 +163,21 @@ public sealed class BiomeMap
             {
                 var vertical = mapKind is BiomeMapKind.VerticalBands
                     or BiomeMapKind.VerticalEdgeBands
-                    or BiomeMapKind.VerticalEdgeLadderBands;
+                    or BiomeMapKind.VerticalEdgeLadderBands
+                    or BiomeMapKind.VerticalEdgeCorridorBands;
                 var edgeRich = mapKind is BiomeMapKind.HorizontalEdgeBands
                     or BiomeMapKind.VerticalEdgeBands
                     or BiomeMapKind.HorizontalEdgeLadderBands
-                    or BiomeMapKind.VerticalEdgeLadderBands;
+                    or BiomeMapKind.VerticalEdgeLadderBands
+                    or BiomeMapKind.VerticalEdgeCorridorBands;
                 var edgeLadder = mapKind is BiomeMapKind.HorizontalEdgeLadderBands
                     or BiomeMapKind.VerticalEdgeLadderBands;
+                var edgeCorridor = mapKind is BiomeMapKind.VerticalEdgeCorridorBands;
                 var bandIndex = vertical ? x : y;
                 var bandCount = vertical ? cellCountX : cellCountY;
-                cells[y * cellCountX + x] = edgeLadder
+                cells[y * cellCountX + x] = edgeCorridor
+                    ? BiomeKindForVerticalEdgeCorridorBand(x, y, cellCountX, cellCountY)
+                    : edgeLadder
                     ? BiomeKindForEdgeLadderBand(bandIndex, bandCount)
                     : edgeRich
                     ? BiomeKindForEdgeBand(bandIndex, bandCount)
@@ -448,6 +454,29 @@ public sealed class BiomeMap
             < 0.18f => BiomeKind.Rich,
             < 0.44f => BiomeKind.Grassland,
             _ => BiomeKind.Sparse
+        };
+    }
+
+    private static BiomeKind BiomeKindForVerticalEdgeCorridorBand(int x, int y, int cellCountX, int cellCountY)
+    {
+        var band = BiomeKindForEdgeBand(x, cellCountX);
+        if (band != BiomeKind.Barren)
+        {
+            return band;
+        }
+
+        if (cellCountY <= 2)
+        {
+            return BiomeKind.Sparse;
+        }
+
+        var yPhase = (y + 0.5f) / cellCountY;
+        var corridorDistance = MathF.Abs(yPhase - 0.5f);
+        return corridorDistance switch
+        {
+            < 0.14f => BiomeKind.Grassland,
+            < 0.25f => BiomeKind.Sparse,
+            _ => BiomeKind.Barren
         };
     }
 

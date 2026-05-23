@@ -221,7 +221,7 @@ public sealed class WorldState
         return false;
     }
 
-    internal void MarkCreatureDead(EntityId id, CreatureDeathReason reason)
+    internal void MarkCreatureDead(EntityId id, CreatureDeathReason reason, BiomeKind deathBiome)
     {
         if (!_lineageRecordByEntityId.TryGetValue(id, out var index))
         {
@@ -239,7 +239,7 @@ public sealed class WorldState
         record.DeathReason = reason;
         _lineageRecords[index] = record;
         var lifespanSeconds = MathF.Max(0f, (float)(record.DeathElapsedSeconds.Value - record.BirthElapsedSeconds));
-        Stats.RecordCreatureDeath(reason, lifespanSeconds);
+        Stats.RecordCreatureDeath(reason, lifespanSeconds, deathBiome);
     }
 
     public EntityId SpawnResourcePatch(ResourcePatchState patch)
