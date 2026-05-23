@@ -26,6 +26,7 @@ public static class GodotRunExportWriter
         GodotStatsCsvWriter.Write(paths.StatsPath, state.Stats.Snapshots);
         GodotLineageCsvWriter.Write(paths.LineagePath, state.LineageRecords);
         GodotTraitSummaryCsvWriter.Write(paths.TraitSummaryPath, state);
+        GodotSpeciesClusterCsvWriter.Write(paths.SpeciesSummaryPath, state);
         GodotFounderSummaryCsvWriter.Write(paths.FounderSummaryPath, state.LineageRecords);
         GodotGenerationSummaryCsvWriter.Write(paths.GenerationSummaryPath, state.LineageRecords);
         GodotLineageTrendCsvWriter.Write(paths.LineageTrendPath, state.Stats.Snapshots, state.LineageRecords);
@@ -37,6 +38,7 @@ public static class GodotRunExportWriter
             paths.StatsPath,
             paths.LineagePath,
             paths.TraitSummaryPath,
+            paths.SpeciesSummaryPath,
             paths.FounderSummaryPath,
             paths.GenerationSummaryPath,
             paths.LineageTrendPath,
@@ -50,6 +52,7 @@ public sealed record GodotRunExportResult(
     string StatsPath,
     string LineagePath,
     string TraitSummaryPath,
+    string SpeciesSummaryPath,
     string FounderSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
@@ -57,13 +60,14 @@ public sealed record GodotRunExportResult(
     string ReportPath,
     string SnapshotPath)
 {
-    public int FileCount => 9;
+    public int FileCount => 10;
 }
 
 internal sealed record GodotRunExportPaths(
     string StatsPath,
     string LineagePath,
     string TraitSummaryPath,
+    string SpeciesSummaryPath,
     string FounderSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
@@ -77,6 +81,7 @@ internal sealed record GodotRunExportPaths(
             statsPath,
             AddSuffix(statsPath, "lineage"),
             AddSuffix(statsPath, "traits"),
+            AddSuffix(statsPath, "species"),
             AddSuffix(statsPath, "founders"),
             AddSuffix(statsPath, "generations"),
             AddSuffix(statsPath, "lineage_trends"),
@@ -449,6 +454,68 @@ internal static class GodotTraitSummaryCsvWriter
     private static float ToDegrees(float radians)
     {
         return radians * 180f / MathF.PI;
+    }
+}
+
+internal static class GodotSpeciesClusterCsvWriter
+{
+    public static void Write(string path, WorldState state)
+    {
+        using var writer = GodotStatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("rank,species_id,name,living_creatures,living_share,founder_count,dominant_founder_id,dominant_founder_living,min_generation,avg_generation,max_generation,avg_energy,avg_age_seconds,avg_genome_distance,avg_brain_distance,avg_body_radius,avg_max_speed,avg_vision_range,avg_dietary_adaptation,avg_carrion_adaptation,avg_plant_digestion,avg_meat_digestion,avg_fresh_meat_digestion,avg_stale_meat_digestion,avg_bite_strength,avg_damage_resistance,recent_plant_kcal,recent_meat_kcal,eating_share,attack_share,current_east_progress_share,right_region_share,diet_label,tactic_label,region_label");
+
+        foreach (var summary in SpeciesClusterAnalyzer.Analyze(state))
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                summary.Rank.ToString(CultureInfo.InvariantCulture),
+                summary.SpeciesId.ToString(CultureInfo.InvariantCulture),
+                Escape(summary.Name),
+                summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                Format(summary.LivingShare),
+                summary.FounderCount.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderId.Value.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.MinGeneration.ToString(CultureInfo.InvariantCulture),
+                Format(summary.AverageGeneration),
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                Format(summary.AverageEnergy),
+                Format(summary.AverageAgeSeconds),
+                Format(summary.AverageGenomeDistance),
+                Format(summary.AverageBrainDistance),
+                Format(summary.AverageBodyRadius),
+                Format(summary.AverageMaxSpeed),
+                Format(summary.AverageSenseRadius),
+                Format(summary.AverageDietaryAdaptation),
+                Format(summary.AverageCarrionAdaptation),
+                Format(summary.AveragePlantDigestion),
+                Format(summary.AverageMeatDigestion),
+                Format(summary.AverageFreshMeatDigestion),
+                Format(summary.AverageStaleMeatDigestion),
+                Format(summary.AverageBiteStrength),
+                Format(summary.AverageDamageResistance),
+                Format(summary.RecentPlantCaloriesEaten),
+                Format(summary.RecentMeatCaloriesEaten),
+                Format(summary.EatingShare),
+                Format(summary.AttackShare),
+                Format(summary.CurrentEastProgressShare),
+                Format(summary.RightRegionShare),
+                Escape(summary.DietLabel),
+                Escape(summary.TacticLabel),
+                Escape(summary.RegionLabel)));
+        }
+    }
+
+    private static string Format(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Escape(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
     }
 }
 

@@ -122,6 +122,9 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
+    ("Species clustering groups injected profile founders", SpeciesClusteringGroupsInjectedProfileFounders),
+    ("Species clustering splits distinct brains", SpeciesClusteringSplitsDistinctBrains),
+    ("Species clustering handles non-neural creatures", SpeciesClusteringHandlesNonNeuralCreatures),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
@@ -4828,6 +4831,91 @@ static void SpeciesProfileInjectionCreatesFounderCreatures()
         AssertClose(33f, creature.Energy, 0.000001, "Injected creature energy");
         AssertTrue(creature.Position.X >= 20f && creature.Position.X <= target.State.Bounds.Width / 3f, "Injected creature should spawn in left third away from void");
     }
+}
+
+static void SpeciesClusteringGroupsInjectedProfileFounders()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Name = "Cluster Source",
+        Seed = 910,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ExplorerForager,
+        InitialCreatureCount = 3,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(sourceScenario, source.State, "Explorer cluster");
+
+    var targetScenario = new SimulationScenario
+    {
+        Seed = 911,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var target = SimulationScenarioFactory.CreateSimulation(targetScenario);
+    SpeciesProfileInjector.Inject(
+        target.State,
+        profile,
+        new SpeciesInjectionOptions(5, InitialCreatureSpawnRegion.Uniform, EnergyOverride: 40f));
+
+    var clusters = SpeciesClusterAnalyzer.Analyze(target.State);
+
+    AssertEqual(1, clusters.Count, "Injected profile cluster count");
+    AssertEqual(5, clusters[0].LivingCreatures, "Injected profile cluster living count");
+    AssertEqual(5, clusters[0].FounderCount, "Injected profile cluster founder count");
+    AssertClose(1f, clusters[0].LivingShare, 0.000001, "Injected profile cluster living share");
+    AssertTrue(!string.IsNullOrWhiteSpace(clusters[0].Name), "Injected profile cluster should have a name");
+}
+
+static void SpeciesClusteringSplitsDistinctBrains()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 912,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        WorldWidth = 300f,
+        WorldHeight = 100f,
+        ResourceVoidBorderWidth = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var saturatedWeights = new float[NeuralBrainGenome.DirectWeightCount];
+    Array.Fill(saturatedWeights, 8f);
+    var quietBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero());
+    var saturatedBrainId = simulation.State.AddBrain(new NeuralBrainGenome(saturatedWeights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(180f, 30f), energy: 35f, brainId: saturatedBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(190f, 30f), energy: 35f, brainId: saturatedBrainId);
+
+    var clusters = SpeciesClusterAnalyzer.Analyze(simulation.State);
+
+    AssertEqual(2, clusters.Count, "Distinct brain cluster count");
+    AssertEqual(3, clusters[0].LivingCreatures, "Largest distinct brain cluster");
+    AssertEqual(2, clusters[1].LivingCreatures, "Second distinct brain cluster");
+}
+
+static void SpeciesClusteringHandlesNonNeuralCreatures()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 913,
+        PipelineKind = SimulationPipelineKind.SimpleForaging,
+        InitialCreatureCount = 3,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+
+    var clusters = SpeciesClusterAnalyzer.Analyze(simulation.State);
+
+    AssertEqual(1, clusters.Count, "Simple controller cluster count");
+    AssertEqual(3, clusters[0].LivingCreatures, "Simple controller living count");
 }
 
 static void ScenarioSpeciesRosterInjectsProfileFounders()

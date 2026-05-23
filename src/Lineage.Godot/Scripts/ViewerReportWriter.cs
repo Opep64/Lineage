@@ -56,6 +56,7 @@ public static class ViewerReportWriter
             .ToArray();
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
+        var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
         var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
         var seasonPressure = SeasonPressureAnalysis.Analyze(scenario, snapshots);
@@ -406,6 +407,7 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
 
         WriteChartsSection(writer, state.Stats.Snapshots);
+        WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteBehaviorAssaySection(writer, behaviorSummary);
         WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
         WriteBrainInputDiagnosticsSection(writer, brainInputDiagnostics);
@@ -1163,6 +1165,48 @@ public static class ViewerReportWriter
                 $"<td>{Html(FormatPercent(result.EatShare))}</td>" +
                 $"<td>{Html(FormatPercent(result.ReproduceShare))}</td>" +
                 $"<td>{Html(FormatPercent(result.AttackShare))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpeciesClusterSection(
+        StreamWriter writer,
+        IReadOnlyList<SpeciesClusterSummary> summaries)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Top Species Clusters</h2>");
+        if (summaries.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living creatures were available for species clustering.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in summaries)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(summary.Rank)}</td>" +
+                $"<td>{Html(summary.Name)}</td>" +
+                $"<td>{Html(summary.LivingCreatures)}</td>" +
+                $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
+                $"<td>{Html(summary.FounderCount)}</td>" +
+                $"<td>#{Html(summary.DominantFounderId.Value)} ({Html(summary.DominantFounderLivingCreatures)})</td>" +
+                $"<td>{Html($"{summary.MinGeneration}/{summary.AverageGeneration:0.#}/{summary.MaxGeneration}")}</td>" +
+                $"<td>{Html(summary.DietLabel)}</td>" +
+                $"<td>{Html(summary.TacticLabel)}</td>" +
+                $"<td>{Html(summary.RegionLabel)}</td>" +
+                $"<td>{Html(summary.AverageGenomeDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.AverageBrainDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(summary.AveragePlantDigestion))}</td>" +
+                $"<td>{Html(FormatPercent(summary.AverageMeatDigestion))}</td>" +
+                $"<td>{Html(FormatPercent(summary.AttackShare))}</td>" +
                 "</tr>");
         }
 

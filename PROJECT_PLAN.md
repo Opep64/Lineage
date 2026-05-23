@@ -512,13 +512,13 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Report standing living energy/biomass using multiple views: total usable creature energy, total gut contents, total reproductive reserve, total egg energy, estimated body biomass from size/growth, and total plant/meat resource calories.
 - Add derived ratios such as average energy per creature, energy per biomass, living biomass versus available resource calories, egg/reproductive investment share, and tail-window stability so boom-crash runs are easier to distinguish from genuinely stable ecosystems.
 
-### Future Analysis: Taxonomy And Classification
+### Analysis: Taxonomy And Classification
 
-- Add an analysis/reporting layer that classifies evolved creatures without pretending the categories are absolute biological species.
+- Add an analysis/reporting layer that classifies evolved creatures without pretending the categories are absolute biological species. First pass done: `SpeciesClusterAnalyzer` groups living creatures by genome trait similarity plus neural-brain weight similarity, assigns deterministic readable cluster names, and writes the results to CLI/Godot CSV and HTML reports.
 - Use several complementary taxonomy views:
-  - lineage taxonomy: ancestry, founder clades, branches, extinct/surviving descendant groups
-  - genetic taxonomy: clustering by genome traits such as body size, speed, vision, diet, maturity, egg investment, mutation rates, and later terrain/temperature traits
-  - brain taxonomy: compare current direct-weight brains by weight vectors; for richer future brains, use functional brain fingerprints instead of relying only on internal structure
+  - lineage taxonomy: ancestry, founder clades, branches, extinct/surviving descendant groups. Founder and lineage-trend reports exist.
+  - genetic taxonomy: clustering by genome traits such as body size, speed, vision, diet, maturity, egg investment, mutation rates, and later terrain/temperature traits. First living-cluster pass done.
+  - brain taxonomy: compare current direct-weight brains by weight vectors; for richer future brains, use functional brain fingerprints instead of relying only on internal structure. First living-cluster pass compares current neural weight vectors.
   - behavioral taxonomy: classify by observed behavior in standardized assays or live-run metrics
   - ecological taxonomy: classify by realized niche, such as plant forager, scavenger, egg predator, low-energy specialist, sprinter, cautious grazer, edge-dweller, or later terrain/season specialists
 - Brain fingerprints should use standardized sensory situations and record output responses. Two brains can be considered similar if they react similarly, even if their internal wiring differs.
@@ -643,6 +643,7 @@ Useful CLI options:
 - `--output <path>`
 - `--lineage-output <path>`
 - `--traits-output <path>`
+- `--species-output <path>`
 - `--founders-output <path>`
 - `--generations-output <path>`
 - `--lineage-trends-output <path>`
@@ -765,6 +766,7 @@ Core types currently present:
 - `SpeciesProfileJson`: JSON load/save helpers for `.species.json` files.
 - `SpeciesProfileExporter`: exports a selected, founder-lineage, or dominant living representative as a species profile.
 - `SpeciesProfileInjector`: injects a species profile into an existing world as new founders.
+- `SpeciesClusterAnalyzer`: report-only living population clustering by genome traits and neural brain weights. It assigns deterministic readable names, groups imported profile founders when they share genome/brain data, and does not affect simulation behavior.
 - `ResourcePlacement`: shared initial/relocated plant placement rules, including biome-weighted fallback and optional clustering around live plants.
 - `SimulationPipelineKind`: named pipeline selection for scenario runners.
 - `BiomeMap`: deterministic low-resolution biome grid used for resource density, resource void-border exclusion, and reports.
@@ -1205,6 +1207,7 @@ The current smoke test runner covers:
 - patchy resource placement around live plants
 - scenario-backed initial brain mode, including per-founder random initial weights and a forager-predator starter
 - species profile JSON round-tripping, profile injection, and scenario species roster startup
+- species cluster reporting for living genome/brain similarity
 - simulation snapshot deterministic continuation
 - CLI batch comparison reports
 - scenario JSON round-tripping

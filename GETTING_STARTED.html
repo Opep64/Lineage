@@ -401,6 +401,7 @@
         <li><code>--output &lt;path&gt;</code>: stats CSV output path</li>
         <li><code>--lineage-output &lt;path&gt;</code>: lineage CSV output path</li>
         <li><code>--traits-output &lt;path&gt;</code>: final trait summary CSV output path</li>
+        <li><code>--species-output &lt;path&gt;</code>: living species cluster summary CSV output path</li>
         <li><code>--founders-output &lt;path&gt;</code>: founder summary CSV output path</li>
         <li><code>--generations-output &lt;path&gt;</code>: generation survival CSV output path</li>
         <li><code>--lineage-trends-output &lt;path&gt;</code>: founder lineage trend CSV output path</li>
@@ -427,7 +428,7 @@
 
       <p>
         The CLI currently writes a global stats CSV, a lineage CSV, a final living
-        trait summary CSV, a founder lineage summary CSV, and a generation survival
+        trait summary CSV, a living species cluster CSV, a founder lineage summary CSV, and a generation survival
         CSV, plus a lineage trend CSV. If only
         <code>--output</code> is provided, the other filenames are derived from it.
         The stats CSV includes plant and meat resource counts/calories plus egg predation deaths and foraging diagnostics such as food-seeing share,

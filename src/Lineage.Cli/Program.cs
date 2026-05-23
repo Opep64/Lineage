@@ -63,6 +63,7 @@ static void PrintHelp()
           --output <path>            Stats CSV output path.
           --lineage-output <path>    Lineage event CSV output path.
           --traits-output <path>     Final trait summary CSV output path.
+          --species-output <path>    Living species cluster summary CSV output path.
           --founders-output <path>   Founder lineage summary CSV output path.
           --generations-output <path> Generation survival summary CSV output path.
           --lineage-trends-output <path> Founder lineage trend CSV output path.
@@ -474,6 +475,7 @@ static void WriteRunOutputs(
         StatsCsvWriter.Write(outputPaths.StatsPath, simulation.State.Stats.Snapshots);
         LineageCsvWriter.Write(outputPaths.LineagePath!, simulation.State.LineageRecords);
         TraitSummaryCsvWriter.Write(outputPaths.TraitSummaryPath!, simulation.State);
+        SpeciesClusterCsvWriter.Write(outputPaths.SpeciesSummaryPath!, simulation.State);
         FounderSummaryCsvWriter.Write(outputPaths.FounderSummaryPath!, simulation.State.LineageRecords);
         GenerationSummaryCsvWriter.Write(outputPaths.GenerationSummaryPath!, simulation.State.LineageRecords);
         LineageTrendCsvWriter.Write(outputPaths.LineageTrendPath!, simulation.State.Stats.Snapshots, simulation.State.LineageRecords);
@@ -559,6 +561,7 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Stats CSV: {Path.GetFullPath(outputPaths.StatsPath)}");
         Console.WriteLine($"Lineage CSV: {Path.GetFullPath(outputPaths.LineagePath!)}");
         Console.WriteLine($"Traits CSV: {Path.GetFullPath(outputPaths.TraitSummaryPath!)}");
+        Console.WriteLine($"Species clusters CSV: {Path.GetFullPath(outputPaths.SpeciesSummaryPath!)}");
         Console.WriteLine($"Founders CSV: {Path.GetFullPath(outputPaths.FounderSummaryPath!)}");
         Console.WriteLine($"Generations CSV: {Path.GetFullPath(outputPaths.GenerationSummaryPath!)}");
         Console.WriteLine($"Lineage trends CSV: {Path.GetFullPath(outputPaths.LineageTrendPath!)}");
@@ -759,6 +762,8 @@ internal sealed record RunOptions
 
     public string? TraitSummaryOutputPath { get; init; }
 
+    public string? SpeciesSummaryOutputPath { get; init; }
+
     public string? FounderSummaryOutputPath { get; init; }
 
     public string? GenerationSummaryOutputPath { get; init; }
@@ -895,6 +900,7 @@ internal sealed record RunOptions
                 null,
                 null,
                 null,
+                null,
                 ReportPath,
                 ProfileOutputPath,
                 disabledSensingProfilePath,
@@ -911,6 +917,7 @@ internal sealed record RunOptions
             statsPath,
             LineageOutputPath ?? AddSuffix(statsPath, "lineage"),
             TraitSummaryOutputPath ?? AddSuffix(statsPath, "traits"),
+            SpeciesSummaryOutputPath ?? AddSuffix(statsPath, "species"),
             FounderSummaryOutputPath ?? AddSuffix(statsPath, "founders"),
             GenerationSummaryOutputPath ?? AddSuffix(statsPath, "generations"),
             LineageTrendOutputPath ?? AddSuffix(statsPath, "lineage_trends"),
@@ -934,6 +941,7 @@ internal sealed record RunOptions
             OutputPath = DisableOutput ? null : statsPath,
             LineageOutputPath = null,
             TraitSummaryOutputPath = null,
+            SpeciesSummaryOutputPath = null,
             FounderSummaryOutputPath = null,
             GenerationSummaryOutputPath = null,
             LineageTrendOutputPath = null,
@@ -1005,6 +1013,9 @@ internal sealed record RunOptions
                     break;
                 case "--traits-output":
                     options = options with { TraitSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
+                    break;
+                case "--species-output":
+                    options = options with { SpeciesSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
                     break;
                 case "--founders-output":
                     options = options with { FounderSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
@@ -1297,6 +1308,7 @@ internal readonly record struct OutputPaths(
     string? StatsPath,
     string? LineagePath,
     string? TraitSummaryPath,
+    string? SpeciesSummaryPath,
     string? FounderSummaryPath,
     string? GenerationSummaryPath,
     string? LineageTrendPath,
@@ -2671,6 +2683,68 @@ internal static class TraitSummaryCsvWriter
     }
 }
 
+internal static class SpeciesClusterCsvWriter
+{
+    public static void Write(string path, WorldState state)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("rank,species_id,name,living_creatures,living_share,founder_count,dominant_founder_id,dominant_founder_living,min_generation,avg_generation,max_generation,avg_energy,avg_age_seconds,avg_genome_distance,avg_brain_distance,avg_body_radius,avg_max_speed,avg_vision_range,avg_dietary_adaptation,avg_carrion_adaptation,avg_plant_digestion,avg_meat_digestion,avg_fresh_meat_digestion,avg_stale_meat_digestion,avg_bite_strength,avg_damage_resistance,recent_plant_kcal,recent_meat_kcal,eating_share,attack_share,current_east_progress_share,right_region_share,diet_label,tactic_label,region_label");
+
+        foreach (var summary in SpeciesClusterAnalyzer.Analyze(state))
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                summary.Rank.ToString(CultureInfo.InvariantCulture),
+                summary.SpeciesId.ToString(CultureInfo.InvariantCulture),
+                Escape(summary.Name),
+                summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                Format(summary.LivingShare),
+                summary.FounderCount.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderId.Value.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.MinGeneration.ToString(CultureInfo.InvariantCulture),
+                Format(summary.AverageGeneration),
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                Format(summary.AverageEnergy),
+                Format(summary.AverageAgeSeconds),
+                Format(summary.AverageGenomeDistance),
+                Format(summary.AverageBrainDistance),
+                Format(summary.AverageBodyRadius),
+                Format(summary.AverageMaxSpeed),
+                Format(summary.AverageSenseRadius),
+                Format(summary.AverageDietaryAdaptation),
+                Format(summary.AverageCarrionAdaptation),
+                Format(summary.AveragePlantDigestion),
+                Format(summary.AverageMeatDigestion),
+                Format(summary.AverageFreshMeatDigestion),
+                Format(summary.AverageStaleMeatDigestion),
+                Format(summary.AverageBiteStrength),
+                Format(summary.AverageDamageResistance),
+                Format(summary.RecentPlantCaloriesEaten),
+                Format(summary.RecentMeatCaloriesEaten),
+                Format(summary.EatingShare),
+                Format(summary.AttackShare),
+                Format(summary.CurrentEastProgressShare),
+                Format(summary.RightRegionShare),
+                Escape(summary.DietLabel),
+                Escape(summary.TacticLabel),
+                Escape(summary.RegionLabel)));
+        }
+    }
+
+    private static string Format(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Escape(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
+
 internal static class FounderSummaryCsvWriter
 {
     public static void Write(string path, IReadOnlyList<CreatureLineageRecord> records)
@@ -3918,6 +3992,7 @@ internal static class RunReportWriter
             snapshots,
             snapshot => snapshot.CaloriesEatenPerFoodVisionEvent,
             finalSnapshot.CaloriesEatenPerFoodVisionEvent);
+        var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
@@ -4331,6 +4406,7 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
+        WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteBehaviorAssaySection(writer, behaviorSummary);
         WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
         WriteBrainInputDiagnosticsSection(writer, brainInputDiagnostics);
@@ -4526,6 +4602,7 @@ internal static class RunReportWriter
         WriteOptionalPath(writer, "Stats CSV", outputPaths.StatsPath);
         WriteOptionalPath(writer, "Lineage CSV", outputPaths.LineagePath);
         WriteOptionalPath(writer, "Traits CSV", outputPaths.TraitSummaryPath);
+        WriteOptionalPath(writer, "Species clusters CSV", outputPaths.SpeciesSummaryPath);
         WriteOptionalPath(writer, "Founders CSV", outputPaths.FounderSummaryPath);
         WriteOptionalPath(writer, "Generations CSV", outputPaths.GenerationSummaryPath);
         WriteOptionalPath(writer, "Lineage trends CSV", outputPaths.LineageTrendPath);
@@ -5205,6 +5282,48 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatPercent(result.EatShare))}</td>" +
                 $"<td>{Html(FormatPercent(result.ReproduceShare))}</td>" +
                 $"<td>{Html(FormatPercent(result.AttackShare))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpeciesClusterSection(
+        StreamWriter writer,
+        IReadOnlyList<SpeciesClusterSummary> summaries)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Top Species Clusters</h2>");
+        if (summaries.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living creatures were available for species clustering.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in summaries)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(summary.Rank)}</td>" +
+                $"<td>{Html(summary.Name)}</td>" +
+                $"<td>{Html(summary.LivingCreatures)}</td>" +
+                $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
+                $"<td>{Html(summary.FounderCount)}</td>" +
+                $"<td>#{Html(summary.DominantFounderId.Value)} ({Html(summary.DominantFounderLivingCreatures)})</td>" +
+                $"<td>{Html(FormatGenerationRange(summary.MinGeneration, summary.AverageGeneration, summary.MaxGeneration))}</td>" +
+                $"<td>{Html(summary.DietLabel)}</td>" +
+                $"<td>{Html(summary.TacticLabel)}</td>" +
+                $"<td>{Html(summary.RegionLabel)}</td>" +
+                $"<td>{Html(summary.AverageGenomeDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.AverageBrainDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(summary.AveragePlantDigestion))}</td>" +
+                $"<td>{Html(FormatPercent(summary.AverageMeatDigestion))}</td>" +
+                $"<td>{Html(FormatPercent(summary.AttackShare))}</td>" +
                 "</tr>");
         }
 
