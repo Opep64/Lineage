@@ -58,6 +58,8 @@ public sealed record SimulationSnapshot
 
     public int InjuryDeathCount { get; init; }
 
+    public int RottenMeatDeathCount { get; init; }
+
     public int BarrenDeathCount { get; init; }
 
     public int SparseDeathCount { get; init; }
@@ -97,6 +99,7 @@ public sealed record SimulationSnapshot
             EggPredationDeathCount = state.Stats.EggPredationDeathCount,
             StarvationDeathCount = state.Stats.StarvationDeathCount,
             InjuryDeathCount = state.Stats.InjuryDeathCount,
+            RottenMeatDeathCount = state.Stats.RottenMeatDeathCount,
             BarrenDeathCount = state.Stats.BarrenDeathCount,
             SparseDeathCount = state.Stats.SparseDeathCount,
             GrasslandDeathCount = state.Stats.GrasslandDeathCount,

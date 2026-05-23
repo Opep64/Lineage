@@ -163,6 +163,7 @@ Performance/ecology update from 2026-05-22:
 - Depleted plants now enter a dormant respawn period instead of immediately becoming edible again.
 - Dormant plants are kept out of the resource spatial index, which lowers resource query/scan cost and makes local depletion matter more.
 - Checked-in scenarios now use lower starting plant densities plus per-scenario plant respawn delay ranges.
+- Rotten meat now has a configurable digestion-time health risk that scales with carcass staleness and is reduced by carrion adaptation, with CSV/report diagnostics for damage and affected creatures.
 - Current baseline numbers live in `PERFORMANCE_BASELINES.md`; after the plant dormancy pass, Balanced Foraging 20k with full profiling is about 16.756 seconds on the current machine.
 - This changed scenario outcomes intentionally, so future comparisons should use the plant-dormancy baseline rather than the pre-dormancy counts.
 

@@ -24,6 +24,8 @@ var tests = new (string Name, Action Body)[]
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
     ("Fresh-kill resource credit expires", FreshKillResourceCreditExpires),
     ("Meat freshness reduces digested energy", MeatFreshnessReducesDigestedEnergy),
+    ("Rotten meat damage scales with carrion adaptation", RottenMeatDamageScalesWithCarrionAdaptation),
+    ("Rotten meat health deaths are counted", RottenMeatHealthDeathsAreCounted),
     ("Eating transfers resource calories into creature energy", EatingTransfersCalories),
     ("Eating fills gut before digestion", EatingFillsGutBeforeDigestion),
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
@@ -788,6 +790,99 @@ static void MeatFreshnessReducesDigestedEnergy()
     AssertClose(expectedEnergy, creature.LastMeatDigestedEnergy, 0.000001, "Stale meat digested energy");
     AssertClose(0f, creature.GutMeatCalories, 0.000001, "Meat gut emptied");
     AssertClose(0f, creature.GutMeatQualityCalories, 0.000001, "Meat quality gut emptied");
+}
+
+static void RottenMeatDamageScalesWithCarrionAdaptation()
+{
+    var freshSpecialist = RunRottenMeatDamageProbe(carrionAdaptation: 0f, meatAgeSeconds: 0f);
+    var staleSpecialist = RunRottenMeatDamageProbe(carrionAdaptation: 0f, meatAgeSeconds: MeatQuality.StaleAgeSeconds);
+    var carrionSpecialist = RunRottenMeatDamageProbe(carrionAdaptation: 1f, meatAgeSeconds: MeatQuality.StaleAgeSeconds);
+
+    AssertClose(0f, freshSpecialist.LastRottenMeatDamage, 0.000001, "Fresh meat should not damage health");
+    AssertClose(0.04f, staleSpecialist.LastRottenMeatDamage, 0.000001, "Fully stale meat damage");
+    AssertClose(0.004f, carrionSpecialist.LastRottenMeatDamage, 0.000001, "Carrion adaptation protects against most stale meat damage");
+    AssertTrue(
+        carrionSpecialist.Health > staleSpecialist.Health,
+        "Carrion adaptation should preserve more health from rotten meat");
+}
+
+static CreatureState RunRottenMeatDamageProbe(float carrionAdaptation, float meatAgeSeconds)
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 232,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex),
+            new DigestionSystem(rottenMeatDamagePerRawKcal: 0.004f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 10f,
+        DigestionCaloriesPerSecond = 10f,
+        DietaryAdaptation = 1f,
+        CarrionAdaptation = carrionAdaptation,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        DecayCaloriesPerSecond = 0f,
+        MeatAgeSeconds = meatAgeSeconds
+    });
+
+    simulation.Step();
+    return simulation.State.Creatures[0];
+}
+
+static void RottenMeatHealthDeathsAreCounted()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 233,
+        systems:
+        [
+            new DigestionSystem(rottenMeatDamagePerRawKcal: 0.004f),
+            new DeathSystem(meatCaloriesPerBodyRadius: 4f, meatEnergyFraction: 0.35f, meatDecayCaloriesPerSecond: 0.03f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 1f,
+        DigestionCaloriesPerSecond = 10f,
+        MaturityAgeSeconds = 0f
+    });
+    var creatureId = simulation.State.SpawnCreature(
+        genomeId,
+        new SimVector2(20f, 20f),
+        energy: 10f,
+        health: 0.02f);
+    var creature = simulation.State.Creatures[0];
+    creature.GutMeatCalories = 10f;
+    creature.GutMeatQualityCalories = 10f * MeatQuality.MinimumFreshness;
+    creature.LastDamagingCreatureId = new EntityId(999);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertEqual(0, simulation.State.Creatures.Count, "Rotten meat victim removed");
+    AssertEqual(1, simulation.State.Stats.CreatureDeathCount, "Rotten death total count");
+    AssertEqual(1, simulation.State.Stats.RottenMeatDeathCount, "Rotten death count");
+    AssertEqual(0, simulation.State.Stats.InjuryDeathCount, "Rotten death should not count as injury");
+    AssertTrue(simulation.State.TryGetLineageRecord(creatureId, out var record), "Rotten death lineage lookup");
+    AssertEqual(CreatureDeathReason.RottenMeat, record.DeathReason, "Rotten death reason");
+    AssertEqual(1, simulation.State.Resources.Count, "Rotten death meat resource");
+    AssertEqual(default(EntityId), simulation.State.Resources[0].FreshKillAttackerId, "Rotten death should not credit a stale attacker");
 }
 
 static void EatingTransfersCalories()
@@ -3059,6 +3154,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.LastCaloriesDigested = 3.5f;
     seeingCreature.LastPlantDigestedEnergy = 2f;
     seeingCreature.LastMeatDigestedEnergy = 1.5f;
+    seeingCreature.LastRottenMeatDamage = 0.03f;
     seeingCreature.GutPlantCalories = 20f;
     seeingCreature.GutMeatCalories = 5f;
     seeingCreature.LastAttackDamageDealt = 0.2f;
@@ -3179,6 +3275,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0f, snapshot.TotalStaleMeatCaloriesEatenPerSecond, 0.000001, "Stale meat calories eaten per second");
     AssertClose(1f, snapshot.FreshMeatCaloriesEatenShare, 0.000001, "Fresh carcass share");
     AssertClose(0f, snapshot.StaleMeatCaloriesEatenShare, 0.000001, "Stale carcass share");
+    AssertClose(0.03f, snapshot.TotalRottenMeatDamagePerSecond, 0.000001, "Rotten meat damage per second");
+    AssertEqual(1, snapshot.RottenMeatDamagedCreatureCount, "Rotten meat damaged creature count");
     AssertClose(1.5f / 3.5f, snapshot.MeatDigestedEnergyShare, 0.000001, "Meat digested energy share");
     AssertClose(0.5f, snapshot.AverageGutFillRatio, 0.000001, "Average gut fill");
     AssertClose(0.4f, snapshot.AverageGutPlantShare, 0.000001, "Average gut plant share");
@@ -3235,6 +3333,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.EggDeathCount, "Snapshot egg death count");
     AssertEqual(0, snapshot.EggPredationDeathCount, "Snapshot egg predation death count");
     AssertEqual(0, snapshot.CreatureDeathCount, "Snapshot death count");
+    AssertEqual(0, snapshot.RottenMeatDeathCount, "Snapshot rotten meat death count");
     AssertClose(0f, snapshot.AverageLifespanSeconds, 0.000001, "Snapshot average lifespan without deaths");
     AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
 }
@@ -4247,6 +4346,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         DeathMeatCaloriesPerBodyRadius = 5f,
         DeathMeatEnergyFraction = 0.4f,
         MeatDecayCaloriesPerSecond = 0.08f,
+        RottenMeatDamagePerRawKcal = 0.005f,
         MeatScentRangeMultiplier = 4f,
         MeatScentCaloriesForFullStrength = 70f,
         MeatScentDensitySaturation = 1.5f,
@@ -4290,6 +4390,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(5f, scenario.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
     AssertClose(0.4f, scenario.DeathMeatEnergyFraction, 0.000001, "Scenario death meat energy fraction");
     AssertClose(0.08f, scenario.MeatDecayCaloriesPerSecond, 0.000001, "Scenario meat decay");
+    AssertClose(0.005f, scenario.RottenMeatDamagePerRawKcal, 0.000001, "Scenario rotten meat damage");
     AssertClose(4f, scenario.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
     AssertClose(70f, scenario.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");
     AssertClose(1.5f, scenario.MeatScentDensitySaturation, 0.000001, "Scenario meat scent saturation");
@@ -4423,6 +4524,7 @@ static void ScenarioJsonRoundTrips()
         DeathMeatCaloriesPerBodyRadius = 3.5f,
         DeathMeatEnergyFraction = 0.25f,
         MeatDecayCaloriesPerSecond = 0.09f,
+        RottenMeatDamagePerRawKcal = 0.006f,
         MeatScentRangeMultiplier = 2.5f,
         MeatScentCaloriesForFullStrength = 55f,
         MeatScentDensitySaturation = 1.75f,
@@ -4456,6 +4558,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
+    AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
@@ -4539,6 +4642,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.DeathMeatCaloriesPerBodyRadius, roundTripped.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
     AssertClose(scenario.DeathMeatEnergyFraction, roundTripped.DeathMeatEnergyFraction, 0.000001, "Scenario death meat energy fraction");
     AssertClose(scenario.MeatDecayCaloriesPerSecond, roundTripped.MeatDecayCaloriesPerSecond, 0.000001, "Scenario meat decay");
+    AssertClose(scenario.RottenMeatDamagePerRawKcal, roundTripped.RottenMeatDamagePerRawKcal, 0.000001, "Scenario rotten meat damage");
     AssertClose(scenario.MeatScentRangeMultiplier, roundTripped.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
     AssertClose(scenario.MeatScentCaloriesForFullStrength, roundTripped.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");
     AssertClose(scenario.MeatScentDensitySaturation, roundTripped.MeatScentDensitySaturation, 0.000001, "Scenario meat scent saturation");

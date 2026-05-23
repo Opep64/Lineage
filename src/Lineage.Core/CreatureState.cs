@@ -113,6 +113,8 @@ public struct CreatureState
 
     public float LastMeatDigestedEnergy { get; set; }
 
+    public float LastRottenMeatDamage { get; set; }
+
     public float GutPlantCalories { get; set; }
 
     public float GutMeatCalories { get; set; }
@@ -123,6 +125,8 @@ public struct CreatureState
     public float GutMeatQualityCalories { get; set; }
 
     public float LastAttackDamageDealt { get; set; }
+
+    public float LastAttackDamageTaken { get; set; }
 
     /// <summary>
     /// Most recent creature that damaged this one, used to attribute fresh-kill meat after injury deaths.

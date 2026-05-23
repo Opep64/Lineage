@@ -24,6 +24,7 @@ public static class SimulationPipelines
         float deathMeatCaloriesPerBodyRadius = 4f,
         float deathMeatEnergyFraction = 0.35f,
         float meatDecayCaloriesPerSecond = 0.03f,
+        float rottenMeatDamagePerRawKcal = 0f,
         float meatScentRangeMultiplier = 2f,
         float meatScentCaloriesForFullStrength = 60f,
         float meatScentDensitySaturation = 1f,
@@ -89,7 +90,7 @@ public static class SimulationPipelines
             new MovementSystem(biomeMovementCostProfile, biomeSpeedProfile, movementSpeedCostExponent),
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
-            new DigestionSystem(),
+            new DigestionSystem(rottenMeatDamagePerRawKcal),
             new ReproductionSystem(
                 requireReproductionIntent: requireReproductionIntent,
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
@@ -133,6 +134,7 @@ public static class SimulationPipelines
         float deathMeatCaloriesPerBodyRadius = 4f,
         float deathMeatEnergyFraction = 0.35f,
         float meatDecayCaloriesPerSecond = 0.03f,
+        float rottenMeatDamagePerRawKcal = 0f,
         float meatScentRangeMultiplier = 2f,
         float meatScentCaloriesForFullStrength = 60f,
         float meatScentDensitySaturation = 1f,
@@ -206,7 +208,7 @@ public static class SimulationPipelines
             new MovementSystem(biomeMovementCostProfile, biomeSpeedProfile, movementSpeedCostExponent),
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex, requireEatIntent: true),
-            new DigestionSystem(),
+            new DigestionSystem(rottenMeatDamagePerRawKcal),
             new ReproductionSystem(
                 requireReproductionIntent: requireReproductionIntent,
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,

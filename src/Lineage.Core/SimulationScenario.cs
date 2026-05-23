@@ -208,6 +208,8 @@ public sealed record SimulationScenario
 
     public float MeatDecayCaloriesPerSecond { get; init; } = 0.03f;
 
+    public float RottenMeatDamagePerRawKcal { get; init; } = 0.004f;
+
     public float MeatScentRangeMultiplier { get; init; } = 2f;
 
     public float MeatScentCaloriesForFullStrength { get; init; } = 60f;
@@ -315,6 +317,7 @@ public sealed record SimulationScenario
         EnsureNonNegative(DeathMeatCaloriesPerBodyRadius, nameof(DeathMeatCaloriesPerBodyRadius));
         EnsureProbability(DeathMeatEnergyFraction, nameof(DeathMeatEnergyFraction));
         EnsureNonNegative(MeatDecayCaloriesPerSecond, nameof(MeatDecayCaloriesPerSecond));
+        EnsureNonNegative(RottenMeatDamagePerRawKcal, nameof(RottenMeatDamagePerRawKcal));
         EnsureRange(MeatScentRangeMultiplier, 1f, 10f, nameof(MeatScentRangeMultiplier));
         EnsurePositive(MeatScentCaloriesForFullStrength, nameof(MeatScentCaloriesForFullStrength));
         EnsurePositive(MeatScentDensitySaturation, nameof(MeatScentDensitySaturation));

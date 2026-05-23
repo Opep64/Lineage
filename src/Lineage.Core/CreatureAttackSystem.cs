@@ -36,6 +36,7 @@ public sealed class CreatureAttackSystem(
             attacker.CreatureContactId = default;
             attacker.CreatureContactEdgeDistance = 0f;
             attacker.LastAttackDamageDealt = 0f;
+            attacker.LastAttackDamageTaken = 0f;
 
             var contact = FindBestBiteContact(state, i, attacker, attackerRadius);
             if (contact.TargetIndex < 0)
@@ -91,6 +92,7 @@ public sealed class CreatureAttackSystem(
 
             var creature = state.Creatures[i];
             creature.Health = Math.Max(0f, creature.Health - damage);
+            creature.LastAttackDamageTaken = damage;
             if (_damageSourceByCreature[i] != default)
             {
                 creature.LastDamagingCreatureId = _damageSourceByCreature[i];

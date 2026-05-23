@@ -58,6 +58,7 @@ public sealed class StatsRecordingSystem(
         var totalCaloriesDigested = 0f;
         var totalPlantDigestedEnergy = 0f;
         var totalMeatDigestedEnergy = 0f;
+        var totalRottenMeatDamage = 0f;
         var totalGutFillRatio = 0f;
         var totalGutPlantShare = 0f;
         var totalGutMeatShare = 0f;
@@ -110,6 +111,7 @@ public sealed class StatsRecordingSystem(
         var meatScentDetectedCreatureCount = 0;
         var foodContactCreatureCount = 0;
         var eatingCreatureCount = 0;
+        var rottenMeatDamagedCreatureCount = 0;
         var attackingCreatureCount = 0;
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
@@ -158,6 +160,12 @@ public sealed class StatsRecordingSystem(
             totalCaloriesDigested += creature.LastCaloriesDigested;
             totalPlantDigestedEnergy += creature.LastPlantDigestedEnergy;
             totalMeatDigestedEnergy += creature.LastMeatDigestedEnergy;
+            totalRottenMeatDamage += creature.LastRottenMeatDamage;
+            if (creature.LastRottenMeatDamage > 0f)
+            {
+                rottenMeatDamagedCreatureCount++;
+            }
+
             var gutTotal = creature.GutPlantCalories + creature.GutMeatCalories;
             var gutCapacity = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome);
             totalGutFillRatio += gutCapacity > 0f
@@ -471,6 +479,9 @@ public sealed class StatsRecordingSystem(
         var attackDamagePerSecond = deltaSeconds > 0f
             ? totalAttackDamage / deltaSeconds
             : 0f;
+        var rottenMeatDamagePerSecond = deltaSeconds > 0f
+            ? totalRottenMeatDamage / deltaSeconds
+            : 0f;
         var distanceTraveledPerSecond = deltaSeconds > 0f
             ? totalDistanceTraveled / deltaSeconds
             : 0f;
@@ -658,6 +669,7 @@ public sealed class StatsRecordingSystem(
             state.Stats.CreatureDeathCount,
             state.Stats.StarvationDeathCount,
             state.Stats.InjuryDeathCount,
+            state.Stats.RottenMeatDeathCount,
             creatureDetectedCreatureCount,
             meatCaloriesEatenShare,
             freshKillCaloriesEatenShare,
@@ -677,6 +689,8 @@ public sealed class StatsRecordingSystem(
             staleMeatCaloriesEatenPerSecond,
             freshMeatCaloriesEatenShare,
             staleMeatCaloriesEatenShare,
+            rottenMeatDamagePerSecond,
+            rottenMeatDamagedCreatureCount,
             state.Stats.AverageDeadCreatureLifespanSeconds,
             state.Stats.MedianDeadCreatureLifespanSeconds,
             reproductionReadyCreatureCount,

@@ -766,7 +766,7 @@ public partial class Main : Node2D
             $"Repro attempts {state.Stats.ReproductionAttemptCount}  success {FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount))}\n" +
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +
             $"Egg health {snapshot.AverageEggHealthRatio * 100f:0}%  Birth inv {snapshot.AverageBirthInvestmentRatio:0.00}x\n" +
-            $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
+            $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}  Rotten {state.Stats.RottenMeatDeathCount}\n" +
             $"Repro intent {FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount))}  ready {FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount))}\n" +
             $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
             $"Max gen {snapshot.MaxGeneration}\n" +
@@ -928,8 +928,9 @@ public partial class Main : Node2D
             $"Last meal {BuildLastMealSourceText(creature)}\n" +
             $"Swallowed this tick {creature.LastCaloriesEaten:0.00} raw ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
             $"Source P {creature.LastPlantCaloriesEaten:0.00}  C {creature.LastCarcassCaloriesEaten:0.00}  Egg {creature.LastEggCaloriesEaten:0.00}  FK {creature.LastLivePreyCaloriesEaten:0.00}\n" +
-            $"Digested this tick {creature.LastCaloriesDigested:0.00} energy ({FormatCaloriesPerSecond(creature.LastCaloriesDigested)}/s)\n" +
+            $"Digested this tick {creature.LastCaloriesDigested:0.00} energy ({FormatPerSecond(creature.LastCaloriesDigested)}/s)\n" +
             $"Energy P {creature.LastPlantDigestedEnergy:0.00}  M {creature.LastMeatDigestedEnergy:0.00}\n" +
+            $"Rotten dmg {creature.LastRottenMeatDamage:0.000} health ({FormatPerSecond(creature.LastRottenMeatDamage)}/s)\n" +
             $"Creature contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
             $"Attack dmg {creature.LastAttackDamageDealt:0.000}\n" +
             $"Since meal {creature.SecondsSinceLastMeal:0.0}s  {creature.DistanceSinceLastMeal:0.0}u\n" +
@@ -1620,8 +1621,13 @@ public partial class Main : Node2D
 
     private string FormatCaloriesPerSecond(float calories)
     {
+        return FormatPerSecond(calories);
+    }
+
+    private string FormatPerSecond(float value)
+    {
         var fixedDelta = MathF.Max(_simulation.Config.FixedDeltaSeconds, 0.0001f);
-        return (calories / fixedDelta).ToString("0.0", CultureInfo.InvariantCulture);
+        return (value / fixedDelta).ToString("0.0", CultureInfo.InvariantCulture);
     }
 
     private Color ColorForResource(ResourceKind kind, float fullness)

@@ -100,6 +100,7 @@ public static class SimulationSnapshotJson
             snapshot.EggPredationDeathCount,
             snapshot.StarvationDeathCount,
             snapshot.InjuryDeathCount,
+            snapshot.RottenMeatDeathCount,
             snapshot.StatsSnapshots,
             snapshot.ReproductionAttemptCount,
             snapshot.BarrenDeathCount,

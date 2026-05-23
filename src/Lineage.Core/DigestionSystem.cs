@@ -12,6 +12,15 @@ namespace Lineage.Core;
 /// </remarks>
 public sealed class DigestionSystem : ISimulationSystem
 {
+    private readonly float _rottenMeatDamagePerRawKcal;
+
+    public DigestionSystem(float rottenMeatDamagePerRawKcal = 0f)
+    {
+        _rottenMeatDamagePerRawKcal = ValidateNonNegative(
+            rottenMeatDamagePerRawKcal,
+            nameof(rottenMeatDamagePerRawKcal));
+    }
+
     public void Update(WorldState state, float deltaSeconds)
     {
         for (var i = 0; i < state.Creatures.Count; i++)
@@ -22,6 +31,7 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.LastCaloriesDigested = 0f;
             creature.LastPlantDigestedEnergy = 0f;
             creature.LastMeatDigestedEnergy = 0f;
+            creature.LastRottenMeatDamage = 0f;
             NormalizeMeatQuality(ref creature);
             ClampGutToCapacity(ref creature, genome);
 
@@ -67,13 +77,28 @@ public sealed class DigestionSystem : ISimulationSystem
             var plantReleasedEnergy = plantDigested * CreatureDigestion.PlantEfficiency(genome);
             var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEnergyEfficiency(genome, meatQuality);
             var releasedEnergy = plantReleasedEnergy + meatReleasedEnergy;
+            var rottenMeatDamage = CalculateRottenMeatDamage(genome, meatQuality, meatDigested);
             creature.Energy += releasedEnergy;
+            creature.Health = Math.Max(0f, creature.Health - rottenMeatDamage);
             creature.LastCaloriesDigested = releasedEnergy;
             creature.LastPlantDigestedEnergy = plantReleasedEnergy;
             creature.LastMeatDigestedEnergy = meatReleasedEnergy;
+            creature.LastRottenMeatDamage = rottenMeatDamage;
 
             state.Creatures[i] = creature;
         }
+    }
+
+    private float CalculateRottenMeatDamage(CreatureGenome genome, float meatQuality, float meatDigested)
+    {
+        if (_rottenMeatDamagePerRawKcal <= 0f || meatDigested <= 0f)
+        {
+            return 0f;
+        }
+
+        return meatDigested
+            * _rottenMeatDamagePerRawKcal
+            * CreatureDigestion.RottenMeatDamageMultiplier(genome, meatQuality);
     }
 
     private static void NormalizeMeatQuality(ref CreatureState creature)
@@ -109,5 +134,12 @@ public sealed class DigestionSystem : ISimulationSystem
         creature.GutPlantCalories *= scale;
         creature.GutMeatCalories *= scale;
         creature.GutMeatQualityCalories *= scale;
+    }
+
+    private static float ValidateNonNegative(float value, string name)
+    {
+        return float.IsFinite(value) && value >= 0f
+            ? value
+            : throw new ArgumentOutOfRangeException(name, "Rotten meat damage must be finite and non-negative.");
     }
 }
