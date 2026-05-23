@@ -17,6 +17,7 @@ namespace Lineage.Viewer;
 public partial class Main : Node2D
 {
     private const string StartupScenarioFileName = "balanced-foraging.json";
+    private const string SpeciesProfileDirectoryName = "species";
     private const float LauncherPanelWidth = 520f;
     private const float CollapsedLauncherPanelWidth = 230f;
     private const float RightPanelWidth = 300f;
@@ -62,6 +63,8 @@ public partial class Main : Node2D
     private FileDialog _loadScenarioDialog = null!;
     private FileDialog _saveScenarioDialog = null!;
     private FileDialog _loadSnapshotDialog = null!;
+    private FileDialog _loadSpeciesProfileDialog = null!;
+    private FileDialog _saveSpeciesProfileDialog = null!;
     private Label _hud = null!;
     private ScrollContainer _inspectorScroll = null!;
     private Label _inspector = null!;
@@ -76,6 +79,11 @@ public partial class Main : Node2D
     private ulong _currentSeed = SimulationScenario.DefaultSeed;
     private string? _currentScenarioPath;
     private bool _cliRunInProgress;
+    private SpeciesProfile? _loadedSpeciesProfile;
+    private string? _loadedSpeciesProfilePath;
+    private EntityId _pendingSpeciesExportCreatureId;
+    private string? _pendingSpeciesExportName;
+    private string? _pendingSpeciesExportNotes;
     private bool _isPanning;
     private bool _followSelected;
     private bool _showBiomeOverlay = true;
@@ -2259,20 +2267,33 @@ public partial class Main : Node2D
         _scenarioEditor.LoadSnapshotFileRequested += OpenLoadSnapshotDialog;
         _scenarioEditor.LoadCheckpointFileRequested += OpenLoadCheckpointDialog;
         _scenarioEditor.LoadSnapshotRequested += LoadSnapshotFromPath;
+        _scenarioEditor.ExportSelectedSpeciesRequested += OpenExportSelectedSpeciesDialog;
+        _scenarioEditor.LoadSpeciesProfileRequested += OpenLoadSpeciesProfileDialog;
+        _scenarioEditor.InjectSpeciesRequested += InjectLoadedSpeciesProfile;
         _scenarioEditor.MapToggleRequested += () => SetMapVisible(!_renderMap);
         _scenarioEditor.CloseRequested += _scenarioEditor.ToggleCollapsed;
         AddChild(_scenarioEditor);
 
-        var scenarioDirectory = System.IO.Path.Combine(GetRepositoryRoot(), "scenarios");
+        var repositoryRoot = GetRepositoryRoot();
+        var scenarioDirectory = System.IO.Path.Combine(repositoryRoot, "scenarios");
+        var outDirectory = System.IO.Path.Combine(repositoryRoot, "out");
+        var speciesDirectory = System.IO.Path.Combine(repositoryRoot, SpeciesProfileDirectoryName);
+        System.IO.Directory.CreateDirectory(speciesDirectory);
         _loadScenarioDialog = CreateScenarioDialog(FileDialog.FileModeEnum.OpenFile, "Load Scenario", scenarioDirectory);
         _saveScenarioDialog = CreateScenarioDialog(FileDialog.FileModeEnum.SaveFile, "Save Scenario", scenarioDirectory);
-        _loadSnapshotDialog = CreateSnapshotDialog(System.IO.Path.Combine(GetRepositoryRoot(), "out"));
+        _loadSnapshotDialog = CreateSnapshotDialog(outDirectory);
+        _loadSpeciesProfileDialog = CreateSpeciesProfileDialog(FileDialog.FileModeEnum.OpenFile, "Load Species Profile", speciesDirectory);
+        _saveSpeciesProfileDialog = CreateSpeciesProfileDialog(FileDialog.FileModeEnum.SaveFile, "Export Species Profile", speciesDirectory);
         _loadScenarioDialog.FileSelected += LoadScenarioFromPath;
         _saveScenarioDialog.FileSelected += SaveScenarioToPath;
         _loadSnapshotDialog.FileSelected += LoadSnapshotFromPath;
+        _loadSpeciesProfileDialog.FileSelected += LoadSpeciesProfileFromPath;
+        _saveSpeciesProfileDialog.FileSelected += ExportPendingSpeciesProfileToPath;
         AddChild(_loadScenarioDialog);
         AddChild(_saveScenarioDialog);
         AddChild(_loadSnapshotDialog);
+        AddChild(_loadSpeciesProfileDialog);
+        AddChild(_saveSpeciesProfileDialog);
     }
 
     private void OpenLoadSnapshotDialog()
@@ -2312,6 +2333,121 @@ public partial class Main : Node2D
         catch (Exception ex)
         {
             _scenarioEditor.SetStatus($"Snapshot load failed: {ex.Message}");
+        }
+    }
+
+    private void OpenExportSelectedSpeciesDialog()
+    {
+        if (!TryGetSelectedCreature(out var selected))
+        {
+            _scenarioEditor.SetStatus("Select a living creature before exporting a species profile.");
+            return;
+        }
+
+        var request = _scenarioEditor.ReadSpeciesExportRequest();
+        _pendingSpeciesExportCreatureId = selected.Id;
+        _pendingSpeciesExportName = request.Name;
+        _pendingSpeciesExportNotes = request.Notes;
+
+        var profileName = string.IsNullOrWhiteSpace(request.Name)
+            ? $"species_{selected.Id.Value}"
+            : SanitizeFileName(request.Name);
+        _saveSpeciesProfileDialog.CurrentFile = ToSpeciesProfileFileName(profileName);
+        _saveSpeciesProfileDialog.PopupCenteredRatio(0.75f);
+    }
+
+    private void OpenLoadSpeciesProfileDialog()
+    {
+        _loadSpeciesProfileDialog.PopupCenteredRatio(0.75f);
+    }
+
+    private void LoadSpeciesProfileFromPath(string path)
+    {
+        try
+        {
+            _loadedSpeciesProfile = SpeciesProfileJson.Load(path);
+            _loadedSpeciesProfilePath = path;
+            _scenarioEditor.SetLoadedSpeciesProfilePath(path);
+            _scenarioEditor.SetStatus($"Loaded species profile {_loadedSpeciesProfile.Name}.");
+        }
+        catch (Exception ex)
+        {
+            _loadedSpeciesProfile = null;
+            _loadedSpeciesProfilePath = null;
+            _scenarioEditor.SetLoadedSpeciesProfilePath(null);
+            _scenarioEditor.SetStatus($"Species profile load failed: {ex.Message}");
+        }
+    }
+
+    private void ExportPendingSpeciesProfileToPath(string path)
+    {
+        if (_pendingSpeciesExportCreatureId == default)
+        {
+            _scenarioEditor.SetStatus("Species export failed: no creature was selected.");
+            return;
+        }
+
+        try
+        {
+            path = SpeciesProfileJson.WithFileExtension(path);
+            var profile = SpeciesProfileExporter.ExportCreature(
+                _scenario,
+                _simulation.State,
+                _pendingSpeciesExportCreatureId,
+                _pendingSpeciesExportName,
+                _pendingSpeciesExportNotes);
+            SpeciesProfileJson.Save(path, profile);
+            _loadedSpeciesProfile = profile;
+            _loadedSpeciesProfilePath = path;
+            _scenarioEditor.SetLastSpeciesExportPath(path);
+            _scenarioEditor.SetLoadedSpeciesProfilePath(path);
+            _scenarioEditor.SetStatus($"Exported species profile {profile.Name}.");
+        }
+        catch (Exception ex)
+        {
+            _scenarioEditor.SetStatus($"Species export failed: {ex.Message}");
+        }
+        finally
+        {
+            _pendingSpeciesExportCreatureId = default;
+            _pendingSpeciesExportName = null;
+            _pendingSpeciesExportNotes = null;
+        }
+    }
+
+    private void InjectLoadedSpeciesProfile()
+    {
+        if (_loadedSpeciesProfile is null)
+        {
+            _scenarioEditor.SetStatus("Load a species profile before injecting.");
+            return;
+        }
+
+        try
+        {
+            var request = _scenarioEditor.ReadSpeciesInjectionRequest();
+            var result = SpeciesProfileInjector.Inject(
+                _simulation.State,
+                _loadedSpeciesProfile,
+                new SpeciesInjectionOptions(
+                    request.Count,
+                    request.SpawnRegion,
+                    request.EnergyOverride));
+
+            if (result.CreatureIds.Count > 0)
+            {
+                _selectedCreatureId = result.CreatureIds[0];
+                _selectedEggId = default;
+            }
+
+            InvalidateCreatureRenderCache();
+            ResetTelemetry();
+            _scenarioEditor.SetStatus(
+                $"Injected {result.CreatureIds.Count} {result.SpeciesName} founders from {System.IO.Path.GetFileName(_loadedSpeciesProfilePath ?? "profile")}.");
+        }
+        catch (Exception ex)
+        {
+            _scenarioEditor.SetStatus($"Species injection failed: {ex.Message}");
         }
     }
 
@@ -2362,6 +2498,18 @@ public partial class Main : Node2D
         };
     }
 
+    private static FileDialog CreateSpeciesProfileDialog(FileDialog.FileModeEnum mode, string title, string profileDirectory)
+    {
+        return new FileDialog
+        {
+            Title = title,
+            FileMode = mode,
+            Access = FileDialog.AccessEnum.Filesystem,
+            CurrentDir = profileDirectory,
+            Filters = [$"{SpeciesProfileJson.FilePattern};Species Profile ({SpeciesProfileJson.FileExtension})"]
+        };
+    }
+
     private static string GetRepositoryRoot()
     {
         var projectDirectory = ProjectSettings.GlobalizePath("res://");
@@ -2391,6 +2539,24 @@ public partial class Main : Node2D
         return System.IO.Path.IsPathRooted(path)
             ? System.IO.Path.GetFullPath(path)
             : System.IO.Path.GetFullPath(System.IO.Path.Combine(workspaceRoot, path));
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var sanitized = new string(value
+            .Select(character => invalid.Contains(character) ? '_' : character)
+            .ToArray())
+            .Trim();
+        return string.IsNullOrWhiteSpace(sanitized) ? "species" : sanitized;
+    }
+
+    private static string ToSpeciesProfileFileName(string value)
+    {
+        var sanitized = SanitizeFileName(value);
+        return sanitized.EndsWith(SpeciesProfileJson.FileExtension, StringComparison.OrdinalIgnoreCase)
+            ? sanitized
+            : $"{sanitized}{SpeciesProfileJson.FileExtension}";
     }
 
     private static string LastLine(string primary, string fallback)

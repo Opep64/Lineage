@@ -74,11 +74,11 @@ static void PrintHelp()
           --save-snapshot <path>     Save final simulation snapshot JSON.
           --checkpoint-interval <n>  Save loadable snapshot checkpoints every n ticks.
           --checkpoint-dir <dir>      Directory for checkpoint JSON files.
-          --inject-species <path>    Inject a species profile JSON as new founders before running. Can repeat.
+          --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
           --inject-species-count <n> Founder count per injected profile. Default: 10
           --inject-species-region <region> Spawn region for injected species. Default: uniform
           --inject-species-energy <n> Override starting energy for injected founders.
-          --export-species <path>    Export a species profile from the final living population.
+          --export-species <path>    Export a species profile, usually species/name.species.json.
           --export-species-creature <id> Export this living creature ID instead of the dominant lineage.
           --export-species-founder <id> Export a representative from this founder lineage.
           --export-species-name <text> Name for the exported species profile.

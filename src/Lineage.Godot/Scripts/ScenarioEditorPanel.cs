@@ -46,10 +46,20 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private LineEdit _cliReportInput = null!;
     private LineEdit _cliSnapshotInput = null!;
     private LineEdit _cliCheckpointDirectoryInput = null!;
+    private LineEdit _speciesNameInput = null!;
+    private LineEdit _speciesNotesInput = null!;
+    private SpinBox _speciesInjectCountInput = null!;
+    private SpinBox _speciesInjectEnergyInput = null!;
+    private OptionButton _speciesInjectRegionInput = null!;
+    private Label _loadedSpeciesLabel = null!;
+    private Label _lastSpeciesExportLabel = null!;
+    private Button _injectSpeciesButton = null!;
     private string? _lastReportPath;
     private string? _lastSnapshotPath;
     private string? _lastCheckpointPath;
     private string? _lastCheckpointDirectory;
+    private string? _loadedSpeciesProfilePath;
+    private string? _lastSpeciesExportPath;
 
     public bool IsCollapsed { get; private set; }
 
@@ -74,6 +84,12 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     public event Action<string?>? LoadCheckpointFileRequested;
 
     public event Action<string>? LoadSnapshotRequested;
+
+    public event Action? ExportSelectedSpeciesRequested;
+
+    public event Action? LoadSpeciesProfileRequested;
+
+    public event Action? InjectSpeciesRequested;
 
     public event Action? CloseRequested;
 
@@ -134,6 +150,24 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 : _cliCheckpointDirectoryInput.Text.Trim());
     }
 
+    public SpeciesInjectionUiRequest ReadSpeciesInjectionRequest()
+    {
+        var regionText = _speciesInjectRegionInput.GetItemText(_speciesInjectRegionInput.Selected);
+        return new SpeciesInjectionUiRequest(
+            Math.Max(1, (int)Math.Round(_speciesInjectCountInput.Value)),
+            Enum.Parse<InitialCreatureSpawnRegion>(regionText),
+            _speciesInjectEnergyInput.Value <= 0
+                ? null
+                : (float)_speciesInjectEnergyInput.Value);
+    }
+
+    public SpeciesExportUiRequest ReadSpeciesExportRequest()
+    {
+        return new SpeciesExportUiRequest(
+            string.IsNullOrWhiteSpace(_speciesNameInput.Text) ? null : _speciesNameInput.Text.Trim(),
+            string.IsNullOrWhiteSpace(_speciesNotesInput.Text) ? null : _speciesNotesInput.Text.Trim());
+    }
+
     public void SetStatus(string message)
     {
         _statusLabel.Text = message;
@@ -164,6 +198,19 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 ? $"No checkpoint found in {_lastCheckpointDirectory}."
                 : "No checkpoint generated yet.";
         _loadCheckpointButton.Disabled = _lastCheckpointPath is null;
+    }
+
+    public void SetLoadedSpeciesProfilePath(string? path)
+    {
+        _loadedSpeciesProfilePath = string.IsNullOrWhiteSpace(path) ? null : path;
+        _loadedSpeciesLabel.Text = _loadedSpeciesProfilePath ?? "No species profile loaded.";
+        _injectSpeciesButton.Disabled = _loadedSpeciesProfilePath is null;
+    }
+
+    public void SetLastSpeciesExportPath(string? path)
+    {
+        _lastSpeciesExportPath = string.IsNullOrWhiteSpace(path) ? null : path;
+        _lastSpeciesExportLabel.Text = _lastSpeciesExportPath ?? "No species profile exported yet.";
     }
 
     public void SetMapVisible(bool isVisible)
@@ -276,6 +323,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         tabs.AddChild(BuildScenarioTab());
         tabs.AddChild(BuildCliTab());
+        tabs.AddChild(BuildSpeciesTab());
         return margin;
     }
 
@@ -369,6 +417,62 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         var note = new Label
         {
             Text = "Run CLI reruns the edited scenario through Lineage.Cli. Export Current Run writes CSV sidecars, an HTML report, and a reloadable snapshot from the live Godot simulation.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        root.AddChild(note);
+
+        return root;
+    }
+
+    private Control BuildSpeciesTab()
+    {
+        var root = new VBoxContainer
+        {
+            Name = "Species"
+        };
+        root.AddThemeConstantOverride("separation", 8);
+
+        _speciesNameInput = new LineEdit { PlaceholderText = "Optional exported species name" };
+        _speciesNotesInput = new LineEdit { PlaceholderText = "Optional notes" };
+        _speciesInjectCountInput = CreateSpinBox(1, 10_000, step: 1, rounded: true);
+        _speciesInjectCountInput.Value = 10;
+        _speciesInjectEnergyInput = CreateSpinBox(0, 10_000, step: 1, rounded: false);
+        _speciesInjectEnergyInput.Value = 0;
+        _speciesInjectEnergyInput.TooltipText = "Use 0 for profile-derived default energy.";
+        _speciesInjectRegionInput = new OptionButton();
+        foreach (var name in Enum.GetNames<InitialCreatureSpawnRegion>())
+        {
+            _speciesInjectRegionInput.AddItem(name);
+        }
+
+        root.AddChild(CreateFieldRow("Export name", _speciesNameInput));
+        root.AddChild(CreateFieldRow("Export notes", _speciesNotesInput));
+        root.AddChild(CreateButton("Export Selected Creature", () => ExportSelectedSpeciesRequested?.Invoke()));
+        _lastSpeciesExportLabel = new Label
+        {
+            Text = "No species profile exported yet.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        root.AddChild(CreateFieldRow("Last export", _lastSpeciesExportLabel));
+
+        root.AddChild(new HSeparator());
+        root.AddChild(CreateButton("Load Species Profile", () => LoadSpeciesProfileRequested?.Invoke()));
+        _loadedSpeciesLabel = new Label
+        {
+            Text = "No species profile loaded.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        root.AddChild(CreateFieldRow("Loaded profile", _loadedSpeciesLabel));
+        root.AddChild(CreateFieldRow("Inject count", _speciesInjectCountInput));
+        root.AddChild(CreateFieldRow("Inject region", _speciesInjectRegionInput));
+        root.AddChild(CreateFieldRow("Inject energy", _speciesInjectEnergyInput));
+        _injectSpeciesButton = CreateButton("Inject Loaded Species", () => InjectSpeciesRequested?.Invoke());
+        _injectSpeciesButton.Disabled = true;
+        root.AddChild(_injectSpeciesButton);
+
+        var note = new Label
+        {
+            Text = "Export stores the selected living creature's genome and brain. Inject adds loaded profile copies as new founders in the current world.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         root.AddChild(note);
@@ -584,3 +688,12 @@ public readonly record struct CliRunRequest(
     string SnapshotPath,
     int CheckpointIntervalTicks,
     string CheckpointDirectory);
+
+public readonly record struct SpeciesInjectionUiRequest(
+    int Count,
+    InitialCreatureSpawnRegion SpawnRegion,
+    float? EnergyOverride);
+
+public readonly record struct SpeciesExportUiRequest(
+    string? Name,
+    string? Notes);
