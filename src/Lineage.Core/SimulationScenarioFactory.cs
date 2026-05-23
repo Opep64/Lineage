@@ -23,6 +23,7 @@ public static class SimulationScenarioFactory
 
         simulation.State.Biomes = CreateBiomeMap(scenario);
         simulation.State.SetObstacles(CreateObstacleMap(scenario));
+        simulation.State.SetLocalFertility(CreateLocalFertilityMap(scenario));
         SeedWorld(simulation, scenario);
         return simulation;
     }
@@ -248,6 +249,20 @@ public static class SimulationScenarioFactory
         return scenario.EnableObstacles && scenario.ObstacleMapKind != ObstacleMapKind.None
             ? ObstacleMap.Generate(bounds, scenario.ObstacleCellSize, scenario.ObstacleMapKind, scenario.Seed)
             : ObstacleMap.CreateEmpty(bounds, scenario.ObstacleCellSize);
+    }
+
+    private static LocalFertilityMap CreateLocalFertilityMap(SimulationScenario scenario)
+    {
+        var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
+        return scenario.EnableLocalFertility
+            ? LocalFertilityMap.Create(
+                bounds,
+                scenario.LocalFertilityCellSize,
+                scenario.LocalFertilityMinimumMultiplier,
+                scenario.LocalFertilityRecoveryPerSecond,
+                scenario.LocalFertilityDepletionPerPlant,
+                scenario.LocalFertilityNeighborDepletionShare)
+            : LocalFertilityMap.CreateDisabled(bounds);
     }
 
     private static int CreateSharedInitialBrainId(WorldState state, SimulationScenario scenario)

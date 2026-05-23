@@ -71,6 +71,7 @@ public static class SimulationSnapshotJson
 
         state.Biomes = snapshot.Biomes.ToMap(state.Bounds);
         state.SetObstacles(snapshot.Obstacles.ToMap(state.Bounds));
+        state.SetLocalFertility(snapshot.LocalFertility.ToMap(state.Bounds));
         state.Random.State = snapshot.RandomState;
         state.RestoreClock(snapshot.Tick, snapshot.ElapsedSeconds);
         state.RestoreNextEntityId(snapshot.NextEntityId);
@@ -156,6 +157,7 @@ public static class SimulationSnapshotJson
 
         _ = snapshot.Biomes.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         _ = snapshot.Obstacles.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
+        _ = snapshot.LocalFertility.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         return snapshot;
     }
 

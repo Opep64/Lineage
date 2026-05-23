@@ -109,6 +109,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Plant patch occupied", FormatPercent(snapshot.PlantPatchOccupiedCellShare));
         WriteMetric(writer, "Plant top-decile calories", FormatPercent(snapshot.PlantPatchTopDecileCaloriesShare));
         WriteMetric(writer, "Plant patchiness", snapshot.PlantPatchiness.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg local fertility", $"{snapshot.AverageLocalFertilityMultiplier:0.###}x");
+        WriteMetric(writer, "Min local fertility", $"{snapshot.MinimumLocalFertilityMultiplier:0.###}x");
+        WriteMetric(writer, "Depleted fertility cells", FormatPercent(snapshot.DepletedLocalFertilityCellShare));
         WriteMetric(writer, "Plant depletions", state.Stats.PlantDepletionCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant relocations", FormatPlantRelocations(state.Stats));
         WriteMetric(writer, "Avg dormancy scheduled", $"{state.Stats.AveragePlantDormancyScheduledSeconds:0.###} seconds");
@@ -299,6 +302,12 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource cluster radius", $"{scenario.ResourceClusterRadius:0.###} world units");
         WriteMetric(writer, "Plant local dispersal", FormatPercent(scenario.PlantLocalDispersalChance));
         WriteMetric(writer, "Plant local dispersal radius", $"{scenario.PlantLocalDispersalRadius:0.###} world units");
+        WriteMetric(writer, "Local fertility", scenario.EnableLocalFertility ? "Enabled" : "Disabled");
+        WriteMetric(writer, "Local fertility cell size", $"{scenario.LocalFertilityCellSize:0.###} world units");
+        WriteMetric(writer, "Local fertility minimum", $"{scenario.LocalFertilityMinimumMultiplier:0.###}x");
+        WriteMetric(writer, "Local fertility recovery", $"{scenario.LocalFertilityRecoveryPerSecond:0.######}/s");
+        WriteMetric(writer, "Local fertility depletion", $"{scenario.LocalFertilityDepletionPerPlant:0.###}x per plant");
+        WriteMetric(writer, "Local fertility spread", FormatPercent(scenario.LocalFertilityNeighborDepletionShare));
         WriteMetric(writer, "Biome season response", FormatBiomePressureProfile(scenario.CreateBiomeSeasonalAmplitudeProfile()));
         WriteMetric(writer, "Biome movement costs", FormatBiomePressureProfile(scenario.CreateBiomeMovementCostProfile()));
         WriteMetric(writer, "Biome basal costs", FormatBiomePressureProfile(scenario.CreateBiomeBasalCostProfile()));
@@ -881,6 +890,14 @@ public static class ViewerReportWriter
             new ChartSeries("Occupied cells", "#35a862", snapshots.Select(snapshot => snapshot.PlantPatchOccupiedCellShare * 100f).ToArray()),
             new ChartSeries("Top decile kcal", "#d69d2f", snapshots.Select(snapshot => snapshot.PlantPatchTopDecileCaloriesShare * 100f).ToArray()),
             new ChartSeries("Patchiness", "#8f4cb8", snapshots.Select(snapshot => snapshot.PlantPatchiness * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Local fertility",
+            "%",
+            snapshots,
+            new ChartSeries("Average", "#35a862", snapshots.Select(snapshot => snapshot.AverageLocalFertilityMultiplier * 100f).ToArray()),
+            new ChartSeries("Minimum", "#d69d2f", snapshots.Select(snapshot => snapshot.MinimumLocalFertilityMultiplier * 100f).ToArray()),
+            new ChartSeries("Depleted cells", "#8f4cb8", snapshots.Select(snapshot => snapshot.DepletedLocalFertilityCellShare * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Season fertility",

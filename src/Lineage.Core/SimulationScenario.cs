@@ -100,6 +100,18 @@ public sealed record SimulationScenario
 
     public float PlantLocalDispersalRadius { get; init; } = 220f;
 
+    public bool EnableLocalFertility { get; init; } = true;
+
+    public float LocalFertilityCellSize { get; init; } = 250f;
+
+    public float LocalFertilityMinimumMultiplier { get; init; } = 0.35f;
+
+    public float LocalFertilityRecoveryPerSecond { get; init; } = 0.00045f;
+
+    public float LocalFertilityDepletionPerPlant { get; init; } = 0.08f;
+
+    public float LocalFertilityNeighborDepletionShare { get; init; } = 0.35f;
+
     public bool EnableSeasons { get; init; }
 
     public float SeasonLengthSeconds { get; init; } = 900f;
@@ -290,6 +302,12 @@ public sealed record SimulationScenario
         {
             throw new InvalidOperationException("Plant local dispersal radius must be positive when local dispersal is enabled.");
         }
+
+        EnsurePositive(LocalFertilityCellSize, nameof(LocalFertilityCellSize));
+        EnsureRange(LocalFertilityMinimumMultiplier, 0.05f, 1f, nameof(LocalFertilityMinimumMultiplier));
+        EnsureNonNegative(LocalFertilityRecoveryPerSecond, nameof(LocalFertilityRecoveryPerSecond));
+        EnsureRange(LocalFertilityDepletionPerPlant, 0f, 1f, nameof(LocalFertilityDepletionPerPlant));
+        EnsureProbability(LocalFertilityNeighborDepletionShare, nameof(LocalFertilityNeighborDepletionShare));
 
         EnsurePositive(SeasonLengthSeconds, nameof(SeasonLengthSeconds));
         EnsureRange(SeasonFertilityAmplitude, 0f, 0.95f, nameof(SeasonFertilityAmplitude));

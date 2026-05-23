@@ -84,6 +84,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
 
     public void Update(WorldState state, float deltaSeconds)
     {
+        state.LocalFertility.Recover(deltaSeconds);
+
         var resourcesDirty = false;
         var writeIndex = 0;
         for (var readIndex = 0; readIndex < state.Resources.Count; readIndex++)
@@ -167,6 +169,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         if (resource.Calories <= 0f && HasPlantRespawnDelay)
         {
             state.Stats.RecordPlantDepletion();
+            state.LocalFertility.ApplyPlantDepletion(resource.Position);
             resource.Calories = 0f;
             if (_relocateDepletedResources)
             {
@@ -189,6 +192,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         else if (_relocateDepletedResources && resource.Calories <= 0f)
         {
             state.Stats.RecordPlantDepletion();
+            state.LocalFertility.ApplyPlantDepletion(resource.Position);
             RelocateDepletedPlant(state, ref resource);
             resourcesDirty = true;
         }
@@ -222,7 +226,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
     private float CalculatePlantFertilityMultiplier(WorldState state, SimVector2 position)
     {
         var biome = state.Biomes.GetKindAt(position);
-        return SeasonalFertility.CalculateBiomeMultiplierAt(
+        var seasonalMultiplier = SeasonalFertility.CalculateBiomeMultiplierAt(
             _enableSeasons,
             state.ElapsedSeconds,
             _seasonLengthSeconds,
@@ -233,6 +237,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             position,
             biome,
             _biomeSeasonalAmplitudeProfile);
+        return seasonalMultiplier * state.LocalFertility.GetMultiplierAt(position);
     }
 
     private bool HasPlantRespawnDelay => _plantRespawnDelaySecondsMax > 0f;

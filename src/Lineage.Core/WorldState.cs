@@ -21,6 +21,7 @@ public sealed class WorldState
         Random = new DeterministicRandom(seed);
         Biomes = BiomeMap.CreateUniform(bounds, MathF.Max(bounds.Width, bounds.Height), BiomeKind.Grassland);
         Obstacles = ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
+        LocalFertility = LocalFertilityMap.CreateDisabled(bounds);
     }
 
     public long Tick { get; private set; }
@@ -34,6 +35,8 @@ public sealed class WorldState
     public BiomeMap Biomes { get; internal set; }
 
     public ObstacleMap Obstacles { get; internal set; }
+
+    public LocalFertilityMap LocalFertility { get; internal set; }
 
     public SimulationStats Stats { get; } = new();
 
@@ -102,6 +105,16 @@ public sealed class WorldState
         }
 
         Obstacles = obstacles;
+    }
+
+    public void SetLocalFertility(LocalFertilityMap localFertility)
+    {
+        if (localFertility.Bounds.Width != Bounds.Width || localFertility.Bounds.Height != Bounds.Height)
+        {
+            throw new ArgumentException("Local fertility map bounds must match the world bounds.", nameof(localFertility));
+        }
+
+        LocalFertility = localFertility;
     }
 
     public EntityId SpawnCreature(

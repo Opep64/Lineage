@@ -90,6 +90,8 @@ public sealed record SimulationSnapshot
 
     public ObstacleSnapshot Obstacles { get; init; } = new();
 
+    public LocalFertilitySnapshot LocalFertility { get; init; } = new();
+
     public static SimulationSnapshot Capture(SimulationScenario scenario, Simulation simulation)
     {
         var state = simulation.State;
@@ -132,7 +134,8 @@ public sealed record SimulationSnapshot
             PlantDormancyCompletedSecondsTotal = state.Stats.PlantDormancyCompletedSecondsTotal,
             MaxCreatureXReached = state.Stats.MaxCreatureXReached,
             Biomes = BiomeSnapshot.Capture(state.Biomes),
-            Obstacles = ObstacleSnapshot.Capture(state.Obstacles)
+            Obstacles = ObstacleSnapshot.Capture(state.Obstacles),
+            LocalFertility = LocalFertilitySnapshot.Capture(state.LocalFertility)
         };
     }
 }
@@ -193,6 +196,60 @@ public sealed record ObstacleSnapshot
         return BlockedCells.Length == CellCountX * CellCountY
             ? ObstacleMap.CreateFromCells(bounds, CellSize, CellCountX, CellCountY, BlockedCells)
             : ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
+    }
+}
+
+public sealed record LocalFertilitySnapshot
+{
+    public bool Enabled { get; init; }
+
+    public float CellSize { get; init; } = 1f;
+
+    public int CellCountX { get; init; } = 1;
+
+    public int CellCountY { get; init; } = 1;
+
+    public float MinimumMultiplier { get; init; } = 1f;
+
+    public float RecoveryPerSecond { get; init; }
+
+    public float DepletionPerPlant { get; init; }
+
+    public float NeighborDepletionShare { get; init; }
+
+    public float[] Multipliers { get; init; } = [1f];
+
+    public static LocalFertilitySnapshot Capture(LocalFertilityMap map)
+    {
+        return new LocalFertilitySnapshot
+        {
+            Enabled = map.Enabled,
+            CellSize = map.CellSize,
+            CellCountX = map.CellCountX,
+            CellCountY = map.CellCountY,
+            MinimumMultiplier = map.MinimumMultiplier,
+            RecoveryPerSecond = map.RecoveryPerSecond,
+            DepletionPerPlant = map.DepletionPerPlant,
+            NeighborDepletionShare = map.NeighborDepletionShare,
+            Multipliers = map.GetCellsCopy()
+        };
+    }
+
+    public LocalFertilityMap ToMap(WorldBounds bounds)
+    {
+        return Multipliers.Length == CellCountX * CellCountY
+            ? LocalFertilityMap.CreateFromCells(
+                bounds,
+                Enabled,
+                CellSize,
+                CellCountX,
+                CellCountY,
+                MinimumMultiplier,
+                RecoveryPerSecond,
+                DepletionPerPlant,
+                NeighborDepletionShare,
+                Multipliers)
+            : LocalFertilityMap.CreateDisabled(bounds);
     }
 }
 

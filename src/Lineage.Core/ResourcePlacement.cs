@@ -110,9 +110,15 @@ public static class ResourcePlacement
 
     private static bool CanPlacePlant(WorldState state, SimVector2 position)
     {
-        return !state.Biomes.IsInResourceVoid(position)
-            && state.Biomes.GetResourceDensityMultiplierAt(position) > 0f
-            && !state.Obstacles.IsBlockedAt(position);
+        if (state.Biomes.IsInResourceVoid(position)
+            || state.Biomes.GetResourceDensityMultiplierAt(position) <= 0f
+            || state.Obstacles.IsBlockedAt(position))
+        {
+            return false;
+        }
+
+        var localFertility = state.LocalFertility.GetMultiplierAt(position);
+        return localFertility >= 0.999f || state.Random.NextSingle() <= localFertility;
     }
 
     private static SimVector2 SampleOpenBiomeResourcePosition(WorldState state)

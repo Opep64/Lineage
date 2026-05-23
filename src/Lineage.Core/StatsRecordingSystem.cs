@@ -632,6 +632,7 @@ public sealed class StatsRecordingSystem(
             _seasonLengthSeconds,
             _seasonFertilityAmplitude,
             _seasonPhaseOffsetSeconds);
+        var localFertilitySummary = state.LocalFertility.Summarize();
         var leftRegionSeason = CalculateRegionSeason(state, 1f / 6f);
         var middleRegionSeason = CalculateRegionSeason(state, 0.5f);
         var rightRegionSeason = CalculateRegionSeason(state, 5f / 6f);
@@ -652,6 +653,10 @@ public sealed class StatsRecordingSystem(
             plantPatchSummary.OccupiedCellShare,
             plantPatchSummary.TopDecileCaloriesShare,
             plantPatchSummary.Patchiness,
+            localFertilitySummary.CellCount,
+            localFertilitySummary.AverageMultiplier,
+            localFertilitySummary.MinimumMultiplier,
+            localFertilitySummary.DepletedCellShare,
             state.Genomes.Count,
             state.Brains.Count,
             averageBrainHiddenNodeCount,

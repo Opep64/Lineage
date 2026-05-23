@@ -21,6 +21,8 @@ var tests = new (string Name, Action Body)[]
     ("Seasonal fertility scales plant dormancy", SeasonalFertilityScalesPlantDormancy),
     ("Opposed seasonal fertility alternates world halves", OpposedSeasonalFertilityAlternatesWorldHalves),
     ("Biome seasonal response scales plant regrowth", BiomeSeasonalResponseScalesPlantRegrowth),
+    ("Local fertility recovers after plant depletion", LocalFertilityRecoversAfterPlantDepletion),
+    ("Local fertility slows plant dormancy", LocalFertilitySlowsPlantDormancy),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Depleted plants can disperse locally", DepletedPlantsCanDisperseLocally),
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
@@ -746,6 +748,78 @@ static void BiomeSeasonalResponseScalesPlantRegrowth()
     simulation.Step();
 
     AssertClose(12.5f, simulation.State.Resources[0].Calories, 0.000001, "Grassland seasonal response regrowth calories");
+}
+
+static void LocalFertilityRecoversAfterPlantDepletion()
+{
+    var map = LocalFertilityMap.Create(
+        new WorldBounds(100f, 100f),
+        cellSize: 50f,
+        minimumMultiplier: 0.4f,
+        recoveryPerSecond: 0.1f,
+        depletionPerPlant: 0.25f,
+        neighborDepletionShare: 0.5f);
+
+    map.ApplyPlantDepletion(new SimVector2(25f, 25f));
+
+    AssertClose(0.75f, map.GetMultiplierAt(new SimVector2(25f, 25f)), 0.000001, "Center fertility depletion");
+    AssertClose(0.875f, map.GetMultiplierAt(new SimVector2(75f, 25f)), 0.000001, "Neighbor fertility depletion");
+    AssertClose(0.9375f, map.GetMultiplierAt(new SimVector2(75f, 75f)), 0.000001, "Diagonal fertility depletion");
+    AssertClose(1f, map.Summarize().DepletedCellShare, 0.000001, "All cells should be recovering after corner depletion");
+
+    map.Recover(1f);
+
+    AssertClose(0.85f, map.GetMultiplierAt(new SimVector2(25f, 25f)), 0.000001, "Center fertility recovery");
+    AssertClose(0.975f, map.GetMultiplierAt(new SimVector2(75f, 25f)), 0.000001, "Neighbor fertility recovery");
+    AssertClose(1f, map.GetMultiplierAt(new SimVector2(75f, 75f)), 0.000001, "Diagonal fertility should cap at full recovery");
+}
+
+static void LocalFertilitySlowsPlantDormancy()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 122,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                plantRespawnDelaySecondsMin: 1f,
+                plantRespawnDelaySecondsMax: 1f,
+                plantRespawnCaloriesMin: 4f,
+                plantRespawnCaloriesMax: 4f)
+        ]);
+    simulation.State.SetLocalFertility(LocalFertilityMap.Create(
+        simulation.State.Bounds,
+        cellSize: 50f,
+        minimumMultiplier: 0.5f,
+        recoveryPerSecond: 0f,
+        depletionPerPlant: 0.5f,
+        neighborDepletionShare: 0f));
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(25f, 25f),
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 5f
+    });
+
+    simulation.Step();
+    AssertClose(0.5f, simulation.State.LocalFertility.GetMultiplierAt(new SimVector2(25f, 25f)), 0.000001, "Depleted local fertility");
+    AssertClose(1f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Dormancy starts at full sampled duration");
+
+    simulation.Step();
+    AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Low fertility keeps plant dormant");
+    AssertClose(0.5f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Dormancy countdown is slowed by local fertility");
+
+    simulation.Step();
+    AssertClose(4f, simulation.State.Resources[0].Calories, 0.000001, "Plant eventually respawns once slowed countdown completes");
 }
 
 static void DepletedResourcesCanRelocateBeforeRegrowing()
@@ -3729,6 +3803,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.01f, snapshot.PlantPatchOccupiedCellShare, 0.000001, "Snapshot plant occupied cell share");
     AssertClose(1f, snapshot.PlantPatchTopDecileCaloriesShare, 0.000001, "Snapshot plant top decile calorie share");
     AssertClose(9.949874f, snapshot.PlantPatchiness, 0.00001, "Snapshot plant patchiness");
+    AssertEqual(0, snapshot.LocalFertilityCellCount, "Snapshot local fertility cell count");
+    AssertClose(1f, snapshot.AverageLocalFertilityMultiplier, 0.000001, "Snapshot average local fertility");
+    AssertClose(1f, snapshot.MinimumLocalFertilityMultiplier, 0.000001, "Snapshot minimum local fertility");
+    AssertClose(0f, snapshot.DepletedLocalFertilityCellShare, 0.000001, "Snapshot depleted local fertility share");
     AssertEqual(1, snapshot.GenomeCount, "Snapshot genome count");
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
@@ -5084,6 +5162,12 @@ static void ScenarioJsonRoundTrips()
         PlantRespawnDelaySecondsMax = 34f,
         PlantLocalDispersalChance = 0.27f,
         PlantLocalDispersalRadius = 188f,
+        EnableLocalFertility = true,
+        LocalFertilityCellSize = 175f,
+        LocalFertilityMinimumMultiplier = 0.31f,
+        LocalFertilityRecoveryPerSecond = 0.0007f,
+        LocalFertilityDepletionPerPlant = 0.11f,
+        LocalFertilityNeighborDepletionShare = 0.42f,
         EnableSeasons = true,
         SeasonLengthSeconds = 480f,
         SeasonFertilityAmplitude = 0.45f,
@@ -5174,6 +5258,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
     AssertTrue(json.Contains("\"plantLocalDispersalChance\""), "JSON should serialize plant local dispersal chance");
     AssertTrue(json.Contains("\"plantLocalDispersalRadius\""), "JSON should serialize plant local dispersal radius");
+    AssertTrue(json.Contains("\"enableLocalFertility\""), "JSON should serialize local fertility toggle");
+    AssertTrue(json.Contains("\"localFertilityDepletionPerPlant\""), "JSON should serialize local fertility depletion");
     AssertTrue(json.Contains("\"enableSeasons\""), "JSON should serialize season toggle");
     AssertTrue(json.Contains("\"seasonFertilityAmplitude\""), "JSON should serialize season fertility");
     AssertTrue(json.Contains("\"seasonPhaseMode\": \"horizontalOpposed\""), "JSON should serialize season phase mode");
@@ -5214,6 +5300,12 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
     AssertClose(scenario.PlantLocalDispersalChance, roundTripped.PlantLocalDispersalChance, 0.000001, "Scenario plant local dispersal chance");
     AssertClose(scenario.PlantLocalDispersalRadius, roundTripped.PlantLocalDispersalRadius, 0.000001, "Scenario plant local dispersal radius");
+    AssertEqual(scenario.EnableLocalFertility, roundTripped.EnableLocalFertility, "Scenario local fertility toggle");
+    AssertClose(scenario.LocalFertilityCellSize, roundTripped.LocalFertilityCellSize, 0.000001, "Scenario local fertility cell size");
+    AssertClose(scenario.LocalFertilityMinimumMultiplier, roundTripped.LocalFertilityMinimumMultiplier, 0.000001, "Scenario local fertility minimum");
+    AssertClose(scenario.LocalFertilityRecoveryPerSecond, roundTripped.LocalFertilityRecoveryPerSecond, 0.000001, "Scenario local fertility recovery");
+    AssertClose(scenario.LocalFertilityDepletionPerPlant, roundTripped.LocalFertilityDepletionPerPlant, 0.000001, "Scenario local fertility depletion");
+    AssertClose(scenario.LocalFertilityNeighborDepletionShare, roundTripped.LocalFertilityNeighborDepletionShare, 0.000001, "Scenario local fertility neighbor share");
     AssertEqual(scenario.EnableSeasons, roundTripped.EnableSeasons, "Scenario season toggle");
     AssertClose(scenario.SeasonLengthSeconds, roundTripped.SeasonLengthSeconds, 0.000001, "Scenario season length");
     AssertClose(scenario.SeasonFertilityAmplitude, roundTripped.SeasonFertilityAmplitude, 0.000001, "Scenario season fertility amplitude");

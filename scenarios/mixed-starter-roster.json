@@ -4,6 +4,12 @@
   "worldSenseIntervalTicks": 4,
   "plantLocalDispersalChance": 0.35,
   "plantLocalDispersalRadius": 220,
+  "enableLocalFertility": true,
+  "localFertilityCellSize": 250,
+  "localFertilityMinimumMultiplier": 0.35,
+  "localFertilityRecoveryPerSecond": 0.00045,
+  "localFertilityDepletionPerPlant": 0.08,
+  "localFertilityNeighborDepletionShare": 0.35,
   "initialCreatureCount": 0,
   "speciesSeeds": [
     {
