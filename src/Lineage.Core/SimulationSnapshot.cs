@@ -72,6 +72,8 @@ public sealed record SimulationSnapshot
 
     public BiomeSnapshot Biomes { get; init; } = new();
 
+    public ObstacleSnapshot Obstacles { get; init; } = new();
+
     public static SimulationSnapshot Capture(SimulationScenario scenario, Simulation simulation)
     {
         var state = simulation.State;
@@ -105,7 +107,8 @@ public sealed record SimulationSnapshot
             GrasslandDeathCount = state.Stats.GrasslandDeathCount,
             RichDeathCount = state.Stats.RichDeathCount,
             MaxCreatureXReached = state.Stats.MaxCreatureXReached,
-            Biomes = BiomeSnapshot.Capture(state.Biomes)
+            Biomes = BiomeSnapshot.Capture(state.Biomes),
+            Obstacles = ObstacleSnapshot.Capture(state.Obstacles)
         };
     }
 }
@@ -137,6 +140,35 @@ public sealed record BiomeSnapshot
     public BiomeMap ToMap(WorldBounds bounds)
     {
         return BiomeMap.CreateFromCells(bounds, CellSize, CellCountX, CellCountY, Cells, ResourceVoidBorderWidth);
+    }
+}
+
+public sealed record ObstacleSnapshot
+{
+    public float CellSize { get; init; } = 1f;
+
+    public int CellCountX { get; init; } = 1;
+
+    public int CellCountY { get; init; } = 1;
+
+    public bool[] BlockedCells { get; init; } = [];
+
+    public static ObstacleSnapshot Capture(ObstacleMap map)
+    {
+        return new ObstacleSnapshot
+        {
+            CellSize = map.CellSize,
+            CellCountX = map.CellCountX,
+            CellCountY = map.CellCountY,
+            BlockedCells = map.GetCellsCopy()
+        };
+    }
+
+    public ObstacleMap ToMap(WorldBounds bounds)
+    {
+        return BlockedCells.Length == CellCountX * CellCountY
+            ? ObstacleMap.CreateFromCells(bounds, CellSize, CellCountX, CellCountY, BlockedCells)
+            : ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
     }
 }
 

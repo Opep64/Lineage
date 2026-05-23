@@ -73,6 +73,8 @@ public sealed class SimulationSensingProfile
 
     public long CreaturesSensed { get; internal set; }
 
+    public long TraitCacheCreatures { get; internal set; }
+
     public long ResourceQueries { get; internal set; }
 
     public long ResourceCandidates { get; internal set; }
@@ -105,6 +107,24 @@ public sealed class SimulationSensingProfile
 
     public long VisibleCreatureCandidates { get; internal set; }
 
+    public long CreatureCellsVisited { get; internal set; }
+
+    public long CreatureNonEmptyCellsVisited { get; internal set; }
+
+    public long CreatureDistanceRejectedCandidates { get; internal set; }
+
+    public long CreatureSelfRejectedCandidates { get; internal set; }
+
+    public long CreatureNonviableRejectedCandidates { get; internal set; }
+
+    public long CreatureRangeRejectedCandidates { get; internal set; }
+
+    public long CreatureVisionRejectedCandidates { get; internal set; }
+
+    public long CreatureBodyRadiusCacheMisses { get; internal set; }
+
+    public long ObstacleSenseSamples { get; internal set; }
+
     public long ResourceQueryTimestampTicks { get; internal set; }
 
     public long PlantResourceQueryTimestampTicks { get; internal set; }
@@ -120,6 +140,12 @@ public sealed class SimulationSensingProfile
     public long CreatureQueryTimestampTicks { get; internal set; }
 
     public long CreatureScanTimestampTicks { get; internal set; }
+
+    public long TraitCacheTimestampTicks { get; internal set; }
+
+    public long ObstacleSenseTimestampTicks { get; internal set; }
+
+    public double TraitCacheMilliseconds => ToMilliseconds(TraitCacheTimestampTicks);
 
     public double ResourceQueryMilliseconds => ToMilliseconds(ResourceQueryTimestampTicks);
 
@@ -137,18 +163,28 @@ public sealed class SimulationSensingProfile
 
     public double CreatureScanMilliseconds => ToMilliseconds(CreatureScanTimestampTicks);
 
+    public double ObstacleSenseMilliseconds => ToMilliseconds(ObstacleSenseTimestampTicks);
+
     public double TotalMeasuredMilliseconds =>
-        ResourceQueryMilliseconds
+        TraitCacheMilliseconds
+        + ResourceQueryMilliseconds
         + ResourceScanMilliseconds
         + EggQueryMilliseconds
         + EggScanMilliseconds
         + CreatureQueryMilliseconds
-        + CreatureScanMilliseconds;
+        + CreatureScanMilliseconds
+        + ObstacleSenseMilliseconds;
 
     internal void BeginUpdate(int creatureCount)
     {
         Updates++;
         CreaturesSensed += Math.Max(0, creatureCount);
+    }
+
+    internal void RecordTraitCache(int creatureCount, long elapsedTimestampTicks)
+    {
+        TraitCacheCreatures += Math.Max(0, creatureCount);
+        TraitCacheTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     internal void RecordResourceQuery(int candidateCount, long elapsedTimestampTicks)
@@ -224,10 +260,29 @@ public sealed class SimulationSensingProfile
         CreatureQueryTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
+    internal void RecordCreatureQuery(VisibleCreatureQueryResult result, long elapsedTimestampTicks)
+    {
+        RecordCreatureQuery(result.CandidateCount, elapsedTimestampTicks);
+        CreatureCellsVisited += Math.Max(0, result.CellsVisited);
+        CreatureNonEmptyCellsVisited += Math.Max(0, result.NonEmptyCellsVisited);
+        CreatureDistanceRejectedCandidates += Math.Max(0, result.DistanceRejectedCount);
+        CreatureSelfRejectedCandidates += Math.Max(0, result.SelfRejectedCount);
+        CreatureNonviableRejectedCandidates += Math.Max(0, result.NonviableRejectedCount);
+        CreatureRangeRejectedCandidates += Math.Max(0, result.RangeRejectedCount);
+        CreatureVisionRejectedCandidates += Math.Max(0, result.VisionRejectedCount);
+        CreatureBodyRadiusCacheMisses += Math.Max(0, result.BodyRadiusCacheMissCount);
+    }
+
     internal void RecordCreatureScan(int visibleCreatures, long elapsedTimestampTicks)
     {
         VisibleCreatureCandidates += Math.Max(0, visibleCreatures);
         CreatureScanTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+    }
+
+    internal void RecordObstacleSense(long elapsedTimestampTicks)
+    {
+        ObstacleSenseSamples++;
+        ObstacleSenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     private static double ToMilliseconds(long elapsedTimestampTicks)

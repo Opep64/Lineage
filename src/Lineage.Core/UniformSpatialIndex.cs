@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Lineage.Core;
 
 /// <summary>
@@ -816,55 +818,93 @@ public sealed class UniformSpatialIndex
             return VisibleCreatureQueryResult.Empty;
         }
 
+        var creatures = CollectionsMarshal.AsSpan(state.Creatures);
         var queryRadiusSquared = queryRadius * queryRadius;
+        var forwardX = forward.X;
+        var forwardY = forward.Y;
+        var squaredVisionCosThreshold = visionCosThreshold * visionCosThreshold;
         var candidateCount = 0;
         var visibleCount = 0;
         var nearestIndex = -1;
         var nearestDistanceSquared = float.PositiveInfinity;
+        var cellsVisited = 0;
+        var nonEmptyCellsVisited = 0;
+        var distanceRejectedCount = 0;
+        var selfRejectedCount = 0;
+        var nonviableRejectedCount = 0;
+        var rangeRejectedCount = 0;
+        var visionRejectedCount = 0;
+        var bodyRadiusCacheMissCount = 0;
 
         for (var cellY = minCellY; cellY <= maxCellY; cellY++)
         {
             for (var cellX = minCellX; cellX <= maxCellX; cellX++)
             {
+                cellsVisited++;
                 var cell = GetCell(cellX, cellY);
-                if (cell is null)
+                if (cell is null || cell.CreatureIndices.Count == 0)
                 {
                     continue;
                 }
 
+                nonEmptyCellsVisited++;
                 for (var i = 0; i < cell.CreatureIndices.Count; i++)
                 {
                     var otherCreatureIndex = cell.CreatureIndices[i];
-                    var otherCreature = state.Creatures[otherCreatureIndex];
-                    var toOther = otherCreature.Position - position;
-                    var distanceSquared = toOther.LengthSquared;
+                    var otherCreature = creatures[otherCreatureIndex];
+                    var toOtherX = otherCreature.Position.X - position.X;
+                    var toOtherY = otherCreature.Position.Y - position.Y;
+                    var distanceSquared = toOtherX * toOtherX + toOtherY * toOtherY;
                     if (distanceSquared > queryRadiusSquared)
                     {
+                        distanceRejectedCount++;
                         continue;
                     }
 
                     candidateCount++;
 
                     if (otherCreatureIndex == selfIndex
-                        || otherCreature.Id == selfId
-                        || otherCreature.Health <= 0f
+                        || otherCreature.Id == selfId)
+                    {
+                        selfRejectedCount++;
+                        continue;
+                    }
+
+                    if (otherCreature.Health <= 0f
                         || otherCreature.Energy <= 0f)
                     {
+                        nonviableRejectedCount++;
                         continue;
                     }
 
                     var otherRadius = bodyRadii[otherCreatureIndex];
                     if (otherRadius < 0f)
                     {
+                        bodyRadiusCacheMissCount++;
                         otherRadius = CreatureGrowth.EffectiveBodyRadius(
                             otherCreature,
                             state.GetGenome(otherCreature.GenomeId));
                         bodyRadii[otherCreatureIndex] = otherRadius;
                     }
 
-                    if (!IsWithinEdgeRange(distanceSquared, otherRadius, senseRadius)
-                        || !IsInsideVisionCone(toOther, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
+                    var maxCenterDistance = otherRadius + senseRadius;
+                    if (distanceSquared > maxCenterDistance * maxCenterDistance)
                     {
+                        rangeRejectedCount++;
+                        continue;
+                    }
+
+                    if (!IsInsideVisionCone(
+                        toOtherX,
+                        toOtherY,
+                        distanceSquared,
+                        forwardX,
+                        forwardY,
+                        hasLimitedVision,
+                        visionCosThreshold,
+                        squaredVisionCosThreshold))
+                    {
+                        visionRejectedCount++;
                         continue;
                     }
 
@@ -878,7 +918,19 @@ public sealed class UniformSpatialIndex
             }
         }
 
-        return new VisibleCreatureQueryResult(candidateCount, visibleCount, nearestIndex, nearestDistanceSquared);
+        return new VisibleCreatureQueryResult(
+            candidateCount,
+            visibleCount,
+            nearestIndex,
+            nearestDistanceSquared,
+            cellsVisited,
+            nonEmptyCellsVisited,
+            distanceRejectedCount,
+            selfRejectedCount,
+            nonviableRejectedCount,
+            rangeRejectedCount,
+            visionRejectedCount,
+            bodyRadiusCacheMissCount);
     }
 
     private void AddResourceToCells(int resourceIndex, ResourceKind kind, SimVector2 position, float radius)
@@ -1052,6 +1104,31 @@ public sealed class UniformSpatialIndex
         return forwardDot >= 0f || forwardDot * forwardDot <= thresholdSquaredDistance;
     }
 
+    private static bool IsInsideVisionCone(
+        float toTargetX,
+        float toTargetY,
+        float distanceSquared,
+        float forwardX,
+        float forwardY,
+        bool hasLimitedVision,
+        float visionCosThreshold,
+        float squaredVisionCosThreshold)
+    {
+        if (!hasLimitedVision || distanceSquared <= DirectionEpsilonSquared)
+        {
+            return true;
+        }
+
+        var forwardDot = toTargetX * forwardX + toTargetY * forwardY;
+        var thresholdSquaredDistance = squaredVisionCosThreshold * distanceSquared;
+        if (visionCosThreshold >= 0f)
+        {
+            return forwardDot >= 0f && forwardDot * forwardDot >= thresholdSquaredDistance;
+        }
+
+        return forwardDot >= 0f || forwardDot * forwardDot <= thresholdSquaredDistance;
+    }
+
     private static bool IsWithinEdgeRange(float distanceSquared, float targetRadius, float senseRadius)
     {
         var maxCenterDistance = targetRadius + senseRadius;
@@ -1171,7 +1248,15 @@ internal readonly record struct VisibleCreatureQueryResult(
     int CandidateCount,
     int VisibleCount,
     int NearestIndex,
-    float NearestDistanceSquared)
+    float NearestDistanceSquared,
+    int CellsVisited,
+    int NonEmptyCellsVisited,
+    int DistanceRejectedCount,
+    int SelfRejectedCount,
+    int NonviableRejectedCount,
+    int RangeRejectedCount,
+    int VisionRejectedCount,
+    int BodyRadiusCacheMissCount)
 {
-    public static VisibleCreatureQueryResult Empty { get; } = new(0, 0, -1, float.PositiveInfinity);
+    public static VisibleCreatureQueryResult Empty { get; } = new(0, 0, -1, float.PositiveInfinity, 0, 0, 0, 0, 0, 0, 0, 0);
 }

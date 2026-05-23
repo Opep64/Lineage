@@ -112,6 +112,26 @@ public struct CreatureSenseState
     /// </summary>
     public float RightTerrainDrag { get; set; }
 
+    /// <summary>
+    /// Hard obstacle proximity sampled a short distance in front of the creature.
+    /// </summary>
+    public float ForwardObstacle { get; set; }
+
+    /// <summary>
+    /// Hard obstacle proximity sampled a short distance to the creature's left.
+    /// </summary>
+    public float LeftObstacle { get; set; }
+
+    /// <summary>
+    /// Hard obstacle proximity sampled a short distance to the creature's right.
+    /// </summary>
+    public float RightObstacle { get; set; }
+
+    /// <summary>
+    /// Contact cue from the previous movement pass; 1 means movement was blocked by an obstacle.
+    /// </summary>
+    public float MovementBlocked { get; set; }
+
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }
 

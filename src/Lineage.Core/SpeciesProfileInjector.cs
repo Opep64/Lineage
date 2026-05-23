@@ -21,7 +21,7 @@ public static class SpeciesProfileInjector
         {
             creatureIds[i] = state.SpawnCreature(
                 genomeId,
-                RandomCreaturePosition(state, options.SpawnRegion),
+                RandomCreaturePosition(state, options.SpawnRegion, profile.Genome.BodyRadius),
                 options.Energy,
                 health: 1f,
                 generation: 0,
@@ -32,9 +32,24 @@ public static class SpeciesProfileInjector
         return new SpeciesInjectionResult(profile.Name, genomeId, brainId, creatureIds);
     }
 
-    private static SimVector2 RandomCreaturePosition(WorldState state, InitialCreatureSpawnRegion spawnRegion)
+    private static SimVector2 RandomCreaturePosition(
+        WorldState state,
+        InitialCreatureSpawnRegion spawnRegion,
+        float bodyRadius)
     {
         var bounds = ResolveCreatureSpawnBounds(state, spawnRegion);
+        for (var attempt = 0; attempt < 64; attempt++)
+        {
+            var candidate = new SimVector2(
+                RandomRange(state, bounds.Left, bounds.Right),
+                RandomRange(state, bounds.Top, bounds.Bottom));
+
+            if (!state.Obstacles.IsBlockedForCircle(candidate, bodyRadius))
+            {
+                return candidate;
+            }
+        }
+
         return new SimVector2(
             RandomRange(state, bounds.Left, bounds.Right),
             RandomRange(state, bounds.Top, bounds.Bottom));

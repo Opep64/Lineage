@@ -42,7 +42,7 @@ public static class ResourcePlacement
             }
         }
 
-        return state.Biomes.SampleResourcePosition(state.Random);
+        return SampleOpenBiomeResourcePosition(state);
     }
 
     private static bool TryGetRandomLivePlantAnchor(WorldState state, out ResourcePatchState anchor)
@@ -66,6 +66,21 @@ public static class ResourcePlacement
     private static bool CanPlacePlant(WorldState state, SimVector2 position)
     {
         return !state.Biomes.IsInResourceVoid(position)
-            && state.Biomes.GetResourceDensityMultiplierAt(position) > 0f;
+            && state.Biomes.GetResourceDensityMultiplierAt(position) > 0f
+            && !state.Obstacles.IsBlockedAt(position);
+    }
+
+    private static SimVector2 SampleOpenBiomeResourcePosition(WorldState state)
+    {
+        for (var attempt = 0; attempt < 64; attempt++)
+        {
+            var candidate = state.Biomes.SampleResourcePosition(state.Random);
+            if (CanPlacePlant(state, candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return state.Biomes.SampleResourcePosition(state.Random);
     }
 }

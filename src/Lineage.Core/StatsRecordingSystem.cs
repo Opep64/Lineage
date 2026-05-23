@@ -96,6 +96,9 @@ public sealed class StatsRecordingSystem(
         var totalBiomeMovementCostMultiplier = 0f;
         var totalBiomeBasalCostMultiplier = 0f;
         var totalBiomeSpeedMultiplier = 0f;
+        var totalForwardObstacle = 0f;
+        var totalLeftObstacle = 0f;
+        var totalRightObstacle = 0f;
         var barrenCaloriesEaten = 0f;
         var sparseCaloriesEaten = 0f;
         var grasslandCaloriesEaten = 0f;
@@ -122,6 +125,8 @@ public sealed class StatsRecordingSystem(
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
         var activeMemoryCreatureCount = 0;
+        var obstacleBlockedCreatureCount = 0;
+        var obstacleSensedCreatureCount = 0;
         var nonMemoryCreatureCount = 0;
         var memoryUserFoodContactCount = 0;
         var nonMemoryUserFoodContactCount = 0;
@@ -249,6 +254,21 @@ public sealed class StatsRecordingSystem(
             totalBiomeMovementCostMultiplier += _biomeMovementCostProfile.For(biome);
             totalBiomeBasalCostMultiplier += _biomeBasalCostProfile.For(biome);
             totalBiomeSpeedMultiplier += _biomeSpeedProfile.For(biome);
+            totalForwardObstacle += creature.Senses.ForwardObstacle;
+            totalLeftObstacle += creature.Senses.LeftObstacle;
+            totalRightObstacle += creature.Senses.RightObstacle;
+            if (creature.LastMovementBlocked)
+            {
+                obstacleBlockedCreatureCount++;
+            }
+
+            if (creature.Senses.ForwardObstacle > 0f
+                || creature.Senses.LeftObstacle > 0f
+                || creature.Senses.RightObstacle > 0f)
+            {
+                obstacleSensedCreatureCount++;
+            }
+
             AddBiomeValue(
                 biome,
                 creature.LastCaloriesEaten,
@@ -631,6 +651,11 @@ public sealed class StatsRecordingSystem(
             totalBiomeMovementCostMultiplier / divisor,
             totalBiomeBasalCostMultiplier / divisor,
             totalBiomeSpeedMultiplier / divisor,
+            obstacleBlockedCreatureCount,
+            obstacleSensedCreatureCount,
+            totalForwardObstacle / divisor,
+            totalLeftObstacle / divisor,
+            totalRightObstacle / divisor,
             barrenPlantCalories,
             sparsePlantCalories,
             grasslandPlantCalories,

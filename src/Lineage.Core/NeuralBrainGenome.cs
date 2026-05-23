@@ -27,6 +27,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutReproductiveContext = 33;
     private const int LegacyInputCountWithoutMemory = 35;
     private const int LegacyInputCountWithoutRottenMeatSensing = 38;
+    private const int LegacyInputCountWithoutObstacleSensing = 42;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
 
@@ -194,6 +195,13 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.VisibleCreatureDensityInput, -1.2f);
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
+
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.ForwardObstacleInput, -1.1f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MovementBlockedInput, -1.5f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.ForwardObstacleInput, 0.8f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.LeftObstacleInput, 1.1f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RightObstacleInput, -1.1f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MovementBlockedInput, 0.7f);
 
         SeedHiddenConceptInputs(weights, hiddenNodeCount);
 
@@ -523,6 +531,21 @@ public sealed class NeuralBrainGenome
         if (TryInferCurrentWeightLayout(weights.Length, out var hiddenNodeCount))
         {
             return (weights, hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
+            LegacyInputCountWithoutObstacleSensing,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutObstacleSensing,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
         }
 
         if (TryInferLegacyWeightLayout(

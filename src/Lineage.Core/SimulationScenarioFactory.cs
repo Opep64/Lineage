@@ -22,6 +22,7 @@ public static class SimulationScenarioFactory
             CreatePipeline(scenario));
 
         simulation.State.Biomes = CreateBiomeMap(scenario);
+        simulation.State.SetObstacles(CreateObstacleMap(scenario));
         SeedWorld(simulation, scenario);
         return simulation;
     }
@@ -188,13 +189,15 @@ public static class SimulationScenarioFactory
         var initialBrainRandom = scenario.InitialBrainKind == InitialBrainKind.RandomPerFounder
             ? new DeterministicRandom(scenario.Seed ^ InitialBrainRandomizationSalt)
             : null;
+        var initialGenome = state.GetGenome(genomeId);
+        var initialBodyRadius = initialGenome.BodyRadius;
 
         for (var i = 0; i < scenario.InitialCreatureCount; i++)
         {
             var brainId = CreateFounderBrainId(state, scenario, sharedBrainId, initialBrainRandom);
             state.SpawnCreature(
                 genomeId,
-                RandomCreaturePosition(state, scenario.InitialCreatureSpawnRegion),
+                RandomCreaturePosition(state, scenario.InitialCreatureSpawnRegion, initialBodyRadius),
                 energy: RandomRange(
                     state,
                     scenario.InitialCreatureEnergyMin,
@@ -231,6 +234,14 @@ public static class SimulationScenarioFactory
                 scenario.ResourceVoidBorderWidth),
             _ => BiomeMap.Generate(bounds, scenario.BiomeCellSize, scenario.Seed, scenario.ResourceVoidBorderWidth)
         };
+    }
+
+    private static ObstacleMap CreateObstacleMap(SimulationScenario scenario)
+    {
+        var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
+        return scenario.EnableObstacles && scenario.ObstacleMapKind != ObstacleMapKind.None
+            ? ObstacleMap.Generate(bounds, scenario.ObstacleCellSize, scenario.ObstacleMapKind, scenario.Seed)
+            : ObstacleMap.CreateEmpty(bounds, scenario.ObstacleCellSize);
     }
 
     private static int CreateSharedInitialBrainId(WorldState state, SimulationScenario scenario)
@@ -285,9 +296,24 @@ public static class SimulationScenarioFactory
         };
     }
 
-    private static SimVector2 RandomCreaturePosition(WorldState state, InitialCreatureSpawnRegion spawnRegion)
+    private static SimVector2 RandomCreaturePosition(
+        WorldState state,
+        InitialCreatureSpawnRegion spawnRegion,
+        float bodyRadius)
     {
         var bounds = ResolveCreatureSpawnBounds(state, spawnRegion);
+        for (var attempt = 0; attempt < 64; attempt++)
+        {
+            var candidate = new SimVector2(
+                RandomRange(state, bounds.Left, bounds.Right),
+                RandomRange(state, bounds.Top, bounds.Bottom));
+
+            if (!state.Obstacles.IsBlockedForCircle(candidate, bodyRadius))
+            {
+                return candidate;
+            }
+        }
+
         return new SimVector2(
             RandomRange(state, bounds.Left, bounds.Right),
             RandomRange(state, bounds.Top, bounds.Bottom));

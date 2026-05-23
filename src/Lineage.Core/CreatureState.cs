@@ -100,6 +100,11 @@ public struct CreatureState
     public float LastDistanceTraveled { get; set; }
 
     /// <summary>
+    /// True when obstacle collision prevented at least part of the most recent movement request.
+    /// </summary>
+    public bool LastMovementBlocked { get; set; }
+
+    /// <summary>
     /// World units moved since this creature last transferred calories into its gut.
     /// </summary>
     public float DistanceSinceLastMeal { get; set; }

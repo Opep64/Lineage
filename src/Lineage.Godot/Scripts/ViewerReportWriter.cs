@@ -182,6 +182,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Meat scent density", snapshot.AverageMeatScentDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rot scent density", snapshot.AverageRottenMeatScentDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible creature density", snapshot.AverageVisibleCreatureDensity.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Obstacle sensed", FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Movement blocked", FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Obstacle pressure", $"{snapshot.AverageForwardObstacle:0.###} fwd / {snapshot.AverageLeftObstacle:0.###} left / {snapshot.AverageRightObstacle:0.###} right");
         WriteMetric(writer, "Calories eaten", $"{snapshot.TotalCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Plant eaten", $"{snapshot.TotalPlantCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Carcass eaten", $"{snapshot.TotalCarcassCaloriesEatenPerSecond:0.###} raw kcal/s");
@@ -273,6 +276,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");
         WriteMetric(writer, "Biome map", scenario.BiomeMapKind.ToString());
         WriteMetric(writer, "Biome cell size", scenario.BiomeCellSize.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Obstacles", scenario.EnableObstacles ? "Enabled" : "Disabled");
+        WriteMetric(writer, "Obstacle map", scenario.ObstacleMapKind.ToString());
+        WriteMetric(writer, "Obstacle cell size", scenario.ObstacleCellSize.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Resource void border", $"{scenario.ResourceVoidBorderWidth:0.###} world units");
         WriteMetric(writer, "Resource calories", FormatRange(scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax));
         WriteMetric(writer, "Resource regrowth", $"{FormatRange(scenario.ResourceRegrowthMin, scenario.ResourceRegrowthMax)} kcal/s");
@@ -906,6 +912,15 @@ public static class ViewerReportWriter
             new ChartSeries("Smelling rot", "#7d5546", snapshots.Select(snapshot => Share(snapshot.RottenMeatScentDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Touching food", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Eating", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.EatingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Obstacle pressure",
+            "%",
+            snapshots,
+            new ChartSeries("Sensed", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Blocked", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Forward cue", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageForwardObstacle * 100f).ToArray()),
+            new ChartSeries("Side cue", "#2f7d4f", snapshots.Select(snapshot => MathF.Max(snapshot.AverageLeftObstacle, snapshot.AverageRightObstacle) * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Search Efficiency",

@@ -28,13 +28,21 @@ public sealed class MovementSystem(
             var desiredVelocity = creature.DesiredVelocity.ClampedLength(effectiveMaxSpeed);
             var biomeSpeedMultiplier = _biomeSpeedProfile.For(biome);
             var terrainAdjustedVelocity = desiredVelocity * biomeSpeedMultiplier;
-            var nextPosition = state.Bounds.Clamp(previousPosition + terrainAdjustedVelocity * deltaSeconds);
+            var intendedPosition = state.Bounds.Clamp(previousPosition + terrainAdjustedVelocity * deltaSeconds);
+            var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+            var nextPosition = ResolveObstacleMovement(
+                state,
+                previousPosition,
+                intendedPosition,
+                bodyRadius,
+                out var wasBlocked);
             var distanceTraveled = SimVector2.Distance(previousPosition, nextPosition);
 
             creature.Position = nextPosition;
             creature.MaxXReached = Math.Max(creature.MaxXReached, nextPosition.X);
             creature.Velocity = (nextPosition - previousPosition) / deltaSeconds;
             creature.LastDistanceTraveled = distanceTraveled;
+            creature.LastMovementBlocked = wasBlocked;
             creature.DistanceSinceLastMeal += distanceTraveled;
 
             var speedCostMultiplier = CalculateSpeedCostMultiplier(creature.Velocity.Length, _movementSpeedCostExponent);
@@ -60,6 +68,39 @@ public sealed class MovementSystem(
         var referenceSpeed = MathF.Max(0.000001f, CreatureGenome.Baseline.MaxSpeed);
         var speedRatio = speed / referenceSpeed;
         return MathF.Pow(speedRatio, movementSpeedCostExponent);
+    }
+
+    private static SimVector2 ResolveObstacleMovement(
+        WorldState state,
+        SimVector2 previousPosition,
+        SimVector2 intendedPosition,
+        float bodyRadius,
+        out bool wasBlocked)
+    {
+        wasBlocked = false;
+        if (!state.Obstacles.HasObstacles
+            || !state.Obstacles.IsBlockedForCircle(intendedPosition, bodyRadius))
+        {
+            return intendedPosition;
+        }
+
+        wasBlocked = true;
+
+        // Try axis-aligned fallbacks so creatures can scrape along obstacle edges
+        // instead of freezing on every shallow collision.
+        var xOnly = state.Bounds.Clamp(new SimVector2(intendedPosition.X, previousPosition.Y));
+        if (!state.Obstacles.IsBlockedForCircle(xOnly, bodyRadius))
+        {
+            return xOnly;
+        }
+
+        var yOnly = state.Bounds.Clamp(new SimVector2(previousPosition.X, intendedPosition.Y));
+        if (!state.Obstacles.IsBlockedForCircle(yOnly, bodyRadius))
+        {
+            return yOnly;
+        }
+
+        return previousPosition;
     }
 
     private static float ValidateExponent(float value, string name)

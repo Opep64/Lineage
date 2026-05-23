@@ -54,6 +54,7 @@ public partial class Main : Node2D
     private readonly Color _selectedColor = new(1.0f, 0.94f, 0.42f);
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
     private readonly Color _memoryColor = new(0.55f, 0.8f, 1.0f, 0.78f);
+    private readonly Color _obstacleColor = new(0.035f, 0.04f, 0.038f, 0.82f);
     private readonly Color _graphPopulationColor = new(0.96f, 0.78f, 0.34f);
     private readonly Color _graphResourceColor = new(0.31f, 0.82f, 0.48f);
     private readonly Color _graphDeathColor = new(0.96f, 0.32f, 0.28f);
@@ -185,6 +186,7 @@ public partial class Main : Node2D
                 DrawBiomeOverlay();
             }
 
+            DrawObstacleOverlay();
             DrawResources();
             DrawEggs();
             DrawCreatures();
@@ -783,6 +785,8 @@ public partial class Main : Node2D
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
+            $"Obstacles {FormatObstacleMapKind(_scenario.ObstacleMapKind)} cells {_simulation.State.Obstacles.BlockedCellCount}\n" +
+            $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}  fwd {snapshot.AverageForwardObstacle:0.00}\n" +
             $"Biome pop B {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} S {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} R {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
             $"Biome move {snapshot.AverageBiomeMovementCostMultiplier:0.00}x basal {snapshot.AverageBiomeBasalCostMultiplier:0.00}x speed {snapshot.AverageBiomeSpeedMultiplier:0.00}x\n" +
             $"Color {FormatColorMode(_colorMode)}\n" +
@@ -801,6 +805,7 @@ public partial class Main : Node2D
             $"Seen F {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  C {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}\n" +
             $"Attack {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.0}/s\n" +
             $"Eat {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
+            $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}";
     }
 
@@ -906,6 +911,7 @@ public partial class Main : Node2D
             $"Vision angle {ToDegrees(CreatureGrowth.EffectiveVisionAngleRadians(creature, genome)):0}deg/{ToDegrees(genome.VisionAngleRadians):0}deg\n" +
             $"Body {CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}/{genome.BodyRadius:0.0}\n" +
             $"Terrain drag now {senses.CurrentTerrainDrag:0.00}  ahead {senses.ForwardTerrainDrag:0.00}  L {senses.LeftTerrainDrag:0.00}  R {senses.RightTerrainDrag:0.00}\n" +
+            $"Obstacle fwd {senses.ForwardObstacle:0.00}  L {senses.LeftObstacle:0.00}  R {senses.RightObstacle:0.00}  blocked {senses.MovementBlocked:0.00}\n" +
             $"Eat rate {CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome):0.0}/{genome.EatCaloriesPerSecond:0.0}\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}\n" +
             $"Carrion bias {genome.CarrionAdaptation:0.00}\n" +
@@ -1752,6 +1758,41 @@ public partial class Main : Node2D
         DrawWorldRect(new BiomeCellBounds(0f, map.Bounds.Height - width, map.Bounds.Width, width), color);
         DrawWorldRect(new BiomeCellBounds(0f, width, width, middleHeight), color);
         DrawWorldRect(new BiomeCellBounds(map.Bounds.Width - width, width, width, middleHeight), color);
+    }
+
+    private void DrawObstacleOverlay()
+    {
+        var map = _simulation.State.Obstacles;
+        if (!map.HasObstacles)
+        {
+            return;
+        }
+
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                if (!map.IsBlocked(x, y))
+                {
+                    continue;
+                }
+
+                var cell = map.GetCellBounds(x, y);
+                var topLeft = ToScreen(new SimVector2(cell.X, cell.Y));
+                var bottomRight = ToScreen(new SimVector2(cell.X + cell.Width, cell.Y + cell.Height));
+                var rect = RectFromPoints(topLeft, bottomRight);
+                if (!TryClipRect(rect, _worldRect, out var clipped))
+                {
+                    continue;
+                }
+
+                DrawRect(clipped, _obstacleColor, filled: true);
+                if (clipped.Size.X > 8f && clipped.Size.Y > 8f)
+                {
+                    DrawRect(clipped, new Color(0f, 0f, 0f, 0.45f), filled: false, width: 1f);
+                }
+            }
+        }
     }
 
     private void DrawWorldRect(BiomeCellBounds worldBounds, Color color)
@@ -2740,6 +2781,17 @@ public partial class Main : Node2D
             BiomeMapKind.VerticalEdgeCorridorBands => "vertical corridor bands",
             BiomeMapKind.VerticalEdgeWideCorridorBands => "wide vertical corridor bands",
             _ => "noise"
+        };
+    }
+
+    private static string FormatObstacleMapKind(ObstacleMapKind mapKind)
+    {
+        return mapKind switch
+        {
+            ObstacleMapKind.VerticalBarrierWithGaps => "vertical barrier",
+            ObstacleMapKind.HorizontalBarrierWithGaps => "horizontal barrier",
+            ObstacleMapKind.ScatteredRocks => "scattered rocks",
+            _ => "none"
         };
     }
 

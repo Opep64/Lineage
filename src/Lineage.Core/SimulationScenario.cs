@@ -36,6 +36,12 @@ public sealed record SimulationScenario
 
     public BiomeMapKind BiomeMapKind { get; init; } = BiomeMapKind.GeneratedNoise;
 
+    public bool EnableObstacles { get; init; }
+
+    public ObstacleMapKind ObstacleMapKind { get; init; } = ObstacleMapKind.None;
+
+    public float ObstacleCellSize { get; init; } = 128f;
+
     public float WorldWidth { get; init; } = 2_000f;
 
     public float WorldHeight { get; init; } = 2_000f;
@@ -46,7 +52,7 @@ public sealed record SimulationScenario
 
     public float FixedDeltaSeconds { get; init; } = 1f / 30f;
 
-    public float SpatialCellSize { get; init; } = 192f;
+    public float SpatialCellSize { get; init; } = 64f;
 
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 
@@ -239,8 +245,10 @@ public sealed record SimulationScenario
         EnsurePositive(WorldHeight, nameof(WorldHeight));
         EnsureEnumDefined(InitialBrainKind, nameof(InitialBrainKind));
         EnsureEnumDefined(BiomeMapKind, nameof(BiomeMapKind));
+        EnsureEnumDefined(ObstacleMapKind, nameof(ObstacleMapKind));
         EnsureHiddenNodeCount(BrainHiddenNodeCount, nameof(BrainHiddenNodeCount));
         EnsurePositive(BiomeCellSize, nameof(BiomeCellSize));
+        EnsurePositive(ObstacleCellSize, nameof(ObstacleCellSize));
         EnsureNonNegative(ResourceVoidBorderWidth, nameof(ResourceVoidBorderWidth));
         EnsurePositive(FixedDeltaSeconds, nameof(FixedDeltaSeconds));
         EnsurePositive(SpatialCellSize, nameof(SpatialCellSize));

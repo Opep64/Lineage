@@ -20,6 +20,7 @@ public sealed class WorldState
         Bounds = bounds;
         Random = new DeterministicRandom(seed);
         Biomes = BiomeMap.CreateUniform(bounds, MathF.Max(bounds.Width, bounds.Height), BiomeKind.Grassland);
+        Obstacles = ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
     }
 
     public long Tick { get; private set; }
@@ -31,6 +32,8 @@ public sealed class WorldState
     public DeterministicRandom Random { get; }
 
     public BiomeMap Biomes { get; internal set; }
+
+    public ObstacleMap Obstacles { get; internal set; }
 
     public SimulationStats Stats { get; } = new();
 
@@ -89,6 +92,16 @@ public sealed class WorldState
         }
 
         return Brains[brainId];
+    }
+
+    public void SetObstacles(ObstacleMap obstacles)
+    {
+        if (obstacles.Bounds.Width != Bounds.Width || obstacles.Bounds.Height != Bounds.Height)
+        {
+            throw new ArgumentException("Obstacle map bounds must match the world bounds.", nameof(obstacles));
+        }
+
+        Obstacles = obstacles;
     }
 
     public EntityId SpawnCreature(

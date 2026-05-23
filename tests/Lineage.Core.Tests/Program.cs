@@ -9,6 +9,8 @@ var tests = new (string Name, Action Body)[]
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
+    ("Movement blocks obstacle collisions", MovementBlocksObstacleCollisions),
+    ("Movement slides along obstacle edges", MovementSlidesAlongObstacleEdges),
     ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
     ("Movement speed follows biome multiplier", MovementSpeedFollowsBiomeMultiplier),
     ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
@@ -55,6 +57,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
+    ("Creature sensing reports local obstacles", CreatureSensingReportsLocalObstacles),
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
     ("Creature sensing reports reproductive context", CreatureSensingReportsReproductiveContext),
@@ -77,6 +80,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
     ("Neural brain migrates memory inputs and outputs", NeuralBrainMigratesMemoryInputsAndOutputs),
     ("Neural brain migrates rotten meat sensing inputs", NeuralBrainMigratesRottenMeatSensingInputs),
+    ("Neural brain migrates obstacle sensing inputs", NeuralBrainMigratesObstacleSensingInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -101,6 +105,7 @@ var tests = new (string Name, Action Body)[]
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
     ("Edge corridor biome maps create harsh crossings", EdgeCorridorBiomeMapsCreateHarshCrossings),
+    ("Obstacle maps create barriers and scattered rocks", ObstacleMapsCreateBarriersAndScatteredRocks),
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
@@ -108,6 +113,7 @@ var tests = new (string Name, Action Body)[]
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
+    ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
@@ -239,6 +245,7 @@ static void SensingProfilerRecordsCandidateCounts()
 
     var sensing = simulation.Profile.Sensing;
     AssertEqual(1L, sensing.CreaturesSensed, "Sensed creature count");
+    AssertEqual(1L, sensing.TraitCacheCreatures, "Trait cache creature count");
     AssertEqual(1L, sensing.ResourceQueries, "Resource query count");
     AssertEqual(2L, sensing.ResourceCandidates, "Resource candidate count");
     AssertEqual(1L, sensing.PlantResourceQueries, "Plant resource query count");
@@ -252,6 +259,11 @@ static void SensingProfilerRecordsCandidateCounts()
     AssertEqual(1L, sensing.CreatureQueries, "Creature query count");
     AssertEqual(1L, sensing.CreatureCandidates, "Raw creature candidate count includes self");
     AssertEqual(0L, sensing.VisibleCreatureCandidates, "Visible creature count excludes self");
+    AssertTrue(sensing.CreatureCellsVisited > 0, "Creature query should record visited cells");
+    AssertTrue(sensing.CreatureNonEmptyCellsVisited > 0, "Creature query should record non-empty cells");
+    AssertEqual(1L, sensing.CreatureSelfRejectedCandidates, "Self creature reject count");
+    AssertEqual(1L, sensing.ObstacleSenseSamples, "Obstacle sense sample count");
+    AssertTrue(sensing.ObstacleSenseMilliseconds >= 0.0, "Obstacle sensing time should be non-negative");
     AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Measured sensing time should be non-negative");
 }
 
@@ -337,6 +349,88 @@ static void MovementRecordsSearchDistance()
     AssertClose(26f, moved.Position.X, 0.000001, "Movement x position");
     AssertClose(26f, moved.MaxXReached, 0.000001, "Personal max x is updated");
     AssertClose(26f, simulation.State.Stats.MaxCreatureXReached, 0.000001, "Run max x is updated");
+}
+
+static void MovementBlocksObstacleCollisions()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 220,
+        systems: [new MovementSystem()]);
+    var cells = new bool[100];
+    cells[2 * 10 + 3] = true;
+    simulation.State.SetObstacles(ObstacleMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 10f,
+        cellCountX: 10,
+        cellCountY: 10,
+        cells));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 20f,
+        BodyRadius = 1f,
+        MovementEnergyPerSecond = 0f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(25f, 25f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(10f, 0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var moved = simulation.State.Creatures[0];
+    AssertClose(25f, moved.Position.X, 0.000001, "Blocked movement x");
+    AssertClose(25f, moved.Position.Y, 0.000001, "Blocked movement y");
+    AssertClose(0f, moved.LastDistanceTraveled, 0.000001, "Blocked movement distance");
+    AssertTrue(moved.LastMovementBlocked, "Creature should record obstacle contact");
+}
+
+static void MovementSlidesAlongObstacleEdges()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 221,
+        systems: [new MovementSystem()]);
+    var cells = new bool[100];
+    cells[3 * 10 + 3] = true;
+    simulation.State.SetObstacles(ObstacleMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 10f,
+        cellCountX: 10,
+        cellCountY: 10,
+        cells));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 20f,
+        BodyRadius = 1f,
+        MovementEnergyPerSecond = 0f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(25f, 25f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(10f, 10f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var moved = simulation.State.Creatures[0];
+    AssertClose(35f, moved.Position.X, 0.000001, "Sliding movement x");
+    AssertClose(25f, moved.Position.Y, 0.000001, "Sliding movement y");
+    AssertClose(10f, moved.LastDistanceTraveled, 0.000001, "Sliding movement distance");
+    AssertTrue(moved.LastMovementBlocked, "Sliding should still record a blocked component");
 }
 
 static void MovementCostFollowsBiomeMultiplier()
@@ -2147,6 +2241,52 @@ static void CreatureSensingReportsMemoryDirection()
     AssertClose(0.75f, senses.MemoryDirectionRight, 0.000001, "Memory right direction");
 }
 
+static void CreatureSensingReportsLocalObstacles()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 0.1f
+        },
+        seed: 409,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex)
+        ]);
+    var cells = new bool[25];
+    cells[2 * 5 + 2] = true;
+    simulation.State.SetObstacles(ObstacleMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 20f,
+        cellCountX: 5,
+        cellCountY: 5,
+        cells));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        BodyRadius = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 50f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    creature.LastMovementBlocked = true;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(senses.ForwardObstacle > 0f, "Obstacle ahead should be sensed before contact");
+    AssertClose(0f, senses.LeftObstacle, 0.000001, "No obstacle left");
+    AssertClose(0f, senses.RightObstacle, 0.000001, "No obstacle right");
+    AssertClose(1f, senses.MovementBlocked, 0.000001, "Movement blocked cue");
+}
+
 static void CreatureSensingReportsEggReserveReadiness()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -2692,6 +2832,36 @@ static void NeuralBrainMigratesRottenMeatSensingInputs()
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisibleMeatFreshnessInput), 0.000001, "New visible meat freshness input starts neutral");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentDensityInput), 0.000001, "New rotten meat scent density input starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.RottenMeatScentForwardInput), 0.000001, "New hidden rotten scent direction input starts neutral");
+}
+
+static void NeuralBrainMigratesObstacleSensingInputs()
+{
+    const int legacyInputCount = 42;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 4;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.RottenMeatScentRightInput] = -0.9f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.VisibleMeatFreshnessInput] = 1.2f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MemoryRightOutput * hiddenNodeCount] = -2.1f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Obstacle sensing migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Obstacle sensing migrated weight count");
+    AssertClose(
+        -0.9f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentRightInput),
+        0.000001,
+        "Existing rot-scent direct weight remains in place");
+    AssertClose(1.2f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.VisibleMeatFreshnessInput), 0.000001, "Existing hidden freshness input remains in place");
+    AssertClose(-2.1f, brain.GetHiddenOutputWeight(NeuralBrainSchema.MemoryRightOutput, 0), 0.000001, "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.ForwardObstacleInput), 0.000001, "New obstacle forward input starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.LeftObstacleInput), 0.000001, "New obstacle left input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.MovementBlockedInput), 0.000001, "New hidden blocked input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -3334,10 +3504,14 @@ static void StatsRecordingCapturesAggregateSnapshot()
         EggReserveRatio = 0.5f,
         EnergySurplusRatio = 0.25f,
         RecentFoodSuccess = 0.75f,
-        ReproductionReadiness = 1f
+        ReproductionReadiness = 1f,
+        ForwardObstacle = 0.5f,
+        LeftObstacle = 0.25f,
+        RightObstacle = 0.1f
     };
     seeingCreature.Actions = new CreatureActionState { WantsReproduce = true };
     seeingCreature.IsTouchingFood = true;
+    seeingCreature.LastMovementBlocked = true;
     seeingCreature.LastCaloriesEaten = 4.25f;
     seeingCreature.LastPlantCaloriesEaten = 2.5f;
     seeingCreature.LastCarcassCaloriesEaten = 1f;
@@ -3372,7 +3546,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleCreatureDensity = 0.15f,
         EggReserveRatio = 0.25f,
         EnergySurplusRatio = 0.05f,
-        RecentFoodSuccess = 0.25f
+        RecentFoodSuccess = 0.25f,
+        ForwardObstacle = 0.25f,
+        LeftObstacle = 0.5f,
+        RightObstacle = 0.2f
     };
     searchingCreature.SecondsSinceLastMeal = 6f;
     searchingCreature.LastDistanceTraveled = 5f;
@@ -3411,7 +3588,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
     AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot max hidden nodes");
-    AssertClose(14.2f / 168f, snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
+    AssertClose(14.2f / (4f * NeuralBrainSchema.InputCount), snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
     AssertClose(0f, snapshot.AverageBrainHiddenOutputWeightMagnitude, 0.000001, "Snapshot hidden output weight magnitude");
     AssertClose(0f, snapshot.ActiveBrainHiddenOutputShare, 0.000001, "Snapshot active hidden output share");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
@@ -3428,6 +3605,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(1.25f, snapshot.AverageBiomeMovementCostMultiplier, 0.000001, "Average biome movement cost");
     AssertClose(1.5f, snapshot.AverageBiomeBasalCostMultiplier, 0.000001, "Average biome basal cost");
     AssertClose(0.75f, snapshot.AverageBiomeSpeedMultiplier, 0.000001, "Average biome speed");
+    AssertEqual(1, snapshot.ObstacleBlockedCreatureCount, "Obstacle blocked creature count");
+    AssertEqual(2, snapshot.ObstacleSensedCreatureCount, "Obstacle sensed creature count");
+    AssertClose(0.375f, snapshot.AverageForwardObstacle, 0.000001, "Average forward obstacle sense");
+    AssertClose(0.375f, snapshot.AverageLeftObstacle, 0.000001, "Average left obstacle sense");
+    AssertClose(0.15f, snapshot.AverageRightObstacle, 0.000001, "Average right obstacle sense");
     AssertClose(0f, snapshot.BarrenPlantCalories, 0.000001, "Barren plant calories");
     AssertClose(8f, snapshot.GrasslandPlantCalories, 0.000001, "Grassland plant calories");
     AssertClose(0f, snapshot.RichMeatCalories, 0.000001, "Rich meat calories");
@@ -3903,6 +4085,44 @@ static void EdgeCorridorBiomeMapsCreateHarshCrossings()
     AssertEqual(BiomeKind.Rich, wide.GetKind(7, 0), "Wide corridor right edge should stay rich");
 }
 
+static void ObstacleMapsCreateBarriersAndScatteredRocks()
+{
+    var vertical = ObstacleMap.Generate(
+        new WorldBounds(1_000f, 1_000f),
+        cellSize: 100f,
+        ObstacleMapKind.VerticalBarrierWithGaps,
+        seed: 61);
+
+    AssertEqual(10, vertical.CellCountX, "Vertical obstacle cell count x");
+    AssertEqual(10, vertical.CellCountY, "Vertical obstacle cell count y");
+    AssertTrue(vertical.IsBlocked(5, 0), "Vertical barrier should block its center column");
+    AssertTrue(!vertical.IsBlocked(5, 5), "Vertical barrier should leave a central gap");
+    AssertTrue(!vertical.IsBlocked(4, 0), "Vertical barrier should not block neighboring columns");
+    AssertTrue(vertical.IsBlockedAt(new SimVector2(550f, 50f)), "Point inside blocked obstacle cell");
+    AssertTrue(!vertical.IsBlockedAt(new SimVector2(550f, 550f)), "Point inside obstacle gap");
+
+    var firstScatter = ObstacleMap.Generate(
+        new WorldBounds(2_000f, 2_000f),
+        cellSize: 100f,
+        ObstacleMapKind.ScatteredRocks,
+        seed: 62);
+    var secondScatter = ObstacleMap.Generate(
+        new WorldBounds(2_000f, 2_000f),
+        cellSize: 100f,
+        ObstacleMapKind.ScatteredRocks,
+        seed: 62);
+
+    AssertTrue(firstScatter.BlockedCellCount > 0, "Scattered rocks should produce some blocked cells on a large map");
+    AssertEqual(firstScatter.BlockedCellCount, secondScatter.BlockedCellCount, "Scattered rock count should be deterministic");
+    for (var y = 0; y < firstScatter.CellCountY; y++)
+    {
+        for (var x = 0; x < firstScatter.CellCountX; x++)
+        {
+            AssertEqual(firstScatter.IsBlocked(x, y), secondScatter.IsBlocked(x, y), $"Scattered rock cell {x},{y}");
+        }
+    }
+}
+
 static void BiomeMapSamplesResourcesByDensity()
 {
     var map = BiomeMap.CreateFromCells(
@@ -4130,6 +4350,29 @@ static void ScenarioFactoryHonorsBiomeMapKind()
     AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(0, 0), "Vertical band left edge");
     AssertEqual(BiomeKind.Rich, simulation.State.Biomes.GetKind(3, 0), "Vertical band rich center");
     AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(7, 0), "Vertical band right edge");
+}
+
+static void ScenarioFactoryHonorsObstacleMapKind()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 29,
+        EnableObstacles = true,
+        ObstacleMapKind = ObstacleMapKind.VerticalBarrierWithGaps,
+        ObstacleCellSize = 100f,
+        WorldWidth = 1_000f,
+        WorldHeight = 1_000f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var disabled = SimulationScenarioFactory.CreateSimulation(scenario with { EnableObstacles = false });
+
+    AssertEqual(10, simulation.State.Obstacles.CellCountX, "Obstacle cell count x");
+    AssertTrue(simulation.State.Obstacles.IsBlocked(5, 0), "Enabled scenario should create obstacle barrier");
+    AssertTrue(!simulation.State.Obstacles.IsBlocked(5, 5), "Enabled scenario should create obstacle gap");
+    AssertEqual(0, disabled.State.Obstacles.BlockedCellCount, "Disabled scenario should create empty obstacle map");
 }
 
 static void ScenarioFactorySupportsInitialBrainKinds()
@@ -4443,6 +4686,9 @@ static void SimulationSnapshotsRestoreExactContinuation()
         WorldWidth = 500f,
         WorldHeight = 400f,
         BiomeCellSize = 125f,
+        EnableObstacles = true,
+        ObstacleMapKind = ObstacleMapKind.HorizontalBarrierWithGaps,
+        ObstacleCellSize = 100f,
         InitialCreatureCount = 8,
         InitialResourcesPerMillionArea = 80f,
         StatsSnapshotIntervalTicks = 1
@@ -4465,6 +4711,7 @@ static void SimulationSnapshotsRestoreExactContinuation()
     AssertEqual(original.State.Resources.Count, restored.State.Resources.Count, "Restored resource count");
     AssertEqual(original.State.LineageRecords.Count, restored.State.LineageRecords.Count, "Restored lineage count");
     AssertEqual(original.State.Stats.Snapshots.Count, restored.State.Stats.Snapshots.Count, "Restored snapshot count");
+    AssertEqual(original.State.Obstacles.BlockedCellCount, restored.State.Obstacles.BlockedCellCount, "Restored obstacle count");
 
     for (var i = 0; i < original.State.Creatures.Count; i++)
     {
@@ -4478,6 +4725,7 @@ static void SimulationSnapshotsRestoreExactContinuation()
         AssertClose(expected.BirthInvestmentRatio, actual.BirthInvestmentRatio, 0.000001, $"Creature {i} birth investment");
         AssertClose(expected.HeadingRadians, actual.HeadingRadians, 0.000001, $"Creature {i} heading");
         AssertClose(expected.LastDistanceTraveled, actual.LastDistanceTraveled, 0.000001, $"Creature {i} last distance");
+        AssertEqual(expected.LastMovementBlocked, actual.LastMovementBlocked, $"Creature {i} blocked movement");
         AssertClose(expected.DistanceSinceLastMeal, actual.DistanceSinceLastMeal, 0.000001, $"Creature {i} meal distance");
         AssertEqual(expected.LastDamagingCreatureId, actual.LastDamagingCreatureId, $"Creature {i} last damaging creature");
         AssertEqual(expected.GenomeId, actual.GenomeId, $"Creature {i} genome");
@@ -4651,6 +4899,9 @@ static void ScenarioJsonRoundTrips()
         BrainHiddenNodeCount = 6,
         EnableBiomes = false,
         BiomeMapKind = BiomeMapKind.HorizontalBands,
+        EnableObstacles = true,
+        ObstacleMapKind = ObstacleMapKind.ScatteredRocks,
+        ObstacleCellSize = 150f,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
         WorldWidth = 500f,
@@ -4759,6 +5010,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"brainHiddenNodeCount\": 6"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
+    AssertTrue(json.Contains("\"obstacleMapKind\": \"scatteredRocks\""), "JSON should serialize obstacle map kind as a string");
     AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
     AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
@@ -4780,6 +5032,9 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.BrainHiddenNodeCount, roundTripped.BrainHiddenNodeCount, "Scenario brain hidden nodes");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
     AssertEqual(scenario.BiomeMapKind, roundTripped.BiomeMapKind, "Scenario biome map kind");
+    AssertEqual(scenario.EnableObstacles, roundTripped.EnableObstacles, "Scenario obstacle mode");
+    AssertEqual(scenario.ObstacleMapKind, roundTripped.ObstacleMapKind, "Scenario obstacle map kind");
+    AssertClose(scenario.ObstacleCellSize, roundTripped.ObstacleCellSize, 0.000001, "Scenario obstacle cell size");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");
     AssertClose(scenario.WorldWidth, roundTripped.WorldWidth, 0.000001, "Scenario world width");

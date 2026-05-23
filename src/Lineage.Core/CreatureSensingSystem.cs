@@ -12,6 +12,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumScentStrength = 0.001f;
     private const float MinimumTerrainProbeDistance = 24f;
     private const float MaximumTerrainProbeDistance = 160f;
+    private const int ObstacleProbeSteps = 4;
     private const float MinimumExpectedFoodTransfer = 0.001f;
 
     private readonly UniformSpatialIndex _spatialIndex;
@@ -62,8 +63,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     public void Update(WorldState state, float deltaSeconds)
     {
-        BeginTraitCache(state);
         var sensingProfile = state.Profile?.Sensing;
+        var traitCacheStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        BeginTraitCache(state);
+        sensingProfile?.RecordTraitCache(
+            state.Creatures.Count,
+            Stopwatch.GetTimestamp() - traitCacheStartedAt);
         sensingProfile?.BeginUpdate(state.Creatures.Count);
 
         for (var i = 0; i < state.Creatures.Count; i++)
@@ -129,7 +136,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 visionCosThreshold,
                 _cachedBodyRadii);
             sensingProfile?.RecordCreatureQuery(
-                creatureVisibility.CandidateCount,
+                creatureVisibility,
                 Stopwatch.GetTimestamp() - creatureVisibilityStartedAt);
             sensingProfile?.RecordCreatureScan(
                 creatureVisibility.VisibleCount,
@@ -162,6 +169,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ReproductionReadiness = isReadyToLay ? 1f : 0f
             };
             ApplyTerrainDragSense(ref senses, state, creature, forward, right, effectiveSenseRadius);
+            var obstacleSenseStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
+            ApplyObstacleSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
+            sensingProfile?.RecordObstacleSense(Stopwatch.GetTimestamp() - obstacleSenseStartedAt);
             ApplyMemorySense(ref senses, creature, forward, right);
 
             var visibleFoodCount = 0;
@@ -452,6 +464,73 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.ForwardTerrainDrag = SpeedMultiplierToDrag(forwardSpeedMultiplier);
         senses.LeftTerrainDrag = SpeedMultiplierToDrag(leftSpeedMultiplier);
         senses.RightTerrainDrag = SpeedMultiplierToDrag(rightSpeedMultiplier);
+    }
+
+    private static void ApplyObstacleSense(
+        ref CreatureSenseState senses,
+        WorldState state,
+        CreatureState creature,
+        CreatureGenome genome,
+        SimVector2 forward,
+        SimVector2 right,
+        float effectiveSenseRadius)
+    {
+        senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
+
+        if (!state.Obstacles.HasObstacles)
+        {
+            return;
+        }
+
+        var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+        var probeDistance = Math.Clamp(
+            MathF.Max(effectiveSenseRadius * 0.35f, bodyRadius * 4f),
+            MinimumTerrainProbeDistance,
+            MaximumTerrainProbeDistance);
+
+        senses.ForwardObstacle = SampleObstacleProximity(
+            state.Obstacles,
+            creature.Position,
+            forward,
+            bodyRadius,
+            probeDistance);
+        senses.LeftObstacle = SampleObstacleProximity(
+            state.Obstacles,
+            creature.Position,
+            right * -1f,
+            bodyRadius,
+            probeDistance);
+        senses.RightObstacle = SampleObstacleProximity(
+            state.Obstacles,
+            creature.Position,
+            right,
+            bodyRadius,
+            probeDistance);
+    }
+
+    private static float SampleObstacleProximity(
+        ObstacleMap obstacles,
+        SimVector2 origin,
+        SimVector2 direction,
+        float bodyRadius,
+        float probeDistance)
+    {
+        var normalized = direction.Normalized();
+        if (normalized.LengthSquared <= DirectionEpsilonSquared)
+        {
+            return 0f;
+        }
+
+        for (var step = 1; step <= ObstacleProbeSteps; step++)
+        {
+            var distance = probeDistance * step / ObstacleProbeSteps;
+            if (obstacles.IsBlockedForCircle(origin + normalized * distance, bodyRadius))
+            {
+                return 1f - Math.Clamp((distance - probeDistance / ObstacleProbeSteps) / probeDistance, 0f, 1f);
+            }
+        }
+
+        return 0f;
     }
 
     private static void ApplyMemorySense(
