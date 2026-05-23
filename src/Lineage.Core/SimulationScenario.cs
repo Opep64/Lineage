@@ -106,11 +106,11 @@ public sealed record SimulationScenario
 
     public float LocalFertilityMinimumMultiplier { get; init; } = 0.35f;
 
-    public float LocalFertilityRecoveryPerSecond { get; init; } = 0.00045f;
+    public float LocalFertilityRecoveryPerSecond { get; init; } = 0.0003f;
 
-    public float LocalFertilityDepletionPerPlant { get; init; } = 0.08f;
+    public float LocalFertilityDepletionPerPlant { get; init; } = 0.12f;
 
-    public float LocalFertilityNeighborDepletionShare { get; init; } = 0.35f;
+    public float LocalFertilityNeighborDepletionShare { get; init; } = 0.55f;
 
     public bool EnableSeasons { get; init; }
 
