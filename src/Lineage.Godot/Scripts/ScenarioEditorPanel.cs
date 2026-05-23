@@ -44,10 +44,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private Button _loadCheckpointButton = null!;
     private SpinBox _cliTicksInput = null!;
     private SpinBox _cliCheckpointIntervalInput = null!;
-    private LineEdit _cliOutputInput = null!;
-    private LineEdit _cliReportInput = null!;
-    private LineEdit _cliSnapshotInput = null!;
-    private LineEdit _cliCheckpointDirectoryInput = null!;
+    private LineEdit _cliExperimentNameInput = null!;
+    private Label _cliOutputSummaryLabel = null!;
     private LineEdit _speciesNameInput = null!;
     private LineEdit _speciesNotesInput = null!;
     private SpinBox _speciesInjectCountInput = null!;
@@ -142,21 +140,17 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
     public CliRunRequest ReadCliRunRequest()
     {
+        var experimentName = SanitizeExperimentName(_cliExperimentNameInput.Text);
+        var experimentDirectory = System.IO.Path.Combine("out", experimentName);
         return new CliRunRequest(
             Math.Max(1, (int)Math.Round(_cliTicksInput.Value)),
-            string.IsNullOrWhiteSpace(_cliOutputInput.Text)
-                ? "out/godot_launcher_stats.csv"
-                : _cliOutputInput.Text.Trim(),
-            string.IsNullOrWhiteSpace(_cliReportInput.Text)
-                ? "out/godot_launcher_report.html"
-                : _cliReportInput.Text.Trim(),
-            string.IsNullOrWhiteSpace(_cliSnapshotInput.Text)
-                ? "out/godot_launcher_snapshot.json"
-                : _cliSnapshotInput.Text.Trim(),
+            experimentName,
+            System.IO.Path.Combine(experimentDirectory, $"{experimentName}_scenario.json"),
+            System.IO.Path.Combine(experimentDirectory, $"{experimentName}_stats.csv"),
+            System.IO.Path.Combine(experimentDirectory, $"{experimentName}_report.html"),
+            System.IO.Path.Combine(experimentDirectory, $"{experimentName}_snapshot.json"),
             Math.Max(0, (int)Math.Round(_cliCheckpointIntervalInput.Value)),
-            string.IsNullOrWhiteSpace(_cliCheckpointDirectoryInput.Text)
-                ? "out/godot_launcher_checkpoints"
-                : _cliCheckpointDirectoryInput.Text.Trim());
+            System.IO.Path.Combine(experimentDirectory, "checkpoints"));
     }
 
     public SpeciesInjectionUiRequest ReadSpeciesInjectionRequest()
@@ -378,19 +372,23 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         _cliTicksInput = CreateSpinBox(1, 10_000_000, step: 100, rounded: true);
         _cliTicksInput.Value = 5_000;
-        _cliOutputInput = new LineEdit { Text = "out/godot_launcher_stats.csv" };
-        _cliReportInput = new LineEdit { Text = "out/godot_launcher_report.html" };
-        _cliSnapshotInput = new LineEdit { Text = "out/godot_launcher_snapshot.json" };
+        _cliExperimentNameInput = new LineEdit
+        {
+            Text = "godot_launcher",
+            PlaceholderText = "Experiment name"
+        };
+        _cliExperimentNameInput.TextChanged += _ => UpdateCliOutputSummary();
+        _cliOutputSummaryLabel = new Label
+        {
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
         _cliCheckpointIntervalInput = CreateSpinBox(0, 10_000_000, step: 100, rounded: true);
         _cliCheckpointIntervalInput.Value = 0;
-        _cliCheckpointDirectoryInput = new LineEdit { Text = "out/godot_launcher_checkpoints" };
 
+        root.AddChild(CreateFieldRow("Experiment", _cliExperimentNameInput));
         root.AddChild(CreateFieldRow("Ticks", _cliTicksInput));
-        root.AddChild(CreateFieldRow("Stats CSV", _cliOutputInput));
-        root.AddChild(CreateFieldRow("HTML report", _cliReportInput));
-        root.AddChild(CreateFieldRow("Snapshot JSON", _cliSnapshotInput));
         root.AddChild(CreateFieldRow("Checkpoint interval", _cliCheckpointIntervalInput));
-        root.AddChild(CreateFieldRow("Checkpoint folder", _cliCheckpointDirectoryInput));
+        root.AddChild(CreateFieldRow("Outputs", _cliOutputSummaryLabel));
         root.AddChild(CreateButton("Export Current Run", () => ReportRequested?.Invoke()));
         root.AddChild(CreateButton("Load Snapshot File", () => LoadSnapshotFileRequested?.Invoke()));
         root.AddChild(CreateButton("Load Checkpoint File", () => LoadCheckpointFileRequested?.Invoke(_lastCheckpointDirectory)));
@@ -429,8 +427,25 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         root.AddChild(note);
+        UpdateCliOutputSummary();
 
         return root;
+    }
+
+    private void UpdateCliOutputSummary()
+    {
+        if (_cliOutputSummaryLabel is null)
+        {
+            return;
+        }
+
+        var request = ReadCliRunRequest();
+        _cliOutputSummaryLabel.Text =
+            $"{request.OutputPath}\n" +
+            $"{request.ReportPath}\n" +
+            $"{request.SnapshotPath}\n" +
+            $"{request.ScenarioPath}\n" +
+            $"Checkpoints: {request.CheckpointDirectory}";
     }
 
     private Control BuildSpeciesTab()
@@ -780,11 +795,28 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         return string.Join(' ', words);
     }
 
+    private static string SanitizeExperimentName(string? value)
+    {
+        var text = string.IsNullOrWhiteSpace(value)
+            ? "godot_launcher"
+            : value.Trim();
+        var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+        var chars = text
+            .Select(ch => invalidChars.Contains(ch) || ch is '/' or '\\' || char.IsWhiteSpace(ch) ? '_' : ch)
+            .ToArray();
+        var sanitized = new string(chars).Trim('_');
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? "godot_launcher"
+            : sanitized;
+    }
+
     private sealed record ScenarioFieldBinding(PropertyInfo Property, Control Editor);
 }
 
 public readonly record struct CliRunRequest(
     int Ticks,
+    string ExperimentName,
+    string ScenarioPath,
     string OutputPath,
     string ReportPath,
     string SnapshotPath,

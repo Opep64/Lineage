@@ -451,7 +451,7 @@ public partial class Main : Node2D
         var request = _scenarioEditor.ReadCliRunRequest();
         var workspaceRoot = GetRepositoryRoot();
         var cliProjectPath = System.IO.Path.Combine(workspaceRoot, "src", "Lineage.Cli", "Lineage.Cli.csproj");
-        var temporaryScenarioPath = System.IO.Path.Combine(workspaceRoot, "out", "godot_cli_scenario.json");
+        var cliScenarioPath = ResolveWorkspacePath(request.ScenarioPath, workspaceRoot);
         var outputPath = ResolveWorkspacePath(request.OutputPath, workspaceRoot);
         var reportPath = ResolveWorkspacePath(request.ReportPath, workspaceRoot);
         var snapshotPath = ResolveWorkspacePath(request.SnapshotPath, workspaceRoot);
@@ -473,7 +473,7 @@ public partial class Main : Node2D
             request.Ticks,
             workspaceRoot,
             cliProjectPath,
-            temporaryScenarioPath,
+            cliScenarioPath,
             outputPath,
             reportPath,
             snapshotPath,
