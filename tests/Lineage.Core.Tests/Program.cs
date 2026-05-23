@@ -6,6 +6,7 @@ var tests = new (string Name, Action Body)[]
     ("Simulation profiler records system timings", SimulationProfilerRecordsSystemTimings),
     ("Simulation profiler can be paused", SimulationProfilerCanBePaused),
     ("Sensing profiler records candidate counts", SensingProfilerRecordsCandidateCounts),
+    ("Creature sensing time slices world queries", CreatureSensingTimeSlicesWorldQueries),
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
@@ -246,6 +247,11 @@ static void SensingProfilerRecordsCandidateCounts()
     var sensing = simulation.Profile.Sensing;
     AssertEqual(1L, sensing.CreaturesSensed, "Sensed creature count");
     AssertEqual(1L, sensing.TraitCacheCreatures, "Trait cache creature count");
+    AssertEqual(1L, sensing.WorldSenseRefreshes, "World sense refresh count");
+    AssertEqual(1L, sensing.WorldSenseForcedRefreshes, "World sense forced refresh count");
+    AssertEqual(0L, sensing.WorldSenseSkippedUpdates, "World sense skipped count");
+    AssertTrue(sensing.CreatureSetupMilliseconds >= 0.0, "Creature setup time should be non-negative");
+    AssertTrue(sensing.InternalStateMilliseconds >= 0.0, "Internal state time should be non-negative");
     AssertEqual(1L, sensing.ResourceQueries, "Resource query count");
     AssertEqual(2L, sensing.ResourceCandidates, "Resource candidate count");
     AssertEqual(1L, sensing.PlantResourceQueries, "Plant resource query count");
@@ -262,9 +268,76 @@ static void SensingProfilerRecordsCandidateCounts()
     AssertTrue(sensing.CreatureCellsVisited > 0, "Creature query should record visited cells");
     AssertTrue(sensing.CreatureNonEmptyCellsVisited > 0, "Creature query should record non-empty cells");
     AssertEqual(1L, sensing.CreatureSelfRejectedCandidates, "Self creature reject count");
+    AssertTrue(sensing.TerrainSenseMilliseconds >= 0.0, "Terrain sensing time should be non-negative");
     AssertEqual(1L, sensing.ObstacleSenseSamples, "Obstacle sense sample count");
     AssertTrue(sensing.ObstacleSenseMilliseconds >= 0.0, "Obstacle sensing time should be non-negative");
+    AssertTrue(sensing.MemorySenseMilliseconds >= 0.0, "Memory sensing time should be non-negative");
+    AssertTrue(sensing.SenseFinalizationMilliseconds >= 0.0, "Sense finalization time should be non-negative");
     AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Measured sensing time should be non-negative");
+}
+
+static void CreatureSensingTimeSlicesWorldQueries()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 8,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 4,
+                closeSenseRefreshProximity: 0.7f)
+        ]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(90f, 20f),
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+    simulation.Step();
+    simulation.Step();
+    simulation.Step();
+
+    var sensing = simulation.Profile.Sensing;
+    AssertEqual(4L, sensing.CreaturesSensed, "Time-sliced sensed creature count");
+    AssertEqual(1L, sensing.WorldSenseForcedRefreshes, "Initial world sense refresh should be forced");
+    AssertEqual(1L, sensing.WorldSenseScheduledRefreshes, "One later world sense refresh should be scheduled");
+    AssertEqual(0L, sensing.WorldSenseCloseRefreshes, "Distant food should not trigger close refresh");
+    AssertEqual(2L, sensing.WorldSenseSkippedUpdates, "Two world sense updates should be skipped");
+    AssertEqual(2L, sensing.ResourceQueries, "Resource query count should follow world sense refreshes");
+
+    simulation.Profile = new SimulationProfile();
+    var closeCreature = simulation.State.Creatures[0];
+    var closeSenses = closeCreature.Senses;
+    closeSenses.FoodDetected = true;
+    closeSenses.FoodProximity = 0.95f;
+    closeCreature.Senses = closeSenses;
+    simulation.State.Creatures[0] = closeCreature;
+
+    simulation.Step();
+
+    var closeSensing = simulation.Profile.Sensing;
+    AssertEqual(1L, closeSensing.WorldSenseCloseRefreshes, "Close food should force a world sense refresh");
+    AssertEqual(0L, closeSensing.WorldSenseSkippedUpdates, "Close food should not skip world sensing");
+    AssertEqual(1L, closeSensing.ResourceQueries, "Close refresh should run resource query");
 }
 
 static void RandomRepeatsFromSameSeed()
@@ -2162,6 +2235,7 @@ static void CreatureSensingReportsLocalTerrainDrag()
         WorldHeight = 700f,
         BiomeCellSize = 100f,
         ResourceVoidBorderWidth = 0f,
+        WorldSenseIntervalTicks = 1,
         InitialCreatureCount = 0,
         InitialResourcesPerMillionArea = 0f,
         BarrenBiomeSpeedMultiplier = 0.5f,
@@ -4906,6 +4980,8 @@ static void ScenarioJsonRoundTrips()
         ResourceVoidBorderWidth = 25f,
         WorldWidth = 500f,
         WorldHeight = 300f,
+        WorldSenseIntervalTicks = 6,
+        CloseSenseRefreshProximity = 0.93f,
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
         InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.RightThird,
@@ -5024,6 +5100,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
+    AssertTrue(json.Contains("\"worldSenseIntervalTicks\""), "JSON should serialize world sense interval");
+    AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
@@ -5039,6 +5117,8 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");
     AssertClose(scenario.WorldWidth, roundTripped.WorldWidth, 0.000001, "Scenario world width");
     AssertClose(scenario.WorldHeight, roundTripped.WorldHeight, 0.000001, "Scenario world height");
+    AssertEqual(scenario.WorldSenseIntervalTicks, roundTripped.WorldSenseIntervalTicks, "Scenario world sense interval");
+    AssertClose(scenario.CloseSenseRefreshProximity, roundTripped.CloseSenseRefreshProximity, 0.000001, "Scenario close sense threshold");
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
     AssertEqual(scenario.InitialCreatureSpawnRegion, roundTripped.InitialCreatureSpawnRegion, "Scenario initial spawn region");

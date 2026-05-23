@@ -56,6 +56,8 @@ public static class SimulationScenarioFactory
                 scenario.MeatScentRangeMultiplier,
                 scenario.MeatScentCaloriesForFullStrength,
                 scenario.MeatScentDensitySaturation,
+                scenario.WorldSenseIntervalTicks,
+                scenario.CloseSenseRefreshProximity,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,

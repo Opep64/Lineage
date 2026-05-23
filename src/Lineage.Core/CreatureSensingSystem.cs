@@ -14,12 +14,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MaximumTerrainProbeDistance = 160f;
     private const int ObstacleProbeSteps = 4;
     private const float MinimumExpectedFoodTransfer = 0.001f;
+    public const int DefaultWorldSenseIntervalTicks = 4;
+    public const float DefaultCloseSenseRefreshProximity = 0.85f;
 
     private readonly UniformSpatialIndex _spatialIndex;
     private readonly BiomePressureProfile _biomeSpeedProfile;
+    private readonly bool _hasUniformBiomeSpeedProfile;
+    private readonly float _uniformBiomeDrag;
     private readonly float _meatScentRangeMultiplier;
     private readonly float _meatScentCaloriesForFullStrength;
     private readonly float _meatScentDensitySaturation;
+    private readonly int _worldSenseIntervalTicks;
+    private readonly float _closeSenseRefreshProximity;
 
     private readonly List<int> _plantResourceCandidates = [];
     private readonly IndexStampSet _seenPlantResourceCandidates = new();
@@ -37,7 +43,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float meatScentRangeMultiplier = 2f,
         float meatScentCaloriesForFullStrength = 60f,
         float meatScentDensitySaturation = 1f,
-        BiomePressureProfile? biomeSpeedProfile = null)
+        BiomePressureProfile? biomeSpeedProfile = null,
+        int worldSenseIntervalTicks = DefaultWorldSenseIntervalTicks,
+        float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -54,11 +62,27 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             throw new ArgumentOutOfRangeException(nameof(meatScentDensitySaturation), "Meat scent density saturation must be finite and positive.");
         }
 
+        if (worldSenseIntervalTicks <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(worldSenseIntervalTicks), "World sense interval must be positive.");
+        }
+
+        if (!float.IsFinite(closeSenseRefreshProximity) || closeSenseRefreshProximity < 0f || closeSenseRefreshProximity > 1f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(closeSenseRefreshProximity), "Close sense refresh proximity must be in [0, 1].");
+        }
+
         _spatialIndex = spatialIndex;
-        _biomeSpeedProfile = biomeSpeedProfile ?? BiomePressureProfile.Neutral;
+        _biomeSpeedProfile = BiomePressureProfile.Validate(
+            biomeSpeedProfile ?? BiomePressureProfile.Neutral,
+            nameof(biomeSpeedProfile));
+        _hasUniformBiomeSpeedProfile = HasUniformMultipliers(_biomeSpeedProfile);
+        _uniformBiomeDrag = SpeedMultiplierToDrag(_biomeSpeedProfile.Barren);
         _meatScentRangeMultiplier = meatScentRangeMultiplier;
         _meatScentCaloriesForFullStrength = meatScentCaloriesForFullStrength;
         _meatScentDensitySaturation = meatScentDensitySaturation;
+        _worldSenseIntervalTicks = worldSenseIntervalTicks;
+        _closeSenseRefreshProximity = closeSenseRefreshProximity;
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -75,6 +99,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         for (var i = 0; i < state.Creatures.Count; i++)
         {
+            var creatureSetupStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
             var creature = state.Creatures[i];
             var genome = state.GetGenome(creature.GenomeId);
             var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
@@ -88,6 +115,38 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var plantFoodEfficiency = CreatureDigestion.PlantEfficiency(genome);
             var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
             var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
+            sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
+
+            var worldSenseRefreshReason = GetWorldSenseRefreshReason(state, creature);
+            sensingProfile?.RecordWorldSenseRefresh(worldSenseRefreshReason);
+            var shouldRefreshWorldSense = worldSenseRefreshReason != WorldSenseRefreshReason.Skipped;
+            var senses = shouldRefreshWorldSense
+                ? new CreatureSenseState()
+                : creature.Senses;
+            var internalStateStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
+            ApplyInternalSense(ref senses, creature, genome, deltaSeconds);
+            sensingProfile?.RecordInternalState(Stopwatch.GetTimestamp() - internalStateStartedAt);
+
+            senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
+
+            var memorySenseStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
+            ApplyMemorySense(ref senses, creature, forward, right);
+            sensingProfile?.RecordMemorySense(Stopwatch.GetTimestamp() - memorySenseStartedAt);
+
+            if (!shouldRefreshWorldSense)
+            {
+                var skippedFinalizationStartedAt = sensingProfile is not null
+                    ? Stopwatch.GetTimestamp()
+                    : 0L;
+                creature.Senses = senses;
+                state.Creatures[i] = creature;
+                sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - skippedFinalizationStartedAt);
+                continue;
+            }
 
             var resourceQueryStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
@@ -142,39 +201,17 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 creatureVisibility.VisibleCount,
                 0L);
 
-            var energyRatio = Math.Clamp(creature.Energy / genome.ReproductionEnergyThreshold, 0f, 1f);
-            var eggReserveRatio = Math.Clamp(creature.ReproductiveEnergy / genome.OffspringEnergyInvestment, 0f, 1f);
-            var energySurplusRatio = Math.Clamp(
-                (creature.Energy - genome.ReproductionEnergyThreshold) / Math.Max(1f, genome.OffspringEnergyInvestment),
-                0f,
-                1f);
-            var expectedFoodTransfer = Math.Max(
-                MinimumExpectedFoodTransfer,
-                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * Math.Max(0f, deltaSeconds));
-            var recentFoodSuccess = Math.Clamp(
-                (creature.LastCaloriesEaten + creature.LastCaloriesDigested) / expectedFoodTransfer,
-                0f,
-                1f);
-            var isReadyToLay =
-                eggReserveRatio >= 1f
-                && creature.AgeSeconds >= genome.MaturityAgeSeconds
-                && creature.ReproductionCooldownSeconds <= 0f;
-            var senses = new CreatureSenseState
-            {
-                EnergyRatio = energyRatio,
-                Hunger = 1f - energyRatio,
-                EggReserveRatio = eggReserveRatio,
-                EnergySurplusRatio = energySurplusRatio,
-                RecentFoodSuccess = recentFoodSuccess,
-                ReproductionReadiness = isReadyToLay ? 1f : 0f
-            };
+            var terrainSenseStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
             ApplyTerrainDragSense(ref senses, state, creature, forward, right, effectiveSenseRadius);
+            sensingProfile?.RecordTerrainSense(Stopwatch.GetTimestamp() - terrainSenseStartedAt);
+
             var obstacleSenseStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
             ApplyObstacleSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
             sensingProfile?.RecordObstacleSense(Stopwatch.GetTimestamp() - obstacleSenseStartedAt);
-            ApplyMemorySense(ref senses, creature, forward, right);
 
             var visibleFoodCount = 0;
             var visiblePlantCount = 0;
@@ -361,6 +398,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 visibleEggCandidates,
                 Stopwatch.GetTimestamp() - eggScanStartedAt);
 
+            var senseFinalizationStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
             senses.VisibleFoodDensity = Math.Clamp(visibleFoodCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisiblePlantDensity = Math.Clamp(visiblePlantCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
@@ -437,7 +477,77 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             creature.Senses = senses;
             state.Creatures[i] = creature;
+            sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - senseFinalizationStartedAt);
         }
+    }
+
+    private WorldSenseRefreshReason GetWorldSenseRefreshReason(WorldState state, CreatureState creature)
+    {
+        if (_worldSenseIntervalTicks <= 1 || state.Tick == 0)
+        {
+            return WorldSenseRefreshReason.Forced;
+        }
+
+        if (NeedsCloseWorldSenseRefresh(creature))
+        {
+            return WorldSenseRefreshReason.Close;
+        }
+
+        return (state.Tick + creature.Id.Value) % _worldSenseIntervalTicks == 0
+            ? WorldSenseRefreshReason.Scheduled
+            : WorldSenseRefreshReason.Skipped;
+    }
+
+    private bool NeedsCloseWorldSenseRefresh(CreatureState creature)
+    {
+        if (creature.IsTouchingFood
+            || creature.IsTouchingCreature
+            || creature.LastMovementBlocked)
+        {
+            return true;
+        }
+
+        var senses = creature.Senses;
+        return senses.FoodProximity >= _closeSenseRefreshProximity
+            || senses.PlantProximity >= _closeSenseRefreshProximity
+            || senses.MeatProximity >= _closeSenseRefreshProximity
+            || senses.CreatureProximity >= _closeSenseRefreshProximity
+            || senses.PreyProximity >= _closeSenseRefreshProximity
+            || senses.ForwardObstacle >= _closeSenseRefreshProximity
+            || senses.LeftObstacle >= _closeSenseRefreshProximity
+            || senses.RightObstacle >= _closeSenseRefreshProximity;
+    }
+
+    private static void ApplyInternalSense(
+        ref CreatureSenseState senses,
+        CreatureState creature,
+        CreatureGenome genome,
+        float deltaSeconds)
+    {
+        var energyRatio = Math.Clamp(creature.Energy / genome.ReproductionEnergyThreshold, 0f, 1f);
+        var eggReserveRatio = Math.Clamp(creature.ReproductiveEnergy / genome.OffspringEnergyInvestment, 0f, 1f);
+        var energySurplusRatio = Math.Clamp(
+            (creature.Energy - genome.ReproductionEnergyThreshold) / Math.Max(1f, genome.OffspringEnergyInvestment),
+            0f,
+            1f);
+        var expectedFoodTransfer = Math.Max(
+            MinimumExpectedFoodTransfer,
+            CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * Math.Max(0f, deltaSeconds));
+        var recentFoodSuccess = Math.Clamp(
+            (creature.LastCaloriesEaten + creature.LastCaloriesDigested) / expectedFoodTransfer,
+            0f,
+            1f);
+        var isReadyToLay =
+            eggReserveRatio >= 1f
+            && creature.AgeSeconds >= genome.MaturityAgeSeconds
+            && creature.ReproductionCooldownSeconds <= 0f;
+
+        senses.EnergyRatio = energyRatio;
+        senses.Hunger = 1f - energyRatio;
+        senses.EggReserveRatio = eggReserveRatio;
+        senses.EnergySurplusRatio = energySurplusRatio;
+        senses.RecentFoodSuccess = recentFoodSuccess;
+        senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
     }
 
     private void ApplyTerrainDragSense(
@@ -448,6 +558,19 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         SimVector2 right,
         float effectiveSenseRadius)
     {
+        if (_hasUniformBiomeSpeedProfile)
+        {
+            if (_uniformBiomeDrag != 0f)
+            {
+                senses.CurrentTerrainDrag = _uniformBiomeDrag;
+                senses.ForwardTerrainDrag = _uniformBiomeDrag;
+                senses.LeftTerrainDrag = _uniformBiomeDrag;
+                senses.RightTerrainDrag = _uniformBiomeDrag;
+            }
+
+            return;
+        }
+
         var currentSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(creature.Position));
         var probeDistance = Math.Clamp(
             effectiveSenseRadius * 0.5f,
@@ -515,8 +638,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float bodyRadius,
         float probeDistance)
     {
-        var normalized = direction.Normalized();
-        if (normalized.LengthSquared <= DirectionEpsilonSquared)
+        if (direction.LengthSquared <= DirectionEpsilonSquared)
         {
             return 0f;
         }
@@ -524,7 +646,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         for (var step = 1; step <= ObstacleProbeSteps; step++)
         {
             var distance = probeDistance * step / ObstacleProbeSteps;
-            if (obstacles.IsBlockedForCircle(origin + normalized * distance, bodyRadius))
+            if (obstacles.IsBlockedForCircle(origin + direction * distance, bodyRadius))
             {
                 return 1f - Math.Clamp((distance - probeDistance / ObstacleProbeSteps) / probeDistance, 0f, 1f);
             }
@@ -539,6 +661,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         SimVector2 forward,
         SimVector2 right)
     {
+        senses.MemoryStrength = 0f;
+        senses.MemoryDirectionForward = 0f;
+        senses.MemoryDirectionRight = 0f;
+
         var memory = creature.MemoryVector.ClampedLength(1f);
         var memoryStrength = Math.Clamp(memory.Length, 0f, 1f);
         if (memoryStrength <= 0.000001f)
@@ -554,6 +680,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private static float SpeedMultiplierToDrag(float speedMultiplier)
     {
         return Math.Clamp(1f - speedMultiplier, -1f, 1f);
+    }
+
+    private static bool HasUniformMultipliers(BiomePressureProfile profile)
+    {
+        const float epsilon = 0.000001f;
+        return Math.Abs(profile.Barren - profile.Sparse) <= epsilon
+            && Math.Abs(profile.Barren - profile.Grassland) <= epsilon
+            && Math.Abs(profile.Barren - profile.Rich) <= epsilon;
     }
 
     private void ApplyMeatScentSense(

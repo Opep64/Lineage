@@ -75,6 +75,16 @@ public sealed class SimulationSensingProfile
 
     public long TraitCacheCreatures { get; internal set; }
 
+    public long WorldSenseRefreshes { get; internal set; }
+
+    public long WorldSenseScheduledRefreshes { get; internal set; }
+
+    public long WorldSenseCloseRefreshes { get; internal set; }
+
+    public long WorldSenseForcedRefreshes { get; internal set; }
+
+    public long WorldSenseSkippedUpdates { get; internal set; }
+
     public long ResourceQueries { get; internal set; }
 
     public long ResourceCandidates { get; internal set; }
@@ -143,9 +153,29 @@ public sealed class SimulationSensingProfile
 
     public long TraitCacheTimestampTicks { get; internal set; }
 
+    public long CreatureSetupTimestampTicks { get; internal set; }
+
+    public long InternalStateTimestampTicks { get; internal set; }
+
+    public long TerrainSenseTimestampTicks { get; internal set; }
+
+    public long MemorySenseTimestampTicks { get; internal set; }
+
+    public long SenseFinalizationTimestampTicks { get; internal set; }
+
     public long ObstacleSenseTimestampTicks { get; internal set; }
 
     public double TraitCacheMilliseconds => ToMilliseconds(TraitCacheTimestampTicks);
+
+    public double CreatureSetupMilliseconds => ToMilliseconds(CreatureSetupTimestampTicks);
+
+    public double InternalStateMilliseconds => ToMilliseconds(InternalStateTimestampTicks);
+
+    public double TerrainSenseMilliseconds => ToMilliseconds(TerrainSenseTimestampTicks);
+
+    public double MemorySenseMilliseconds => ToMilliseconds(MemorySenseTimestampTicks);
+
+    public double SenseFinalizationMilliseconds => ToMilliseconds(SenseFinalizationTimestampTicks);
 
     public double ResourceQueryMilliseconds => ToMilliseconds(ResourceQueryTimestampTicks);
 
@@ -167,6 +197,11 @@ public sealed class SimulationSensingProfile
 
     public double TotalMeasuredMilliseconds =>
         TraitCacheMilliseconds
+        + CreatureSetupMilliseconds
+        + InternalStateMilliseconds
+        + TerrainSenseMilliseconds
+        + MemorySenseMilliseconds
+        + SenseFinalizationMilliseconds
         + ResourceQueryMilliseconds
         + ResourceScanMilliseconds
         + EggQueryMilliseconds
@@ -185,6 +220,55 @@ public sealed class SimulationSensingProfile
     {
         TraitCacheCreatures += Math.Max(0, creatureCount);
         TraitCacheTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+    }
+
+    internal void RecordWorldSenseRefresh(WorldSenseRefreshReason reason)
+    {
+        switch (reason)
+        {
+            case WorldSenseRefreshReason.Skipped:
+                WorldSenseSkippedUpdates++;
+                break;
+            case WorldSenseRefreshReason.Close:
+                WorldSenseRefreshes++;
+                WorldSenseCloseRefreshes++;
+                break;
+            case WorldSenseRefreshReason.Scheduled:
+                WorldSenseRefreshes++;
+                WorldSenseScheduledRefreshes++;
+                break;
+            case WorldSenseRefreshReason.Forced:
+                WorldSenseRefreshes++;
+                WorldSenseForcedRefreshes++;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unsupported world sense refresh reason.");
+        }
+    }
+
+    internal void RecordCreatureSetup(long elapsedTimestampTicks)
+    {
+        CreatureSetupTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+    }
+
+    internal void RecordInternalState(long elapsedTimestampTicks)
+    {
+        InternalStateTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+    }
+
+    internal void RecordTerrainSense(long elapsedTimestampTicks)
+    {
+        TerrainSenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+    }
+
+    internal void RecordMemorySense(long elapsedTimestampTicks)
+    {
+        MemorySenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+    }
+
+    internal void RecordSenseFinalization(long elapsedTimestampTicks)
+    {
+        SenseFinalizationTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     internal void RecordResourceQuery(int candidateCount, long elapsedTimestampTicks)
@@ -289,4 +373,12 @@ public sealed class SimulationSensingProfile
     {
         return elapsedTimestampTicks * 1000.0 / Stopwatch.Frequency;
     }
+}
+
+internal enum WorldSenseRefreshReason
+{
+    Skipped,
+    Scheduled,
+    Close,
+    Forced
 }

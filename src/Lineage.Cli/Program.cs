@@ -639,6 +639,13 @@ static void PrintSensingProfileSummary(SimulationSensingProfile profile)
     Console.WriteLine(
         $"  Trait cache: {profile.TraitCacheMilliseconds:0.000}ms, {FormatAverage(profile.TraitCacheCreatures, profile.Updates):0.00} creatures/update");
     Console.WriteLine(
+        $"  World sense refreshes: {profile.WorldSenseRefreshes} refreshed, {profile.WorldSenseSkippedUpdates} skipped"
+        + $" (scheduled {profile.WorldSenseScheduledRefreshes}, close {profile.WorldSenseCloseRefreshes}, forced {profile.WorldSenseForcedRefreshes})");
+    Console.WriteLine(
+        $"  Creature setup: {profile.CreatureSetupMilliseconds:0.000}ms");
+    Console.WriteLine(
+        $"  Internal state: {profile.InternalStateMilliseconds:0.000}ms");
+    Console.WriteLine(
         $"  Resource query: {profile.ResourceQueryMilliseconds:0.000}ms, {FormatAverage(profile.ResourceCandidates, profile.ResourceQueries):0.00} candidates/query");
     Console.WriteLine(
         $"    Plant candidates: {FormatAverage(profile.PlantResourceQueryCandidates, profile.PlantResourceQueries):0.00}/query");
@@ -657,7 +664,13 @@ static void PrintSensingProfileSummary(SimulationSensingProfile profile)
     Console.WriteLine(
         $"    Body radius cache misses: {profile.CreatureBodyRadiusCacheMisses}");
     Console.WriteLine(
+        $"  Terrain sense: {profile.TerrainSenseMilliseconds:0.000}ms");
+    Console.WriteLine(
         $"  Obstacle sense: {profile.ObstacleSenseMilliseconds:0.000}ms, avg {FormatAverage((long)(profile.ObstacleSenseMilliseconds * 1000.0), profile.ObstacleSenseSamples):0.00}us/creature");
+    Console.WriteLine(
+        $"  Memory sense: {profile.MemorySenseMilliseconds:0.000}ms");
+    Console.WriteLine(
+        $"  Sense finalization: {profile.SenseFinalizationMilliseconds:0.000}ms");
 }
 
 static double FormatAverage(long numerator, long denominator)
@@ -2924,7 +2937,7 @@ internal static class SensingProfileCsvWriter
     public static void Write(string path, SimulationSensingProfile profile)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("phase,queries,candidates,plant_candidates,meat_candidates,visible,total_ms,avg_candidates_per_query,avg_ms_per_query,cells_visited,non_empty_cells,distance_rejects,self_rejects,nonviable_rejects,range_rejects,vision_rejects,body_radius_cache_misses");
+        writer.WriteLine("phase,queries,candidates,plant_candidates,meat_candidates,visible,total_ms,avg_candidates_per_query,avg_ms_per_query,cells_visited,non_empty_cells,distance_rejects,self_rejects,nonviable_rejects,range_rejects,vision_rejects,body_radius_cache_misses,scheduled_refreshes,close_refreshes,forced_refreshes,skipped_updates");
         WriteRow(
             writer,
             "trait_cache",
@@ -2944,11 +2957,66 @@ internal static class SensingProfileCsvWriter
             0);
         WriteRow(
             writer,
+            "world_sense_refresh",
+            profile.CreaturesSensed,
+            profile.WorldSenseRefreshes,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            scheduledRefreshes: profile.WorldSenseScheduledRefreshes,
+            closeRefreshes: profile.WorldSenseCloseRefreshes,
+            forcedRefreshes: profile.WorldSenseForcedRefreshes,
+            skippedUpdates: profile.WorldSenseSkippedUpdates);
+        WriteRow(
+            writer,
+            "creature_setup",
+            profile.CreaturesSensed,
+            profile.CreaturesSensed,
+            0,
+            0,
+            0,
+            profile.CreatureSetupMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "internal_state",
+            profile.CreaturesSensed,
+            profile.CreaturesSensed,
+            0,
+            0,
+            0,
+            profile.InternalStateMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
             "resource_query",
             profile.ResourceQueries,
             profile.ResourceCandidates,
-            profile.PlantCandidates,
-            profile.MeatResourceCandidates,
+            profile.PlantResourceQueryCandidates,
+            profile.MeatResourceQueryCandidates,
             profile.VisiblePlantCandidates + profile.VisibleMeatResourceCandidates,
             profile.ResourceQueryMilliseconds,
             0,
@@ -3046,6 +3114,23 @@ internal static class SensingProfileCsvWriter
             0);
         WriteRow(
             writer,
+            "terrain_sense",
+            profile.CreaturesSensed,
+            profile.CreaturesSensed,
+            0,
+            0,
+            0,
+            profile.TerrainSenseMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
             "obstacle_sense",
             profile.ObstacleSenseSamples,
             0,
@@ -3053,6 +3138,40 @@ internal static class SensingProfileCsvWriter
             0,
             0,
             profile.ObstacleSenseMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "memory_sense",
+            profile.CreaturesSensed,
+            profile.CreaturesSensed,
+            0,
+            0,
+            0,
+            profile.MemorySenseMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "sense_finalization",
+            profile.CreaturesSensed,
+            profile.CreaturesSensed,
+            0,
+            0,
+            0,
+            profile.SenseFinalizationMilliseconds,
             0,
             0,
             0,
@@ -3079,7 +3198,11 @@ internal static class SensingProfileCsvWriter
         long nonviableRejects,
         long rangeRejects,
         long visionRejects,
-        long bodyRadiusCacheMisses)
+        long bodyRadiusCacheMisses,
+        long scheduledRefreshes = 0,
+        long closeRefreshes = 0,
+        long forcedRefreshes = 0,
+        long skippedUpdates = 0)
     {
         var averageCandidates = queries > 0
             ? candidates / (double)queries
@@ -3106,7 +3229,11 @@ internal static class SensingProfileCsvWriter
             nonviableRejects.ToString(CultureInfo.InvariantCulture),
             rangeRejects.ToString(CultureInfo.InvariantCulture),
             visionRejects.ToString(CultureInfo.InvariantCulture),
-            bodyRadiusCacheMisses.ToString(CultureInfo.InvariantCulture)));
+            bodyRadiusCacheMisses.ToString(CultureInfo.InvariantCulture),
+            scheduledRefreshes.ToString(CultureInfo.InvariantCulture),
+            closeRefreshes.ToString(CultureInfo.InvariantCulture),
+            forcedRefreshes.ToString(CultureInfo.InvariantCulture),
+            skippedUpdates.ToString(CultureInfo.InvariantCulture)));
     }
 }
 

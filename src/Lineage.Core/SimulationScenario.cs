@@ -54,6 +54,10 @@ public sealed record SimulationScenario
 
     public float SpatialCellSize { get; init; } = 64f;
 
+    public int WorldSenseIntervalTicks { get; init; } = CreatureSensingSystem.DefaultWorldSenseIntervalTicks;
+
+    public float CloseSenseRefreshProximity { get; init; } = CreatureSensingSystem.DefaultCloseSenseRefreshProximity;
+
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 
     public int InitialCreatureCount { get; init; } = 80;
@@ -252,6 +256,8 @@ public sealed record SimulationScenario
         EnsureNonNegative(ResourceVoidBorderWidth, nameof(ResourceVoidBorderWidth));
         EnsurePositive(FixedDeltaSeconds, nameof(FixedDeltaSeconds));
         EnsurePositive(SpatialCellSize, nameof(SpatialCellSize));
+        EnsurePositive(WorldSenseIntervalTicks, nameof(WorldSenseIntervalTicks));
+        EnsureRange(CloseSenseRefreshProximity, 0f, 1f, nameof(CloseSenseRefreshProximity));
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsureNonNegative(InitialCreatureCount, nameof(InitialCreatureCount));
         EnsureEnumDefined(InitialCreatureSpawnRegion, nameof(InitialCreatureSpawnRegion));
