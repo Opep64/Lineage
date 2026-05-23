@@ -53,6 +53,7 @@ public partial class Main : Node2D
     private readonly Color _creatureColor = new(0.82f, 0.73f, 0.48f);
     private readonly Color _selectedColor = new(1.0f, 0.94f, 0.42f);
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
+    private readonly Color _memoryColor = new(0.55f, 0.8f, 1.0f, 0.78f);
     private readonly Color _graphPopulationColor = new(0.96f, 0.78f, 0.34f);
     private readonly Color _graphResourceColor = new(0.31f, 0.82f, 0.48f);
     private readonly Color _graphDeathColor = new(0.96f, 0.32f, 0.28f);
@@ -917,6 +918,8 @@ public partial class Main : Node2D
             $"Damage resist {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Energy surplus {senses.EnergySurplusRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
+            $"Memory {senses.MemoryStrength:0.00}  fwd {senses.MemoryDirectionForward:0.00}  right {senses.MemoryDirectionRight:0.00}\n" +
+            $"Memory write fwd {creature.Actions.MemoryForward:0.00}  right {creature.Actions.MemoryRight:0.00}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +
             $"Lay ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}\n" +
             $"Egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
@@ -1462,8 +1465,24 @@ public partial class Main : Node2D
     {
         DrawVisionCone(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
+        DrawSelectedMemoryVector(creature, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
+    }
+
+    private void DrawSelectedMemoryVector(CreatureState creature, Vector2 screenPosition)
+    {
+        var memory = creature.MemoryVector.ClampedLength(1f);
+        var strength = memory.Length;
+        if (strength <= 0.02f)
+        {
+            return;
+        }
+
+        var direction = ToGodot(memory.Normalized());
+        var end = screenPosition + direction * (28f + 46f * strength);
+        DrawLine(screenPosition, end, _memoryColor, width: 2f);
+        DrawCircle(end, 3f + 2f * strength, _memoryColor);
     }
 
     private void DrawSelectedEggOverlay()

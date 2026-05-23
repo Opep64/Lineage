@@ -25,7 +25,9 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutTerrainDrag = 29;
     private const int LegacyInputCountWithoutLateralTerrainDrag = 31;
     private const int LegacyInputCountWithoutReproductiveContext = 33;
+    private const int LegacyInputCountWithoutMemory = 35;
     private const int LegacyOutputCountWithoutAttack = 4;
+    private const int LegacyOutputCountWithoutMemory = 5;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
     {
@@ -500,52 +502,67 @@ public sealed class NeuralBrainGenome
             return (weights, hiddenNodeCount);
         }
 
-        if (weights.Length == LegacyInputCountWithoutReproductiveContext * NeuralBrainSchema.OutputCount)
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
+            LegacyInputCountWithoutMemory,
+            LegacyOutputCountWithoutMemory,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutMemory,
+                LegacyOutputCountWithoutMemory,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (weights.Length == LegacyInputCountWithoutReproductiveContext * LegacyOutputCountWithoutMemory)
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutReproductiveContext,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutMemory,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
                 oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
-        if (weights.Length == LegacyInputCountWithoutLateralTerrainDrag * NeuralBrainSchema.OutputCount)
+        if (weights.Length == LegacyInputCountWithoutLateralTerrainDrag * LegacyOutputCountWithoutMemory)
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutLateralTerrainDrag,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutMemory,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
                 oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
-        if (weights.Length == LegacyInputCountWithoutTerrainDrag * NeuralBrainSchema.OutputCount)
+        if (weights.Length == LegacyInputCountWithoutTerrainDrag * LegacyOutputCountWithoutMemory)
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutTerrainDrag,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutMemory,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
                 oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
-        if (weights.Length == LegacyInputCountWithoutCreatureRelations * NeuralBrainSchema.OutputCount)
+        if (weights.Length == LegacyInputCountWithoutCreatureRelations * LegacyOutputCountWithoutMemory)
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutCreatureRelations,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutMemory,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
                 oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
 
-        if (weights.Length == LegacyInputCountWithoutMeatScent * NeuralBrainSchema.OutputCount)
+        if (weights.Length == LegacyInputCountWithoutMeatScent * LegacyOutputCountWithoutMemory)
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutMeatScent,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutMemory,
                 oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
                 oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
         }
@@ -603,14 +620,40 @@ public sealed class NeuralBrainGenome
         return true;
     }
 
+    private static bool TryInferLegacyWeightLayout(
+        int weightCount,
+        int legacyInputCount,
+        int legacyOutputCount,
+        out int hiddenNodeCount)
+    {
+        hiddenNodeCount = 0;
+        var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+        if (weightCount < legacyDirectWeightCount)
+        {
+            return false;
+        }
+
+        var hiddenWeightCount = weightCount - legacyDirectWeightCount;
+        var weightsPerHiddenNode = legacyInputCount + legacyOutputCount;
+        if (hiddenWeightCount % weightsPerHiddenNode != 0)
+        {
+            return false;
+        }
+
+        hiddenNodeCount = hiddenWeightCount / weightsPerHiddenNode;
+        ValidateHiddenNodeCount(hiddenNodeCount);
+        return true;
+    }
+
     private static float[] NormalizeLegacyWeights(
         float[] weights,
         int legacyInputCount,
         int legacyOutputCount,
         int oldEggReserveInput,
-        int oldReproductionReadinessInput)
+        int oldReproductionReadinessInput,
+        int hiddenNodeCount = 0)
     {
-        var migrated = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
+        var migrated = new float[GetExpectedWeightCount(hiddenNodeCount)];
         for (var output = 0; output < legacyOutputCount; output++)
         {
             var legacyOffset = output * legacyInputCount;
@@ -629,6 +672,46 @@ public sealed class NeuralBrainGenome
                 }
 
                 migrated[newOffset + targetInput] = weights[legacyOffset + input];
+            }
+        }
+
+        if (hiddenNodeCount > 0)
+        {
+            var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+            var legacyHiddenInputOffset = legacyDirectWeightCount;
+            var newHiddenInputOffset = DirectWeightCount;
+
+            for (var hidden = 0; hidden < hiddenNodeCount; hidden++)
+            {
+                var legacyOffset = legacyHiddenInputOffset + hidden * legacyInputCount;
+                var newOffset = newHiddenInputOffset + hidden * NeuralBrainSchema.InputCount;
+
+                for (var input = 0; input < legacyInputCount; input++)
+                {
+                    var targetInput = input;
+                    if (input == oldEggReserveInput)
+                    {
+                        targetInput = NeuralBrainSchema.EggReserveRatioInput;
+                    }
+                    else if (input == oldReproductionReadinessInput)
+                    {
+                        targetInput = NeuralBrainSchema.ReproductionReadinessInput;
+                    }
+
+                    migrated[newOffset + targetInput] = weights[legacyOffset + input];
+                }
+            }
+
+            var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+            var newHiddenOutputOffset = DirectWeightCount + hiddenNodeCount * NeuralBrainSchema.InputCount;
+            for (var output = 0; output < legacyOutputCount; output++)
+            {
+                var legacyOffset = legacyHiddenOutputOffset + output * hiddenNodeCount;
+                var newOffset = newHiddenOutputOffset + output * hiddenNodeCount;
+                for (var hidden = 0; hidden < hiddenNodeCount; hidden++)
+                {
+                    migrated[newOffset + hidden] = weights[legacyOffset + hidden];
+                }
             }
         }
 

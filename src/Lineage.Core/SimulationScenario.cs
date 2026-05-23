@@ -152,6 +152,8 @@ public sealed record SimulationScenario
 
     public float DamageResistanceEnergyCostPerSecond { get; init; } = 0.03f;
 
+    public float MemoryEnergyCostPerSecond { get; init; } = 0.01f;
+
     public float EggEnergyCostPerSecond { get; init; } = 0f;
 
     public float EggEnvironmentalDamagePerSecond { get; init; } = 0.08f;
@@ -282,6 +284,7 @@ public sealed record SimulationScenario
         EnsureNonNegative(DigestionRateEnergyCostPerSecond, nameof(DigestionRateEnergyCostPerSecond));
         EnsureNonNegative(BiteStrengthEnergyCostPerSecond, nameof(BiteStrengthEnergyCostPerSecond));
         EnsureNonNegative(DamageResistanceEnergyCostPerSecond, nameof(DamageResistanceEnergyCostPerSecond));
+        EnsureNonNegative(MemoryEnergyCostPerSecond, nameof(MemoryEnergyCostPerSecond));
         EnsureNonNegative(EggEnergyCostPerSecond, nameof(EggEnergyCostPerSecond));
         EnsureNonNegative(EggEnvironmentalDamagePerSecond, nameof(EggEnvironmentalDamagePerSecond));
         EnsureNonNegative(MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));

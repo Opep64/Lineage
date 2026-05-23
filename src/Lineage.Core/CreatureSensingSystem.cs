@@ -162,6 +162,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ReproductionReadiness = isReadyToLay ? 1f : 0f
             };
             ApplyTerrainDragSense(ref senses, state, creature, forward, right, effectiveSenseRadius);
+            ApplyMemorySense(ref senses, creature, forward, right);
 
             var visibleFoodCount = 0;
             var visiblePlantCount = 0;
@@ -436,6 +437,24 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.ForwardTerrainDrag = SpeedMultiplierToDrag(forwardSpeedMultiplier);
         senses.LeftTerrainDrag = SpeedMultiplierToDrag(leftSpeedMultiplier);
         senses.RightTerrainDrag = SpeedMultiplierToDrag(rightSpeedMultiplier);
+    }
+
+    private static void ApplyMemorySense(
+        ref CreatureSenseState senses,
+        CreatureState creature,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        var memory = creature.MemoryVector.ClampedLength(1f);
+        var memoryStrength = Math.Clamp(memory.Length, 0f, 1f);
+        if (memoryStrength <= 0.000001f)
+        {
+            return;
+        }
+
+        senses.MemoryStrength = memoryStrength;
+        senses.MemoryDirectionForward = Math.Clamp(SimVector2.Dot(memory, forward), -1f, 1f);
+        senses.MemoryDirectionRight = Math.Clamp(SimVector2.Dot(memory, right), -1f, 1f);
     }
 
     private static float SpeedMultiplierToDrag(float speedMultiplier)

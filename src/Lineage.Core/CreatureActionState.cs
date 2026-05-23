@@ -14,4 +14,8 @@ public struct CreatureActionState
     public bool WantsReproduce { get; set; }
 
     public bool WantsAttack { get; set; }
+
+    public float MemoryForward { get; set; }
+
+    public float MemoryRight { get; set; }
 }

@@ -9,9 +9,9 @@ public static class NeuralBrainSchema
 
     public const int MaxHiddenNodeCount = 64;
 
-    public const int InputCount = 35;
+    public const int InputCount = 38;
 
-    public const int OutputCount = 5;
+    public const int OutputCount = 7;
 
     public const int BiasInput = 0;
 
@@ -83,6 +83,12 @@ public static class NeuralBrainSchema
 
     public const int RecentFoodSuccessInput = 34;
 
+    public const int MemoryForwardInput = 35;
+
+    public const int MemoryRightInput = 36;
+
+    public const int MemoryStrengthInput = 37;
+
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 
     public const int PreyProximityInput = CreatureProximityInput;
@@ -100,4 +106,8 @@ public static class NeuralBrainSchema
     public const int ReproduceOutput = 3;
 
     public const int AttackOutput = 4;
+
+    public const int MemoryForwardOutput = 5;
+
+    public const int MemoryRightOutput = 6;
 }

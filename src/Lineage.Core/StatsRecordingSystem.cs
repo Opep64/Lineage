@@ -69,6 +69,7 @@ public sealed class StatsRecordingSystem(
         var totalEggReserveRatio = 0f;
         var totalEnergySurplusRatio = 0f;
         var totalRecentFoodSuccess = 0f;
+        var totalMemoryStrength = 0f;
         var totalVisionRange = 0f;
         var totalVisionAngle = 0f;
         var totalDietaryAdaptation = 0f;
@@ -98,6 +99,7 @@ public sealed class StatsRecordingSystem(
         var attackingCreatureCount = 0;
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
+        var activeMemoryCreatureCount = 0;
         var nonAttackingCreatureCount = 0;
         var barrenCreatureCount = 0;
         var sparseCreatureCount = 0;
@@ -154,6 +156,13 @@ public sealed class StatsRecordingSystem(
             totalEggReserveRatio += creature.Senses.EggReserveRatio;
             totalEnergySurplusRatio += creature.Senses.EnergySurplusRatio;
             totalRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
+            var memoryStrength = Math.Clamp(creature.MemoryVector.Length, 0f, 1f);
+            totalMemoryStrength += memoryStrength;
+            if (memoryStrength > 0.05f)
+            {
+                activeMemoryCreatureCount++;
+            }
+
             totalVisionRange += CreatureGrowth.EffectiveSenseRadius(creature, genome);
             totalVisionAngle += CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
             totalDietaryAdaptation += genome.DietaryAdaptation;
@@ -590,6 +599,8 @@ public sealed class StatsRecordingSystem(
             totalEggReserveRatio / divisor,
             totalEnergySurplusRatio / divisor,
             totalRecentFoodSuccess / divisor,
+            activeMemoryCreatureCount,
+            totalMemoryStrength / divisor,
             leftRegionCreatureCount,
             middleRegionCreatureCount,
             rightRegionCreatureCount,

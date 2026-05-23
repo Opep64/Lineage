@@ -121,4 +121,19 @@ public struct CreatureSenseState
     public float ReproductionReadiness { get; set; }
 
     public float RecentFoodSuccess { get; set; }
+
+    /// <summary>
+    /// Persistent memory vector projected onto the creature's forward direction.
+    /// </summary>
+    public float MemoryDirectionForward { get; set; }
+
+    /// <summary>
+    /// Persistent memory vector projected onto the creature's right direction.
+    /// </summary>
+    public float MemoryDirectionRight { get; set; }
+
+    /// <summary>
+    /// Magnitude of the creature's current memory vector, clamped to [0, 1].
+    /// </summary>
+    public float MemoryStrength { get; set; }
 }

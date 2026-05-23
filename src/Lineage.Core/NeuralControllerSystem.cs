@@ -8,6 +8,10 @@ public sealed class NeuralControllerSystem(
     float reproduceThreshold = 0.25f,
     float attackThreshold = 0.25f) : ISimulationSystem
 {
+    private const float MemoryDecayPerSecond = 0.06f;
+    private const float MemoryWriteRatePerSecond = 2.5f;
+    private const float MemoryWriteDeadZone = 0.02f;
+
     public void Update(WorldState state, float deltaSeconds)
     {
         Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
@@ -33,9 +37,20 @@ public sealed class NeuralControllerSystem(
 
             var moveForward = Math.Clamp(outputs[NeuralBrainSchema.MoveForwardOutput], 0f, 1f);
             var turn = Math.Clamp(outputs[NeuralBrainSchema.TurnOutput], -1f, 1f);
+            var memoryForward = Math.Clamp(outputs[NeuralBrainSchema.MemoryForwardOutput], -1f, 1f);
+            var memoryRight = Math.Clamp(outputs[NeuralBrainSchema.MemoryRightOutput], -1f, 1f);
             var effectiveMaxSpeed = CreatureGrowth.EffectiveMaxSpeed(creature, genome);
             var effectiveTurnRate = CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome);
+            var forward = SimVector2.FromAngle(creature.HeadingRadians);
+            var right = new SimVector2(-forward.Y, forward.X);
 
+            creature.MemoryVector = UpdateMemoryVector(
+                creature.MemoryVector,
+                forward,
+                right,
+                memoryForward,
+                memoryRight,
+                deltaSeconds);
             creature.HeadingRadians += turn * effectiveTurnRate * deltaSeconds;
             creature.DesiredVelocity = SimVector2.FromAngle(creature.HeadingRadians)
                 * effectiveMaxSpeed
@@ -46,7 +61,9 @@ public sealed class NeuralControllerSystem(
                 Turn = turn,
                 WantsEat = outputs[NeuralBrainSchema.EatOutput] > eatThreshold,
                 WantsReproduce = outputs[NeuralBrainSchema.ReproduceOutput] > reproduceThreshold,
-                WantsAttack = outputs[NeuralBrainSchema.AttackOutput] > attackThreshold
+                WantsAttack = outputs[NeuralBrainSchema.AttackOutput] > attackThreshold,
+                MemoryForward = memoryForward,
+                MemoryRight = memoryRight
             };
 
             state.Creatures[i] = creature;
@@ -90,5 +107,34 @@ public sealed class NeuralControllerSystem(
         inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
         inputs[NeuralBrainSchema.EnergySurplusInput] = senses.EnergySurplusRatio;
         inputs[NeuralBrainSchema.RecentFoodSuccessInput] = senses.RecentFoodSuccess;
+        inputs[NeuralBrainSchema.MemoryForwardInput] = senses.MemoryDirectionForward;
+        inputs[NeuralBrainSchema.MemoryRightInput] = senses.MemoryDirectionRight;
+        inputs[NeuralBrainSchema.MemoryStrengthInput] = senses.MemoryStrength;
+    }
+
+    private static SimVector2 UpdateMemoryVector(
+        SimVector2 existingMemory,
+        SimVector2 forward,
+        SimVector2 right,
+        float memoryForward,
+        float memoryRight,
+        float deltaSeconds)
+    {
+        var memory = existingMemory.IsFinite
+            ? existingMemory.ClampedLength(1f)
+            : SimVector2.Zero;
+        var decay = MathF.Exp(-MemoryDecayPerSecond * Math.Max(0f, deltaSeconds));
+        memory *= decay;
+
+        var writeVector = forward * memoryForward + right * memoryRight;
+        var writeStrength = Math.Clamp(writeVector.Length, 0f, 1f);
+        if (writeStrength <= MemoryWriteDeadZone)
+        {
+            return memory.ClampedLength(1f);
+        }
+
+        var desiredMemory = writeVector.Normalized() * writeStrength;
+        var blend = 1f - MathF.Exp(-MemoryWriteRatePerSecond * Math.Max(0f, deltaSeconds));
+        return (memory * (1f - blend) + desiredMemory * blend).ClampedLength(1f);
     }
 }

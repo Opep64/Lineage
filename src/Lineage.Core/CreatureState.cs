@@ -32,6 +32,11 @@ public struct CreatureState
 
     public CreatureActionState Actions { get; set; }
 
+    /// <summary>
+    /// Persistent world-space direction the neural controller can write and read later.
+    /// </summary>
+    public SimVector2 MemoryVector { get; set; }
+
     public float AgeSeconds { get; set; }
 
     public float Energy { get; set; }

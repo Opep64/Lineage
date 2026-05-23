@@ -503,6 +503,9 @@ public static class BehaviorAssay
         inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
         inputs[NeuralBrainSchema.EnergySurplusInput] = senses.EnergySurplusRatio;
         inputs[NeuralBrainSchema.RecentFoodSuccessInput] = senses.RecentFoodSuccess;
+        inputs[NeuralBrainSchema.MemoryForwardInput] = senses.MemoryDirectionForward;
+        inputs[NeuralBrainSchema.MemoryRightInput] = senses.MemoryDirectionRight;
+        inputs[NeuralBrainSchema.MemoryStrengthInput] = senses.MemoryStrength;
     }
 
     private static string ClassifyMovement(BehaviorAssaySummary summary)
