@@ -154,6 +154,10 @@ public sealed record SimulationScenario
 
     public float MemoryEnergyCostPerSecond { get; init; } = 0.01f;
 
+    public float MemoryDecayPerSecond { get; init; } = NeuralControllerSystem.DefaultMemoryDecayPerSecond;
+
+    public float MemoryWriteRatePerSecond { get; init; } = NeuralControllerSystem.DefaultMemoryWriteRatePerSecond;
+
     public float EggEnergyCostPerSecond { get; init; } = 0f;
 
     public float EggEnvironmentalDamagePerSecond { get; init; } = 0.08f;
@@ -285,6 +289,8 @@ public sealed record SimulationScenario
         EnsureNonNegative(BiteStrengthEnergyCostPerSecond, nameof(BiteStrengthEnergyCostPerSecond));
         EnsureNonNegative(DamageResistanceEnergyCostPerSecond, nameof(DamageResistanceEnergyCostPerSecond));
         EnsureNonNegative(MemoryEnergyCostPerSecond, nameof(MemoryEnergyCostPerSecond));
+        EnsureNonNegative(MemoryDecayPerSecond, nameof(MemoryDecayPerSecond));
+        EnsureNonNegative(MemoryWriteRatePerSecond, nameof(MemoryWriteRatePerSecond));
         EnsureNonNegative(EggEnergyCostPerSecond, nameof(EggEnergyCostPerSecond));
         EnsureNonNegative(EggEnvironmentalDamagePerSecond, nameof(EggEnvironmentalDamagePerSecond));
         EnsureNonNegative(MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));

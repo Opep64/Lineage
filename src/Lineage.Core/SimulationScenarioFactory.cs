@@ -44,6 +44,8 @@ public static class SimulationScenarioFactory
                 scenario.BiteStrengthEnergyCostPerSecond,
                 scenario.DamageResistanceEnergyCostPerSecond,
                 scenario.MemoryEnergyCostPerSecond,
+                scenario.MemoryDecayPerSecond,
+                scenario.MemoryWriteRatePerSecond,
                 scenario.EggEnergyCostPerSecond,
                 scenario.EggEnvironmentalDamagePerSecond,
                 scenario.DeathMeatCaloriesPerBodyRadius,

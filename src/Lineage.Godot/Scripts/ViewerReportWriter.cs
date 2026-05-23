@@ -283,6 +283,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Bite strength upkeep", $"{scenario.BiteStrengthEnergyCostPerSecond:0.######} energy/strength/s");
         WriteMetric(writer, "Damage resistance upkeep", $"{scenario.DamageResistanceEnergyCostPerSecond:0.######} energy/resistance/s");
         WriteMetric(writer, "Active memory upkeep", $"{scenario.MemoryEnergyCostPerSecond:0.######} energy/full-memory/s");
+        WriteMetric(writer, "Memory decay", $"{scenario.MemoryDecayPerSecond:0.######}/s");
+        WriteMetric(writer, "Memory write rate", $"{scenario.MemoryWriteRatePerSecond:0.######}/s");
         WriteMetric(writer, "Egg upkeep", $"{scenario.EggEnergyCostPerSecond:0.######} energy/egg/s");
         WriteMetric(writer, "Egg exposure damage", $"{scenario.EggEnvironmentalDamagePerSecond:0.######} health/s");
         WriteMetric(writer, "Movement upkeep", $"{scenario.MovementEnergyPerSecond:0.###} energy/s");

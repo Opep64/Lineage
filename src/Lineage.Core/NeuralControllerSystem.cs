@@ -6,11 +6,17 @@ namespace Lineage.Core;
 public sealed class NeuralControllerSystem(
     float eatThreshold = 0f,
     float reproduceThreshold = 0.25f,
-    float attackThreshold = 0.25f) : ISimulationSystem
+    float attackThreshold = 0.25f,
+    float memoryDecayPerSecond = 0.06f,
+    float memoryWriteRatePerSecond = 2.5f) : ISimulationSystem
 {
-    private const float MemoryDecayPerSecond = 0.06f;
-    private const float MemoryWriteRatePerSecond = 2.5f;
+    public const float DefaultMemoryDecayPerSecond = 0.06f;
+    public const float DefaultMemoryWriteRatePerSecond = 2.5f;
+
     private const float MemoryWriteDeadZone = 0.02f;
+
+    private readonly float _memoryDecayPerSecond = ValidateNonNegative(memoryDecayPerSecond, nameof(memoryDecayPerSecond));
+    private readonly float _memoryWriteRatePerSecond = ValidateNonNegative(memoryWriteRatePerSecond, nameof(memoryWriteRatePerSecond));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -50,7 +56,9 @@ public sealed class NeuralControllerSystem(
                 right,
                 memoryForward,
                 memoryRight,
-                deltaSeconds);
+                deltaSeconds,
+                _memoryDecayPerSecond,
+                _memoryWriteRatePerSecond);
             creature.HeadingRadians += turn * effectiveTurnRate * deltaSeconds;
             creature.DesiredVelocity = SimVector2.FromAngle(creature.HeadingRadians)
                 * effectiveMaxSpeed
@@ -118,12 +126,14 @@ public sealed class NeuralControllerSystem(
         SimVector2 right,
         float memoryForward,
         float memoryRight,
-        float deltaSeconds)
+        float deltaSeconds,
+        float memoryDecayPerSecond,
+        float memoryWriteRatePerSecond)
     {
         var memory = existingMemory.IsFinite
             ? existingMemory.ClampedLength(1f)
             : SimVector2.Zero;
-        var decay = MathF.Exp(-MemoryDecayPerSecond * Math.Max(0f, deltaSeconds));
+        var decay = MathF.Exp(-memoryDecayPerSecond * Math.Max(0f, deltaSeconds));
         memory *= decay;
 
         var writeVector = forward * memoryForward + right * memoryRight;
@@ -134,7 +144,17 @@ public sealed class NeuralControllerSystem(
         }
 
         var desiredMemory = writeVector.Normalized() * writeStrength;
-        var blend = 1f - MathF.Exp(-MemoryWriteRatePerSecond * Math.Max(0f, deltaSeconds));
+        var blend = 1f - MathF.Exp(-memoryWriteRatePerSecond * Math.Max(0f, deltaSeconds));
         return (memory * (1f - blend) + desiredMemory * blend).ClampedLength(1f);
+    }
+
+    private static float ValidateNonNegative(float value, string name)
+    {
+        if (!float.IsFinite(value) || value < 0f)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and non-negative.");
+        }
+
+        return value;
     }
 }

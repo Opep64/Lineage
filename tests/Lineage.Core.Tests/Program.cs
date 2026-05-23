@@ -58,6 +58,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
     ("Neural controller writes spatial memory", NeuralControllerWritesSpatialMemory),
+    ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
@@ -2204,6 +2205,33 @@ static void NeuralControllerWritesSpatialMemory()
 
     creature = simulation.State.Creatures[0];
     AssertTrue(creature.Actions.MoveForward > 0.9f, "Remembered forward direction should drive movement");
+}
+
+static void NeuralControllerHonorsMemoryTuning()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 410,
+        systems: [new NeuralControllerSystem(memoryDecayPerSecond: 1f, memoryWriteRatePerSecond: 0f)]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MemoryForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodForwardInput] = 4f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    creature.MemoryVector = new SimVector2(1f, 0f);
+    creature.Senses = new CreatureSenseState { FoodDirectionForward = 1f };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertTrue(creature.Actions.MemoryForward > 0.9f, "Food cue should still request memory write");
+    AssertClose(MathF.Exp(-1f), creature.MemoryVector.Length, 0.000001, "Memory should decay by configured rate");
+    AssertTrue(creature.MemoryVector.X < 0.4f, "Zero write rate should prevent refreshing memory");
 }
 
 static void ForagerPredatorTurnsCreatureProximityIntoAttackIntent()
@@ -4370,6 +4398,9 @@ static void ScenarioJsonRoundTrips()
         DigestionRateEnergyCostPerSecond = 0.0065f,
         BiteStrengthEnergyCostPerSecond = 0.041f,
         DamageResistanceEnergyCostPerSecond = 0.032f,
+        MemoryEnergyCostPerSecond = 0.021f,
+        MemoryDecayPerSecond = 0.09f,
+        MemoryWriteRatePerSecond = 1.75f,
         EggEnergyCostPerSecond = 0.023f,
         EggEnvironmentalDamagePerSecond = 0.037f,
         MovementEnergyPerSecond = 0.62f,
@@ -4483,6 +4514,9 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.DigestionRateEnergyCostPerSecond, roundTripped.DigestionRateEnergyCostPerSecond, 0.000001, "Scenario digestion-rate energy");
     AssertClose(scenario.BiteStrengthEnergyCostPerSecond, roundTripped.BiteStrengthEnergyCostPerSecond, 0.000001, "Scenario bite-strength energy");
     AssertClose(scenario.DamageResistanceEnergyCostPerSecond, roundTripped.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
+    AssertClose(scenario.MemoryEnergyCostPerSecond, roundTripped.MemoryEnergyCostPerSecond, 0.000001, "Scenario memory energy");
+    AssertClose(scenario.MemoryDecayPerSecond, roundTripped.MemoryDecayPerSecond, 0.000001, "Scenario memory decay");
+    AssertClose(scenario.MemoryWriteRatePerSecond, roundTripped.MemoryWriteRatePerSecond, 0.000001, "Scenario memory write rate");
     AssertClose(scenario.EggEnergyCostPerSecond, roundTripped.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(scenario.EggEnvironmentalDamagePerSecond, roundTripped.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(scenario.MovementEnergyPerSecond, roundTripped.MovementEnergyPerSecond, 0.000001, "Scenario movement energy");
