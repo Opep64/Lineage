@@ -36,6 +36,7 @@ public sealed class NeuralBrainGenome
         var normalized = NormalizeWeights(weights.ToArray());
         Weights = normalized.Weights;
         HiddenNodeCount = normalized.HiddenNodeCount;
+        HasActiveHiddenOutputs = HasNonZeroHiddenOutputWeights(Weights, HiddenNodeCount);
         ValidateWeights(Weights, HiddenNodeCount);
     }
 
@@ -49,11 +50,14 @@ public sealed class NeuralBrainGenome
 
         Weights = weights;
         HiddenNodeCount = hiddenNodeCount;
+        HasActiveHiddenOutputs = HasNonZeroHiddenOutputWeights(Weights, HiddenNodeCount);
     }
 
     public float[] Weights { get; }
 
     public int HiddenNodeCount { get; }
+
+    private bool HasActiveHiddenOutputs { get; }
 
     public static int DirectWeightCount => NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount;
 
@@ -356,7 +360,7 @@ public sealed class NeuralBrainGenome
             outputs[output] = sum;
         }
 
-        if (HiddenNodeCount > 0)
+        if (HasActiveHiddenOutputs)
         {
             Span<float> hiddenValues = HiddenNodeCount <= NeuralBrainSchema.MaxHiddenNodeCount
                 ? stackalloc float[HiddenNodeCount]
@@ -394,6 +398,26 @@ public sealed class NeuralBrainGenome
         {
             outputs[output] = MathF.Tanh(outputs[output]);
         }
+    }
+
+    private static bool HasNonZeroHiddenOutputWeights(float[] weights, int hiddenNodeCount)
+    {
+        if (hiddenNodeCount <= 0)
+        {
+            return false;
+        }
+
+        var offset = DirectWeightCount + hiddenNodeCount * NeuralBrainSchema.InputCount;
+        var count = hiddenNodeCount * NeuralBrainSchema.OutputCount;
+        for (var i = 0; i < count; i++)
+        {
+            if (weights[offset + i] != 0f)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public NeuralBrainGenome Mutated(DeterministicRandom random, float mutationStrength)

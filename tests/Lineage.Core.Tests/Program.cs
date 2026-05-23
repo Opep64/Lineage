@@ -2967,6 +2967,18 @@ static void NeuralBrainSupportsHiddenNodes()
     AssertClose(2f, brain.SumAbsoluteHiddenOutputWeights(), 0.000001, "Hidden output weight magnitude");
     AssertEqual(1, brain.CountActiveHiddenOutputWeights(0.05f), "Active hidden output count");
 
+    var inertHiddenWeights = new float[NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount)];
+    inertHiddenWeights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.5f;
+    inertHiddenWeights[hiddenInputOffset + NeuralBrainSchema.BiasInput] = 8f;
+    var inertHiddenBrain = new NeuralBrainGenome(inertHiddenWeights);
+    outputs.Clear();
+    inertHiddenBrain.Evaluate(inputs, outputs);
+    AssertClose(
+        MathF.Tanh(0.5f),
+        outputs[NeuralBrainSchema.MoveForwardOutput],
+        0.000001,
+        "Hidden inputs without hidden outputs should not affect behavior");
+
     var seedBrain = NeuralBrainGenome.CreateSeedForager(hiddenNodeCount);
     AssertEqual(hiddenNodeCount, seedBrain.HiddenNodeCount, "Seed hidden node count");
     AssertClose(
