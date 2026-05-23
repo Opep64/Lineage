@@ -98,6 +98,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
+    ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
@@ -3773,6 +3774,83 @@ static void SpeciesProfileInjectionCreatesFounderCreatures()
     }
 }
 
+static void ScenarioSpeciesRosterInjectsProfileFounders()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 802,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        InitialBrainKind = InitialBrainKind.ExplorerForager
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
+        sourceScenario,
+        source.State,
+        "Roster explorer");
+
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_roster_{Guid.NewGuid():N}");
+    try
+    {
+        var profilePath = Path.Combine(tempRoot, "species", "roster-explorer.species.json");
+        SpeciesProfileJson.Save(profilePath, profile);
+
+        var scenarioPath = Path.Combine(tempRoot, "scenarios", "roster-scenario.json");
+        var scenario = new SimulationScenario
+        {
+            Seed = 803,
+            WorldWidth = 900f,
+            WorldHeight = 600f,
+            ResourceVoidBorderWidth = 20f,
+            InitialCreatureCount = 99,
+            InitialResourcesPerMillionArea = 0f,
+            SpeciesSeeds =
+            [
+                new SpeciesScenarioSeed
+                {
+                    ProfilePath = "species/roster-explorer.species.json",
+                    Count = 4,
+                    SpawnRegion = InitialCreatureSpawnRegion.RightThird,
+                    EnergyOverride = 44f
+                }
+            ]
+        };
+        SimulationScenarioJson.Save(scenarioPath, scenario);
+
+        var loadedScenario = SimulationScenarioJson.Load(scenarioPath);
+        var simulation = SimulationScenarioFactory.CreateSimulation(loadedScenario);
+        AssertEqual(0, simulation.State.Creatures.Count, "Scenario roster should replace generic initial creatures");
+        AssertEqual(0, simulation.State.Genomes.Count, "Generic starter genome should not be created for roster scenarios");
+        AssertEqual(0, simulation.State.Brains.Count, "Generic starter brain should not be created for roster scenarios");
+
+        var results = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+            loadedScenario,
+            simulation.State,
+            scenarioPath);
+
+        AssertEqual(1, results.Count, "Roster injection result count");
+        AssertEqual("Roster explorer", results[0].SpeciesName, "Roster species name");
+        AssertEqual(4, results[0].CreatureIds.Count, "Roster creature count");
+        AssertEqual(4, simulation.State.Creatures.Count, "Injected roster living count");
+        AssertEqual(4, simulation.State.Stats.FounderCreatureCount, "Injected roster founder count");
+        AssertEqual(1, simulation.State.Genomes.Count, "Roster genome count");
+        AssertEqual(1, simulation.State.Brains.Count, "Roster brain count");
+
+        foreach (var creature in simulation.State.Creatures)
+        {
+            AssertClose(44f, creature.Energy, 0.000001, "Roster energy override");
+            AssertTrue(creature.Position.X > simulation.State.Bounds.Width * 2f / 3f, "Roster creature should spawn in right third");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
 static void SimulationSnapshotsRestoreExactContinuation()
 {
     var scenario = new SimulationScenario
@@ -3994,6 +4072,23 @@ static void ScenarioJsonRoundTrips()
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
         InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.RightThird,
+        SpeciesSeeds =
+        [
+            new SpeciesScenarioSeed
+            {
+                ProfilePath = "species/alpha.species.json",
+                Count = 3,
+                SpawnRegion = InitialCreatureSpawnRegion.LeftThird,
+                EnergyOverride = 42f
+            },
+            new SpeciesScenarioSeed
+            {
+                ProfilePath = "species/disabled.species.json",
+                Count = 2,
+                SpawnRegion = InitialCreatureSpawnRegion.BottomThird,
+                Enabled = false
+            }
+        ],
         InitialResourcesPerMillionArea = 37.5f,
         PlantRespawnDelaySecondsMin = 12f,
         PlantRespawnDelaySecondsMax = 34f,
@@ -4075,6 +4170,9 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
     AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
+    AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
+    AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
+    AssertTrue(json.Contains("\"spawnRegion\": \"leftThird\""), "JSON should serialize species seed spawn regions");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
     AssertTrue(json.Contains("\"enableSeasons\""), "JSON should serialize season toggle");
@@ -4098,6 +4196,12 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
     AssertEqual(scenario.InitialCreatureSpawnRegion, roundTripped.InitialCreatureSpawnRegion, "Scenario initial spawn region");
+    AssertEqual(2, roundTripped.SpeciesSeeds.Length, "Scenario species seed count");
+    AssertEqual("species/alpha.species.json", roundTripped.SpeciesSeeds[0].ProfilePath, "Scenario species seed profile");
+    AssertEqual(3, roundTripped.SpeciesSeeds[0].Count, "Scenario species seed creature count");
+    AssertEqual(InitialCreatureSpawnRegion.LeftThird, roundTripped.SpeciesSeeds[0].SpawnRegion, "Scenario species seed spawn region");
+    AssertClose(42f, roundTripped.SpeciesSeeds[0].EnergyOverride ?? 0f, 0.000001, "Scenario species seed energy override");
+    AssertTrue(!roundTripped.SpeciesSeeds[1].Enabled, "Scenario disabled species seed");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");

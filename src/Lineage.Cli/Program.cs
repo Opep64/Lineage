@@ -115,7 +115,7 @@ static RunResult RunSingle(RunOptions options)
         SimulationScenarioJson.Save(options.SaveScenarioPath, scenario);
     }
 
-    var speciesInjections = InjectSpeciesProfiles(options, simulation);
+    var speciesInjections = InjectStartupSpeciesProfiles(options, scenario, simulation);
     if (options.ProfileEnabled)
     {
         simulation.Profile = new SimulationProfile();
@@ -165,6 +165,25 @@ static (SimulationScenario Scenario, Simulation Simulation) CreateSimulationRun(
     return (scenario, SimulationScenarioFactory.CreateSimulation(scenario));
 }
 
+static IReadOnlyList<SpeciesInjectionResult> InjectStartupSpeciesProfiles(
+    RunOptions options,
+    SimulationScenario scenario,
+    Simulation simulation)
+{
+    var results = new List<SpeciesInjectionResult>();
+    if (options.LoadSnapshotPath is null)
+    {
+        results.AddRange(SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+            scenario,
+            simulation.State,
+            options.ScenarioPath,
+            Directory.GetCurrentDirectory()));
+    }
+
+    results.AddRange(InjectSpeciesProfiles(options, simulation));
+    return results;
+}
+
 static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions options, Simulation simulation)
 {
     if (options.InjectSpeciesPaths.Count == 0)
@@ -175,7 +194,10 @@ static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions op
     var results = new List<SpeciesInjectionResult>(options.InjectSpeciesPaths.Count);
     foreach (var path in options.InjectSpeciesPaths)
     {
-        var profile = SpeciesProfileJson.Load(path);
+        var profile = SpeciesProfileJson.Load(SimulationScenarioSpeciesSeeder.ResolveProfilePath(
+            path,
+            options.ScenarioPath,
+            Directory.GetCurrentDirectory()));
         results.Add(SpeciesProfileInjector.Inject(
             simulation.State,
             profile,
@@ -353,6 +375,11 @@ static IReadOnlyList<ProbeRunResult> RunProbe(RunOptions options)
                 scenario = scenario.Validated();
 
                 var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+                _ = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+                    scenario,
+                    simulation.State,
+                    scenarioPath,
+                    Directory.GetCurrentDirectory());
                 var stopwatch = Stopwatch.StartNew();
                 var status = RunProbeSimulation(options, simulation);
                 stopwatch.Stop();
@@ -3339,6 +3366,7 @@ internal static class RunReportWriter
             WriteMetric(writer, "Scenario file", Path.GetFullPath(options.ScenarioPath));
         }
 
+        WriteMetric(writer, "Scenario species roster", FormatScenarioSpeciesSeeds(scenario));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -4545,6 +4573,25 @@ internal static class RunReportWriter
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
             _ => kind.ToString()
         };
+    }
+
+    private static string FormatScenarioSpeciesSeeds(SimulationScenario scenario)
+    {
+        var seeds = scenario.EnabledSpeciesSeeds().ToArray();
+        if (seeds.Length == 0)
+        {
+            return "None";
+        }
+
+        return string.Join(
+            ", ",
+            seeds.Select(seed =>
+            {
+                var energy = seed.EnergyOverride is null
+                    ? "profile energy"
+                    : $"{seed.EnergyOverride.Value:0.###} energy";
+                return $"{seed.Count} x {Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy})";
+            }));
     }
 
     private static string FormatPercent(float value)

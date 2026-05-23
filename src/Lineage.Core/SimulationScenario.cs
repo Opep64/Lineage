@@ -54,6 +54,8 @@ public sealed record SimulationScenario
 
     public InitialCreatureSpawnRegion InitialCreatureSpawnRegion { get; init; } = InitialCreatureSpawnRegion.Uniform;
 
+    public SpeciesScenarioSeed[] SpeciesSeeds { get; init; } = [];
+
     public float InitialResourcesPerMillionArea { get; init; } = 165f;
 
     public float InitialCreatureEnergyMin { get; init; } = 25f;
@@ -237,6 +239,16 @@ public sealed record SimulationScenario
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsureNonNegative(InitialCreatureCount, nameof(InitialCreatureCount));
         EnsureEnumDefined(InitialCreatureSpawnRegion, nameof(InitialCreatureSpawnRegion));
+        var speciesSeeds = (SpeciesSeeds ?? []).Select(seed =>
+        {
+            if (seed is null)
+            {
+                throw new InvalidOperationException("Species seed entries cannot be null.");
+            }
+
+            return seed.Validated();
+        }).ToArray();
+
         EnsureNonNegative(InitialResourcesPerMillionArea, nameof(InitialResourcesPerMillionArea));
         EnsureRange(InitialCreatureEnergyMin, InitialCreatureEnergyMax, nameof(InitialCreatureEnergyMin), nameof(InitialCreatureEnergyMax));
         EnsureRange(ResourceRadiusMin, ResourceRadiusMax, nameof(ResourceRadiusMin), nameof(ResourceRadiusMax));
@@ -324,7 +336,7 @@ public sealed record SimulationScenario
             throw new InvalidOperationException("Reproductive senescence age must be greater than or equal to prime age.");
         }
 
-        return this;
+        return this with { SpeciesSeeds = speciesSeeds };
     }
 
     public BiomePressureProfile CreateBiomeMovementCostProfile()
@@ -366,6 +378,19 @@ public sealed record SimulationScenario
     public int CalculateInitialResourceCount()
     {
         return CalculateResourceCount(WorldWidth, WorldHeight, InitialResourcesPerMillionArea);
+    }
+
+    public bool HasEnabledSpeciesSeeds()
+    {
+        return EnabledSpeciesSeeds().Any();
+    }
+
+    public IEnumerable<SpeciesScenarioSeed> EnabledSpeciesSeeds()
+    {
+        return (SpeciesSeeds ?? [])
+            .Where(seed => seed is not null)
+            .Select(seed => seed.Validated())
+            .Where(seed => seed.Enabled);
     }
 
     public static int CalculateResourceCount(float worldWidth, float worldHeight, float resourcesPerMillionArea)

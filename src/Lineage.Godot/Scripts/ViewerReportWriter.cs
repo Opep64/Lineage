@@ -86,6 +86,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Season length", $"{scenario.SeasonLengthSeconds:0.###} seconds");
         WriteMetric(writer, "Season fertility swing", FormatPercent(scenario.SeasonFertilityAmplitude));
         WriteMetric(writer, "Season phase mode", scenario.SeasonPhaseMode.ToString());
+        WriteMetric(writer, "Scenario species roster", FormatScenarioSpeciesSeeds(scenario));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
@@ -1144,6 +1145,25 @@ public static class ViewerReportWriter
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
             _ => kind.ToString()
         };
+    }
+
+    private static string FormatScenarioSpeciesSeeds(SimulationScenario scenario)
+    {
+        var seeds = scenario.EnabledSpeciesSeeds().ToArray();
+        if (seeds.Length == 0)
+        {
+            return "None";
+        }
+
+        return string.Join(
+            ", ",
+            seeds.Select(seed =>
+            {
+                var energy = seed.EnergyOverride is null
+                    ? "profile energy"
+                    : $"{seed.EnergyOverride.Value:0.###} energy";
+                return $"{seed.Count} x {Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy})";
+            }));
     }
 
     private static string FormatBiomePressureProfile(BiomePressureProfile profile)

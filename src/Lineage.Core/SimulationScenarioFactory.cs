@@ -129,6 +129,33 @@ public static class SimulationScenarioFactory
     private static void SeedWorld(Simulation simulation, SimulationScenario scenario)
     {
         var state = simulation.State;
+
+        var initialResourceCount = scenario.CalculateInitialResourceCount();
+        for (var i = 0; i < initialResourceCount; i++)
+        {
+            var position = ResourcePlacement.SamplePlantPosition(
+                state,
+                scenario.ResourceClusterStrength,
+                scenario.ResourceClusterRadius);
+            state.SpawnResourcePatch(new ResourcePatchState
+            {
+                Position = position,
+                Radius = RandomRange(state, scenario.ResourceRadiusMin, scenario.ResourceRadiusMax),
+                Calories = RandomRange(state, scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax),
+                MaxCalories = scenario.ResourceMaxCalories,
+                RegrowthCaloriesPerSecond = RandomRange(
+                    state,
+                    scenario.ResourceRegrowthMin,
+                    scenario.ResourceRegrowthMax)
+                    * state.Biomes.GetResourceRegrowthMultiplierAt(position)
+            });
+        }
+
+        if (scenario.HasEnabledSpeciesSeeds())
+        {
+            return;
+        }
+
         var genomeId = state.AddGenome(CreatureGenome.Baseline with
         {
             BasalEnergyPerSecond = scenario.BasalEnergyPerSecond,
@@ -155,27 +182,6 @@ public static class SimulationScenarioFactory
         var initialBrainRandom = scenario.InitialBrainKind == InitialBrainKind.RandomPerFounder
             ? new DeterministicRandom(scenario.Seed ^ InitialBrainRandomizationSalt)
             : null;
-
-        var initialResourceCount = scenario.CalculateInitialResourceCount();
-        for (var i = 0; i < initialResourceCount; i++)
-        {
-            var position = ResourcePlacement.SamplePlantPosition(
-                state,
-                scenario.ResourceClusterStrength,
-                scenario.ResourceClusterRadius);
-            state.SpawnResourcePatch(new ResourcePatchState
-            {
-                Position = position,
-                Radius = RandomRange(state, scenario.ResourceRadiusMin, scenario.ResourceRadiusMax),
-                Calories = RandomRange(state, scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax),
-                MaxCalories = scenario.ResourceMaxCalories,
-                RegrowthCaloriesPerSecond = RandomRange(
-                    state,
-                    scenario.ResourceRegrowthMin,
-                    scenario.ResourceRegrowthMax)
-                    * state.Biomes.GetResourceRegrowthMultiplierAt(position)
-            });
-        }
 
         for (var i = 0; i < scenario.InitialCreatureCount; i++)
         {

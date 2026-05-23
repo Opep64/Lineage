@@ -79,6 +79,7 @@ public partial class Main : Node2D
     private ulong _currentSeed = SimulationScenario.DefaultSeed;
     private string? _currentScenarioPath;
     private bool _cliRunInProgress;
+    private IReadOnlyList<SpeciesInjectionResult> _scenarioSpeciesInjections = Array.Empty<SpeciesInjectionResult>();
     private SpeciesProfile? _loadedSpeciesProfile;
     private string? _loadedSpeciesProfilePath;
     private EntityId _pendingSpeciesExportCreatureId;
@@ -292,6 +293,11 @@ public partial class Main : Node2D
     {
         _scenario = _scenario with { Seed = _currentSeed };
         _simulation = SimulationScenarioFactory.CreateSimulation(_scenario);
+        _scenarioSpeciesInjections = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+            _scenario,
+            _simulation.State,
+            _currentScenarioPath,
+            GetRepositoryRoot());
 
         ClearSelection();
         _followSelected = false;
@@ -356,8 +362,15 @@ public partial class Main : Node2D
         _scenario = scenario;
         _currentSeed = scenario.Seed;
         _paused = false;
-        ResetSimulation(resetView: true);
-        _scenarioEditor.SetStatus($"Launched {scenario.Name}.");
+        try
+        {
+            ResetSimulation(resetView: true);
+            _scenarioEditor.SetStatus($"Launched {scenario.Name}.{FormatScenarioSpeciesSeedStatus()}");
+        }
+        catch (Exception ex)
+        {
+            _scenarioEditor.SetStatus($"Launch failed: {ex.Message}");
+        }
     }
 
     private void SaveScenario()
@@ -390,7 +403,7 @@ public partial class Main : Node2D
             _currentScenarioPath = path;
             _scenarioEditor.SetScenario(_scenario);
             ResetSimulation(resetView: true);
-            _scenarioEditor.SetStatus($"Loaded {System.IO.Path.GetFileName(path)}.");
+            _scenarioEditor.SetStatus($"Loaded {System.IO.Path.GetFileName(path)}.{FormatScenarioSpeciesSeedStatus()}");
         }
         catch (Exception ex)
         {
@@ -2367,7 +2380,7 @@ public partial class Main : Node2D
         {
             _loadedSpeciesProfile = SpeciesProfileJson.Load(path);
             _loadedSpeciesProfilePath = path;
-            _scenarioEditor.SetLoadedSpeciesProfilePath(path);
+            _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path));
             _scenarioEditor.SetStatus($"Loaded species profile {_loadedSpeciesProfile.Name}.");
         }
         catch (Exception ex)
@@ -2400,7 +2413,7 @@ public partial class Main : Node2D
             _loadedSpeciesProfile = profile;
             _loadedSpeciesProfilePath = path;
             _scenarioEditor.SetLastSpeciesExportPath(path);
-            _scenarioEditor.SetLoadedSpeciesProfilePath(path);
+            _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path));
             _scenarioEditor.SetStatus($"Exported species profile {profile.Name}.");
         }
         catch (Exception ex)
@@ -2539,6 +2552,35 @@ public partial class Main : Node2D
         return System.IO.Path.IsPathRooted(path)
             ? System.IO.Path.GetFullPath(path)
             : System.IO.Path.GetFullPath(System.IO.Path.Combine(workspaceRoot, path));
+    }
+
+    private string FormatScenarioSpeciesSeedStatus()
+    {
+        var seededCount = _scenarioSpeciesInjections.Sum(injection => injection.CreatureIds.Count);
+        return seededCount > 0
+            ? $" Seeded {seededCount} scenario roster creatures."
+            : string.Empty;
+    }
+
+    private static string ToWorkspaceRelativePath(string path)
+    {
+        try
+        {
+            var root = System.IO.Path.GetFullPath(GetRepositoryRoot());
+            var fullPath = System.IO.Path.GetFullPath(path);
+            var relativePath = System.IO.Path.GetRelativePath(root, fullPath);
+            if (!relativePath.StartsWith("..", StringComparison.Ordinal)
+                && !System.IO.Path.IsPathFullyQualified(relativePath))
+            {
+                return relativePath.Replace('\\', '/');
+            }
+        }
+        catch
+        {
+            // Keep absolute paths for files outside the workspace or unusual paths.
+        }
+
+        return path;
     }
 
     private static string SanitizeFileName(string value)

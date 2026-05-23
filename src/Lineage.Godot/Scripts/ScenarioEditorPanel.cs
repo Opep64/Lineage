@@ -24,10 +24,12 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         .GetProperties(BindingFlags.Instance | BindingFlags.Public)
         .Where(property => property.CanRead && property.CanWrite)
         .Where(property => property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+        .Where(IsEditableScenarioProperty)
         .OrderBy(property => property.MetadataToken)
         .ToArray();
 
     private readonly List<ScenarioFieldBinding> _bindings = [];
+    private readonly List<SpeciesScenarioSeed> _speciesSeedEntries = [];
 
     private MarginContainer _expandedRoot = null!;
     private MarginContainer _collapsedRoot = null!;
@@ -51,6 +53,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private SpinBox _speciesInjectCountInput = null!;
     private SpinBox _speciesInjectEnergyInput = null!;
     private OptionButton _speciesInjectRegionInput = null!;
+    private CheckBox _speciesSeedEnabledInput = null!;
+    private Label _speciesRosterLabel = null!;
     private Label _loadedSpeciesLabel = null!;
     private Label _lastSpeciesExportLabel = null!;
     private Button _injectSpeciesButton = null!;
@@ -106,6 +110,10 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             var value = binding.Property.GetValue(scenario);
             SetEditorValue(binding.Editor, value);
         }
+
+        _speciesSeedEntries.Clear();
+        _speciesSeedEntries.AddRange((scenario.SpeciesSeeds ?? []).Select(seed => seed.Validated()));
+        UpdateSpeciesRosterLabel();
     }
 
     public bool TryReadScenario(out SimulationScenario scenario, out string error)
@@ -121,6 +129,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 binding.Property.SetValue(scenario, value);
             }
 
+            scenario = scenario with { SpeciesSeeds = _speciesSeedEntries.ToArray() };
             scenario = scenario.Validated();
             return true;
         }
@@ -445,6 +454,13 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             _speciesInjectRegionInput.AddItem(name);
         }
 
+        _speciesSeedEnabledInput = new CheckBox { ButtonPressed = true };
+        _speciesRosterLabel = new Label
+        {
+            Text = "No scenario species seeds.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+
         root.AddChild(CreateFieldRow("Export name", _speciesNameInput));
         root.AddChild(CreateFieldRow("Export notes", _speciesNotesInput));
         root.AddChild(CreateButton("Export Selected Creature", () => ExportSelectedSpeciesRequested?.Invoke()));
@@ -470,14 +486,89 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _injectSpeciesButton.Disabled = true;
         root.AddChild(_injectSpeciesButton);
 
+        root.AddChild(new HSeparator());
+        root.AddChild(CreateFieldRow("Roster entry enabled", _speciesSeedEnabledInput));
+        root.AddChild(CreateButton("Add Loaded To Scenario", AddLoadedSpeciesToScenarioRoster));
+        root.AddChild(BuildButtonRow(
+            CreateButton("Remove Last Roster Entry", RemoveLastSpeciesSeed),
+            CreateButton("Clear Roster", ClearSpeciesRoster)));
+        root.AddChild(CreateFieldRow("Scenario start roster", _speciesRosterLabel));
+
         var note = new Label
         {
-            Text = "Export stores the selected living creature's genome and brain. Inject adds loaded profile copies as new founders in the current world.",
+            Text = "Export stores the selected living creature's genome and brain. Inject adds loaded profile copies to the current world. Add Loaded To Scenario saves the loaded profile as part of this scenario's repeatable starting roster.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         root.AddChild(note);
 
         return root;
+    }
+
+    private void AddLoadedSpeciesToScenarioRoster()
+    {
+        if (_loadedSpeciesProfilePath is null)
+        {
+            SetStatus("Load a species profile before adding it to the scenario roster.");
+            return;
+        }
+
+        var request = ReadSpeciesInjectionRequest();
+        var seed = new SpeciesScenarioSeed
+        {
+            ProfilePath = _loadedSpeciesProfilePath,
+            Count = request.Count,
+            SpawnRegion = request.SpawnRegion,
+            EnergyOverride = request.EnergyOverride,
+            Enabled = _speciesSeedEnabledInput.ButtonPressed
+        }.Validated();
+        _speciesSeedEntries.Add(seed);
+        UpdateSpeciesRosterLabel();
+        SetStatus($"Added {System.IO.Path.GetFileName(seed.ProfilePath)} to the scenario roster.");
+    }
+
+    private void RemoveLastSpeciesSeed()
+    {
+        if (_speciesSeedEntries.Count == 0)
+        {
+            SetStatus("Scenario roster is already empty.");
+            return;
+        }
+
+        _speciesSeedEntries.RemoveAt(_speciesSeedEntries.Count - 1);
+        UpdateSpeciesRosterLabel();
+        SetStatus("Removed the last scenario roster entry.");
+    }
+
+    private void ClearSpeciesRoster()
+    {
+        _speciesSeedEntries.Clear();
+        UpdateSpeciesRosterLabel();
+        SetStatus("Cleared the scenario species roster.");
+    }
+
+    private void UpdateSpeciesRosterLabel()
+    {
+        if (_speciesRosterLabel is null)
+        {
+            return;
+        }
+
+        if (_speciesSeedEntries.Count == 0)
+        {
+            _speciesRosterLabel.Text = "No scenario species seeds. Generic initial creatures will be used.";
+            return;
+        }
+
+        _speciesRosterLabel.Text = string.Join(
+            "\n",
+            _speciesSeedEntries.Select((seed, index) =>
+            {
+                var state = seed.Enabled ? "On" : "Off";
+                var energy = seed.EnergyOverride is null
+                    ? "profile energy"
+                    : $"{seed.EnergyOverride.Value:0.###} energy";
+                return $"{index + 1}. {state}: {seed.Count} x {System.IO.Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy})";
+            }));
     }
 
     private void OpenLastReport()
@@ -523,6 +614,17 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         var button = new Button { Text = text };
         button.Pressed += pressed;
         return button;
+    }
+
+    private static bool IsEditableScenarioProperty(PropertyInfo property)
+    {
+        var type = property.PropertyType;
+        return type == typeof(string)
+            || type == typeof(ulong)
+            || type == typeof(int)
+            || type == typeof(float)
+            || type == typeof(bool)
+            || type.IsEnum;
     }
 
     private static Control CreateEditor(PropertyInfo property)
