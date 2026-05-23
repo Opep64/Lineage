@@ -1139,6 +1139,7 @@ public static class ViewerReportWriter
         {
             InitialBrainKind.SeedForager => "Seed forager",
             InitialBrainKind.ExplorerForager => "Explorer forager",
+            InitialBrainKind.ScavengerForager => "Scavenger forager",
             InitialBrainKind.ForagerPredator => "Forager predator",
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
             _ => kind.ToString()

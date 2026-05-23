@@ -115,6 +115,29 @@ public sealed class NeuralBrainGenome
     }
 
     /// <summary>
+    /// Seed controller that still grazes, but actively follows visible meat and meat scent without attacking.
+    /// </summary>
+    public static NeuralBrainGenome CreateScavengerForager(int hiddenNodeCount = 0)
+    {
+        var weights = CreateSeedForagerWeights(hiddenNodeCount);
+
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.3f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatForwardInput, 0.9f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentDensityInput, 0.2f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 1.15f);
+
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatRightInput, 1.8f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 2.5f);
+
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
+
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
+
+    /// <summary>
     /// Seed controller that still forages, but also steers toward close visible creatures while hungry.
     /// </summary>
     public static NeuralBrainGenome CreateForagerPredator(int hiddenNodeCount = 0)

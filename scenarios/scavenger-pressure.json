@@ -2,7 +2,7 @@
   "name": "Scavenger Pressure",
   "seed": 20260519,
   "pipelineKind": "neural",
-  "initialBrainKind": "seedForager",
+  "initialBrainKind": "scavengerForager",
   "brainHiddenNodeCount": 4,
   "enableBiomes": true,
   "biomeMapKind": "generatedNoise",

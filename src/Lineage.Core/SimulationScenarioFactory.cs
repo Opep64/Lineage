@@ -263,6 +263,7 @@ public static class SimulationScenarioFactory
         {
             InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(hiddenNodeCount),
             InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(hiddenNodeCount),
+            InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(hiddenNodeCount),
             InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(hiddenNodeCount),
             InitialBrainKind.RandomPerFounder => throw new ArgumentException("Random-per-founder brains are created individually."),
             _ => throw new ArgumentOutOfRangeException(nameof(initialBrainKind), initialBrainKind, "Unsupported initial brain kind.")

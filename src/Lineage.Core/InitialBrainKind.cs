@@ -7,6 +7,7 @@ public enum InitialBrainKind
 {
     SeedForager,
     ExplorerForager,
+    ScavengerForager,
     ForagerPredator,
     RandomPerFounder
 }

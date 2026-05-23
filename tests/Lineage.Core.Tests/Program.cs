@@ -62,6 +62,7 @@ var tests = new (string Name, Action Body)[]
     ("Explorer forager keeps searching without food cues", ExplorerForagerKeepsSearchingWithoutFoodCues),
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
+    ("Scavenger forager starter brain follows carrion cues", ScavengerForagerStarterBrainFollowsCarrionCues),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
@@ -2329,6 +2330,31 @@ static void NeuralBrainSupportsHiddenNodes()
         "Seed hidden concepts should be prewired on the input side");
 }
 
+static void ScavengerForagerStarterBrainFollowsCarrionCues()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 407, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.3f,
+        CarrionAdaptation = 0.4f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateScavengerForager());
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Scavenger forager should still eat close plants");
+    AssertTrue(summary.MeatAhead.MoveForward > summary.PlantAhead.MoveForward + 0.25f, "Scavenger forager should push harder toward visible meat than plants");
+    AssertTrue(summary.MeatRight.Turn > 0.8f, "Scavenger forager should turn toward visible meat");
+    AssertTrue(summary.MeatScentAhead.MoveForward > summary.Baseline.MoveForward + 0.3f, "Scavenger forager should move toward meat scent");
+    AssertTrue(summary.MeatScentRight.Turn > 0.6f, "Scavenger forager should turn toward meat scent");
+    AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Scavenger forager should not arrive with built-in attack behavior");
+    AssertEqual("rare attack response", summary.PredatorTendency, "Scavenger forager attack tendency");
+    AssertEqual("scavenger-leaning", summary.Ecotype, "Scavenger forager ecotype");
+}
+
 static void ForagerPredatorStarterBrainHuntsCreatureCues()
 {
     var simulation = new Simulation(new SimulationConfig(), seed: 402, systems: []);
@@ -3589,6 +3615,18 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     for (var i = 0; i < explorerBrain.Weights.Length; i++)
     {
         AssertClose(explorerBrain.Weights[i], explorerSimulation.State.Brains[0].Weights[i], 0.000001, $"Explorer brain weight {i}");
+    }
+
+    var scavengerSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
+    {
+        InitialBrainKind = InitialBrainKind.ScavengerForager
+    });
+    var scavengerBrain = NeuralBrainGenome.CreateScavengerForager(scenario.BrainHiddenNodeCount);
+
+    AssertEqual(1, scavengerSimulation.State.Brains.Count, "Scavenger founder brain count");
+    for (var i = 0; i < scavengerBrain.Weights.Length; i++)
+    {
+        AssertClose(scavengerBrain.Weights[i], scavengerSimulation.State.Brains[0].Weights[i], 0.000001, $"Scavenger brain weight {i}");
     }
 
     var predatorSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
