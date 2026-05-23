@@ -59,6 +59,7 @@ var tests = new (string Name, Action Body)[]
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
+    ("Explorer forager keeps searching without food cues", ExplorerForagerKeepsSearchingWithoutFoodCues),
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
@@ -2181,12 +2182,41 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(21, summary.Results.Count, "Assay result count");
+    AssertEqual(23, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
     AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
+}
+
+static void ExplorerForagerKeepsSearchingWithoutFoodCues()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 402, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var seedBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    var explorerBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateExplorerForager());
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: seedBrainId);
+    var seedSummary = BehaviorAssay.Analyze(simulation.State);
+
+    simulation.State.Creatures.Clear();
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: explorerBrainId);
+    var explorerSummary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(
+        explorerSummary.HungryNoCue.MoveForward > seedSummary.HungryNoCue.MoveForward + 0.5f,
+        "Explorer forager should search harder than seed forager when hungry and no food is visible");
+    AssertTrue(explorerSummary.HungryNoCue.MoveForward > 0.75f, "Explorer forager should cruise when hungry and no food is visible");
+    AssertTrue(Math.Abs(explorerSummary.HungryNoCue.Turn) < 0.2f, "Explorer forager no-cue search should not be a tight circle");
+    AssertTrue(explorerSummary.FedNoCue.MoveForward < explorerSummary.HungryNoCue.MoveForward - 0.25f, "Explorer forager search should remain hunger-sensitive");
+    AssertTrue(explorerSummary.PlantRight.Turn > 0.5f, "Explorer forager should still turn toward visible plant cues");
+    AssertTrue(explorerSummary.PlantAhead.EatShare > 0.9f, "Explorer forager should still eat reachable plants");
+    AssertTrue(explorerSummary.CreatureAhead.AttackShare < 0.1f, "Explorer forager should not arrive with built-in attack behavior");
+    AssertEqual("hunger-driven cruising", explorerSummary.SearchTendency, "Explorer forager search tendency");
 }
 
 static void BehaviorAssaySummarizesTerrainResponse()
@@ -3547,6 +3577,18 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     for (var i = 0; i < seededBrain.Weights.Length; i++)
     {
         AssertClose(seededBrain.Weights[i], seededSimulation.State.Brains[0].Weights[i], 0.000001, $"Seed brain weight {i}");
+    }
+
+    var explorerSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
+    {
+        InitialBrainKind = InitialBrainKind.ExplorerForager
+    });
+    var explorerBrain = NeuralBrainGenome.CreateExplorerForager(scenario.BrainHiddenNodeCount);
+
+    AssertEqual(1, explorerSimulation.State.Brains.Count, "Explorer founder brain count");
+    for (var i = 0; i < explorerBrain.Weights.Length; i++)
+    {
+        AssertClose(explorerBrain.Weights[i], explorerSimulation.State.Brains[0].Weights[i], 0.000001, $"Explorer brain weight {i}");
     }
 
     var predatorSimulation = SimulationScenarioFactory.CreateSimulation(scenario with

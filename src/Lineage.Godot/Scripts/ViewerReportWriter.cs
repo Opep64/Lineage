@@ -1039,6 +1039,7 @@ public static class ViewerReportWriter
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Brains evaluated", summary.EvaluatedCreatureCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Movement style", summary.MovementStyle);
+        WriteMetric(writer, "Search response", summary.SearchTendency);
         WriteMetric(writer, "Population ecotype", summary.Ecotype);
         WriteMetric(writer, "Food response", summary.ForagingBias);
         WriteMetric(writer, "Creature attack response", summary.PredatorTendency);
@@ -1137,6 +1138,7 @@ public static class ViewerReportWriter
         return kind switch
         {
             InitialBrainKind.SeedForager => "Seed forager",
+            InitialBrainKind.ExplorerForager => "Explorer forager",
             InitialBrainKind.ForagerPredator => "Forager predator",
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
             _ => kind.ToString()

@@ -94,6 +94,27 @@ public sealed class NeuralBrainGenome
     }
 
     /// <summary>
+    /// Seed controller biased to keep moving when no food is visible, then forage once food enters vision.
+    /// </summary>
+    public static NeuralBrainGenome CreateExplorerForager(int hiddenNodeCount = 0)
+    {
+        var weights = CreateSeedForagerWeights(hiddenNodeCount);
+
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.BiasInput, 0.9f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.EnergyRatioInput, 0.15f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 1.15f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -2.2f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 0.85f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RecentFoodSuccessInput, -0.9f);
+
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.LeftTerrainDragInput, 0.25f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RightTerrainDragInput, -0.25f);
+
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
+
+    /// <summary>
     /// Seed controller that still forages, but also steers toward close visible creatures while hungry.
     /// </summary>
     public static NeuralBrainGenome CreateForagerPredator(int hiddenNodeCount = 0)

@@ -26,6 +26,8 @@ public static class BehaviorAssay
         Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
 
         var baseline = new BehaviorAssayAccumulator();
+        var hungryNoCue = new BehaviorAssayAccumulator();
+        var fedNoCue = new BehaviorAssayAccumulator();
         var plantAhead = new BehaviorAssayAccumulator();
         var plantRight = new BehaviorAssayAccumulator();
         var meatAhead = new BehaviorAssayAccumulator();
@@ -58,6 +60,8 @@ public static class BehaviorAssay
             var genome = state.GetGenome(creature.GenomeId);
 
             Accumulate(brain, genome, CreateBaselineSenses(), inputs, outputs, ref baseline);
+            Accumulate(brain, genome, CreateHungryNoCueSenses(), inputs, outputs, ref hungryNoCue);
+            Accumulate(brain, genome, CreateFedNoCueSenses(), inputs, outputs, ref fedNoCue);
             Accumulate(brain, genome, CreatePlantAheadSenses(), inputs, outputs, ref plantAhead);
             Accumulate(brain, genome, CreatePlantRightSenses(), inputs, outputs, ref plantRight);
             Accumulate(brain, genome, CreateMeatAheadSenses(), inputs, outputs, ref meatAhead);
@@ -83,6 +87,8 @@ public static class BehaviorAssay
         var summary = new BehaviorAssaySummary(
             baseline.Count,
             baseline.ToResult("No cue"),
+            hungryNoCue.ToResult("Hungry no cue"),
+            fedNoCue.ToResult("Fed no cue"),
             plantAhead.ToResult("Plant ahead"),
             plantRight.ToResult("Plant right"),
             meatAhead.ToResult("Meat ahead"),
@@ -107,6 +113,7 @@ public static class BehaviorAssay
         return summary with
         {
             MovementStyle = ClassifyMovement(summary),
+            SearchTendency = ClassifySearchTendency(summary),
             ForagingBias = ClassifyForagingBias(summary),
             PredatorTendency = ClassifyPredatorTendency(summary),
             RiskResponse = ClassifyRiskResponse(summary),
@@ -193,6 +200,26 @@ public static class BehaviorAssay
         {
             EnergyRatio = 0.45f,
             Hunger = 0.55f
+        };
+    }
+
+    private static CreatureSenseState CreateHungryNoCueSenses()
+    {
+        return new CreatureSenseState
+        {
+            EnergyRatio = 0.25f,
+            Hunger = 0.85f,
+            RecentFoodSuccess = 0f
+        };
+    }
+
+    private static CreatureSenseState CreateFedNoCueSenses()
+    {
+        return new CreatureSenseState
+        {
+            EnergyRatio = 0.8f,
+            Hunger = 0.15f,
+            RecentFoodSuccess = 1f
         };
     }
 
@@ -500,6 +527,32 @@ public static class BehaviorAssay
         return "moderate wandering";
     }
 
+    private static string ClassifySearchTendency(BehaviorAssaySummary summary)
+    {
+        var hungryMove = summary.HungryNoCue.MoveForward;
+        var hungryTurn = Math.Abs(summary.HungryNoCue.Turn);
+        var fedMove = summary.FedNoCue.MoveForward;
+
+        if (hungryMove > 0.75f && hungryTurn < 0.2f)
+        {
+            return fedMove < hungryMove - 0.25f
+                ? "hunger-driven cruising"
+                : "persistent cruising";
+        }
+
+        if (hungryMove > 0.55f)
+        {
+            return "active no-cue search";
+        }
+
+        if (hungryMove < 0.25f)
+        {
+            return "weak no-cue search";
+        }
+
+        return "moderate no-cue search";
+    }
+
     private static string ClassifyForagingBias(BehaviorAssaySummary summary)
     {
         var plantScore = CueScore(summary.PlantAhead, summary.PlantRight);
@@ -776,6 +829,8 @@ public static class BehaviorAssay
 public readonly record struct BehaviorAssaySummary(
     int EvaluatedCreatureCount,
     BehaviorAssayResult Baseline,
+    BehaviorAssayResult HungryNoCue,
+    BehaviorAssayResult FedNoCue,
     BehaviorAssayResult PlantAhead,
     BehaviorAssayResult PlantRight,
     BehaviorAssayResult MeatAhead,
@@ -799,6 +854,8 @@ public readonly record struct BehaviorAssaySummary(
 {
     public string MovementStyle { get; init; } = "not evaluated";
 
+    public string SearchTendency { get; init; } = "not evaluated";
+
     public string ForagingBias { get; init; } = "not evaluated";
 
     public string PredatorTendency { get; init; } = "not evaluated";
@@ -814,6 +871,8 @@ public readonly record struct BehaviorAssaySummary(
     public IReadOnlyList<BehaviorAssayResult> Results =>
     [
         Baseline,
+        HungryNoCue,
+        FedNoCue,
         PlantAhead,
         PlantRight,
         MeatAhead,

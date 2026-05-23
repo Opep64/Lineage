@@ -6,6 +6,7 @@ namespace Lineage.Core;
 public enum InitialBrainKind
 {
     SeedForager,
+    ExplorerForager,
     ForagerPredator,
     RandomPerFounder
 }
