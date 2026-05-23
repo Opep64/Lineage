@@ -124,18 +124,24 @@ public sealed class NeuralBrainGenome
     {
         var weights = CreateSeedForagerWeights(hiddenNodeCount);
 
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.3f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatForwardInput, 0.9f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentDensityInput, 0.2f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 1.15f);
+        SeedScavengerForagerWeights(weights);
 
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatRightInput, 1.8f);
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 2.5f);
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
 
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
+    /// <summary>
+    /// Scavenger probe brain that follows meat cues, but suppresses movement into strong rot scent.
+    /// </summary>
+    public static NeuralBrainGenome CreateFreshnessAwareScavenger(int hiddenNodeCount = 0)
+    {
+        var weights = CreateSeedForagerWeights(hiddenNodeCount);
+        SeedScavengerForagerWeights(weights);
+
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentDensityInput, -0.7f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentForwardInput, -2.7f);
+
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RottenMeatScentDensityInput, -1.2f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RottenMeatScentRightInput, -6.5f);
 
         return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
     }
@@ -192,6 +198,22 @@ public sealed class NeuralBrainGenome
         SeedHiddenConceptInputs(weights, hiddenNodeCount);
 
         return weights;
+    }
+
+    private static void SeedScavengerForagerWeights(float[] weights)
+    {
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.3f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatForwardInput, 0.9f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentDensityInput, 0.2f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 1.15f);
+
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatRightInput, 1.8f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 2.5f);
+
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
     }
 
     private static void SeedHiddenConceptInputs(float[] weights, int hiddenNodeCount)

@@ -65,10 +65,13 @@ var tests = new (string Name, Action Body)[]
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
+    ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
+    ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Explorer forager keeps searching without food cues", ExplorerForagerKeepsSearchingWithoutFoodCues),
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
     ("Scavenger forager starter brain follows carrion cues", ScavengerForagerStarterBrainFollowsCarrionCues),
+    ("Freshness-aware scavenger starter brain avoids rot cues", FreshnessAwareScavengerStarterBrainAvoidsRotCues),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
     ("Neural brain migrates memory inputs and outputs", NeuralBrainMigratesMemoryInputsAndOutputs),
@@ -2444,13 +2447,57 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(25, summary.Results.Count, "Assay result count");
+    AssertEqual(27, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
     AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
+    AssertClose(0f, summary.FreshMeatPreferenceScore, 0.000001, "Seed forager fresh meat score");
+    AssertClose(0f, summary.RottenScentAvoidanceScore, 0.000001, "Seed forager rot scent score");
     AssertEqual("little freshness differentiation", summary.RottenMeatResponse, "Seed forager should not arrive with built-in rot response");
+}
+
+static void BehaviorAssayDetectsFreshMeatPreference()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 403, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 3f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 3f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.FreshMeatPreferenceScore > 0.3f, "Freshness-sensitive probe should prefer fresh meat cues");
+    AssertEqual("prefers fresh meat", summary.RottenMeatResponse, "Freshness-sensitive rot response");
+}
+
+static void BehaviorAssayDetectsRottenScentAvoidance()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 404, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.MeatScentForwardInput] = 3f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.MeatScentRightInput] = 3f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentForwardInput] = -4f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentRightInput] = -4f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.RottenScentAvoidanceScore > 0.8f, "Rot-scent-sensitive probe should prefer clean meat scent");
+    AssertEqual("avoids rot scent", summary.RottenMeatResponse, "Rot-scent-sensitive rot response");
 }
 
 static void ExplorerForagerKeepsSearchingWithoutFoodCues()
@@ -2677,6 +2724,32 @@ static void ScavengerForagerStarterBrainFollowsCarrionCues()
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Scavenger forager should not arrive with built-in attack behavior");
     AssertEqual("rare attack response", summary.PredatorTendency, "Scavenger forager attack tendency");
     AssertEqual("scavenger-leaning", summary.Ecotype, "Scavenger forager ecotype");
+}
+
+static void FreshnessAwareScavengerStarterBrainAvoidsRotCues()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 408, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.3f,
+        CarrionAdaptation = 0.4f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateFreshnessAwareScavenger());
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Freshness-aware scavenger should still eat close plants");
+    AssertTrue(summary.MeatAhead.MoveForward > summary.PlantAhead.MoveForward + 0.25f, "Freshness-aware scavenger should still pursue visible fresh meat");
+    AssertTrue(summary.MeatScentAhead.MoveForward > summary.Baseline.MoveForward + 0.3f, "Freshness-aware scavenger should still follow clean meat scent");
+    AssertTrue(summary.RottenMeatAhead.MoveForward < summary.MeatAhead.MoveForward - 0.5f, "Freshness-aware scavenger should suppress movement toward stale meat");
+    AssertTrue(summary.RottenMeatScentAhead.MoveForward < summary.MeatScentAhead.MoveForward - 0.45f, "Freshness-aware scavenger should avoid rot scent ahead");
+    AssertTrue(summary.FreshMeatPreferenceScore > 0.8f, "Freshness-aware scavenger fresh preference score");
+    AssertTrue(summary.RottenScentAvoidanceScore > 1.0f, "Freshness-aware scavenger rot avoidance score");
+    AssertEqual("prefers fresh meat", summary.RottenMeatResponse, "Freshness-aware scavenger rot response");
+    AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Freshness-aware scavenger should not arrive with built-in attack behavior");
 }
 
 static void ForagerPredatorStarterBrainHuntsCreatureCues()
@@ -4095,6 +4168,18 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     for (var i = 0; i < scavengerBrain.Weights.Length; i++)
     {
         AssertClose(scavengerBrain.Weights[i], scavengerSimulation.State.Brains[0].Weights[i], 0.000001, $"Scavenger brain weight {i}");
+    }
+
+    var freshnessAwareSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
+    {
+        InitialBrainKind = InitialBrainKind.FreshnessAwareScavenger
+    });
+    var freshnessAwareBrain = NeuralBrainGenome.CreateFreshnessAwareScavenger(scenario.BrainHiddenNodeCount);
+
+    AssertEqual(1, freshnessAwareSimulation.State.Brains.Count, "Freshness-aware scavenger founder brain count");
+    for (var i = 0; i < freshnessAwareBrain.Weights.Length; i++)
+    {
+        AssertClose(freshnessAwareBrain.Weights[i], freshnessAwareSimulation.State.Brains[0].Weights[i], 0.000001, $"Freshness-aware brain weight {i}");
     }
 
     var predatorSimulation = SimulationScenarioFactory.CreateSimulation(scenario with

@@ -1089,6 +1089,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Terrain response", summary.TerrainResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
+        WriteMetric(writer, "Fresh meat preference", summary.FreshMeatPreferenceScore.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Rot scent avoidance", summary.RottenScentAvoidanceScore.ToString("0.###", CultureInfo.InvariantCulture));
         writer.WriteLine("</div>");
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -1184,6 +1186,7 @@ public static class ViewerReportWriter
             InitialBrainKind.SeedForager => "Seed forager",
             InitialBrainKind.ExplorerForager => "Explorer forager",
             InitialBrainKind.ScavengerForager => "Scavenger forager",
+            InitialBrainKind.FreshnessAwareScavenger => "Freshness-aware scavenger",
             InitialBrainKind.ForagerPredator => "Forager predator",
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
             _ => kind.ToString()
