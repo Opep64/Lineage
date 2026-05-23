@@ -587,7 +587,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: tune `scenarios/terrain-pressure.json` now that crossing diagnostics exist. A 20k seed-42 run reaches about halfway across the world and maintains creatures in the middle third, but no creatures reach the right third. A 5k two-seed probe showed no-drag founders explore farther east than base/drag-hard, so the immediate question is how to make the terrain crossing difficult but solvable without removing the pressure entirely.
+Next practical step: use the now-solvable `scenarios/terrain-pressure.json` as the terrain-pressure lab, then decide whether the next ecological pressure should be rudimentary spatial memory, richer long-range exploration, or a larger-world migration pass after more performance work. A 2026-05-23 tuning pass kept the harsh center and corridor shape, but changed biome speed multipliers to neutral `1.0` so terrain pressure is expressed through energy/basal cost instead of making large-map travel feel physically glacial.
 
 ## Current Implementation State
 
@@ -747,6 +747,7 @@ Core types currently present:
 - `BiomeMap`: deterministic low-resolution biome grid used for resource density, resource void-border exclusion, and reports.
 - `BiomeKind`: coarse biome categories for barren, sparse, grassland, and rich regions.
 - `BiomeMapKind.VerticalEdgeCorridorBands`: rich ends with a harsher center and a crossable corridor, used by the first terrain-pressure scenario.
+- `BiomeMapKind.VerticalEdgeWideCorridorBands`: variant terrain-pressure layout with the same rich ends and a wider center corridor for comparison probes.
 - `WorldState`: mutable tick/time/entity state.
 - `DeterministicRandom`: replay-friendly random source.
 - `SimVector2`: core-owned 2D vector type, avoiding Godot types.
@@ -924,6 +925,7 @@ Build, 101 core tests, CLI `mixed-starter-roster` smoke with 100 roster-seeded f
 Build, 101 core tests, `git diff --check`, and a compact 5k two-seed terrain drag probe passed on 2026-05-22 after adding terrain-assay fields to the lightweight probe CSV/report. Balanced and Scavenger Pressure remained viable across base/no-drag/harder-drag variants, but behavior assays still reported little terrain differentiation.
 Build, 103 core tests, `git diff --check`, a compact 5k two-seed Terrain Pressure base/no-drag/harder-drag probe, and 5k plus 20k seed-42 Terrain Pressure full reports passed on 2026-05-22 after adding the first corridor terrain scenario and per-biome foraging/death telemetry. The 20k run reached generation 1 and stayed viable, but no creatures reached the right region by the final snapshot.
 Build, 103 core tests, `git diff --check`, a compact 5k two-seed Terrain Pressure crossing probe, and a 20k seed-42 Terrain Pressure full report passed on 2026-05-23 after adding creature max-X tracking, run eastward-progress metrics, probe crossing columns, an eastward-progress report graph, and a founder exploration table. The 5k probe showed no-drag reaching `59.6%` average run east progress versus `38.2%` base and `37.7%` drag-hard. The 20k seed-42 base run reached `50.3%` run east progress with `25` creatures in the middle third and `0` in the right third.
+Build, 103 core tests, `git diff --check`, and terrain-pressure tuning probes passed on 2026-05-23 after adding a `VerticalEdgeWideCorridorBands` comparison map and selecting neutral biome speed multipliers for `scenarios/terrain-pressure.json`. The original 20k two-seed base averaged `56.1%` run east progress with `0` right-third creatures. The selected no-speed-drag setup averaged `83.9%` run east progress with `7` right-third creatures, while keeping terrain energy/basal costs active. Softer speed-drag compromises improved progress but were less reliably crossable.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 

@@ -148,7 +148,8 @@ public sealed class BiomeMap
             and not BiomeMapKind.VerticalEdgeBands
             and not BiomeMapKind.HorizontalEdgeLadderBands
             and not BiomeMapKind.VerticalEdgeLadderBands
-            and not BiomeMapKind.VerticalEdgeCorridorBands)
+            and not BiomeMapKind.VerticalEdgeCorridorBands
+            and not BiomeMapKind.VerticalEdgeWideCorridorBands)
         {
             throw new ArgumentException("Banded biome generation requires a band map kind.", nameof(mapKind));
         }
@@ -164,19 +165,23 @@ public sealed class BiomeMap
                 var vertical = mapKind is BiomeMapKind.VerticalBands
                     or BiomeMapKind.VerticalEdgeBands
                     or BiomeMapKind.VerticalEdgeLadderBands
-                    or BiomeMapKind.VerticalEdgeCorridorBands;
+                    or BiomeMapKind.VerticalEdgeCorridorBands
+                    or BiomeMapKind.VerticalEdgeWideCorridorBands;
                 var edgeRich = mapKind is BiomeMapKind.HorizontalEdgeBands
                     or BiomeMapKind.VerticalEdgeBands
                     or BiomeMapKind.HorizontalEdgeLadderBands
                     or BiomeMapKind.VerticalEdgeLadderBands
-                    or BiomeMapKind.VerticalEdgeCorridorBands;
+                    or BiomeMapKind.VerticalEdgeCorridorBands
+                    or BiomeMapKind.VerticalEdgeWideCorridorBands;
                 var edgeLadder = mapKind is BiomeMapKind.HorizontalEdgeLadderBands
                     or BiomeMapKind.VerticalEdgeLadderBands;
-                var edgeCorridor = mapKind is BiomeMapKind.VerticalEdgeCorridorBands;
+                var edgeCorridor = mapKind is BiomeMapKind.VerticalEdgeCorridorBands
+                    or BiomeMapKind.VerticalEdgeWideCorridorBands;
+                var wideCorridor = mapKind is BiomeMapKind.VerticalEdgeWideCorridorBands;
                 var bandIndex = vertical ? x : y;
                 var bandCount = vertical ? cellCountX : cellCountY;
                 cells[y * cellCountX + x] = edgeCorridor
-                    ? BiomeKindForVerticalEdgeCorridorBand(x, y, cellCountX, cellCountY)
+                    ? BiomeKindForVerticalEdgeCorridorBand(x, y, cellCountX, cellCountY, wideCorridor)
                     : edgeLadder
                     ? BiomeKindForEdgeLadderBand(bandIndex, bandCount)
                     : edgeRich
@@ -457,7 +462,12 @@ public sealed class BiomeMap
         };
     }
 
-    private static BiomeKind BiomeKindForVerticalEdgeCorridorBand(int x, int y, int cellCountX, int cellCountY)
+    private static BiomeKind BiomeKindForVerticalEdgeCorridorBand(
+        int x,
+        int y,
+        int cellCountX,
+        int cellCountY,
+        bool wide)
     {
         var band = BiomeKindForEdgeBand(x, cellCountX);
         if (band != BiomeKind.Barren)
@@ -472,6 +482,16 @@ public sealed class BiomeMap
 
         var yPhase = (y + 0.5f) / cellCountY;
         var corridorDistance = MathF.Abs(yPhase - 0.5f);
+        if (wide)
+        {
+            return corridorDistance switch
+            {
+                < 0.20f => BiomeKind.Grassland,
+                < 0.34f => BiomeKind.Sparse,
+                _ => BiomeKind.Barren
+            };
+        }
+
         return corridorDistance switch
         {
             < 0.14f => BiomeKind.Grassland,

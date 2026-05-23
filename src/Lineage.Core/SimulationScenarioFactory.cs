@@ -217,7 +217,8 @@ public static class SimulationScenarioFactory
                 or BiomeMapKind.VerticalEdgeBands
                 or BiomeMapKind.HorizontalEdgeLadderBands
                 or BiomeMapKind.VerticalEdgeLadderBands
-                or BiomeMapKind.VerticalEdgeCorridorBands => BiomeMap.GenerateBands(
+                or BiomeMapKind.VerticalEdgeCorridorBands
+                or BiomeMapKind.VerticalEdgeWideCorridorBands => BiomeMap.GenerateBands(
                 bounds,
                 scenario.BiomeCellSize,
                 scenario.BiomeMapKind,

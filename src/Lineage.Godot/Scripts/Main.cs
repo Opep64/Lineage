@@ -2708,6 +2708,8 @@ public partial class Main : Node2D
             BiomeMapKind.VerticalEdgeBands => "vertical edge bands",
             BiomeMapKind.HorizontalEdgeLadderBands => "horizontal ladder bands",
             BiomeMapKind.VerticalEdgeLadderBands => "vertical ladder bands",
+            BiomeMapKind.VerticalEdgeCorridorBands => "vertical corridor bands",
+            BiomeMapKind.VerticalEdgeWideCorridorBands => "wide vertical corridor bands",
             _ => "noise"
         };
     }

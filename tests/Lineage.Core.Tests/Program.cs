@@ -3427,6 +3427,20 @@ static void EdgeCorridorBiomeMapsCreateHarshCrossings()
     AssertEqual(BiomeKind.Sparse, vertical.GetKind(4, 3), "Lower corridor shoulder should be sparse");
     AssertEqual(BiomeKind.Barren, vertical.GetKind(4, 4), "Lower center should remain barren");
     AssertEqual(BiomeKind.Rich, vertical.GetKind(7, 0), "Right edge should be rich");
+
+    var wide = BiomeMap.GenerateBands(
+        new WorldBounds(800f, 800f),
+        cellSize: 100f,
+        BiomeMapKind.VerticalEdgeWideCorridorBands);
+
+    AssertEqual(BiomeKind.Rich, wide.GetKind(0, 0), "Wide corridor left edge should stay rich");
+    AssertEqual(BiomeKind.Barren, wide.GetKind(3, 0), "Wide corridor upper center should remain barren");
+    AssertEqual(BiomeKind.Sparse, wide.GetKind(3, 1), "Wide corridor upper shoulder should be sparse");
+    AssertEqual(BiomeKind.Grassland, wide.GetKind(3, 2), "Wide corridor should widen into grassland sooner");
+    AssertEqual(BiomeKind.Grassland, wide.GetKind(4, 5), "Wide corridor should keep lower center grassland");
+    AssertEqual(BiomeKind.Sparse, wide.GetKind(4, 6), "Wide corridor lower shoulder should be sparse");
+    AssertEqual(BiomeKind.Barren, wide.GetKind(4, 7), "Wide corridor lower edge should remain barren");
+    AssertEqual(BiomeKind.Rich, wide.GetKind(7, 0), "Wide corridor right edge should stay rich");
 }
 
 static void BiomeMapSamplesResourcesByDensity()
