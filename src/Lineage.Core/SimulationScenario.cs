@@ -96,6 +96,10 @@ public sealed record SimulationScenario
 
     public float ResourceClusterRadius { get; init; } = 180f;
 
+    public float PlantLocalDispersalChance { get; init; } = 0.35f;
+
+    public float PlantLocalDispersalRadius { get; init; } = 220f;
+
     public bool EnableSeasons { get; init; }
 
     public float SeasonLengthSeconds { get; init; } = 900f;
@@ -280,6 +284,13 @@ public sealed record SimulationScenario
         EnsureNonNegativeRange(PlantRespawnDelaySecondsMin, PlantRespawnDelaySecondsMax, nameof(PlantRespawnDelaySecondsMin), nameof(PlantRespawnDelaySecondsMax));
         EnsureProbability(ResourceClusterStrength, nameof(ResourceClusterStrength));
         EnsurePositive(ResourceClusterRadius, nameof(ResourceClusterRadius));
+        EnsureProbability(PlantLocalDispersalChance, nameof(PlantLocalDispersalChance));
+        EnsureNonNegative(PlantLocalDispersalRadius, nameof(PlantLocalDispersalRadius));
+        if (PlantLocalDispersalChance > 0f && PlantLocalDispersalRadius <= 0f)
+        {
+            throw new InvalidOperationException("Plant local dispersal radius must be positive when local dispersal is enabled.");
+        }
+
         EnsurePositive(SeasonLengthSeconds, nameof(SeasonLengthSeconds));
         EnsureRange(SeasonFertilityAmplitude, 0f, 0.95f, nameof(SeasonFertilityAmplitude));
         EnsureFinite(SeasonPhaseOffsetSeconds, nameof(SeasonPhaseOffsetSeconds));

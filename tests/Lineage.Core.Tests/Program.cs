@@ -22,6 +22,7 @@ var tests = new (string Name, Action Body)[]
     ("Opposed seasonal fertility alternates world halves", OpposedSeasonalFertilityAlternatesWorldHalves),
     ("Biome seasonal response scales plant regrowth", BiomeSeasonalResponseScalesPlantRegrowth),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
+    ("Depleted plants can disperse locally", DepletedPlantsCanDisperseLocally),
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
     ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
@@ -775,6 +776,45 @@ static void DepletedResourcesCanRelocateBeforeRegrowing()
     AssertTrue(resource.Position != initialPosition, "Depleted resource should relocate");
     AssertTrue(simulation.State.Bounds.Contains(resource.Position), "Relocated resource should remain inside bounds");
     AssertClose(5f, resource.Calories, 0.000001, "Relocated resource calories after regrowth");
+}
+
+static void DepletedPlantsCanDisperseLocally()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 500f,
+            WorldHeight = 500f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 210,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                relocateDepletedResources: true,
+                resourceClusterStrength: 0f,
+                plantLocalDispersalChance: 1f,
+                plantLocalDispersalRadius: 25f)
+        ]);
+
+    var initialPosition = new SimVector2(250f, 250f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Position = initialPosition,
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 5f
+    });
+
+    simulation.Step();
+
+    var resource = simulation.State.Resources[0];
+    AssertTrue(simulation.State.Bounds.Contains(resource.Position), "Locally dispersed resource should remain inside bounds");
+    AssertTrue(
+        SimVector2.Distance(initialPosition, resource.Position) <= 25.0001f,
+        "Locally dispersed resource should stay near the depleted plant");
+    AssertClose(5f, resource.Calories, 0.000001, "Locally dispersed resource calories after regrowth");
 }
 
 static void DepletedPlantsEnterDormancyBeforeRespawning()
@@ -5017,6 +5057,8 @@ static void ScenarioJsonRoundTrips()
         InitialResourcesPerMillionArea = 37.5f,
         PlantRespawnDelaySecondsMin = 12f,
         PlantRespawnDelaySecondsMax = 34f,
+        PlantLocalDispersalChance = 0.27f,
+        PlantLocalDispersalRadius = 188f,
         EnableSeasons = true,
         SeasonLengthSeconds = 480f,
         SeasonFertilityAmplitude = 0.45f,
@@ -5105,6 +5147,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"spawnRegion\": \"leftThird\""), "JSON should serialize species seed spawn regions");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
+    AssertTrue(json.Contains("\"plantLocalDispersalChance\""), "JSON should serialize plant local dispersal chance");
+    AssertTrue(json.Contains("\"plantLocalDispersalRadius\""), "JSON should serialize plant local dispersal radius");
     AssertTrue(json.Contains("\"enableSeasons\""), "JSON should serialize season toggle");
     AssertTrue(json.Contains("\"seasonFertilityAmplitude\""), "JSON should serialize season fertility");
     AssertTrue(json.Contains("\"seasonPhaseMode\": \"horizontalOpposed\""), "JSON should serialize season phase mode");
@@ -5143,6 +5187,8 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
+    AssertClose(scenario.PlantLocalDispersalChance, roundTripped.PlantLocalDispersalChance, 0.000001, "Scenario plant local dispersal chance");
+    AssertClose(scenario.PlantLocalDispersalRadius, roundTripped.PlantLocalDispersalRadius, 0.000001, "Scenario plant local dispersal radius");
     AssertEqual(scenario.EnableSeasons, roundTripped.EnableSeasons, "Scenario season toggle");
     AssertClose(scenario.SeasonLengthSeconds, roundTripped.SeasonLengthSeconds, 0.000001, "Scenario season length");
     AssertClose(scenario.SeasonFertilityAmplitude, roundTripped.SeasonFertilityAmplitude, 0.000001, "Scenario season fertility amplitude");

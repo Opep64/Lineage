@@ -7,18 +7,41 @@ namespace Lineage.Core;
 /// <remarks>
 /// Biomes decide where plants are allowed and how attractive each area is. Clustering
 /// adds patchiness by sometimes placing a new plant near an existing live plant,
-/// which creates local food islands without giving creatures any direct knowledge
-/// about the underlying fertility map.
+/// while local dispersal lets depleted plants reseed near their previous patch before
+/// falling back to broader placement rules. Both create food islands without giving
+/// creatures any direct knowledge about the underlying fertility map.
 /// </remarks>
 public static class ResourcePlacement
 {
     private const int ClusterAttemptCount = 8;
+    private const int LocalDispersalAttemptCount = 12;
 
     public static SimVector2 SamplePlantPosition(
         WorldState state,
         float clusterStrength,
-        float clusterRadius)
+        float clusterRadius,
+        SimVector2? localDispersalOrigin = null,
+        float localDispersalChance = 0f,
+        float localDispersalRadius = 0f)
     {
+        if (localDispersalOrigin is { } origin
+            && localDispersalChance > 0f
+            && localDispersalRadius > 0f
+            && state.Random.NextSingle() < localDispersalChance)
+        {
+            for (var attempt = 0; attempt < LocalDispersalAttemptCount; attempt++)
+            {
+                var angle = state.Random.NextSingle(0f, MathF.Tau);
+                var radius = localDispersalRadius * MathF.Sqrt(state.Random.NextSingle());
+                var candidate = state.Bounds.Clamp(origin + SimVector2.FromAngle(angle) * radius);
+
+                if (CanPlacePlant(state, candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
         if (clusterStrength > 0f
             && clusterRadius > 0f
             && state.Resources.Count > 0

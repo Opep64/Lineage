@@ -8,6 +8,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
     private readonly bool _relocateDepletedResources;
     private readonly float _resourceClusterStrength;
     private readonly float _resourceClusterRadius;
+    private readonly float _plantLocalDispersalChance;
+    private readonly float _plantLocalDispersalRadius;
     private readonly float _plantRespawnDelaySecondsMin;
     private readonly float _plantRespawnDelaySecondsMax;
     private readonly float _plantRespawnCaloriesMin;
@@ -23,6 +25,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         bool relocateDepletedResources = false,
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
+        float plantLocalDispersalChance = 0f,
+        float plantLocalDispersalRadius = 220f,
         float plantRespawnDelaySecondsMin = 0f,
         float plantRespawnDelaySecondsMax = 0f,
         float plantRespawnCaloriesMin = 0f,
@@ -38,9 +42,16 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         EnsureNonNegative(plantRespawnDelaySecondsMax, nameof(plantRespawnDelaySecondsMax));
         EnsureNonNegative(plantRespawnCaloriesMin, nameof(plantRespawnCaloriesMin));
         EnsureNonNegative(plantRespawnCaloriesMax, nameof(plantRespawnCaloriesMax));
+        EnsureRange(plantLocalDispersalChance, 0f, 1f, nameof(plantLocalDispersalChance));
+        EnsureNonNegative(plantLocalDispersalRadius, nameof(plantLocalDispersalRadius));
         EnsurePositive(seasonLengthSeconds, nameof(seasonLengthSeconds));
         EnsureRange(seasonFertilityAmplitude, 0f, 0.95f, nameof(seasonFertilityAmplitude));
         EnsureFinite(seasonPhaseOffsetSeconds, nameof(seasonPhaseOffsetSeconds));
+
+        if (plantLocalDispersalChance > 0f && plantLocalDispersalRadius <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(plantLocalDispersalRadius), "Plant local dispersal radius must be positive when local dispersal is enabled.");
+        }
 
         if (plantRespawnDelaySecondsMax < plantRespawnDelaySecondsMin)
         {
@@ -55,6 +66,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         _relocateDepletedResources = relocateDepletedResources;
         _resourceClusterStrength = resourceClusterStrength;
         _resourceClusterRadius = resourceClusterRadius;
+        _plantLocalDispersalChance = plantLocalDispersalChance;
+        _plantLocalDispersalRadius = plantLocalDispersalRadius;
         _plantRespawnDelaySecondsMin = plantRespawnDelaySecondsMin;
         _plantRespawnDelaySecondsMax = plantRespawnDelaySecondsMax;
         _plantRespawnCaloriesMin = plantRespawnCaloriesMin;
@@ -150,10 +163,14 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             resource.Calories = 0f;
             if (_relocateDepletedResources)
             {
+                var depletedPosition = resource.Position;
                 resource.Position = ResourcePlacement.SamplePlantPosition(
                     state,
                     _resourceClusterStrength,
-                    _resourceClusterRadius);
+                    _resourceClusterRadius,
+                    depletedPosition,
+                    _plantLocalDispersalChance,
+                    _plantLocalDispersalRadius);
             }
 
             resource.RespawnSecondsRemaining = SamplePlantRespawnDelay(state);
@@ -165,10 +182,14 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         }
         else if (_relocateDepletedResources && resource.Calories <= 0f)
         {
+            var depletedPosition = resource.Position;
             resource.Position = ResourcePlacement.SamplePlantPosition(
                 state,
                 _resourceClusterStrength,
-                _resourceClusterRadius);
+                _resourceClusterRadius,
+                depletedPosition,
+                _plantLocalDispersalChance,
+                _plantLocalDispersalRadius);
             resourcesDirty = true;
         }
 
