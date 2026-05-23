@@ -66,6 +66,8 @@ public sealed record SimulationSnapshot
 
     public int RichDeathCount { get; init; }
 
+    public float MaxCreatureXReached { get; init; }
+
     public BiomeSnapshot Biomes { get; init; } = new();
 
     public static SimulationSnapshot Capture(SimulationScenario scenario, Simulation simulation)
@@ -99,6 +101,7 @@ public sealed record SimulationSnapshot
             SparseDeathCount = state.Stats.SparseDeathCount,
             GrasslandDeathCount = state.Stats.GrasslandDeathCount,
             RichDeathCount = state.Stats.RichDeathCount,
+            MaxCreatureXReached = state.Stats.MaxCreatureXReached,
             Biomes = BiomeSnapshot.Capture(state.Biomes)
         };
     }

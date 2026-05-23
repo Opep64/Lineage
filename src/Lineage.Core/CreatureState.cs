@@ -14,6 +14,11 @@ public struct CreatureState
 
     public SimVector2 Position { get; set; }
 
+    /// <summary>
+    /// Farthest eastward world position this creature has reached.
+    /// </summary>
+    public float MaxXReached { get; set; }
+
     public SimVector2 Velocity { get; set; }
 
     /// <summary>

@@ -105,7 +105,8 @@ public static class SimulationSnapshotJson
             snapshot.BarrenDeathCount,
             snapshot.SparseDeathCount,
             snapshot.GrasslandDeathCount,
-            snapshot.RichDeathCount);
+            snapshot.RichDeathCount,
+            snapshot.MaxCreatureXReached);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 
@@ -192,6 +193,11 @@ public static class SimulationSnapshotJson
         if (creature.BirthInvestmentRatio <= 0f)
         {
             creature.BirthInvestmentRatio = 1f;
+        }
+
+        if (!float.IsFinite(creature.MaxXReached) || creature.MaxXReached < creature.Position.X)
+        {
+            creature.MaxXReached = creature.Position.X;
         }
 
         if (creature.GutMeatCalories <= 0f)

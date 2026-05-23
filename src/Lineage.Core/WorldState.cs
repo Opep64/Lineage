@@ -123,11 +123,13 @@ public sealed class WorldState
         }
 
         var id = CreateEntityId();
+        var clampedPosition = Bounds.Clamp(position);
         Creatures.Add(new CreatureState
         {
             Id = id,
             ParentId = parentId,
-            Position = Bounds.Clamp(position),
+            Position = clampedPosition,
+            MaxXReached = clampedPosition.X,
             HeadingRadians = Random.NextSingle(0f, MathF.Tau),
             Energy = energy,
             Health = health,
@@ -146,8 +148,10 @@ public sealed class WorldState
             Generation = generation,
             GenomeId = genomeId,
             BrainId = brainId,
-            BirthEnergy = energy
+            BirthEnergy = energy,
+            MaxXReached = clampedPosition.X
         });
+        Stats.RecordEastwardProgress(clampedPosition.X);
 
         return id;
     }
@@ -221,7 +225,7 @@ public sealed class WorldState
         return false;
     }
 
-    internal void MarkCreatureDead(EntityId id, CreatureDeathReason reason, BiomeKind deathBiome)
+    internal void MarkCreatureDead(EntityId id, CreatureDeathReason reason, BiomeKind deathBiome, float maxXReached)
     {
         if (!_lineageRecordByEntityId.TryGetValue(id, out var index))
         {
@@ -237,9 +241,33 @@ public sealed class WorldState
         record.DeathTick = Tick;
         record.DeathElapsedSeconds = ElapsedSeconds;
         record.DeathReason = reason;
+        record.MaxXReached = Math.Max(record.MaxXReached, maxXReached);
         _lineageRecords[index] = record;
         var lifespanSeconds = MathF.Max(0f, (float)(record.DeathElapsedSeconds.Value - record.BirthElapsedSeconds));
         Stats.RecordCreatureDeath(reason, lifespanSeconds, deathBiome);
+    }
+
+    internal void RecordCreatureProgress(EntityId id, float maxXReached)
+    {
+        if (!float.IsFinite(maxXReached))
+        {
+            return;
+        }
+
+        Stats.RecordEastwardProgress(maxXReached);
+        if (!_lineageRecordByEntityId.TryGetValue(id, out var index))
+        {
+            return;
+        }
+
+        var record = _lineageRecords[index];
+        if (maxXReached <= record.MaxXReached)
+        {
+            return;
+        }
+
+        record.MaxXReached = maxXReached;
+        _lineageRecords[index] = record;
     }
 
     public EntityId SpawnResourcePatch(ResourcePatchState patch)

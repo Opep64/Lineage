@@ -26,6 +26,8 @@ public struct CreatureLineageRecord
 
     public float BirthEnergy { get; set; }
 
+    public float MaxXReached { get; set; }
+
     public long? DeathTick { get; set; }
 
     public double? DeathElapsedSeconds { get; set; }

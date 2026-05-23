@@ -32,6 +32,7 @@ public sealed class MovementSystem(
             var distanceTraveled = SimVector2.Distance(previousPosition, nextPosition);
 
             creature.Position = nextPosition;
+            creature.MaxXReached = Math.Max(creature.MaxXReached, nextPosition.X);
             creature.Velocity = (nextPosition - previousPosition) / deltaSeconds;
             creature.LastDistanceTraveled = distanceTraveled;
             creature.DistanceSinceLastMeal += distanceTraveled;
@@ -45,6 +46,7 @@ public sealed class MovementSystem(
                 * deltaSeconds;
 
             state.Creatures[i] = creature;
+            state.RecordCreatureProgress(creature.Id, creature.MaxXReached);
         }
     }
 

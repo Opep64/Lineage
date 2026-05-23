@@ -39,6 +39,10 @@ public sealed class StatsRecordingSystem(
         }
 
         var totalCreatureEnergy = 0f;
+        var totalCreatureX = 0f;
+        var maxCreatureX = 0f;
+        var totalMaxCreatureXReached = 0f;
+        var maxCreatureXReached = 0f;
         var totalVisibleFoodDensity = 0f;
         var totalVisiblePlantDensity = 0f;
         var totalVisibleMeatDensity = 0f;
@@ -112,6 +116,10 @@ public sealed class StatsRecordingSystem(
             var creature = state.Creatures[i];
             var genome = state.GetGenome(creature.GenomeId);
             totalCreatureEnergy += creature.Energy;
+            totalCreatureX += creature.Position.X;
+            maxCreatureX = Math.Max(maxCreatureX, creature.Position.X);
+            totalMaxCreatureXReached += creature.MaxXReached;
+            maxCreatureXReached = Math.Max(maxCreatureXReached, creature.MaxXReached);
             totalVisibleFoodDensity += creature.Senses.VisibleFoodDensity;
             totalVisiblePlantDensity += creature.Senses.VisiblePlantDensity;
             totalVisibleMeatDensity += creature.Senses.VisibleMeatDensity;
@@ -458,6 +466,7 @@ public sealed class StatsRecordingSystem(
         var leftRegionSeason = CalculateRegionSeason(state, 1f / 6f);
         var middleRegionSeason = CalculateRegionSeason(state, 0.5f);
         var rightRegionSeason = CalculateRegionSeason(state, 5f / 6f);
+        state.Stats.RecordEastwardProgress(maxCreatureXReached);
         state.Stats.RecordSnapshot(new SimulationStatsSnapshot(
             state.Tick,
             state.ElapsedSeconds,
@@ -505,6 +514,13 @@ public sealed class StatsRecordingSystem(
             state.Stats.SparseDeathCount,
             state.Stats.GrasslandDeathCount,
             state.Stats.RichDeathCount,
+            totalCreatureX / divisor,
+            maxCreatureX,
+            totalMaxCreatureXReached / divisor,
+            maxCreatureXReached,
+            Math.Max(state.Stats.MaxCreatureXReached, maxCreatureXReached),
+            EastProgressShare(maxCreatureX, state.Bounds),
+            EastProgressShare(Math.Max(state.Stats.MaxCreatureXReached, maxCreatureXReached), state.Bounds),
             foodDetectedCreatureCount,
             plantDetectedCreatureCount,
             meatDetectedCreatureCount,
@@ -679,6 +695,13 @@ public sealed class StatsRecordingSystem(
     private static float Rate(float value, float seconds)
     {
         return seconds > 0f ? value / seconds : 0f;
+    }
+
+    private static float EastProgressShare(float x, WorldBounds bounds)
+    {
+        return bounds.Width > 0f
+            ? Math.Clamp(x / bounds.Width, 0f, 1f)
+            : 0f;
     }
 
     private enum HorizontalRegion

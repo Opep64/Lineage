@@ -36,6 +36,8 @@ public sealed class SimulationStats
 
     public int RichDeathCount { get; private set; }
 
+    public float MaxCreatureXReached { get; private set; }
+
     public float AverageDeadCreatureLifespanSeconds => _deadCreatureLifespans.Count == 0
         ? 0f
         : _deadCreatureLifespanTotalSeconds / _deadCreatureLifespans.Count;
@@ -61,6 +63,7 @@ public sealed class SimulationStats
     internal void RecordCreatureBirth(CreatureLineageRecord record)
     {
         CreatureBirthCount++;
+        RecordEastwardProgress(record.MaxXReached);
 
         if (record.IsFounder)
         {
@@ -97,6 +100,14 @@ public sealed class SimulationStats
             default:
                 GrasslandDeathCount++;
                 break;
+        }
+    }
+
+    internal void RecordEastwardProgress(float x)
+    {
+        if (float.IsFinite(x))
+        {
+            MaxCreatureXReached = Math.Max(MaxCreatureXReached, x);
         }
     }
 
@@ -160,7 +171,8 @@ public sealed class SimulationStats
         int barrenDeathCount = 0,
         int sparseDeathCount = 0,
         int grasslandDeathCount = 0,
-        int richDeathCount = 0)
+        int richDeathCount = 0,
+        float maxCreatureXReached = 0f)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
@@ -176,6 +188,9 @@ public sealed class SimulationStats
         SparseDeathCount = sparseDeathCount;
         GrasslandDeathCount = grasslandDeathCount;
         RichDeathCount = richDeathCount;
+        MaxCreatureXReached = float.IsFinite(maxCreatureXReached) && maxCreatureXReached > 0f
+            ? maxCreatureXReached
+            : 0f;
         Snapshots.Clear();
         Snapshots.AddRange(snapshots);
     }

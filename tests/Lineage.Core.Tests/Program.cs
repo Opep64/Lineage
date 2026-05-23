@@ -323,6 +323,8 @@ static void MovementRecordsSearchDistance()
     AssertClose(6f, moved.LastDistanceTraveled, 0.000001, "Last movement distance");
     AssertClose(6f, moved.DistanceSinceLastMeal, 0.000001, "Distance since meal accumulates");
     AssertClose(26f, moved.Position.X, 0.000001, "Movement x position");
+    AssertClose(26f, moved.MaxXReached, 0.000001, "Personal max x is updated");
+    AssertClose(26f, simulation.State.Stats.MaxCreatureXReached, 0.000001, "Run max x is updated");
 }
 
 static void MovementCostFollowsBiomeMultiplier()
@@ -3002,6 +3004,13 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(4.25f, snapshot.GrasslandCaloriesEatenPerSecond, 0.000001, "Grassland calories eaten per second");
     AssertEqual(0, snapshot.BarrenDeathCount, "Barren death count");
     AssertEqual(0, snapshot.GrasslandDeathCount, "Grassland death count");
+    AssertClose(25f, snapshot.AverageCreatureX, 0.000001, "Average creature x");
+    AssertClose(30f, snapshot.MaxCreatureX, 0.000001, "Max creature x");
+    AssertClose(25f, snapshot.AverageMaxCreatureXReached, 0.000001, "Average max creature x reached");
+    AssertClose(30f, snapshot.MaxCreatureXReached, 0.000001, "Snapshot max x reached");
+    AssertClose(30f, snapshot.RunMaxCreatureXReached, 0.000001, "Run max x reached");
+    AssertClose(0.03f, snapshot.CurrentEastProgressShare, 0.000001, "Current east progress share");
+    AssertClose(0.03f, snapshot.RunEastProgressShare, 0.000001, "Run east progress share");
     AssertEqual(2, snapshot.FoodDetectedCreatureCount, "Food detected count");
     AssertEqual(1, snapshot.PlantDetectedCreatureCount, "Plant detected count");
     AssertEqual(1, snapshot.MeatDetectedCreatureCount, "Meat detected count");

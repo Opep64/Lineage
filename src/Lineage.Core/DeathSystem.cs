@@ -32,7 +32,11 @@ public sealed class DeathSystem : ISimulationSystem
             {
                 var reason = GetDeathReason(creature);
                 SpawnMeatResource(state, creature, reason);
-                state.MarkCreatureDead(creature.Id, reason, state.Biomes.GetKindAt(creature.Position));
+                state.MarkCreatureDead(
+                    creature.Id,
+                    reason,
+                    state.Biomes.GetKindAt(creature.Position),
+                    creature.MaxXReached);
                 continue;
             }
 
