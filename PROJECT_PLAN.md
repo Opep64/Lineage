@@ -288,6 +288,8 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add batch scenario comparison runner/report. Preset gentle/balanced/harsh comparison and custom repeated `--batch-scenario` inputs done; comparison reports now include injury deaths and final predation-pressure metrics. Done.
 - Add lightweight probe runner. `--probe` runs multi-scenario/multi-seed tuning sweeps without per-run reports, snapshots, or lineage CSV suites; it writes one compact CSV and one compact HTML summary, with optional extinction/runaway-population early stops. Done.
 - Add temporary probe variants. `--probe-variant <name:key=value,...>` runs the checked-in base scenario plus named in-memory JSON-property overrides, so tuning candidates can be compared without editing scenario files. Probe CSVs and HTML reports keep `scenario`, `variant`, and override text separate. Done.
+- Add species profile export/import. Species profiles live in `species/`, use the `.species.json` suffix, and store one representative genome plus neural brain that can be injected into another run. CLI and Godot can export selected/dominant species profiles and load them later. Done.
+- Add scenario species rosters. `SimulationScenario.SpeciesSeeds` can define repeatable starting mixes from species profiles with count, spawn region, optional energy override, and enabled flag. CLI, probe runs, and Godot launch apply enabled roster entries at startup; scenarios with enabled species seeds skip generic starter creatures. Done.
 
 ### Phase 6: Stronger Evolutionary Pressure
 
@@ -326,6 +328,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add scenario-backed nonlinear movement-speed cost so fast travel is increasingly expensive while slow cruising is cheaper. Done.
 - Tune seed forager movement so food proximity slows approach and eat intent fires only near food. Done.
 - Add Godot viewer report export for the currently running simulation. Done.
+- Add Godot species profile tools. The Species tab can export the selected living creature, load a `.species.json` profile, inject loaded founders into the current run, and add loaded profiles to the scenario's repeatable startup roster. Done.
 
 ### Phase 8: Biomes And Large-World Ecology
 
@@ -584,11 +587,11 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ## Next Practical Step
 
-Next practical step: use the new local terrain/drag sensing in targeted probes to see whether terrain-aware behavior can evolve without giving creatures direct biome, fertility, or void knowledge.
+Next practical step: strengthen terrain-pressure scenario design if we want terrain-aware behavior to matter. The first compact drag probe showed the mechanics are measurable, but current starter behavior still shows little terrain differentiation.
 
 ## Current Implementation State
 
-Phases 1 through 13 have functional first passes. The solution uses .NET 8 projects and the newer `.slnx` solution format created by the installed .NET 10 SDK.
+Phases 1 through 13 have functional first passes, and Phase 14 has first biome speed/drag plus local terrain-sensing slices in place. The solution uses .NET 8 projects and the newer `.slnx` solution format created by the installed .NET 10 SDK.
 
 Current projects:
 
@@ -607,6 +610,7 @@ Useful CLI options:
 
 - `--ticks <n>`
 - `--scenario <path>`
+- `--load-snapshot <path>`
 - `--save-scenario <path>`
 - `--seed <n>`
 - `--pipeline <neural|simple>`
@@ -624,6 +628,15 @@ Useful CLI options:
 - `--save-snapshot <path>`
 - `--checkpoint-interval <n>`
 - `--checkpoint-dir <dir>`
+- `--inject-species <path>`
+- `--inject-species-count <n>`
+- `--inject-species-region <region>`
+- `--inject-species-energy <n>`
+- `--export-species <path>`
+- `--export-species-creature <id>`
+- `--export-species-founder <id>`
+- `--export-species-name <text>`
+- `--export-species-notes <text>`
 - `--batch-scenario <path>`
 - `--batch-report <path>`
 - `--batch-output-dir <dir>`
@@ -643,6 +656,21 @@ Starter scenarios:
 - `scenarios/scavenger-pressure.json`
 - `scenarios/omnivore-pressure.json`
 - `scenarios/predation-pressure.json`
+- `scenarios/mixed-starter-roster.json`
+
+Starter species profiles:
+
+- `species/starter-seed-forager.species.json`
+- `species/starter-explorer-forager.species.json`
+- `species/starter-scavenger-forager.species.json`
+- `species/starter-forager-predator.species.json`
+
+Species profile conventions:
+
+- Keep portable species profiles under `species/`.
+- Use `.species.json` so file dialogs and humans can distinguish species from scenarios, snapshots, and output JSON.
+- Profiles contain one representative genome and brain. They are useful for replaying a lineage in a new ecology, injecting a predator/scavenger into a running world, or defining repeatable scenario species rosters.
+- Scenario `speciesSeeds` entries reference profile paths, usually relative to the repository root or discoverable from the scenario file path.
 
 Godot viewer files currently present:
 
@@ -695,6 +723,7 @@ Current viewer overlays:
 - scenario launcher/editor with visual launch, scenario load/save, CLI run controls, current viewer report export, collapsed mode, and last-report browser launch
 - CLI snapshot controls with configurable snapshot path, arbitrary snapshot load, and last-snapshot load
 - CLI checkpoint controls with configurable interval/folder, checkpoint file load, and latest-checkpoint load
+- species profile controls for exporting the selected creature, loading profiles, live injection, and adding loaded profiles to the current scenario's startup roster
 - HUD food and creature render modes showing individual versus density rendering
 - HUD telemetry for actual simulation ticks/sec, frame time, visible estimates, and draw counts
 - HUD foraging telemetry for food-seeing share, calories eaten per second, average meal gap, search distance, calories per distance, and average vision range/angle
@@ -703,9 +732,15 @@ Core types currently present:
 
 - `Simulation`: the root update boundary for Godot, CLI tools, and tests.
 - `SimulationConfig`: validated scenario-level settings.
-- `SimulationScenario`: reproducible setup parameters shared by Godot and CLI, including food pressure, resource clustering, resource void border, biome movement/basal/speed pressure, starting energy-trait knobs, trait upkeep costs, egg exposure pressure, and initial brain mode.
+- `SimulationScenario`: reproducible setup parameters shared by Godot and CLI, including food pressure, resource clustering, resource void border, biome movement/basal/speed pressure, starting energy-trait knobs, trait upkeep costs, egg exposure pressure, initial brain mode, and optional species roster seeds.
 - `SimulationScenarioJson`: JSON load/save helpers for scenario files.
 - `SimulationScenarioFactory`: creates and seeds simulations from scenarios.
+- `SpeciesScenarioSeed`: scenario-level starter species entry with profile path, count, spawn region, energy override, and enabled flag.
+- `SimulationScenarioSpeciesSeeder`: applies scenario species rosters by resolving profile paths and injecting founder creatures.
+- `SpeciesProfile`: portable representative species profile containing one genome and neural brain.
+- `SpeciesProfileJson`: JSON load/save helpers for `.species.json` files.
+- `SpeciesProfileExporter`: exports a selected, founder-lineage, or dominant living representative as a species profile.
+- `SpeciesProfileInjector`: injects a species profile into an existing world as new founders.
 - `ResourcePlacement`: shared initial/relocated plant placement rules, including biome-weighted fallback and optional clustering around live plants.
 - `SimulationPipelineKind`: named pipeline selection for scenario runners.
 - `BiomeMap`: deterministic low-resolution biome grid used for resource density, resource void-border exclusion, and reports.
@@ -794,6 +829,8 @@ Current neural brain inputs:
 - nearest creature relative speed
 - nearest creature approach rate
 - nearest creature facing alignment
+- current terrain drag
+- forward terrain drag
 
 Current neural brain outputs:
 
@@ -880,6 +917,9 @@ Three biome pressure probe passes completed on 2026-05-22 after adding temporary
 Build, 70 core tests, CLI biome-speed smoke, Godot headless `--quit`, and a 5k two-seed biome-speed drag probe passed on 2026-05-22 after adding biome speed multipliers and selecting the first shared starter values.
 10k three-seed drag-vs-no-drag confirmation probe passed on 2026-05-22 and supported keeping the selected biome speed multipliers.
 Build, 71 core tests, CLI terrain-drag sensing smoke/report/snapshot, Godot headless `--quit`, and `git diff --check` passed on 2026-05-22 after adding local terrain/drag sensing.
+Build, 100 core tests, starter species profile generation, and Godot headless `--quit` passed on 2026-05-22 after adding species profile export/import and the dedicated `species/` profile folder.
+Build, 101 core tests, CLI `mixed-starter-roster` smoke with 100 roster-seeded founders, Godot headless `--quit`, and `git diff --check` passed on 2026-05-22 after adding scenario species rosters.
+Build, 101 core tests, `git diff --check`, and a compact 5k two-seed terrain drag probe passed on 2026-05-22 after adding terrain-assay fields to the lightweight probe CSV/report. Balanced and Scavenger Pressure remained viable across base/no-drag/harder-drag variants, but behavior assays still reported little terrain differentiation.
 20k preset sweeps for seeds 42, 43, and 44 plus 60k balanced/harsh seed-42 probes passed on 2026-05-21. No scenario JSON tuning was applied because the preset populations remained separated and stable; the main finding was limited trait drift and rare prey attack response.
 Trait-cost tuning on 2026-05-20 compared low, medium, and high shared-cost sets across gentle/balanced/harsh for 10k ticks, then medium/high for 30k ticks. The selected high set kept all presets viable while reducing gentle population growth and preserving harsh survival across seed 42 plus 20k-tick spot checks on seeds 43 and 44.
 
@@ -1096,6 +1136,7 @@ The current smoke test runner covers:
 - local cone-based food sensing with visible food density
 - split plant/meat sensing and diet-weighted generic food targeting
 - local meat scent beyond exact vision
+- local terrain/drag sensing without exposing biome labels, fertility, void status, or global map direction
 - source-aware plant, passive carcass, egg, and attacker-credited fresh-kill intake telemetry
 - age-based meat freshness reducing stale-carcass digestion energy and recording fresh/stale carcass intake
 - hiding food behind or outside a creature's vision cone
@@ -1115,6 +1156,7 @@ The current smoke test runner covers:
 - depleted resource relocation
 - patchy resource placement around live plants
 - scenario-backed initial brain mode, including per-founder random initial weights and a forager-predator starter
+- species profile JSON round-tripping, profile injection, and scenario species roster startup
 - simulation snapshot deterministic continuation
 - CLI batch comparison reports
 - scenario JSON round-tripping
