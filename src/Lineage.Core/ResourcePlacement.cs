@@ -24,6 +24,25 @@ public static class ResourcePlacement
         float localDispersalChance = 0f,
         float localDispersalRadius = 0f)
     {
+        return SamplePlantPosition(
+            state,
+            clusterStrength,
+            clusterRadius,
+            out _,
+            localDispersalOrigin,
+            localDispersalChance,
+            localDispersalRadius);
+    }
+
+    public static SimVector2 SamplePlantPosition(
+        WorldState state,
+        float clusterStrength,
+        float clusterRadius,
+        out PlantPlacementMode placementMode,
+        SimVector2? localDispersalOrigin = null,
+        float localDispersalChance = 0f,
+        float localDispersalRadius = 0f)
+    {
         if (localDispersalOrigin is { } origin
             && localDispersalChance > 0f
             && localDispersalRadius > 0f
@@ -37,6 +56,7 @@ public static class ResourcePlacement
 
                 if (CanPlacePlant(state, candidate))
                 {
+                    placementMode = PlantPlacementMode.LocalDispersal;
                     return candidate;
                 }
             }
@@ -60,11 +80,13 @@ public static class ResourcePlacement
 
                 if (CanPlacePlant(state, candidate))
                 {
+                    placementMode = PlantPlacementMode.Cluster;
                     return candidate;
                 }
             }
         }
 
+        placementMode = PlantPlacementMode.Global;
         return SampleOpenBiomeResourcePosition(state);
     }
 

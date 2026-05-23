@@ -320,6 +320,11 @@ public sealed class WorldState
             throw new ArgumentOutOfRangeException(nameof(patch), "Resource respawn timer must be finite and non-negative.");
         }
 
+        if (!float.IsFinite(patch.RespawnSecondsTotal) || patch.RespawnSecondsTotal < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(patch), "Resource respawn total timer must be finite and non-negative.");
+        }
+
         if (!float.IsFinite(patch.FreshKillSecondsRemaining) || patch.FreshKillSecondsRemaining < 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(patch), "Resource fresh-kill timer must be finite and non-negative.");
@@ -334,6 +339,13 @@ public sealed class WorldState
         patch.Id = id;
         patch.Position = Bounds.Clamp(patch.Position);
         patch.Calories = Math.Min(patch.Calories, patch.MaxCalories);
+        if (patch.Kind == ResourceKind.Plant
+            && patch.RespawnSecondsRemaining > 0f
+            && patch.RespawnSecondsTotal <= 0f)
+        {
+            patch.RespawnSecondsTotal = patch.RespawnSecondsRemaining;
+        }
+
         if (patch.Kind != ResourceKind.Meat)
         {
             patch.MeatAgeSeconds = 0f;
@@ -341,11 +353,13 @@ public sealed class WorldState
         else
         {
             patch.RespawnSecondsRemaining = 0f;
+            patch.RespawnSecondsTotal = 0f;
         }
 
         if (patch.Kind == ResourceKind.Plant && patch.Calories > 0f)
         {
             patch.RespawnSecondsRemaining = 0f;
+            patch.RespawnSecondsTotal = 0f;
         }
 
         Resources.Add(patch);

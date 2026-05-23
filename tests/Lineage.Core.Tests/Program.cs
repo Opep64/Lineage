@@ -815,6 +815,10 @@ static void DepletedPlantsCanDisperseLocally()
         SimVector2.Distance(initialPosition, resource.Position) <= 25.0001f,
         "Locally dispersed resource should stay near the depleted plant");
     AssertClose(5f, resource.Calories, 0.000001, "Locally dispersed resource calories after regrowth");
+    AssertEqual(1, simulation.State.Stats.PlantDepletionCount, "Local dispersal depletion count");
+    AssertEqual(1, simulation.State.Stats.PlantLocalDispersalCount, "Local dispersal relocation count");
+    AssertEqual(0, simulation.State.Stats.PlantClusterRelocationCount, "Local dispersal cluster fallback count");
+    AssertEqual(0, simulation.State.Stats.PlantGlobalRelocationCount, "Local dispersal global fallback count");
 }
 
 static void DepletedPlantsEnterDormancyBeforeRespawning()
@@ -854,14 +858,23 @@ static void DepletedPlantsEnterDormancyBeforeRespawning()
     AssertTrue(dormant.Position != initialPosition, "Dormant plant should choose a new respawn position");
     AssertClose(0f, dormant.Calories, 0.000001, "Dormant plant should stay inedible");
     AssertClose(2f, dormant.RespawnSecondsRemaining, 0.000001, "Dormant plant timer");
+    AssertClose(2f, dormant.RespawnSecondsTotal, 0.000001, "Dormant plant original timer");
+    AssertEqual(1, simulation.State.Stats.PlantDepletionCount, "Dormant plant depletion count");
+    AssertEqual(1, simulation.State.Stats.PlantGlobalRelocationCount, "Dormant plant global relocation count");
+    AssertEqual(1, simulation.State.Stats.PlantDormancyStartedCount, "Dormancy started count");
+    AssertClose(2f, simulation.State.Stats.AveragePlantDormancyScheduledSeconds, 0.000001, "Dormancy scheduled duration");
 
     simulation.Step();
     AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Plant should remain dormant before timer completes");
     AssertClose(1f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Dormant plant countdown");
+    AssertEqual(0, simulation.State.Stats.PlantDormancyCompletedCount, "Dormancy should not complete early");
 
     simulation.Step();
     AssertClose(4f, simulation.State.Resources[0].Calories, 0.000001, "Plant should respawn with sampled calories");
     AssertClose(0f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Respawn timer clears");
+    AssertClose(0f, simulation.State.Resources[0].RespawnSecondsTotal, 0.000001, "Respawn total timer clears");
+    AssertEqual(1, simulation.State.Stats.PlantDormancyCompletedCount, "Dormancy completed count");
+    AssertClose(2f, simulation.State.Stats.AveragePlantDormancyCompletedSeconds, 0.000001, "Dormancy completed duration");
 }
 
 static void DormantPlantsAreAbsentFromSpatialIndex()
@@ -3710,6 +3723,12 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.ResourceCount, "Snapshot resource count");
     AssertEqual(1, snapshot.PlantResourceCount, "Snapshot plant resource count");
     AssertEqual(0, snapshot.MeatResourceCount, "Snapshot meat resource count");
+    AssertEqual(0, snapshot.DormantPlantResourceCount, "Snapshot dormant plant count");
+    AssertClose(0f, snapshot.TotalDormantPlantSecondsRemaining, 0.000001, "Snapshot dormant plant remaining total");
+    AssertClose(0f, snapshot.AverageDormantPlantSecondsRemaining, 0.000001, "Snapshot average dormant plant remaining");
+    AssertClose(0.01f, snapshot.PlantPatchOccupiedCellShare, 0.000001, "Snapshot plant occupied cell share");
+    AssertClose(1f, snapshot.PlantPatchTopDecileCaloriesShare, 0.000001, "Snapshot plant top decile calorie share");
+    AssertClose(9.949874f, snapshot.PlantPatchiness, 0.00001, "Snapshot plant patchiness");
     AssertEqual(1, snapshot.GenomeCount, "Snapshot genome count");
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
@@ -3844,6 +3863,12 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.EggPredationDeathCount, "Snapshot egg predation death count");
     AssertEqual(0, snapshot.CreatureDeathCount, "Snapshot death count");
     AssertEqual(0, snapshot.RottenMeatDeathCount, "Snapshot rotten meat death count");
+    AssertEqual(0, snapshot.PlantDepletionCount, "Snapshot plant depletion count");
+    AssertEqual(0, snapshot.PlantLocalDispersalCount, "Snapshot plant local dispersal count");
+    AssertEqual(0, snapshot.PlantClusterRelocationCount, "Snapshot plant cluster relocation count");
+    AssertEqual(0, snapshot.PlantGlobalRelocationCount, "Snapshot plant global relocation count");
+    AssertEqual(0, snapshot.PlantDormancyStartedCount, "Snapshot plant dormancy started count");
+    AssertEqual(0, snapshot.PlantDormancyCompletedCount, "Snapshot plant dormancy completed count");
     AssertClose(0f, snapshot.AverageLifespanSeconds, 0.000001, "Snapshot average lifespan without deaths");
     AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
 }

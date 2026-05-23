@@ -153,6 +153,12 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
                 return resourcesDirty;
             }
 
+            if (resource.RespawnSecondsTotal > 0f)
+            {
+                state.Stats.RecordPlantDormancyCompleted(resource.RespawnSecondsTotal);
+            }
+
+            resource.RespawnSecondsTotal = 0f;
             resource.Calories = SamplePlantRespawnCalories(state, resource.MaxCalories);
             resourcesDirty = true;
             return resourcesDirty;
@@ -160,20 +166,20 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
 
         if (resource.Calories <= 0f && HasPlantRespawnDelay)
         {
+            state.Stats.RecordPlantDepletion();
             resource.Calories = 0f;
             if (_relocateDepletedResources)
             {
-                var depletedPosition = resource.Position;
-                resource.Position = ResourcePlacement.SamplePlantPosition(
-                    state,
-                    _resourceClusterStrength,
-                    _resourceClusterRadius,
-                    depletedPosition,
-                    _plantLocalDispersalChance,
-                    _plantLocalDispersalRadius);
+                RelocateDepletedPlant(state, ref resource);
             }
 
             resource.RespawnSecondsRemaining = SamplePlantRespawnDelay(state);
+            resource.RespawnSecondsTotal = resource.RespawnSecondsRemaining;
+            if (resource.RespawnSecondsRemaining > 0f)
+            {
+                state.Stats.RecordPlantDormancyStarted(resource.RespawnSecondsRemaining);
+            }
+
             resourcesDirty = true;
             if (resource.RespawnSecondsRemaining > 0f)
             {
@@ -182,14 +188,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         }
         else if (_relocateDepletedResources && resource.Calories <= 0f)
         {
-            var depletedPosition = resource.Position;
-            resource.Position = ResourcePlacement.SamplePlantPosition(
-                state,
-                _resourceClusterStrength,
-                _resourceClusterRadius,
-                depletedPosition,
-                _plantLocalDispersalChance,
-                _plantLocalDispersalRadius);
+            state.Stats.RecordPlantDepletion();
+            RelocateDepletedPlant(state, ref resource);
             resourcesDirty = true;
         }
 
@@ -203,6 +203,20 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             resource.MaxCalories,
             resource.Calories + resource.RegrowthCaloriesPerSecond * fertilityMultiplier * deltaSeconds);
         return resourcesDirty;
+    }
+
+    private void RelocateDepletedPlant(WorldState state, ref ResourcePatchState resource)
+    {
+        var depletedPosition = resource.Position;
+        resource.Position = ResourcePlacement.SamplePlantPosition(
+            state,
+            _resourceClusterStrength,
+            _resourceClusterRadius,
+            out var placementMode,
+            depletedPosition,
+            _plantLocalDispersalChance,
+            _plantLocalDispersalRadius);
+        state.Stats.RecordPlantRelocation(placementMode);
     }
 
     private float CalculatePlantFertilityMultiplier(WorldState state, SimVector2 position)

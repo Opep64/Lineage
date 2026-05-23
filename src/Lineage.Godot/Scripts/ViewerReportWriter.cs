@@ -104,6 +104,15 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource calories", totalResourceCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant calories", snapshot.TotalPlantCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Meat calories", snapshot.TotalMeatCalories.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Dormant plants", snapshot.DormantPlantResourceCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg dormancy remaining", $"{snapshot.AverageDormantPlantSecondsRemaining:0.###} seconds");
+        WriteMetric(writer, "Plant patch occupied", FormatPercent(snapshot.PlantPatchOccupiedCellShare));
+        WriteMetric(writer, "Plant top-decile calories", FormatPercent(snapshot.PlantPatchTopDecileCaloriesShare));
+        WriteMetric(writer, "Plant patchiness", snapshot.PlantPatchiness.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Plant depletions", state.Stats.PlantDepletionCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Plant relocations", FormatPlantRelocations(state.Stats));
+        WriteMetric(writer, "Avg dormancy scheduled", $"{state.Stats.AveragePlantDormancyScheduledSeconds:0.###} seconds");
+        WriteMetric(writer, "Avg dormancy completed", $"{state.Stats.AveragePlantDormancyCompletedSeconds:0.###} seconds");
         WriteMetric(writer, "Avg meat freshness", FormatPercent(snapshot.AverageMeatFreshness));
         WriteMetric(writer, "Resource fullness", resourceCapacity > 0f ? $"{totalResourceCalories / resourceCapacity * 100f:0.0}%" : "n/a");
         WriteMetric(writer, "Births", state.Stats.CreatureBirthCount.ToString(CultureInfo.InvariantCulture));
@@ -866,6 +875,14 @@ public static class ViewerReportWriter
             new ChartSeries("Meat", "#b84a4a", snapshots.Select(snapshot => snapshot.TotalMeatCalories).ToArray()));
         WriteLineChart(
             writer,
+            "Plant patch structure",
+            "%",
+            snapshots,
+            new ChartSeries("Occupied cells", "#35a862", snapshots.Select(snapshot => snapshot.PlantPatchOccupiedCellShare * 100f).ToArray()),
+            new ChartSeries("Top decile kcal", "#d69d2f", snapshots.Select(snapshot => snapshot.PlantPatchTopDecileCaloriesShare * 100f).ToArray()),
+            new ChartSeries("Patchiness", "#8f4cb8", snapshots.Select(snapshot => snapshot.PlantPatchiness * 100f).ToArray()));
+        WriteLineChart(
+            writer,
             "Season fertility",
             "x",
             snapshots,
@@ -1345,6 +1362,11 @@ public static class ViewerReportWriter
     private static string FormatPercent(float value)
     {
         return $"{value * 100f:0.0}%";
+    }
+
+    private static string FormatPlantRelocations(SimulationStats stats)
+    {
+        return $"local {stats.PlantLocalDispersalCount}, cluster {stats.PlantClusterRelocationCount}, global {stats.PlantGlobalRelocationCount}";
     }
 
     private static string FormatBrainWeight(float value)

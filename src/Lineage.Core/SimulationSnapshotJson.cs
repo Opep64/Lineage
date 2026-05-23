@@ -108,7 +108,15 @@ public static class SimulationSnapshotJson
             snapshot.SparseDeathCount,
             snapshot.GrasslandDeathCount,
             snapshot.RichDeathCount,
-            snapshot.MaxCreatureXReached);
+            snapshot.MaxCreatureXReached,
+            snapshot.PlantDepletionCount,
+            snapshot.PlantLocalDispersalCount,
+            snapshot.PlantClusterRelocationCount,
+            snapshot.PlantGlobalRelocationCount,
+            snapshot.PlantDormancyStartedCount,
+            snapshot.PlantDormancyCompletedCount,
+            snapshot.PlantDormancyScheduledSecondsTotal,
+            snapshot.PlantDormancyCompletedSecondsTotal);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 
@@ -252,15 +260,27 @@ public static class SimulationSnapshotJson
                 resource.RespawnSecondsRemaining = 0f;
             }
 
+            if (!float.IsFinite(resource.RespawnSecondsTotal) || resource.RespawnSecondsTotal < 0f)
+            {
+                resource.RespawnSecondsTotal = 0f;
+            }
+
+            if (resource.RespawnSecondsRemaining > 0f && resource.RespawnSecondsTotal <= 0f)
+            {
+                resource.RespawnSecondsTotal = resource.RespawnSecondsRemaining;
+            }
+
             if (resource.Calories > 0f)
             {
                 resource.RespawnSecondsRemaining = 0f;
+                resource.RespawnSecondsTotal = 0f;
             }
 
             return resource;
         }
 
         resource.RespawnSecondsRemaining = 0f;
+        resource.RespawnSecondsTotal = 0f;
         if (!float.IsFinite(resource.MeatAgeSeconds) || resource.MeatAgeSeconds < 0f)
         {
             resource.MeatAgeSeconds = 0f;

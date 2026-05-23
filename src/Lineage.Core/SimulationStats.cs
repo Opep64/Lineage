@@ -38,6 +38,22 @@ public sealed class SimulationStats
 
     public int RichDeathCount { get; private set; }
 
+    public int PlantDepletionCount { get; private set; }
+
+    public int PlantLocalDispersalCount { get; private set; }
+
+    public int PlantClusterRelocationCount { get; private set; }
+
+    public int PlantGlobalRelocationCount { get; private set; }
+
+    public int PlantDormancyStartedCount { get; private set; }
+
+    public int PlantDormancyCompletedCount { get; private set; }
+
+    public float PlantDormancyScheduledSecondsTotal { get; private set; }
+
+    public float PlantDormancyCompletedSecondsTotal { get; private set; }
+
     public float MaxCreatureXReached { get; private set; }
 
     public float AverageDeadCreatureLifespanSeconds => _deadCreatureLifespans.Count == 0
@@ -61,6 +77,14 @@ public sealed class SimulationStats
     }
 
     public List<SimulationStatsSnapshot> Snapshots { get; } = [];
+
+    public float AveragePlantDormancyScheduledSeconds => PlantDormancyStartedCount == 0
+        ? 0f
+        : PlantDormancyScheduledSecondsTotal / PlantDormancyStartedCount;
+
+    public float AveragePlantDormancyCompletedSeconds => PlantDormancyCompletedCount == 0
+        ? 0f
+        : PlantDormancyCompletedSecondsTotal / PlantDormancyCompletedCount;
 
     internal void RecordCreatureBirth(CreatureLineageRecord record)
     {
@@ -140,6 +164,39 @@ public sealed class SimulationStats
         }
     }
 
+    internal void RecordPlantDepletion()
+    {
+        PlantDepletionCount++;
+    }
+
+    internal void RecordPlantRelocation(PlantPlacementMode placementMode)
+    {
+        switch (placementMode)
+        {
+            case PlantPlacementMode.LocalDispersal:
+                PlantLocalDispersalCount++;
+                break;
+            case PlantPlacementMode.Cluster:
+                PlantClusterRelocationCount++;
+                break;
+            default:
+                PlantGlobalRelocationCount++;
+                break;
+        }
+    }
+
+    internal void RecordPlantDormancyStarted(float scheduledSeconds)
+    {
+        PlantDormancyStartedCount++;
+        PlantDormancyScheduledSecondsTotal += NormalizeDuration(scheduledSeconds);
+    }
+
+    internal void RecordPlantDormancyCompleted(float scheduledSeconds)
+    {
+        PlantDormancyCompletedCount++;
+        PlantDormancyCompletedSecondsTotal += NormalizeDuration(scheduledSeconds);
+    }
+
     internal void RecordSnapshot(SimulationStatsSnapshot snapshot)
     {
         Snapshots.Add(snapshot);
@@ -178,7 +235,15 @@ public sealed class SimulationStats
         int sparseDeathCount = 0,
         int grasslandDeathCount = 0,
         int richDeathCount = 0,
-        float maxCreatureXReached = 0f)
+        float maxCreatureXReached = 0f,
+        int plantDepletionCount = 0,
+        int plantLocalDispersalCount = 0,
+        int plantClusterRelocationCount = 0,
+        int plantGlobalRelocationCount = 0,
+        int plantDormancyStartedCount = 0,
+        int plantDormancyCompletedCount = 0,
+        float plantDormancyScheduledSecondsTotal = 0f,
+        float plantDormancyCompletedSecondsTotal = 0f)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
@@ -195,6 +260,14 @@ public sealed class SimulationStats
         SparseDeathCount = sparseDeathCount;
         GrasslandDeathCount = grasslandDeathCount;
         RichDeathCount = richDeathCount;
+        PlantDepletionCount = plantDepletionCount;
+        PlantLocalDispersalCount = plantLocalDispersalCount;
+        PlantClusterRelocationCount = plantClusterRelocationCount;
+        PlantGlobalRelocationCount = plantGlobalRelocationCount;
+        PlantDormancyStartedCount = plantDormancyStartedCount;
+        PlantDormancyCompletedCount = plantDormancyCompletedCount;
+        PlantDormancyScheduledSecondsTotal = NormalizeDuration(plantDormancyScheduledSecondsTotal);
+        PlantDormancyCompletedSecondsTotal = NormalizeDuration(plantDormancyCompletedSecondsTotal);
         MaxCreatureXReached = float.IsFinite(maxCreatureXReached) && maxCreatureXReached > 0f
             ? maxCreatureXReached
             : 0f;
@@ -215,5 +288,12 @@ public sealed class SimulationStats
 
         _deadCreatureLifespans.Insert(insertIndex, normalized);
         _deadCreatureLifespanTotalSeconds += normalized;
+    }
+
+    private static float NormalizeDuration(float seconds)
+    {
+        return float.IsFinite(seconds) && seconds > 0f
+            ? seconds
+            : 0f;
     }
 }

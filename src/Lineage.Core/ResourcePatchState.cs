@@ -32,6 +32,11 @@ public struct ResourcePatchState
     public float RespawnSecondsRemaining { get; set; }
 
     /// <summary>
+    /// Original dormant duration sampled when the plant entered dormancy.
+    /// </summary>
+    public float RespawnSecondsTotal { get; set; }
+
+    /// <summary>
     /// Seconds since this meat patch was created. Freshness falls as meat ages.
     /// </summary>
     public float MeatAgeSeconds { get; set; }

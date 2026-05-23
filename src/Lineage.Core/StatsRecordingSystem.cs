@@ -15,6 +15,8 @@ public sealed class StatsRecordingSystem(
     SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global) : ISimulationSystem
 {
     private const float ActiveHiddenOutputWeightThreshold = 0.05f;
+    private const int PlantPatchinessGridAxisCells = 10;
+    private const int PlantPatchinessGridCellCount = PlantPatchinessGridAxisCells * PlantPatchinessGridAxisCells;
 
     private readonly int _sampleIntervalTicks = sampleIntervalTicks > 0
         ? sampleIntervalTicks
@@ -408,6 +410,8 @@ public sealed class StatsRecordingSystem(
         var activeResourceCount = 0;
         var plantResourceCount = 0;
         var meatResourceCount = 0;
+        var dormantPlantResourceCount = 0;
+        var totalDormantPlantSecondsRemaining = 0f;
         var leftRegionPlantCalories = 0f;
         var middleRegionPlantCalories = 0f;
         var rightRegionPlantCalories = 0f;
@@ -422,9 +426,16 @@ public sealed class StatsRecordingSystem(
         var sparseMeatCalories = 0f;
         var grasslandMeatCalories = 0f;
         var richMeatCalories = 0f;
+        Span<float> plantCaloriesByPatchCell = stackalloc float[PlantPatchinessGridCellCount];
         for (var i = 0; i < state.Resources.Count; i++)
         {
             var resource = state.Resources[i];
+            if (resource.Kind == ResourceKind.Plant && resource.RespawnSecondsRemaining > 0f)
+            {
+                dormantPlantResourceCount++;
+                totalDormantPlantSecondsRemaining += resource.RespawnSecondsRemaining;
+            }
+
             if (resource.Calories <= 0f)
             {
                 continue;
@@ -452,6 +463,7 @@ public sealed class StatsRecordingSystem(
             {
                 plantResourceCount++;
                 totalPlantCalories += resource.Calories;
+                AddPlantPatchCell(plantCaloriesByPatchCell, state.Bounds, resource.Position, resource.Calories);
                 AddRegionValue(region, resource.Calories, ref leftRegionPlantCalories, ref middleRegionPlantCalories, ref rightRegionPlantCalories);
                 AddBiomeValue(
                     biome,
@@ -462,6 +474,10 @@ public sealed class StatsRecordingSystem(
                     ref richPlantCalories);
             }
         }
+        var plantPatchSummary = CalculatePlantPatchSummary(plantCaloriesByPatchCell, totalPlantCalories);
+        var averageDormantPlantSecondsRemaining = dormantPlantResourceCount > 0
+            ? totalDormantPlantSecondsRemaining / dormantPlantResourceCount
+            : 0f;
 
         var totalEggEnergy = 0f;
         var totalEggHealth = 0f;
@@ -630,6 +646,12 @@ public sealed class StatsRecordingSystem(
             activeResourceCount,
             plantResourceCount,
             meatResourceCount,
+            dormantPlantResourceCount,
+            totalDormantPlantSecondsRemaining,
+            averageDormantPlantSecondsRemaining,
+            plantPatchSummary.OccupiedCellShare,
+            plantPatchSummary.TopDecileCaloriesShare,
+            plantPatchSummary.Patchiness,
             state.Genomes.Count,
             state.Brains.Count,
             averageBrainHiddenNodeCount,
@@ -729,6 +751,14 @@ public sealed class StatsRecordingSystem(
             state.Stats.StarvationDeathCount,
             state.Stats.InjuryDeathCount,
             state.Stats.RottenMeatDeathCount,
+            state.Stats.PlantDepletionCount,
+            state.Stats.PlantLocalDispersalCount,
+            state.Stats.PlantClusterRelocationCount,
+            state.Stats.PlantGlobalRelocationCount,
+            state.Stats.PlantDormancyStartedCount,
+            state.Stats.PlantDormancyCompletedCount,
+            state.Stats.AveragePlantDormancyScheduledSeconds,
+            state.Stats.AveragePlantDormancyCompletedSeconds,
             creatureDetectedCreatureCount,
             meatCaloriesEatenShare,
             freshKillCaloriesEatenShare,
@@ -879,6 +909,81 @@ public sealed class StatsRecordingSystem(
         }
     }
 
+    private static void AddPlantPatchCell(
+        Span<float> plantCaloriesByPatchCell,
+        WorldBounds bounds,
+        SimVector2 position,
+        float calories)
+    {
+        if (calories <= 0f || bounds.Width <= 0f || bounds.Height <= 0f)
+        {
+            return;
+        }
+
+        var x = Math.Clamp(
+            (int)(position.X / bounds.Width * PlantPatchinessGridAxisCells),
+            0,
+            PlantPatchinessGridAxisCells - 1);
+        var y = Math.Clamp(
+            (int)(position.Y / bounds.Height * PlantPatchinessGridAxisCells),
+            0,
+            PlantPatchinessGridAxisCells - 1);
+        plantCaloriesByPatchCell[y * PlantPatchinessGridAxisCells + x] += calories;
+    }
+
+    private static PlantPatchSummary CalculatePlantPatchSummary(
+        ReadOnlySpan<float> plantCaloriesByPatchCell,
+        float totalPlantCalories)
+    {
+        if (totalPlantCalories <= 0f || plantCaloriesByPatchCell.Length == 0)
+        {
+            return default;
+        }
+
+        var occupiedCellCount = 0;
+        var mean = totalPlantCalories / plantCaloriesByPatchCell.Length;
+        var varianceSum = 0f;
+        Span<float> topDecile = stackalloc float[Math.Max(1, PlantPatchinessGridCellCount / 10)];
+        for (var i = 0; i < plantCaloriesByPatchCell.Length; i++)
+        {
+            var calories = plantCaloriesByPatchCell[i];
+            if (calories > 0f)
+            {
+                occupiedCellCount++;
+                AddTopValue(topDecile, calories);
+            }
+
+            var delta = calories - mean;
+            varianceSum += delta * delta;
+        }
+
+        var topDecileCalories = 0f;
+        for (var i = 0; i < topDecile.Length; i++)
+        {
+            topDecileCalories += topDecile[i];
+        }
+
+        var standardDeviation = MathF.Sqrt(varianceSum / plantCaloriesByPatchCell.Length);
+        return new PlantPatchSummary(
+            occupiedCellCount / (float)plantCaloriesByPatchCell.Length,
+            topDecileCalories / totalPlantCalories,
+            mean > 0f ? standardDeviation / mean : 0f);
+    }
+
+    private static void AddTopValue(Span<float> topValues, float value)
+    {
+        if (topValues.Length == 0 || value <= topValues[0])
+        {
+            return;
+        }
+
+        topValues[0] = value;
+        for (var i = 1; i < topValues.Length && topValues[i - 1] > topValues[i]; i++)
+        {
+            (topValues[i - 1], topValues[i]) = (topValues[i], topValues[i - 1]);
+        }
+    }
+
     private static float Rate(float value, float seconds)
     {
         return seconds > 0f ? value / seconds : 0f;
@@ -897,6 +1002,11 @@ public sealed class StatsRecordingSystem(
         Middle,
         Right
     }
+
+    private readonly record struct PlantPatchSummary(
+        float OccupiedCellShare,
+        float TopDecileCaloriesShare,
+        float Patchiness);
 
     private static float EnsurePositive(float value, string name)
     {

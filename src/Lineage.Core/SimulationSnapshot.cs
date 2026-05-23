@@ -68,6 +68,22 @@ public sealed record SimulationSnapshot
 
     public int RichDeathCount { get; init; }
 
+    public int PlantDepletionCount { get; init; }
+
+    public int PlantLocalDispersalCount { get; init; }
+
+    public int PlantClusterRelocationCount { get; init; }
+
+    public int PlantGlobalRelocationCount { get; init; }
+
+    public int PlantDormancyStartedCount { get; init; }
+
+    public int PlantDormancyCompletedCount { get; init; }
+
+    public float PlantDormancyScheduledSecondsTotal { get; init; }
+
+    public float PlantDormancyCompletedSecondsTotal { get; init; }
+
     public float MaxCreatureXReached { get; init; }
 
     public BiomeSnapshot Biomes { get; init; } = new();
@@ -106,6 +122,14 @@ public sealed record SimulationSnapshot
             SparseDeathCount = state.Stats.SparseDeathCount,
             GrasslandDeathCount = state.Stats.GrasslandDeathCount,
             RichDeathCount = state.Stats.RichDeathCount,
+            PlantDepletionCount = state.Stats.PlantDepletionCount,
+            PlantLocalDispersalCount = state.Stats.PlantLocalDispersalCount,
+            PlantClusterRelocationCount = state.Stats.PlantClusterRelocationCount,
+            PlantGlobalRelocationCount = state.Stats.PlantGlobalRelocationCount,
+            PlantDormancyStartedCount = state.Stats.PlantDormancyStartedCount,
+            PlantDormancyCompletedCount = state.Stats.PlantDormancyCompletedCount,
+            PlantDormancyScheduledSecondsTotal = state.Stats.PlantDormancyScheduledSecondsTotal,
+            PlantDormancyCompletedSecondsTotal = state.Stats.PlantDormancyCompletedSecondsTotal,
             MaxCreatureXReached = state.Stats.MaxCreatureXReached,
             Biomes = BiomeSnapshot.Capture(state.Biomes),
             Obstacles = ObstacleSnapshot.Capture(state.Obstacles)
