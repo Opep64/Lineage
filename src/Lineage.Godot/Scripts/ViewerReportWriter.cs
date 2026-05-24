@@ -411,6 +411,7 @@ public static class ViewerReportWriter
 
         WriteChartsSection(writer, state.Stats.Snapshots);
         WriteSpeciesClusterSection(writer, speciesSummaries);
+        WriteSpeciesClusterInterpretationSection(writer, SpeciesClusterAnalyzer.InterpretClusters(speciesSummaries, speciesHistory, 10));
         WriteSpeciesClusterHistorySection(writer, speciesHistory);
         WriteBehaviorAssaySection(writer, behaviorSummary);
         WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
@@ -1211,6 +1212,40 @@ public static class ViewerReportWriter
                 $"<td>{Html(FormatPercent(summary.AveragePlantDigestion))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AverageMeatDigestion))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AttackShare))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpeciesClusterInterpretationSection(
+        StreamWriter writer,
+        IReadOnlyList<SpeciesClusterInterpretation> interpretations)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Why These Clusters Matter</h2>");
+        if (interpretations.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No species cluster interpretation was available.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Role</th><th>Ancestry</th><th>Trend</th><th>Why It Matters</th><th>Evidence</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var interpretation in interpretations)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(interpretation.Rank)}</td>" +
+                $"<td>{Html(interpretation.Name)}</td>" +
+                $"<td>{Html(interpretation.RoleLabel)}</td>" +
+                $"<td>{Html(interpretation.AncestryLabel)}</td>" +
+                $"<td>{Html(interpretation.TrendLabel)}</td>" +
+                $"<td>{Html(interpretation.ImportanceLabel)}</td>" +
+                $"<td>{Html(interpretation.EvidenceLabel)}</td>" +
                 "</tr>");
         }
 

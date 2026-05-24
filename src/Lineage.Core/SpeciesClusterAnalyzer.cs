@@ -200,6 +200,72 @@ public static class SpeciesClusterAnalyzer
         return new SpeciesClusterHistory(summaries, selectedRows, diversityRows, notes);
     }
 
+    public static IReadOnlyList<SpeciesClusterInterpretation> InterpretClusters(
+        IReadOnlyList<SpeciesClusterSummary> summaries,
+        SpeciesClusterHistory history,
+        int maxClusters = 10)
+    {
+        if (maxClusters <= 0)
+        {
+            return Array.Empty<SpeciesClusterInterpretation>();
+        }
+
+        var historyBySpecies = history.Clusters.ToDictionary(cluster => cluster.SpeciesId);
+        var rowsBySpecies = history.Rows
+            .GroupBy(row => row.SpeciesId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<SpeciesClusterHistoryRow>)group
+                    .OrderBy(row => row.Tick)
+                    .ToArray());
+        var interpreted = new List<SpeciesClusterInterpretation>();
+
+        foreach (var summary in summaries.Take(maxClusters))
+        {
+            historyBySpecies.TryGetValue(summary.SpeciesId, out var historySummary);
+            var hasHistory = historyBySpecies.ContainsKey(summary.SpeciesId);
+            rowsBySpecies.TryGetValue(summary.SpeciesId, out var rows);
+            rows ??= Array.Empty<SpeciesClusterHistoryRow>();
+
+            interpreted.Add(new SpeciesClusterInterpretation(
+                Rank: interpreted.Count + 1,
+                SpeciesId: summary.SpeciesId,
+                Name: summary.Name,
+                RoleLabel: FormatClusterRole(summary),
+                AncestryLabel: FormatClusterAncestry(summary),
+                TrendLabel: hasHistory
+                    ? FormatClusterTrend(historySummary, rows)
+                    : "current snapshot only",
+                ImportanceLabel: FormatClusterImportance(summary, hasHistory ? historySummary : null),
+                EvidenceLabel: FormatClusterEvidence(summary, hasHistory ? historySummary : null)));
+        }
+
+        if (interpreted.Count >= maxClusters)
+        {
+            return interpreted;
+        }
+
+        var livingSpecies = summaries.Select(summary => summary.SpeciesId).ToHashSet();
+        foreach (var historySummary in history.Clusters
+            .Where(cluster => !livingSpecies.Contains(cluster.SpeciesId) && cluster.PeakLivingShare >= 0.25f)
+            .OrderByDescending(cluster => cluster.PeakLivingShare)
+            .ThenBy(cluster => cluster.SpeciesId)
+            .Take(maxClusters - interpreted.Count))
+        {
+            interpreted.Add(new SpeciesClusterInterpretation(
+                Rank: interpreted.Count + 1,
+                SpeciesId: historySummary.SpeciesId,
+                Name: historySummary.Name,
+                RoleLabel: "historical cluster",
+                AncestryLabel: "lineage history only",
+                TrendLabel: FormatClusterTrend(historySummary, rowsBySpecies.GetValueOrDefault(historySummary.SpeciesId) ?? Array.Empty<SpeciesClusterHistoryRow>()),
+                ImportanceLabel: "Historical contrast: this cluster was large enough to shape selection before disappearing.",
+                EvidenceLabel: FormatClusterEvidence(null, historySummary)));
+        }
+
+        return interpreted;
+    }
+
     private static SpeciesClusterSummary SummarizeCluster(
         WorldState state,
         SpeciesClusterAccumulator cluster,
@@ -320,6 +386,132 @@ public static class SpeciesClusterAnalyzer
             DietLabel: FormatDietLabel(averageDietaryAdaptation, averageCarrionAdaptation),
             TacticLabel: FormatTacticLabel(eatingShare, attackShare, averageBiteStrength),
             RegionLabel: FormatRegionLabel(eastProgressShare, rightRegionShare));
+    }
+
+    private static string FormatClusterRole(SpeciesClusterSummary summary)
+    {
+        return $"{summary.DietLabel}; {summary.TacticLabel}; {summary.RegionLabel}";
+    }
+
+    private static string FormatClusterAncestry(SpeciesClusterSummary summary)
+    {
+        if (summary.FounderCount <= 1)
+        {
+            return $"single founder #{summary.DominantFounderId.Value}";
+        }
+
+        var share = summary.LivingCreatures <= 0
+            ? 0f
+            : summary.DominantFounderLivingCreatures / (float)summary.LivingCreatures;
+        return $"{summary.FounderCount} founders; #{summary.DominantFounderId.Value} anchors {summary.DominantFounderLivingCreatures} living ({share * 100f:0.0}%)";
+    }
+
+    private static string FormatClusterTrend(
+        SpeciesClusterHistorySummary historySummary,
+        IReadOnlyList<SpeciesClusterHistoryRow> rows)
+    {
+        if (historySummary.FinalLivingCreatures <= 0)
+        {
+            return historySummary.PeakLivingShare >= 0.25f
+                ? "extinct former major cluster"
+                : "extinct";
+        }
+
+        if (historySummary.FinalLivingCreatures <= 2 && historySummary.PeakLivingCreatures >= 10)
+        {
+            return "lingering remnant";
+        }
+
+        if (rows.Count >= 4)
+        {
+            var recentStart = rows[Math.Max(0, rows.Count - 5)].LivingCreatures;
+            var final = historySummary.FinalLivingCreatures;
+            var meaningfulChange = Math.Max(3f, recentStart * 0.25f);
+            if (final - recentStart >= meaningfulChange)
+            {
+                return "recently growing";
+            }
+
+            if (recentStart - final >= meaningfulChange)
+            {
+                return "recently shrinking";
+            }
+        }
+
+        var peak = Math.Max(1, historySummary.PeakLivingCreatures);
+        var peakRetention = historySummary.FinalLivingCreatures / (float)peak;
+        if (peakRetention < 0.35f)
+        {
+            return "shrinking remnant";
+        }
+
+        if (peakRetention >= 0.8f && historySummary.FinalLivingShare >= 0.45f)
+        {
+            return "dominant near peak";
+        }
+
+        if (peakRetention >= 0.8f)
+        {
+            return "near peak";
+        }
+
+        return historySummary.LifecycleLabel;
+    }
+
+    private static string FormatClusterImportance(
+        SpeciesClusterSummary summary,
+        SpeciesClusterHistorySummary? historySummary)
+    {
+        if (historySummary is { PeakLivingShare: >= 0.25f } history &&
+            summary.LivingShare < history.PeakLivingShare * 0.35f)
+        {
+            return "Formerly important but now fading; useful for spotting replaced strategies.";
+        }
+
+        if (summary.LivingShare >= 0.5f)
+        {
+            return "Defines the current ecology; most living interactions involve this cluster.";
+        }
+
+        if (summary.LivingShare >= 0.15f)
+        {
+            return "Substantial minority niche; compare its role against the dominant cluster.";
+        }
+
+        if (summary.AttackShare >= 0.02f || summary.AverageBiteStrength >= 0.2f)
+        {
+            return "Small cluster with combat signal; watch whether predator pressure is emerging or fading.";
+        }
+
+        if (summary.AverageMeatDigestion > summary.AveragePlantDigestion + 0.1f ||
+            summary.AverageCarrionAdaptation >= 0.2f)
+        {
+            return "Small meat-leaning niche; useful for tracking scavenger or omnivore experiments.";
+        }
+
+        return "Small survivor; watch future runs before treating it as a durable split.";
+    }
+
+    private static string FormatClusterEvidence(
+        SpeciesClusterSummary? summary,
+        SpeciesClusterHistorySummary? historySummary)
+    {
+        var parts = new List<string>();
+        if (summary is { } current)
+        {
+            parts.Add($"living {current.LivingCreatures} ({current.LivingShare * 100f:0.0}%)");
+            parts.Add($"generation {current.MinGeneration}/{current.AverageGeneration:0.0}/{current.MaxGeneration}");
+            parts.Add($"genome div {current.AverageGenomeDistance:0.###}");
+            parts.Add($"brain div {current.AverageBrainDistance:0.###}");
+        }
+
+        if (historySummary is { } history)
+        {
+            parts.Add($"peak {history.PeakLivingCreatures} ({history.PeakLivingShare * 100f:0.0}%) at tick {history.PeakTick}");
+            parts.Add($"lifecycle {history.LifecycleLabel}");
+        }
+
+        return string.Join("; ", parts);
     }
 
     private static EntityId FindFounderId(
@@ -1094,6 +1286,16 @@ public readonly record struct SpeciesClusterSummary(
     string DietLabel,
     string TacticLabel,
     string RegionLabel);
+
+public readonly record struct SpeciesClusterInterpretation(
+    int Rank,
+    int SpeciesId,
+    string Name,
+    string RoleLabel,
+    string AncestryLabel,
+    string TrendLabel,
+    string ImportanceLabel,
+    string EvidenceLabel);
 
 public sealed record SpeciesClusterHistory(
     IReadOnlyList<SpeciesClusterHistorySummary> Clusters,

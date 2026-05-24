@@ -5001,6 +5001,16 @@ static void SpeciesClusterHistoryTracksSnapshots()
     AssertEqual(2, history.DiversityRows[^1].ActiveClusterCount, "Species history final active cluster count");
     AssertClose(2f / 3f, history.DiversityRows[^1].DominantLivingShare, 0.000001, "Species history final dominant diversity share");
     AssertTrue(history.Notes.Count > 0, "Species history should include interpretation notes");
+
+    var summaries = SpeciesClusterAnalyzer.Analyze(simulation.State);
+    var interpretations = SpeciesClusterAnalyzer.InterpretClusters(summaries, history);
+
+    AssertEqual(2, interpretations.Count, "Species interpretation count");
+    AssertTrue(interpretations.All(interpretation => !string.IsNullOrWhiteSpace(interpretation.RoleLabel)), "Species interpretations should include role labels");
+    AssertTrue(interpretations.All(interpretation => !string.IsNullOrWhiteSpace(interpretation.AncestryLabel)), "Species interpretations should include ancestry labels");
+    AssertTrue(interpretations.All(interpretation => !string.IsNullOrWhiteSpace(interpretation.TrendLabel)), "Species interpretations should include trend labels");
+    AssertTrue(interpretations.All(interpretation => !string.IsNullOrWhiteSpace(interpretation.ImportanceLabel)), "Species interpretations should include importance labels");
+    AssertTrue(interpretations.Any(interpretation => interpretation.EvidenceLabel.Contains("peak", StringComparison.Ordinal)), "Species interpretations should include history evidence");
 }
 
 static void ScenarioSpeciesRosterInjectsProfileFounders()
