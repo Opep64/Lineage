@@ -2933,6 +2933,7 @@ public partial class Main : Node2D
         return kind switch
         {
             BrainArchitectureKind.HybridNeural => "hybrid neural",
+            BrainArchitectureKind.HiddenLayerNeural => "hidden-layer neural",
             _ => kind.ToString()
         };
     }

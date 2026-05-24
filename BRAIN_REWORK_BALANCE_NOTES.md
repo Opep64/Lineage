@@ -82,6 +82,41 @@ Base commit: `51f188d Add selected run Markdown export`.
 - Add BrainFactory / architecture abstraction first, then introduce a second neural architecture after the current sector-vision work is stable. The second architecture should force all sensory inputs through hidden layers before reaching outputs.
 - Recommended first hidden-only architecture: `inputs -> 16 hidden -> outputs`, with no direct skip connections. If that is too weak, try `inputs -> 16 hidden -> 8 hidden -> outputs`. Avoid starting with large `64/32`-style layers until viability, mutation tolerance, and performance are measured.
 - Treat hidden-only brains as a separate brain kind, not a migration of the current neural genome layout. That lets us compare viability, behavior diversity, performance, mutation tolerance, and sector-vision use without losing the existing baseline.
+- Implemented first hidden-only architecture as `HiddenLayerNeural`. It uses 16 hidden nodes by default, normalizes undersized hidden-node requests to that default, translates current starter direct policies into hidden relay nodes, and preserves the no-direct-weights constraint during mutation. Existing scenarios remain on `HybridNeural` unless explicitly changed.
+
+## 2026-05-24 Hidden-Layer Neural Evaluation
+
+Output files:
+
+- `out/hidden_layer_viability_20k.csv`
+- `out/hidden_layer_viability_20k.html`
+
+Probe shape:
+
+```powershell
+dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj -c Release -- --probe --ticks 20000 --probe-seeds 42,43,44 --probe-scenario scenarios\gentle-foraging.json --probe-scenario scenarios\balanced-foraging.json --probe-scenario scenarios\harsh-foraging.json --probe-scenario scenarios\scavenger-pressure.json --probe-scenario scenarios\predation-pressure.json --probe-variant hidden:brainArchitectureKind=hiddenLayerNeural,brainHiddenNodeCount=16 --probe-stop-on-extinction --probe-max-population 5000 --probe-output out\hidden_layer_viability_20k.csv --probe-report out\hidden_layer_viability_20k.html
+```
+
+| Scenario | Variant | Avg final pop | Tail avg pop | Avg births | Avg deaths | Avg max gen | Avg ticks/s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gentle Foraging | base | 332.3 | 360.1 | 778.3 | 446.0 | 3.0 | 1918.7 |
+| Gentle Foraging | hidden | 356.7 | 367.8 | 797.7 | 441.0 | 3.0 | 1487.8 |
+| Balanced Foraging | base | 131.3 | 144.0 | 384.7 | 253.3 | 3.0 | 4158.8 |
+| Balanced Foraging | hidden | 142.7 | 159.8 | 398.7 | 256.0 | 2.7 | 2946.6 |
+| Harsh Foraging | base | 54.0 | 56.7 | 198.7 | 144.7 | 2.3 | 9147.8 |
+| Harsh Foraging | hidden | 52.7 | 57.1 | 205.0 | 152.3 | 2.7 | 6488.3 |
+| Scavenger Pressure | base | 33.0 | 35.5 | 138.3 | 105.3 | 2.0 | 12743.9 |
+| Scavenger Pressure | hidden | 31.0 | 33.0 | 134.0 | 103.0 | 2.0 | 8759.3 |
+| Predation Pressure | base | 47.0 | 55.4 | 202.0 | 155.0 | 2.3 | 7510.6 |
+| Predation Pressure | hidden | 31.0 | 35.9 | 190.3 | 159.3 | 2.7 | 5849.0 |
+
+Interpretation:
+
+- `HiddenLayerNeural` survived all five 20k, three-seed probes without extinction.
+- Foraging scenarios look viable: Gentle and Balanced ended slightly higher than the current hybrid baseline, while Harsh was effectively even.
+- Scavenger Pressure was close to baseline, but Predation Pressure ended materially lower: final population was down about 34%, with tail average population down about 19.5 creatures.
+- Performance cost is visible but not catastrophic. Hidden-only ran at about 69-78% of hybrid baseline speed across these probes. This is expected because the 16-node hidden layer evaluates more connections than the sparse direct/reflex-heavy hybrid starter.
+- No immediate starter tuning is needed for basic foraging viability. Predation-specific tuning or a longer predation assay is the first follow-up if hidden-only becomes a serious default candidate.
 
 ## Sparse Resource Balance Pass
 

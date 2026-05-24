@@ -396,7 +396,11 @@ public sealed record SimulationScenario
             throw new InvalidOperationException("Reproductive senescence age must be greater than or equal to prime age.");
         }
 
-        return this with { SpeciesSeeds = speciesSeeds };
+        return this with
+        {
+            BrainHiddenNodeCount = BrainFactory.ResolveHiddenNodeCount(BrainArchitectureKind, BrainHiddenNodeCount),
+            SpeciesSeeds = speciesSeeds
+        };
     }
 
     public BiomePressureProfile CreateBiomeMovementCostProfile()

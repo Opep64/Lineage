@@ -96,6 +96,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
     ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
+    ("Brain factory supports hidden-layer neural architecture", BrainFactorySupportsHiddenLayerNeuralArchitecture),
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -3580,6 +3581,8 @@ static void BrainFactoryDescribesHybridNeuralArchitecture()
     AssertEqual("Hybrid neural", descriptor.Name, "Descriptor name");
     AssertEqual(NeuralBrainSchema.InputCount, descriptor.InputCount, "Descriptor input count");
     AssertEqual(NeuralBrainSchema.OutputCount, descriptor.OutputCount, "Descriptor output count");
+    AssertEqual(NeuralBrainSchema.DefaultHiddenNodeCount, descriptor.DefaultHiddenNodeCount, "Descriptor default hidden nodes");
+    AssertEqual(0, descriptor.MinHiddenNodeCount, "Descriptor min hidden nodes");
     AssertEqual(NeuralBrainSchema.MaxHiddenNodeCount, descriptor.MaxHiddenNodeCount, "Descriptor max hidden nodes");
     AssertTrue(descriptor.SupportsHiddenNodes, "Hybrid neural descriptor should support hidden nodes");
     AssertTrue(
@@ -3662,6 +3665,66 @@ static void BrainFactoryMutatesHybridNeuralBrains()
     AssertTrue(
         mutated.Weights.Zip(source.Weights).Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
         "Nonzero mutation should change at least one brain weight");
+}
+
+static void BrainFactorySupportsHiddenLayerNeuralArchitecture()
+{
+    var descriptor = BrainFactory.Describe(BrainArchitectureKind.HiddenLayerNeural);
+
+    AssertEqual(BrainArchitectureKind.HiddenLayerNeural, descriptor.Kind, "Hidden descriptor kind");
+    AssertEqual("Hidden-layer neural", descriptor.Name, "Hidden descriptor name");
+    AssertEqual(NeuralBrainSchema.DefaultHiddenLayerNodeCount, descriptor.DefaultHiddenNodeCount, "Hidden default node count");
+    AssertEqual(NeuralBrainSchema.OutputCount, descriptor.MinHiddenNodeCount, "Hidden min node count");
+    AssertTrue(descriptor.SupportsHiddenNodes, "Hidden architecture should support hidden nodes");
+    AssertTrue(!descriptor.SupportsDirectInputOutputWeights, "Hidden architecture should not support direct weights");
+
+    var zero = BrainFactory.CreateZero(BrainArchitectureKind.HiddenLayerNeural);
+    AssertEqual(NeuralBrainSchema.DefaultHiddenLayerNodeCount, zero.HiddenNodeCount, "Default hidden-layer zero node count");
+    AssertDirectWeightsZero(zero, "Hidden-layer zero direct weights");
+
+    var random = BrainFactory.CreateRandom(
+        BrainArchitectureKind.HiddenLayerNeural,
+        new DeterministicRandom(118),
+        scale: 0.5f);
+    AssertEqual(NeuralBrainSchema.DefaultHiddenLayerNodeCount, random.HiddenNodeCount, "Default hidden-layer random node count");
+    AssertDirectWeightsZero(random, "Hidden-layer random direct weights");
+    AssertTrue(random.Weights.Skip(NeuralBrainGenome.DirectWeightCount).Any(weight => Math.Abs(weight) > 0.000001f), "Hidden-layer random hidden weights");
+
+    var starter = BrainFactory.CreateStarter(
+        BrainArchitectureKind.HiddenLayerNeural,
+        InitialBrainKind.SectorForager);
+    AssertEqual(NeuralBrainSchema.DefaultHiddenLayerNodeCount, starter.HiddenNodeCount, "Default hidden-layer starter node count");
+    AssertDirectWeightsZero(starter, "Hidden-layer starter direct weights");
+    AssertTrue(starter.CountActiveHiddenOutputWeights(0.05f) >= NeuralBrainSchema.OutputCount, "Hidden-layer starter should wire outputs through hidden nodes");
+
+    Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
+    Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
+    inputs[NeuralBrainSchema.BiasInput] = 1f;
+    inputs[NeuralBrainSchema.HungerInput] = 1f;
+    inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex - 1)] = 1f;
+    starter.Evaluate(inputs, outputs);
+    AssertTrue(Math.Abs(outputs[NeuralBrainSchema.TurnOutput]) > 0.01f, "Hidden-layer starter should respond through hidden nodes");
+
+    var unchanged = BrainFactory.Mutate(
+        BrainArchitectureKind.HiddenLayerNeural,
+        starter,
+        new DeterministicRandom(119),
+        mutationStrength: 0.5f,
+        mutationRate: 0f);
+    AssertBrainsClose(starter, unchanged, "Zero-rate hidden-layer mutation");
+
+    var mutated = BrainFactory.Mutate(
+        BrainArchitectureKind.HiddenLayerNeural,
+        starter,
+        new DeterministicRandom(119),
+        mutationStrength: 0.5f,
+        mutationRate: 0.05f);
+    AssertDirectWeightsZero(mutated, "Mutated hidden-layer direct weights");
+    AssertTrue(
+        mutated.Weights.Skip(NeuralBrainGenome.DirectWeightCount)
+            .Zip(starter.Weights.Skip(NeuralBrainGenome.DirectWeightCount))
+            .Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
+        "Hidden-layer mutation should change at least one hidden weight");
 }
 
 static void WorldStateTracksBrainArchitectureMetadata()
@@ -5282,6 +5345,23 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     {
         AssertClose(predatorBrain.Weights[i], predatorSimulation.State.Brains[0].Weights[i], 0.000001, $"Predator brain weight {i}");
     }
+
+    var hiddenLayerScenario = scenario with
+    {
+        InitialBrainKind = InitialBrainKind.SectorForager,
+        BrainArchitectureKind = BrainArchitectureKind.HiddenLayerNeural
+    };
+    var hiddenLayerSimulation = SimulationScenarioFactory.CreateSimulation(hiddenLayerScenario);
+    AssertEqual(1, hiddenLayerSimulation.State.Brains.Count, "Hidden-layer founder brain count");
+    AssertEqual(
+        BrainArchitectureKind.HiddenLayerNeural,
+        hiddenLayerSimulation.State.GetBrainArchitectureKind(0),
+        "Hidden-layer founder brain architecture");
+    AssertEqual(
+        NeuralBrainSchema.DefaultHiddenLayerNodeCount,
+        hiddenLayerSimulation.State.Brains[0].HiddenNodeCount,
+        "Hidden-layer founder default node count");
+    AssertDirectWeightsZero(hiddenLayerSimulation.State.Brains[0], "Hidden-layer founder direct weights");
 }
 
 static void ScenarioFactoryHonorsReproductionIntentToggle()
@@ -6007,9 +6087,9 @@ static void ScenarioJsonRoundTrips()
         Name = "Sparse Food",
         Seed = 1234,
         PipelineKind = SimulationPipelineKind.SimpleForaging,
-        BrainArchitectureKind = BrainArchitectureKind.HybridNeural,
+        BrainArchitectureKind = BrainArchitectureKind.HiddenLayerNeural,
         InitialBrainKind = InitialBrainKind.ForagerPredator,
-        BrainHiddenNodeCount = 6,
+        BrainHiddenNodeCount = 16,
         EnableBiomes = false,
         BiomeMapKind = BiomeMapKind.HorizontalBands,
         EnableObstacles = true,
@@ -6130,9 +6210,9 @@ static void ScenarioJsonRoundTrips()
     var roundTripped = SimulationScenarioJson.FromJson(json);
 
     AssertTrue(json.Contains("\"pipelineKind\": \"simpleForaging\""), "JSON should serialize pipeline as a string");
-    AssertTrue(json.Contains("\"brainArchitectureKind\": \"hybridNeural\""), "JSON should serialize brain architecture");
+    AssertTrue(json.Contains("\"brainArchitectureKind\": \"hiddenLayerNeural\""), "JSON should serialize brain architecture");
     AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
-    AssertTrue(json.Contains("\"brainHiddenNodeCount\": 6"), "JSON should serialize hidden brain nodes");
+    AssertTrue(json.Contains("\"brainHiddenNodeCount\": 16"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
     AssertTrue(json.Contains("\"obstacleMapKind\": \"scatteredRocks\""), "JSON should serialize obstacle map kind as a string");
@@ -6292,6 +6372,14 @@ static void AssertBrainsClose(NeuralBrainGenome expected, NeuralBrainGenome actu
     for (var i = 0; i < expected.Weights.Length; i++)
     {
         AssertClose(expected.Weights[i], actual.Weights[i], 0.000001, $"{context} weight {i}");
+    }
+}
+
+static void AssertDirectWeightsZero(NeuralBrainGenome brain, string context)
+{
+    for (var i = 0; i < NeuralBrainGenome.DirectWeightCount; i++)
+    {
+        AssertClose(0f, brain.Weights[i], 0.000001, $"{context} weight {i}");
     }
 }
 

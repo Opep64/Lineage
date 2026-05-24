@@ -17,23 +17,43 @@ public static class BrainFactory
         "Direct input/output neural weights with optional hidden concept nodes.",
         NeuralBrainSchema.InputCount,
         NeuralBrainSchema.OutputCount,
+        NeuralBrainSchema.DefaultHiddenNodeCount,
+        0,
         NeuralBrainSchema.MaxHiddenNodeCount,
         SupportsHiddenNodes: true,
         SupportsDirectInputOutputWeights: true);
+
+    private static readonly BrainArchitectureDescriptor HiddenLayerNeuralDescriptor = new(
+        BrainArchitectureKind.HiddenLayerNeural,
+        "Hidden-layer neural",
+        "Neural controller that routes all inputs through a hidden layer before outputs.",
+        NeuralBrainSchema.InputCount,
+        NeuralBrainSchema.OutputCount,
+        NeuralBrainSchema.DefaultHiddenLayerNodeCount,
+        NeuralBrainSchema.OutputCount,
+        NeuralBrainSchema.MaxHiddenNodeCount,
+        SupportsHiddenNodes: true,
+        SupportsDirectInputOutputWeights: false);
 
     public static BrainArchitectureDescriptor Describe(BrainArchitectureKind kind)
     {
         return kind switch
         {
             BrainArchitectureKind.HybridNeural => HybridNeuralDescriptor,
+            BrainArchitectureKind.HiddenLayerNeural => HiddenLayerNeuralDescriptor,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
 
     public static NeuralBrainGenome CreateZero(BrainArchitectureKind kind, int hiddenNodeCount = 0)
     {
-        _ = Describe(kind);
-        return NeuralBrainGenome.CreateZero(hiddenNodeCount);
+        var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
+        return kind switch
+        {
+            BrainArchitectureKind.HybridNeural => NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount),
+            BrainArchitectureKind.HiddenLayerNeural => NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
+        };
     }
 
     public static NeuralBrainGenome CreateRandom(
@@ -43,8 +63,16 @@ public static class BrainFactory
         int hiddenNodeCount = 0)
     {
         ArgumentNullException.ThrowIfNull(random);
-        _ = Describe(kind);
-        return NeuralBrainGenome.CreateRandom(random, scale, hiddenNodeCount);
+        var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
+        return kind switch
+        {
+            BrainArchitectureKind.HybridNeural => NeuralBrainGenome.CreateRandom(random, scale, resolvedHiddenNodeCount),
+            BrainArchitectureKind.HiddenLayerNeural => NeuralBrainGenome.CreateHiddenLayerRandom(
+                random,
+                scale,
+                resolvedHiddenNodeCount),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
+        };
     }
 
     public static NeuralBrainGenome CreateStarter(
@@ -52,16 +80,15 @@ public static class BrainFactory
         InitialBrainKind initialBrainKind,
         int hiddenNodeCount = 0)
     {
-        _ = Describe(kind);
-
-        return initialBrainKind switch
+        var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
+        var starter = initialBrainKind switch
         {
-            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(hiddenNodeCount),
-            InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(hiddenNodeCount),
-            InitialBrainKind.SectorForager => NeuralBrainGenome.CreateSectorForager(hiddenNodeCount),
-            InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(hiddenNodeCount),
-            InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(hiddenNodeCount),
-            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(hiddenNodeCount),
+            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.SectorForager => NeuralBrainGenome.CreateSectorForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.RandomPerFounder => throw new ArgumentException(
                 "Random-per-founder brains are created individually.",
                 nameof(initialBrainKind)),
@@ -69,6 +96,15 @@ public static class BrainFactory
                 nameof(initialBrainKind),
                 initialBrainKind,
                 "Unsupported initial brain kind.")
+        };
+
+        return kind switch
+        {
+            BrainArchitectureKind.HybridNeural => starter,
+            BrainArchitectureKind.HiddenLayerNeural => NeuralBrainGenome.CreateHiddenLayerFromDirect(
+                starter,
+                resolvedHiddenNodeCount),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
 
@@ -81,8 +117,35 @@ public static class BrainFactory
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(random);
-        _ = Describe(kind);
-        return brain.Mutated(random, mutationStrength, mutationRate);
+        return kind switch
+        {
+            BrainArchitectureKind.HybridNeural => brain.Mutated(random, mutationStrength, mutationRate),
+            BrainArchitectureKind.HiddenLayerNeural => brain.MutatedHiddenLayer(
+                random,
+                mutationStrength,
+                mutationRate),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
+        };
+    }
+
+    public static int ResolveHiddenNodeCount(BrainArchitectureKind kind, int requestedHiddenNodeCount)
+    {
+        var descriptor = Describe(kind);
+        if (requestedHiddenNodeCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestedHiddenNodeCount), "Hidden node count cannot be negative.");
+        }
+
+        if (requestedHiddenNodeCount > descriptor.MaxHiddenNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(requestedHiddenNodeCount),
+                $"Hidden node count cannot exceed {descriptor.MaxHiddenNodeCount}.");
+        }
+
+        return requestedHiddenNodeCount < descriptor.MinHiddenNodeCount
+            ? descriptor.DefaultHiddenNodeCount
+            : requestedHiddenNodeCount;
     }
 }
 
@@ -92,6 +155,8 @@ public readonly record struct BrainArchitectureDescriptor(
     string Description,
     int InputCount,
     int OutputCount,
+    int DefaultHiddenNodeCount,
+    int MinHiddenNodeCount,
     int MaxHiddenNodeCount,
     bool SupportsHiddenNodes,
     bool SupportsDirectInputOutputWeights);

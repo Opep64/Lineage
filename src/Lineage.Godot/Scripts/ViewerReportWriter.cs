@@ -1728,6 +1728,7 @@ public static class ViewerReportWriter
         return kind switch
         {
             BrainArchitectureKind.HybridNeural => "Hybrid neural",
+            BrainArchitectureKind.HiddenLayerNeural => "Hidden-layer neural",
             _ => kind.ToString()
         };
     }

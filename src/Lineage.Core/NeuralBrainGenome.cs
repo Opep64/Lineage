@@ -101,6 +101,49 @@ public sealed class NeuralBrainGenome
         return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
     }
 
+    public static NeuralBrainGenome CreateHiddenLayerRandom(
+        DeterministicRandom random,
+        float scale = 1f,
+        int hiddenNodeCount = NeuralBrainSchema.DefaultHiddenLayerNodeCount)
+    {
+        if (!float.IsFinite(scale) || scale < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), "Random brain scale must be finite and non-negative.");
+        }
+
+        ValidateHiddenLayerNodeCount(hiddenNodeCount);
+
+        var weights = new float[GetExpectedWeightCount(hiddenNodeCount)];
+        for (var i = DirectWeightCount; i < weights.Length; i++)
+        {
+            weights[i] = random.NextSingle(-scale, scale);
+        }
+
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome CreateHiddenLayerFromDirect(
+        NeuralBrainGenome directBrain,
+        int hiddenNodeCount = NeuralBrainSchema.DefaultHiddenLayerNodeCount)
+    {
+        ArgumentNullException.ThrowIfNull(directBrain);
+        ValidateHiddenLayerNodeCount(hiddenNodeCount);
+
+        var weights = new float[GetExpectedWeightCount(hiddenNodeCount)];
+        for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+        {
+            var hidden = output;
+            for (var input = 0; input < NeuralBrainSchema.InputCount; input++)
+            {
+                SetHiddenInput(weights, hiddenNodeCount, hidden, input, directBrain.GetWeight(output, input));
+            }
+
+            SetHiddenOutput(weights, hiddenNodeCount, output, hidden, 1.75f);
+        }
+
+        return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
+
     /// <summary>
     /// Seed controller that can seek and eat visible resources without hard-coded actions.
     /// </summary>
@@ -533,17 +576,7 @@ public sealed class NeuralBrainGenome
 
     public NeuralBrainGenome Mutated(DeterministicRandom random, float mutationStrength, float mutationRate)
     {
-        if (!float.IsFinite(mutationStrength) || mutationStrength < 0f)
-        {
-            throw new ArgumentOutOfRangeException(nameof(mutationStrength), "Mutation strength must be finite and non-negative.");
-        }
-
-        if (!float.IsFinite(mutationRate) || mutationRate < 0f || mutationRate > 1f)
-        {
-            throw new ArgumentOutOfRangeException(nameof(mutationRate), "Mutation rate must be finite and between 0 and 1.");
-        }
-
-        var strength = Math.Clamp(mutationStrength, 0f, 1f);
+        var strength = ValidateMutationParameters(mutationStrength, mutationRate);
         var weights = new float[Weights.Length];
         var mutatedAny = false;
 
@@ -565,6 +598,38 @@ public sealed class NeuralBrainGenome
         return new NeuralBrainGenome(weights, HiddenNodeCount, trusted: true);
     }
 
+    public NeuralBrainGenome MutatedHiddenLayer(
+        DeterministicRandom random,
+        float mutationStrength,
+        float mutationRate)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+        ValidateHiddenLayerNodeCount(HiddenNodeCount);
+        var strength = ValidateMutationParameters(mutationStrength, mutationRate);
+        var weights = new float[Weights.Length];
+        Array.Copy(Weights, weights, Weights.Length);
+        Array.Clear(weights, 0, DirectWeightCount);
+
+        var mutatedAny = false;
+        for (var i = DirectWeightCount; i < weights.Length; i++)
+        {
+            var shouldMutate = strength > 0f && mutationRate > 0f && random.NextSingle() < mutationRate;
+            mutatedAny |= shouldMutate;
+            if (shouldMutate)
+            {
+                weights[i] = Math.Clamp(weights[i] + random.NextSingle(-strength, strength), -WeightLimit, WeightLimit);
+            }
+        }
+
+        if (!mutatedAny && strength > 0f && mutationRate > 0f && weights.Length > DirectWeightCount)
+        {
+            var index = DirectWeightCount + random.NextInt32(weights.Length - DirectWeightCount);
+            weights[index] = Math.Clamp(weights[index] + random.NextSingle(-strength, strength), -WeightLimit, WeightLimit);
+        }
+
+        return new NeuralBrainGenome(weights, HiddenNodeCount, trusted: true);
+    }
+
     private static void Set(float[] weights, int outputIndex, int inputIndex, float value)
     {
         weights[GetWeightIndex(outputIndex, inputIndex)] = value;
@@ -578,6 +643,16 @@ public sealed class NeuralBrainGenome
         float value)
     {
         weights[GetHiddenInputWeightIndex(hiddenNodeCount, hiddenIndex, inputIndex)] = value;
+    }
+
+    private static void SetHiddenOutput(
+        float[] weights,
+        int hiddenNodeCount,
+        int outputIndex,
+        int hiddenIndex,
+        float value)
+    {
+        weights[GetHiddenOutputWeightIndex(hiddenNodeCount, outputIndex, hiddenIndex)] = value;
     }
 
     private static int GetWeightIndex(int outputIndex, int inputIndex)
@@ -654,6 +729,31 @@ public sealed class NeuralBrainGenome
                 nameof(hiddenNodeCount),
                 $"Hidden node count must be between 0 and {NeuralBrainSchema.MaxHiddenNodeCount}.");
         }
+    }
+
+    private static void ValidateHiddenLayerNodeCount(int hiddenNodeCount)
+    {
+        if (hiddenNodeCount < NeuralBrainSchema.OutputCount || hiddenNodeCount > NeuralBrainSchema.MaxHiddenNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(hiddenNodeCount),
+                $"Hidden-layer neural brains require between {NeuralBrainSchema.OutputCount} and {NeuralBrainSchema.MaxHiddenNodeCount} hidden nodes.");
+        }
+    }
+
+    private static float ValidateMutationParameters(float mutationStrength, float mutationRate)
+    {
+        if (!float.IsFinite(mutationStrength) || mutationStrength < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mutationStrength), "Mutation strength must be finite and non-negative.");
+        }
+
+        if (!float.IsFinite(mutationRate) || mutationRate < 0f || mutationRate > 1f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(mutationRate), "Mutation rate must be finite and between 0 and 1.");
+        }
+
+        return Math.Clamp(mutationStrength, 0f, 1f);
     }
 
     private static (float[] Weights, int HiddenNodeCount) NormalizeWeights(float[] weights)
