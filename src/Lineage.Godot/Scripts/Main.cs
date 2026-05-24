@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -81,6 +82,8 @@ public partial class Main : Node2D
     private ulong _currentSeed = SimulationScenario.DefaultSeed;
     private string? _currentScenarioPath;
     private bool _cliRunInProgress;
+    private bool _runExportInProgress;
+    private readonly ConcurrentQueue<Action> _mainThreadActions = new();
     private IReadOnlyList<SpeciesInjectionResult> _scenarioSpeciesInjections = Array.Empty<SpeciesInjectionResult>();
     private SpeciesProfile? _loadedSpeciesProfile;
     private string? _loadedSpeciesProfilePath;
@@ -149,6 +152,8 @@ public partial class Main : Node2D
 
     public override void _Process(double delta)
     {
+        DrainMainThreadActions();
+
         var stepsThisFrame = 0;
         if (!_paused)
         {
@@ -171,6 +176,14 @@ public partial class Main : Node2D
         UpdateFollowCamera();
         UpdateLabels();
         QueueRedraw();
+    }
+
+    private void DrainMainThreadActions()
+    {
+        while (_mainThreadActions.TryDequeue(out var action))
+        {
+            action();
+        }
     }
 
     public override void _Draw()
@@ -357,6 +370,11 @@ public partial class Main : Node2D
 
     private void LaunchScenarioFromEditor()
     {
+        if (IsCurrentRunExportBusy("launch a scenario"))
+        {
+            return;
+        }
+
         if (!_scenarioEditor.TryReadScenario(out var scenario, out var error))
         {
             _scenarioEditor.SetStatus($"Launch failed: {error}");
@@ -400,6 +418,11 @@ public partial class Main : Node2D
 
     private void LoadScenarioFromPath(string path)
     {
+        if (IsCurrentRunExportBusy("load a scenario"))
+        {
+            return;
+        }
+
         try
         {
             _scenario = SimulationScenarioJson.Load(path);
@@ -2398,6 +2421,11 @@ public partial class Main : Node2D
 
     private void LoadSnapshotFromPath(string path)
     {
+        if (IsCurrentRunExportBusy("load a snapshot"))
+        {
+            return;
+        }
+
         try
         {
             var restored = SimulationSnapshotJson.LoadSimulation(path);
@@ -2545,6 +2573,11 @@ public partial class Main : Node2D
 
     private void InjectLoadedSpeciesProfile()
     {
+        if (IsCurrentRunExportBusy("inject species"))
+        {
+            return;
+        }
+
         if (_loadedSpeciesProfile is null)
         {
             _scenarioEditor.SetStatus("Load a species profile before injecting.");
@@ -2581,6 +2614,12 @@ public partial class Main : Node2D
 
     private void WriteCurrentReportFromEditor()
     {
+        if (_runExportInProgress)
+        {
+            _scenarioEditor.SetStatus("Current run export already in progress.");
+            return;
+        }
+
         try
         {
             var workspaceRoot = GetRepositoryRoot();
@@ -2588,18 +2627,70 @@ public partial class Main : Node2D
             var statsPath = ResolveWorkspacePath(request.OutputPath, workspaceRoot);
             var reportPath = ResolveWorkspacePath(request.ReportPath, workspaceRoot);
             var snapshotPath = ResolveWorkspacePath(request.SnapshotPath, workspaceRoot);
+            var scenario = _scenario;
+            var simulation = _simulation;
+            var previousPaused = _paused;
+            var stopwatch = Stopwatch.StartNew();
 
-            var result = GodotRunExportWriter.Write(statsPath, reportPath, snapshotPath, _scenario, _simulation);
-            _scenarioEditor.SetLastReportPath(result.ReportPath);
-            _scenarioEditor.SetLastSnapshotPath(result.SnapshotPath);
-            _scenarioEditor.SetStatus($"Current run exported: {result.FileCount} files. Open the report or load the snapshot from the CLI tab.");
+            _runExportInProgress = true;
+            _paused = true;
+            _stepAccumulator = 0;
+            _scenarioEditor.SetStatus("Exporting current run... simulation paused while the bundle is written.");
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    var result = GodotRunExportWriter.Write(statsPath, reportPath, snapshotPath, scenario, simulation);
+                    stopwatch.Stop();
+                    _mainThreadActions.Enqueue(() => CompleteCurrentRunExport(result, previousPaused, stopwatch.Elapsed));
+                }
+                catch (Exception ex)
+                {
+                    stopwatch.Stop();
+                    _mainThreadActions.Enqueue(() => FailCurrentRunExport(ex.Message, previousPaused, stopwatch.Elapsed));
+                }
+            });
         }
         catch (Exception ex)
         {
+            _runExportInProgress = false;
             _scenarioEditor.SetLastReportPath(null);
             _scenarioEditor.SetLastSnapshotPath(null);
             _scenarioEditor.SetStatus($"Export failed: {ex.Message}");
         }
+    }
+
+    private bool IsCurrentRunExportBusy(string action)
+    {
+        if (!_runExportInProgress)
+        {
+            return false;
+        }
+
+        _scenarioEditor.SetStatus($"Wait for the current run export to finish before you {action}.");
+        return true;
+    }
+
+    private void CompleteCurrentRunExport(GodotRunExportResult result, bool previousPaused, TimeSpan elapsed)
+    {
+        _runExportInProgress = false;
+        _paused = previousPaused;
+        _stepAccumulator = 0;
+        _scenarioEditor.SetLastReportPath(result.ReportPath);
+        _scenarioEditor.SetLastSnapshotPath(result.SnapshotPath);
+        _scenarioEditor.SetStatus(
+            $"Current run exported: {result.FileCount} files in {elapsed.TotalSeconds:0.0}s. Open the report or load the snapshot from the CLI tab.");
+    }
+
+    private void FailCurrentRunExport(string message, bool previousPaused, TimeSpan elapsed)
+    {
+        _runExportInProgress = false;
+        _paused = previousPaused;
+        _stepAccumulator = 0;
+        _scenarioEditor.SetLastReportPath(null);
+        _scenarioEditor.SetLastSnapshotPath(null);
+        _scenarioEditor.SetStatus($"Export failed after {elapsed.TotalSeconds:0.0}s: {message}");
     }
 
     private static FileDialog CreateScenarioDialog(FileDialog.FileModeEnum mode, string title, string scenarioDirectory)

@@ -93,6 +93,9 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates sector vision inputs", NeuralBrainMigratesSectorVisionInputs),
     ("Neural brain migrates food contact input", NeuralBrainMigratesFoodContactInput),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
+    ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
+    ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
+    ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
@@ -3568,6 +3571,98 @@ static void NeuralBrainSupportsHiddenNodes()
         "Seed hidden concepts should be prewired on the input side");
 }
 
+static void BrainFactoryDescribesHybridNeuralArchitecture()
+{
+    var descriptor = BrainFactory.Describe(BrainArchitectureKind.HybridNeural);
+
+    AssertEqual(BrainArchitectureKind.HybridNeural, descriptor.Kind, "Descriptor kind");
+    AssertEqual("Hybrid neural", descriptor.Name, "Descriptor name");
+    AssertEqual(NeuralBrainSchema.InputCount, descriptor.InputCount, "Descriptor input count");
+    AssertEqual(NeuralBrainSchema.OutputCount, descriptor.OutputCount, "Descriptor output count");
+    AssertEqual(NeuralBrainSchema.MaxHiddenNodeCount, descriptor.MaxHiddenNodeCount, "Descriptor max hidden nodes");
+    AssertTrue(descriptor.SupportsHiddenNodes, "Hybrid neural descriptor should support hidden nodes");
+    AssertTrue(
+        descriptor.SupportsDirectInputOutputWeights,
+        "Hybrid neural descriptor should report direct input/output support");
+    AssertThrows<ArgumentOutOfRangeException>(
+        () => BrainFactory.Describe((BrainArchitectureKind)999),
+        "Unsupported brain architecture should be rejected");
+}
+
+static void BrainFactoryPreservesHybridStarterBrains()
+{
+    const int hiddenNodeCount = 4;
+
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateZero(hiddenNodeCount),
+        BrainFactory.CreateZero(BrainArchitectureKind.HybridNeural, hiddenNodeCount),
+        "Zero hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateSeedForager(hiddenNodeCount),
+        BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.SeedForager, hiddenNodeCount),
+        "Seed forager hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateExplorerForager(hiddenNodeCount),
+        BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.ExplorerForager, hiddenNodeCount),
+        "Explorer forager hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateSectorForager(hiddenNodeCount),
+        BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.SectorForager, hiddenNodeCount),
+        "Sector forager hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateScavengerForager(hiddenNodeCount),
+        BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.ScavengerForager, hiddenNodeCount),
+        "Scavenger forager hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateFreshnessAwareScavenger(hiddenNodeCount),
+        BrainFactory.CreateStarter(
+            BrainArchitectureKind.HybridNeural,
+            InitialBrainKind.FreshnessAwareScavenger,
+            hiddenNodeCount),
+        "Freshness-aware scavenger hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateForagerPredator(hiddenNodeCount),
+        BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.ForagerPredator, hiddenNodeCount),
+        "Forager predator hybrid brain");
+    AssertBrainsClose(
+        NeuralBrainGenome.CreateRandom(new DeterministicRandom(91), scale: 0.5f, hiddenNodeCount: hiddenNodeCount),
+        BrainFactory.CreateRandom(
+            BrainArchitectureKind.HybridNeural,
+            new DeterministicRandom(91),
+            scale: 0.5f,
+            hiddenNodeCount: hiddenNodeCount),
+        "Random hybrid brain");
+    AssertThrows<ArgumentException>(
+        () => BrainFactory.CreateStarter(
+            BrainArchitectureKind.HybridNeural,
+            InitialBrainKind.RandomPerFounder,
+            hiddenNodeCount),
+        "Random-per-founder should not be created as a shared starter");
+}
+
+static void BrainFactoryMutatesHybridNeuralBrains()
+{
+    var source = BrainFactory.CreateZero(BrainArchitectureKind.HybridNeural, hiddenNodeCount: 2);
+
+    var unchanged = BrainFactory.Mutate(
+        BrainArchitectureKind.HybridNeural,
+        source,
+        new DeterministicRandom(45),
+        mutationStrength: 0.5f,
+        mutationRate: 0f);
+    AssertBrainsClose(source, unchanged, "Zero-rate mutation");
+
+    var mutated = BrainFactory.Mutate(
+        BrainArchitectureKind.HybridNeural,
+        source,
+        new DeterministicRandom(45),
+        mutationStrength: 0.5f,
+        mutationRate: 0.05f);
+    AssertTrue(
+        mutated.Weights.Zip(source.Weights).Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
+        "Nonzero mutation should change at least one brain weight");
+}
+
 static void ScavengerForagerStarterBrainFollowsCarrionCues()
 {
     var simulation = new Simulation(new SimulationConfig(), seed: 407, systems: []);
@@ -5869,6 +5964,7 @@ static void ScenarioJsonRoundTrips()
         Name = "Sparse Food",
         Seed = 1234,
         PipelineKind = SimulationPipelineKind.SimpleForaging,
+        BrainArchitectureKind = BrainArchitectureKind.HybridNeural,
         InitialBrainKind = InitialBrainKind.ForagerPredator,
         BrainHiddenNodeCount = 6,
         EnableBiomes = false,
@@ -5991,6 +6087,7 @@ static void ScenarioJsonRoundTrips()
     var roundTripped = SimulationScenarioJson.FromJson(json);
 
     AssertTrue(json.Contains("\"pipelineKind\": \"simpleForaging\""), "JSON should serialize pipeline as a string");
+    AssertTrue(json.Contains("\"brainArchitectureKind\": \"hybridNeural\""), "JSON should serialize brain architecture");
     AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
     AssertTrue(json.Contains("\"brainHiddenNodeCount\": 6"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
@@ -6020,6 +6117,7 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
+    AssertEqual(scenario.BrainArchitectureKind, roundTripped.BrainArchitectureKind, "Scenario brain architecture");
     AssertEqual(scenario.InitialBrainKind, roundTripped.InitialBrainKind, "Scenario initial brain mode");
     AssertEqual(scenario.BrainHiddenNodeCount, roundTripped.BrainHiddenNodeCount, "Scenario brain hidden nodes");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
@@ -6140,6 +6238,17 @@ static void AssertEqual<T>(T expected, T actual, string context)
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
     {
         throw new InvalidOperationException($"{context}: expected {expected}, actual {actual}.");
+    }
+}
+
+static void AssertBrainsClose(NeuralBrainGenome expected, NeuralBrainGenome actual, string context)
+{
+    AssertEqual(expected.HiddenNodeCount, actual.HiddenNodeCount, $"{context} hidden node count");
+    AssertEqual(expected.Weights.Length, actual.Weights.Length, $"{context} weight count");
+
+    for (var i = 0; i < expected.Weights.Length; i++)
+    {
+        AssertClose(expected.Weights[i], actual.Weights[i], 0.000001, $"{context} weight {i}");
     }
 }
 

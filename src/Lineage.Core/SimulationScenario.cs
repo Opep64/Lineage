@@ -22,6 +22,8 @@ public sealed record SimulationScenario
 
     public SimulationPipelineKind PipelineKind { get; init; } = SimulationPipelineKind.Neural;
 
+    public BrainArchitectureKind BrainArchitectureKind { get; init; } = BrainArchitectureKind.HybridNeural;
+
     public InitialBrainKind InitialBrainKind { get; init; } = InitialBrainKind.SectorForager;
 
     public int BrainHiddenNodeCount { get; init; } = NeuralBrainSchema.DefaultHiddenNodeCount;
@@ -265,6 +267,7 @@ public sealed record SimulationScenario
 
         EnsurePositive(WorldWidth, nameof(WorldWidth));
         EnsurePositive(WorldHeight, nameof(WorldHeight));
+        EnsureEnumDefined(BrainArchitectureKind, nameof(BrainArchitectureKind));
         EnsureEnumDefined(InitialBrainKind, nameof(InitialBrainKind));
         EnsureEnumDefined(BiomeMapKind, nameof(BiomeMapKind));
         EnsureEnumDefined(ObstacleMapKind, nameof(ObstacleMapKind));

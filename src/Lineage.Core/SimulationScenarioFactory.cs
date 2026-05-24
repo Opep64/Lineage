@@ -60,6 +60,7 @@ public static class SimulationScenarioFactory
                 scenario.WorldSenseIntervalTicks,
                 scenario.CloseSenseRefreshProximity,
                 scenario.EnableSectorVision,
+                scenario.BrainArchitectureKind,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,
@@ -274,7 +275,10 @@ public static class SimulationScenarioFactory
             return -1;
         }
 
-        return state.AddBrain(CreateInitialBrain(scenario.InitialBrainKind, scenario.BrainHiddenNodeCount));
+        return state.AddBrain(BrainFactory.CreateStarter(
+            scenario.BrainArchitectureKind,
+            scenario.InitialBrainKind,
+            scenario.BrainHiddenNodeCount));
     }
 
     private static int CreateFounderBrainId(
@@ -299,24 +303,10 @@ public static class SimulationScenarioFactory
         }
 
         // Keep initial brain variation independent of world/resource placement randomness.
-        return state.AddBrain(NeuralBrainGenome.CreateRandom(
+        return state.AddBrain(BrainFactory.CreateRandom(
+            scenario.BrainArchitectureKind,
             initialBrainRandom,
             hiddenNodeCount: scenario.BrainHiddenNodeCount));
-    }
-
-    private static NeuralBrainGenome CreateInitialBrain(InitialBrainKind initialBrainKind, int hiddenNodeCount)
-    {
-        return initialBrainKind switch
-        {
-            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(hiddenNodeCount),
-            InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(hiddenNodeCount),
-            InitialBrainKind.SectorForager => NeuralBrainGenome.CreateSectorForager(hiddenNodeCount),
-            InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(hiddenNodeCount),
-            InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(hiddenNodeCount),
-            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(hiddenNodeCount),
-            InitialBrainKind.RandomPerFounder => throw new ArgumentException("Random-per-founder brains are created individually."),
-            _ => throw new ArgumentOutOfRangeException(nameof(initialBrainKind), initialBrainKind, "Unsupported initial brain kind.")
-        };
     }
 
     private static SimVector2 RandomCreaturePosition(

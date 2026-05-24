@@ -8,7 +8,8 @@ public sealed class ReproductionSystem(
     float reproductivePrimeAgeSeconds = 240f,
     float reproductiveSenescenceAgeSeconds = 900f,
     float senescentFertilityMultiplier = 0.18f,
-    float crowdingFertilityPenalty = 0.65f) : ISimulationSystem
+    float crowdingFertilityPenalty = 0.65f,
+    BrainArchitectureKind brainArchitectureKind = BrainArchitectureKind.HybridNeural) : ISimulationSystem
 {
     private readonly float _reproductivePrimeAgeSeconds =
         ValidateNonNegative(reproductivePrimeAgeSeconds, nameof(reproductivePrimeAgeSeconds));
@@ -18,6 +19,8 @@ public sealed class ReproductionSystem(
         ValidateUnitInterval(senescentFertilityMultiplier, nameof(senescentFertilityMultiplier));
     private readonly float _crowdingFertilityPenalty =
         ValidateUnitInterval(crowdingFertilityPenalty, nameof(crowdingFertilityPenalty));
+    private readonly BrainArchitectureKind _brainArchitectureKind =
+        ValidateBrainArchitectureKind(brainArchitectureKind);
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -85,7 +88,9 @@ public sealed class ReproductionSystem(
             var childGenome = parentGenome.Mutated(state.Random);
             var childGenomeId = state.AddGenome(childGenome);
             var childBrainId = parent.BrainId >= 0
-                ? state.AddBrain(state.GetBrain(parent.BrainId).Mutated(
+                ? state.AddBrain(BrainFactory.Mutate(
+                    _brainArchitectureKind,
+                    state.GetBrain(parent.BrainId),
                     state.Random,
                     parentGenome.MutationStrength,
                     parentGenome.BrainMutationRate))
@@ -159,5 +164,12 @@ public sealed class ReproductionSystem(
         return float.IsFinite(value) && value is >= 0f and <= 1f
             ? value
             : throw new ArgumentOutOfRangeException(name, "Fertility multiplier must be finite and between 0 and 1.");
+    }
+
+    private static BrainArchitectureKind ValidateBrainArchitectureKind(BrainArchitectureKind value)
+    {
+        return Enum.IsDefined(value)
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported brain architecture kind.");
     }
 }
