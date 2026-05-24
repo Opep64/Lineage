@@ -4958,6 +4958,11 @@ static void SpeciesClusterHistoryTracksSnapshots()
     AssertEqual(3, finalRows.Sum(row => row.LivingCreatures), "Species history final living total");
     AssertClose(2f / 3f, finalRows[0].LivingShare, 0.000001, "Species history final dominant share");
     AssertTrue(history.Rows.All(row => row.Rank > 0), "Species history rows should be ranked");
+    AssertTrue(history.Clusters.All(cluster => !string.IsNullOrWhiteSpace(cluster.LifecycleLabel)), "Species history clusters should have lifecycle labels");
+    AssertTrue(history.DiversityRows.Count > 0, "Species history should include diversity rows");
+    AssertEqual(2, history.DiversityRows[^1].ActiveClusterCount, "Species history final active cluster count");
+    AssertClose(2f / 3f, history.DiversityRows[^1].DominantLivingShare, 0.000001, "Species history final dominant diversity share");
+    AssertTrue(history.Notes.Count > 0, "Species history should include interpretation notes");
 }
 
 static void ScenarioSpeciesRosterInjectsProfileFounders()

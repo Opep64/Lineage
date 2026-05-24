@@ -140,8 +140,9 @@ public static class SpeciesClusterAnalyzer
         }
 
         var rows = BuildHistoryRows(state.LineageRecords, snapshots, clusters.RecordClusterById);
+        var diversityRows = BuildDiversityRows(rows);
         var summaries = clusters.Clusters
-            .Select(cluster => SummarizeHistoryCluster(cluster, rows, state.Creatures.Count))
+            .Select(cluster => SummarizeHistoryCluster(cluster, rows, snapshots, state.Creatures.Count))
             .OrderByDescending(summary => summary.PeakLivingCreatures)
             .ThenByDescending(summary => summary.FinalLivingCreatures)
             .ThenByDescending(summary => summary.Births)
@@ -159,7 +160,9 @@ public static class SpeciesClusterAnalyzer
             .ThenBy(row => row.Rank)
             .ToArray();
 
-        return new SpeciesClusterHistory(summaries, selectedRows);
+        var notes = BuildHistoryNotes(summaries, diversityRows);
+
+        return new SpeciesClusterHistory(summaries, selectedRows, diversityRows, notes);
     }
 
     private static SpeciesClusterSummary SummarizeCluster(
@@ -602,6 +605,7 @@ public static class SpeciesClusterAnalyzer
     private static SpeciesClusterHistorySummary SummarizeHistoryCluster(
         SpeciesLineageClusterAccumulator cluster,
         IReadOnlyList<SpeciesClusterHistoryRow> rows,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
         int finalPopulation)
     {
         var clusterRows = rows
@@ -618,6 +622,15 @@ public static class SpeciesClusterAnalyzer
             ? firstTick
             : clusterRows.Max(row => row.Tick);
         var status = finalLiving > 0 ? "alive" : "extinct";
+        var lifecycle = ClassifyLifecycle(
+            clusterRows,
+            snapshots,
+            finalLiving,
+            finalLivingShare: finalPopulation > 0 ? finalLiving / (float)finalPopulation : 0f,
+            peakLiving: peakRow.LivingCreatures,
+            peakShare: peakRow.LivingShare,
+            firstTick,
+            lastLivingTick);
 
         return new SpeciesClusterHistorySummary(
             Rank: 0,
@@ -635,7 +648,184 @@ public static class SpeciesClusterAnalyzer
             MinGeneration: cluster.Records.Min(record => record.Generation),
             AverageGeneration: (float)cluster.Records.Average(record => record.Generation),
             MaxGeneration: cluster.Records.Max(record => record.Generation),
-            Status: status);
+            Status: status,
+            LifecycleLabel: lifecycle);
+    }
+
+    private static IReadOnlyList<SpeciesClusterDiversityRow> BuildDiversityRows(
+        IReadOnlyList<SpeciesClusterHistoryRow> rows)
+    {
+        var result = new List<SpeciesClusterDiversityRow>();
+        var previousActive = new HashSet<int>();
+
+        foreach (var group in rows
+            .GroupBy(row => row.Tick)
+            .OrderBy(group => group.Key))
+        {
+            var orderedRows = group
+                .OrderByDescending(row => row.LivingCreatures)
+                .ThenBy(row => row.SpeciesId)
+                .ToArray();
+            if (orderedRows.Length == 0)
+            {
+                continue;
+            }
+
+            var active = orderedRows.Select(row => row.SpeciesId).ToHashSet();
+            var entering = active.Count(speciesId => !previousActive.Contains(speciesId));
+            var exiting = previousActive.Count(speciesId => !active.Contains(speciesId));
+            var dominant = orderedRows[0];
+            result.Add(new SpeciesClusterDiversityRow(
+                dominant.Tick,
+                dominant.ElapsedSeconds,
+                ActiveClusterCount: active.Count,
+                TotalLiving: dominant.TotalLiving,
+                DominantSpeciesId: dominant.SpeciesId,
+                DominantName: dominant.Name,
+                DominantLivingCreatures: dominant.LivingCreatures,
+                DominantLivingShare: dominant.LivingShare,
+                EnteringClusters: entering,
+                ExitingClusters: exiting,
+                TurnoverClusters: entering + exiting));
+
+            previousActive = active;
+        }
+
+        return result;
+    }
+
+    private static string ClassifyLifecycle(
+        IReadOnlyList<SpeciesClusterHistoryRow> clusterRows,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        int finalLiving,
+        float finalLivingShare,
+        int peakLiving,
+        float peakShare,
+        long firstBirthTick,
+        long lastLivingTick)
+    {
+        if (clusterRows.Count == 0 || snapshots.Count == 0)
+        {
+            return finalLiving > 0 ? "unsampled survivor" : "unsampled extinct";
+        }
+
+        var firstSnapshotTick = snapshots[0].Tick;
+        var finalSnapshotTick = snapshots[^1].Tick;
+        var runSpan = Math.Max(1L, finalSnapshotTick - firstSnapshotTick);
+        var firstSeenTick = clusterRows.Min(row => row.Tick);
+        var peakTick = clusterRows
+            .OrderByDescending(row => row.LivingCreatures)
+            .ThenBy(row => row.Tick)
+            .First()
+            .Tick;
+        var minAfterPeak = clusterRows
+            .Where(row => row.Tick >= peakTick)
+            .Select(row => row.LivingCreatures)
+            .DefaultIfEmpty(peakLiving)
+            .Min();
+
+        if (finalLiving == 0 && peakShare >= 0.25f)
+        {
+            return "major extinct";
+        }
+
+        if (finalLiving == 0)
+        {
+            return lastLivingTick < finalSnapshotTick ? "went extinct" : "extinct at final";
+        }
+
+        if (finalLivingShare >= 0.35f && firstSeenTick > firstSnapshotTick + runSpan * 0.25f)
+        {
+            return "late replacement";
+        }
+
+        if (finalLivingShare >= 0.45f)
+        {
+            return "dominant late";
+        }
+
+        if (peakLiving >= 5 && minAfterPeak <= Math.Max(2, (int)MathF.Ceiling(peakLiving * 0.2f)))
+        {
+            return "bottlenecked survivor";
+        }
+
+        if (firstSeenTick > firstSnapshotTick + runSpan * 0.5f)
+        {
+            return "emerged late";
+        }
+
+        if (firstBirthTick <= firstSnapshotTick + runSpan * 0.1f && lastLivingTick >= finalSnapshotTick)
+        {
+            return "early survivor";
+        }
+
+        if (peakShare >= 0.25f && finalLivingShare < peakShare * 0.35f)
+        {
+            return "declining remnant";
+        }
+
+        return "persistent minority";
+    }
+
+    private static IReadOnlyList<string> BuildHistoryNotes(
+        IReadOnlyList<SpeciesClusterHistorySummary> summaries,
+        IReadOnlyList<SpeciesClusterDiversityRow> diversityRows)
+    {
+        if (summaries.Count == 0 || diversityRows.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var notes = new List<string>();
+        var finalDiversity = diversityRows[^1];
+        notes.Add(
+            $"Final diversity: {finalDiversity.ActiveClusterCount} active cluster(s); {finalDiversity.DominantName} holds {finalDiversity.DominantLivingShare * 100f:0.0}% of living creatures.");
+
+        var peakDiversity = diversityRows
+            .OrderByDescending(row => row.ActiveClusterCount)
+            .ThenBy(row => row.Tick)
+            .First();
+        if (peakDiversity.ActiveClusterCount > finalDiversity.ActiveClusterCount)
+        {
+            notes.Add(
+                $"Diversity peaked at {peakDiversity.ActiveClusterCount} active clusters near tick {peakDiversity.Tick}.");
+        }
+
+        var turnover = diversityRows.Sum(row => row.TurnoverClusters);
+        if (turnover > finalDiversity.ActiveClusterCount)
+        {
+            notes.Add(
+                $"Cluster turnover recorded {turnover} entries/exits across sampled snapshots.");
+        }
+
+        var majorExtinct = summaries
+            .Where(summary => summary.FinalLivingCreatures == 0 && summary.PeakLivingShare >= 0.25f)
+            .OrderByDescending(summary => summary.PeakLivingShare)
+            .FirstOrDefault();
+        if (majorExtinct.SpeciesId != 0)
+        {
+            notes.Add(
+                $"{majorExtinct.Name} peaked at {majorExtinct.PeakLivingShare * 100f:0.0}% near tick {majorExtinct.PeakTick}, then went extinct.");
+        }
+
+        var finalDominant = summaries
+            .Where(summary => summary.FinalLivingCreatures > 0)
+            .OrderByDescending(summary => summary.FinalLivingShare)
+            .FirstOrDefault();
+        var earlierMajor = summaries
+            .Where(summary => summary.SpeciesId != finalDominant.SpeciesId &&
+                summary.PeakLivingShare >= 0.25f &&
+                summary.PeakTick < finalDominant.PeakTick &&
+                summary.FinalLivingShare < 0.1f)
+            .OrderByDescending(summary => summary.PeakLivingShare)
+            .FirstOrDefault();
+        if (finalDominant.SpeciesId != 0 && earlierMajor.SpeciesId != 0)
+        {
+            notes.Add(
+                $"{finalDominant.Name} appears to have replaced earlier cluster {earlierMajor.Name}.");
+        }
+
+        return notes;
     }
 
     private static void AddActiveRecord(
@@ -831,11 +1021,15 @@ public readonly record struct SpeciesClusterSummary(
 
 public sealed record SpeciesClusterHistory(
     IReadOnlyList<SpeciesClusterHistorySummary> Clusters,
-    IReadOnlyList<SpeciesClusterHistoryRow> Rows)
+    IReadOnlyList<SpeciesClusterHistoryRow> Rows,
+    IReadOnlyList<SpeciesClusterDiversityRow> DiversityRows,
+    IReadOnlyList<string> Notes)
 {
     public static SpeciesClusterHistory Empty { get; } = new(
         Array.Empty<SpeciesClusterHistorySummary>(),
-        Array.Empty<SpeciesClusterHistoryRow>());
+        Array.Empty<SpeciesClusterHistoryRow>(),
+        Array.Empty<SpeciesClusterDiversityRow>(),
+        Array.Empty<string>());
 }
 
 public readonly record struct SpeciesClusterHistorySummary(
@@ -854,7 +1048,8 @@ public readonly record struct SpeciesClusterHistorySummary(
     int MinGeneration,
     float AverageGeneration,
     int MaxGeneration,
-    string Status);
+    string Status,
+    string LifecycleLabel);
 
 public readonly record struct SpeciesClusterHistoryRow(
     long Tick,
@@ -868,3 +1063,16 @@ public readonly record struct SpeciesClusterHistoryRow(
     int MinGeneration,
     float AverageGeneration,
     int MaxGeneration);
+
+public readonly record struct SpeciesClusterDiversityRow(
+    long Tick,
+    double ElapsedSeconds,
+    int ActiveClusterCount,
+    int TotalLiving,
+    int DominantSpeciesId,
+    string DominantName,
+    int DominantLivingCreatures,
+    float DominantLivingShare,
+    int EnteringClusters,
+    int ExitingClusters,
+    int TurnoverClusters);

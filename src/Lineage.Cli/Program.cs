@@ -5393,8 +5393,47 @@ internal static class RunReportWriter
             return;
         }
 
+        if (history.Notes.Count > 0)
+        {
+            writer.WriteLine("<ul>");
+            foreach (var note in history.Notes)
+            {
+                writer.WriteLine($"<li>{Html(note)}</li>");
+            }
+
+            writer.WriteLine("</ul>");
+        }
+
+        if (history.DiversityRows.Count > 0)
+        {
+            var finalDiversity = history.DiversityRows[^1];
+            var peakDiversity = history.DiversityRows
+                .OrderByDescending(row => row.ActiveClusterCount)
+                .ThenBy(row => row.Tick)
+                .First();
+            var totalTurnover = history.DiversityRows.Sum(row => row.TurnoverClusters);
+
+            writer.WriteLine("<div class=\"metric-grid\">");
+            WriteMetric(writer, "Final active clusters", finalDiversity.ActiveClusterCount.ToString(CultureInfo.InvariantCulture));
+            WriteMetric(writer, "Peak active clusters", $"{peakDiversity.ActiveClusterCount} at tick {peakDiversity.Tick}");
+            WriteMetric(writer, "Final dominant cluster", $"{finalDiversity.DominantName} ({FormatPercent(finalDiversity.DominantLivingShare)})");
+            WriteMetric(writer, "Sampled turnover", totalTurnover.ToString(CultureInfo.InvariantCulture));
+            writer.WriteLine("</div>");
+
+            writer.WriteLine("<div class=\"chart-grid\">");
+            WriteLineChart(
+                writer,
+                "Species Diversity",
+                "",
+                Array.Empty<SimulationStatsSnapshot>(),
+                new ChartSeries("Active clusters", "#6a8fce", history.DiversityRows.Select(row => (float)row.ActiveClusterCount).ToArray()),
+                new ChartSeries("Dominant share %", "#2f7d4f", history.DiversityRows.Select(row => row.DominantLivingShare * 100f).ToArray()),
+                new ChartSeries("Turnover", "#d69d2f", history.DiversityRows.Select(row => (float)row.TurnoverClusters).ToArray()));
+            writer.WriteLine("</div>");
+        }
+
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Status</th><th>Births</th><th>Deaths</th><th>Final</th><th>Peak</th><th>First Birth</th><th>Peak Tick</th><th>Last Seen</th><th>Generation</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Status</th><th>Lifecycle</th><th>Births</th><th>Deaths</th><th>Final</th><th>Peak</th><th>First Birth</th><th>Peak Tick</th><th>Last Seen</th><th>Generation</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in history.Clusters)
         {
@@ -5403,6 +5442,7 @@ internal static class RunReportWriter
                 $"<td>{Html(summary.Rank)}</td>" +
                 $"<td>{Html(summary.Name)}</td>" +
                 $"<td>{Html(summary.Status)}</td>" +
+                $"<td>{Html(summary.LifecycleLabel)}</td>" +
                 $"<td>{Html(summary.Births)}</td>" +
                 $"<td>{Html(summary.Deaths)}</td>" +
                 $"<td>{Html($"{summary.FinalLivingCreatures} ({FormatPercent(summary.FinalLivingShare)})")}</td>" +
@@ -5417,11 +5457,40 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
 
         var selectedClusters = history.Clusters.Take(5).ToArray();
-        var selectedTicks = SelectReportTicks(history.Rows
+        var selectedTicks = SelectReportTicks(history.DiversityRows
             .Select(row => row.Tick)
-            .Distinct()
             .OrderBy(tick => tick)
             .ToArray());
+        if (selectedTicks.Count > 0)
+        {
+            var diversityByTick = history.DiversityRows.ToDictionary(row => row.Tick);
+            writer.WriteLine("<h3>Diversity Over Time</h3>");
+            writer.WriteLine("<div class=\"table-wrap\"><table>");
+            writer.WriteLine("<thead><tr><th>Tick</th><th>Time</th><th>Active Clusters</th><th>Total Living</th><th>Dominant</th><th>Dominant Share</th><th>Entering</th><th>Exiting</th></tr></thead>");
+            writer.WriteLine("<tbody>");
+            foreach (var tick in selectedTicks)
+            {
+                if (!diversityByTick.TryGetValue(tick, out var row))
+                {
+                    continue;
+                }
+
+                writer.WriteLine(
+                    "<tr>" +
+                    $"<td>{Html(row.Tick)}</td>" +
+                    $"<td>{Html(row.ElapsedSeconds.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(row.ActiveClusterCount)}</td>" +
+                    $"<td>{Html(row.TotalLiving)}</td>" +
+                    $"<td>{Html(row.DominantName)}</td>" +
+                    $"<td>{Html(FormatPercent(row.DominantLivingShare))}</td>" +
+                    $"<td>{Html(row.EnteringClusters)}</td>" +
+                    $"<td>{Html(row.ExitingClusters)}</td>" +
+                    "</tr>");
+            }
+
+            writer.WriteLine("</tbody></table></div>");
+        }
+
         if (selectedClusters.Length > 0 && selectedTicks.Count > 0)
         {
             var rowByTickSpecies = history.Rows.ToDictionary(row => (row.Tick, row.SpeciesId));
