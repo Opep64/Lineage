@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lineage Runner</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Lineage Runner</h1>
+      <p>Launch and monitor CLI simulations without living in terminal scrollback.</p>
+    </div>
+    <div class="status-pill" id="refreshStatus">Idle</div>
+  </header>
+
+  <main>
+    <section class="launch-panel">
+      <h2>Launch Run</h2>
+      <form id="launchForm" class="launch-form">
+        <label>
+          Scenario
+          <select id="scenarioPath" required></select>
+        </label>
+        <label>
+          Ticks
+          <input id="ticks" type="number" min="1" step="1" value="20000" required>
+        </label>
+        <label>
+          Seed
+          <input id="seed" type="number" min="0" step="1" placeholder="scenario default">
+        </label>
+        <label>
+          Checkpoint interval
+          <input id="checkpointInterval" type="number" min="0" step="1" placeholder="manual only">
+        </label>
+        <label class="checkbox-row">
+          <input id="stopOnExtinction" type="checkbox" checked>
+          <span>Stop on extinction</span>
+        </label>
+        <button type="submit">Start CLI Run</button>
+      </form>
+      <p id="formMessage" class="form-message" role="status"></p>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>Runs</h2>
+        <button id="refreshButton" type="button">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th>
+              <th>Status</th>
+              <th>Progress</th>
+              <th>Live</th>
+              <th>Outcome</th>
+              <th>Artifacts</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="runsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

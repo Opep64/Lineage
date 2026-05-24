@@ -5,6 +5,7 @@
     <Project Path="src/Lineage.Godot/Lineage.Godot.csproj">
       <BuildType Project="Debug" />
     </Project>
+    <Project Path="src/Lineage.Runner/Lineage.Runner.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Lineage.Core.Tests/Lineage.Core.Tests.csproj" />

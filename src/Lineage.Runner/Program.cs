@@ -1,0 +1,80 @@
+using Lineage.Runner;
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = FindContentRoot()
+});
+builder.Services.AddSingleton<LineageRunManager>();
+
+var app = builder.Build();
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+var api = app.MapGroup("/api");
+
+api.MapGet("/scenarios", (LineageRunManager manager) => Results.Ok(manager.ListScenarios()));
+
+api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
+
+api.MapGet("/runs/{id}", (string id, LineageRunManager manager) =>
+{
+    var run = manager.GetRun(id);
+    return run is null ? Results.NotFound() : Results.Ok(run);
+});
+
+api.MapPost("/runs", async (RunCreateRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        var run = await manager.StartRunAsync(request);
+        return Results.Created($"/api/runs/{run.Id}", run);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/runs/{id}/stop", (string id, LineageRunManager manager) =>
+    manager.SendControl(id, "stop") ? Results.Accepted() : Results.NotFound());
+
+api.MapPost("/runs/{id}/checkpoint", (string id, LineageRunManager manager) =>
+    manager.SendControl(id, "checkpoint") ? Results.Accepted() : Results.NotFound());
+
+api.MapPost("/runs/{id}/checkpoint-stop", (string id, LineageRunManager manager) =>
+    manager.SendControl(id, "checkpoint-and-stop") ? Results.Accepted() : Results.NotFound());
+
+api.MapDelete("/runs/{id}", (string id, LineageRunManager manager) =>
+    manager.DeleteRun(id, deleteArtifacts: true) ? Results.NoContent() : Results.Conflict());
+
+api.MapGet("/runs/{id}/report", (string id, LineageRunManager manager) =>
+{
+    var reportPath = manager.GetReportPath(id);
+    return reportPath is null
+        ? Results.NotFound()
+        : Results.File(reportPath, "text/html");
+});
+
+app.MapFallbackToFile("index.html");
+app.Run();
+
+static string FindContentRoot()
+{
+    foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+    {
+        var directory = new DirectoryInfo(start);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Lineage.Runner.csproj"))
+                && Directory.Exists(Path.Combine(directory.FullName, "wwwroot")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+    }
+
+    return Directory.GetCurrentDirectory();
+}

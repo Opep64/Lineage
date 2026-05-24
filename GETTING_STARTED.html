@@ -168,8 +168,8 @@
     <header>
       <h1>Lineage Getting Started</h1>
       <p class="summary">
-        This guide explains how to run the Godot viewer, run headless CLI experiments,
-        and validate the current C# solution.
+        This guide explains how to run the Godot viewer, use the local CLI run dashboard,
+        run headless CLI experiments, and validate the current C# solution.
       </p>
     </header>
 
@@ -183,6 +183,7 @@
         <li><span class="tag">Core</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Core</code></li>
         <li><span class="tag">Viewer</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Godot</code></li>
         <li><span class="tag">CLI</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Cli</code></li>
+        <li><span class="tag">Runner</span><code class="path">D:\AIProjects\Codex\Lineage\src\Lineage.Runner</code></li>
         <li><span class="tag">Tests</span><code class="path">D:\AIProjects\Codex\Lineage\tests\Lineage.Core.Tests</code></li>
       </ul>
     </section>
@@ -250,6 +251,44 @@
         <li><code>Load Checkpoint File</code>: opens the checkpoint folder so you can choose a saved checkpoint</li>
         <li><code>Load Last Snapshot</code>: loads the final snapshot from the most recent successful Godot-triggered CLI run</li>
         <li><code>Load Latest Checkpoint</code>: loads the most recent checkpoint from the last successful Godot-triggered CLI run</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Run The Local CLI Runner</h2>
+      <p>
+        The runner is a local web dashboard for starting and monitoring one or more
+        <code>Lineage.Cli</code> simulations without using the Godot launcher or managing
+        terminal windows manually.
+      </p>
+      <p>Start it from the repository root:</p>
+      <pre><code>dotnet run --project .\src\Lineage.Runner\Lineage.Runner.csproj --urls http://localhost:5088</code></pre>
+      <p>Then open:</p>
+      <pre><code>http://localhost:5088</code></pre>
+
+      <h3>Current Runner Features</h3>
+      <ul>
+        <li>Choose a scenario, tick count, optional seed, optional checkpoint interval, and extinction stop behavior</li>
+        <li>Start multiple CLI simulations as managed runs</li>
+        <li>Watch progress, current tick, creature count, egg count, species cluster count, generation, births, deaths, and checkpoint count</li>
+        <li>Request <code>Stop</code>, <code>Checkpoint</code>, or <code>Checkpoint + Stop</code> for an active run</li>
+        <li>View completed run reports from the run table</li>
+        <li>Delete completed run records and their generated artifacts</li>
+      </ul>
+
+      <p>
+        Each dashboard-launched run gets its own folder under
+        <code>out/runs/&lt;run-id&gt;</code>. The folder contains a manifest, stdout/stderr logs,
+        <code>status.json</code>, <code>control.json</code>, stats CSVs, the HTML report, the final
+        snapshot, and checkpoint files.
+      </p>
+
+      <h3>Runner Notes</h3>
+      <ul>
+        <li>The runner can also be started directly from its built executable after a build: <code>.\src\Lineage.Runner\bin\Debug\net8.0\Lineage.Runner.exe --urls http://localhost:5088</code></li>
+        <li>If port <code>5088</code> is already in use, choose another local port in the <code>--urls</code> value.</li>
+        <li>Keep the runner open while important long runs are active. The first runner slice persists run manifests and status files, but it does not yet fully reattach to and control CLI child processes after the runner is restarted.</li>
+        <li>If you need to rebuild while the runner executable is active, stop the <code>Lineage.Runner</code> process first so Windows can replace the executable.</li>
       </ul>
     </section>
 
