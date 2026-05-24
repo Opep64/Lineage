@@ -75,6 +75,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
+    ("Species brain input diagnostics summarize cluster wiring", SpeciesBrainInputDiagnosticsSummarizeClusterWiring),
     ("Explorer forager keeps searching without food cues", ExplorerForagerKeepsSearchingWithoutFoodCues),
     ("Behavior assay summarizes terrain response", BehaviorAssaySummarizesTerrainResponse),
     ("Behavior assay summarizes lateral terrain response", BehaviorAssaySummarizesLateralTerrainResponse),
@@ -2879,6 +2880,54 @@ static void BrainInputDiagnosticsSummarizeFreshnessWiring()
     AssertEqual(1, lineages.Count, "Lineage diagnostic count");
     AssertEqual(founderId, lineages[0].FounderId, "Lineage diagnostic founder");
     AssertClose(summary.DirectRotScentWeightMagnitude, lineages[0].Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Lineage rot magnitude");
+}
+
+static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 916,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        WorldWidth = 300f,
+        WorldHeight = 100f,
+        ResourceVoidBorderWidth = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var wiredWeights = new float[NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount: 1)];
+    wiredWeights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 2f;
+    wiredWeights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = -1f;
+    wiredWeights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentForwardInput] = -4f;
+    wiredWeights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentRightInput] = -3f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 0.5f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.RottenMeatScentDensityInput] = -0.75f;
+    var wiredBrainId = simulation.State.AddBrain(new NeuralBrainGenome(wiredWeights));
+    var quietBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero(hiddenNodeCount: 1));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 30f), energy: 35f, brainId: wiredBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 30f), energy: 35f, brainId: wiredBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(180f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(190f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(200f, 30f), energy: 35f, brainId: quietBrainId);
+
+    var summaries = SpeciesClusterAnalyzer.AnalyzeBrainInputDiagnostics(simulation.State, 10);
+
+    AssertEqual(2, summaries.Count, "Species diagnostic cluster count");
+    AssertTrue(summaries.All(summary => summary.Diagnostics.EvaluatedCreatureCount == summary.LivingCreatures), "Species diagnostics should evaluate all living neural creatures in each cluster");
+
+    var wired = summaries.Single(summary => summary.Diagnostics.DirectFreshnessWeightMagnitude > 0.1f);
+    AssertEqual(2, wired.LivingCreatures, "Wired species diagnostic living count");
+    AssertClose(3f / NeuralBrainSchema.OutputCount, wired.Diagnostics.DirectFreshnessWeightMagnitude, 0.000001, "Species direct freshness magnitude");
+    AssertClose(7f / (NeuralBrainSchema.OutputCount * 3f), wired.Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Species direct rot magnitude");
+    AssertClose(0.5f, wired.Diagnostics.HiddenFreshnessWeightMagnitude, 0.000001, "Species hidden freshness magnitude");
+    AssertClose(0.25f, wired.Diagnostics.HiddenRotScentWeightMagnitude, 0.000001, "Species hidden rot magnitude");
+    AssertClose(-4f, wired.Diagnostics.MoveRotScentForwardWeight, 0.000001, "Species move rot forward weight");
+
+    var quiet = summaries.Single(summary => summary.Diagnostics.DirectFreshnessWeightMagnitude == 0f);
+    AssertEqual(3, quiet.LivingCreatures, "Quiet species diagnostic living count");
+    AssertClose(0f, quiet.Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Quiet species rot magnitude");
 }
 
 static void ExplorerForagerKeepsSearchingWithoutFoodCues()

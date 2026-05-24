@@ -77,12 +77,12 @@
   "eatCaloriesPerSecond": 16,
   "gutCapacityCalories": 55,
   "digestionCaloriesPerSecond": 5,
-  "reproductionEnergyThreshold": 114,
-  "offspringEnergyInvestment": 42,
+  "reproductionEnergyThreshold": 104,
+  "offspringEnergyInvestment": 36,
   "eggProductionEnergyPerSecond": 1.25,
-  "eggIncubationSeconds": 34,
-  "maturityAgeSeconds": 165,
-  "reproductionCooldownSeconds": 42,
+  "eggIncubationSeconds": 26,
+  "maturityAgeSeconds": 115,
+  "reproductionCooldownSeconds": 30,
   "requireReproductionIntent": true,
   "reproductivePrimeAgeSeconds": 400,
   "reproductiveSenescenceAgeSeconds": 1200,
@@ -101,7 +101,7 @@
   "biteDamagePerSecond": 0.21,
   "biteEnergyCostPerSecond": 0.2,
   "biteRangePadding": 1,
-  "mutationStrength": 0.08,
-  "traitMutationRate": 0.24,
-  "brainMutationRate": 0.1
+  "mutationStrength": 0.11,
+  "traitMutationRate": 0.28,
+  "brainMutationRate": 0.16
 }

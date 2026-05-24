@@ -125,6 +125,35 @@ public static class SpeciesClusterAnalyzer
             .ToArray();
     }
 
+    public static IReadOnlyList<SpeciesClusterBrainInputDiagnosticSummary> AnalyzeBrainInputDiagnostics(
+        WorldState state,
+        int maxClusters = 10,
+        SpeciesClusterOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (maxClusters <= 0 || state.Creatures.Count == 0)
+        {
+            return Array.Empty<SpeciesClusterBrainInputDiagnosticSummary>();
+        }
+
+        var resolvedOptions = options ?? SpeciesClusterOptions.Default;
+        var totalLiving = Math.Max(1, state.Creatures.Count);
+        return BuildLivingClusters(state, resolvedOptions)
+            .Select(cluster => new SpeciesClusterBrainInputDiagnosticSummary(
+                Rank: 0,
+                SpeciesId: cluster.SpeciesId,
+                Name: GenerateName(cluster.SpeciesId),
+                LivingCreatures: cluster.Members.Count,
+                LivingShare: cluster.Members.Count / (float)totalLiving,
+                Diagnostics: BrainInputDiagnostics.Analyze(state, cluster.Members)))
+            .Where(summary => summary.Diagnostics.EvaluatedCreatureCount > 0)
+            .OrderByDescending(summary => summary.LivingCreatures)
+            .ThenBy(summary => summary.SpeciesId)
+            .Take(maxClusters)
+            .Select((summary, index) => summary with { Rank = index + 1 })
+            .ToArray();
+    }
+
     public static IReadOnlyList<SpeciesClusterBehaviorChange> AnalyzeBehaviorChanges(
         WorldState state,
         SpeciesClusterHistory history,
@@ -1741,6 +1770,14 @@ public readonly record struct SpeciesClusterBehaviorFingerprint(
     float SmallCreatureAttackShare,
     float LargeApproachAttackShare,
     float ReproductionReadyShare);
+
+public readonly record struct SpeciesClusterBrainInputDiagnosticSummary(
+    int Rank,
+    int SpeciesId,
+    string Name,
+    int LivingCreatures,
+    float LivingShare,
+    BrainInputDiagnosticSummary Diagnostics);
 
 public readonly record struct SpeciesClusterBehaviorChange(
     int Rank,

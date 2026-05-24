@@ -4236,6 +4236,7 @@ internal static class RunReportWriter
             finalSnapshot.CaloriesEatenPerFoodVisionEvent);
         var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
         var speciesBehaviorFingerprints = SpeciesClusterAnalyzer.AnalyzeBehaviorFingerprints(state, 10);
+        var speciesBrainInputDiagnostics = SpeciesClusterAnalyzer.AnalyzeBrainInputDiagnostics(state, 10);
         var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots, 10);
         var speciesBehaviorChanges = SpeciesClusterAnalyzer.AnalyzeBehaviorChanges(state, speciesHistory, 10);
         var behaviorSummary = BehaviorAssay.Analyze(state);
@@ -4653,6 +4654,7 @@ internal static class RunReportWriter
 
         WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
+        WriteSpeciesBrainInputDiagnosticsSection(writer, speciesBrainInputDiagnostics);
         WriteSpeciesBehaviorChangeSection(writer, speciesBehaviorChanges);
         WriteSpeciesClusterInterpretationSection(writer, SpeciesClusterAnalyzer.InterpretClusters(speciesSummaries, speciesHistory, 10));
         WriteSpeciesClusterHistorySection(writer, speciesHistory);
@@ -5985,6 +5987,48 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentForwardWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpeciesBrainInputDiagnosticsSection(
+        StreamWriter writer,
+        IReadOnlyList<SpeciesClusterBrainInputDiagnosticSummary> summaries)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Species Freshness Wiring</h2>");
+        if (summaries.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living neural species clusters were available for brain-input diagnostics.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Fresh Direct</th><th>Rot Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Density</th><th>Turn Rot Density</th><th>Move Rot Ahead</th><th>Turn Rot Right</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in summaries)
+        {
+            var diagnostics = summary.Diagnostics;
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(summary.Rank)}</td>" +
+                $"<td>{Html(summary.Name)}</td>" +
+                $"<td>{Html($"{summary.LivingCreatures} ({FormatPercent(summary.LivingShare)})")}</td>" +
+                $"<td>{Html(diagnostics.EvaluatedCreatureCount)}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectFreshnessWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenFreshnessWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentDensityWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentDensityWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentForwardWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
                 "</tr>");
