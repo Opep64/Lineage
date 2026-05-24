@@ -14,7 +14,7 @@ public static class SpeciesProfileInjector
         options = options.Validated(profile);
 
         var genomeId = state.AddGenome(profile.Genome);
-        var brainId = state.AddBrain(profile.CreateBrain());
+        var brainId = state.AddBrain(profile.CreateBrain(), profile.BrainArchitectureKind);
         var creatureIds = new EntityId[options.Count];
 
         for (var i = 0; i < options.Count; i++)

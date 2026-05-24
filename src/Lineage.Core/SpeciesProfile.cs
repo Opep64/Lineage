@@ -22,12 +22,15 @@ public sealed record SpeciesProfile
 
     public CreatureGenome Genome { get; init; } = CreatureGenome.Baseline;
 
+    public BrainArchitectureKind BrainArchitectureKind { get; init; } = BrainArchitectureKind.HybridNeural;
+
     public int BrainHiddenNodeCount { get; init; }
 
     public float[] BrainWeights { get; init; } = [];
 
     public NeuralBrainGenome CreateBrain()
     {
+        _ = BrainFactory.Describe(BrainArchitectureKind);
         return new NeuralBrainGenome(BrainWeights);
     }
 
@@ -42,6 +45,7 @@ public sealed record SpeciesProfile
             ? "Unnamed species"
             : Name.Trim();
         var genome = Genome.Validated();
+        _ = BrainFactory.Describe(BrainArchitectureKind);
         if (BrainWeights.Length == 0)
         {
             throw new InvalidOperationException("Species profile must include neural brain weights.");
@@ -53,6 +57,7 @@ public sealed record SpeciesProfile
             Name = name,
             Notes = Notes.Trim(),
             Genome = genome,
+            BrainArchitectureKind = BrainArchitectureKind,
             BrainHiddenNodeCount = brain.HiddenNodeCount,
             BrainWeights = brain.Weights.ToArray()
         };

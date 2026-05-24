@@ -68,6 +68,7 @@ public static class SimulationSnapshotJson
         state.Resources.Clear();
         state.Genomes.Clear();
         state.Brains.Clear();
+        state.BrainArchitectureKinds.Clear();
 
         state.Biomes = snapshot.Biomes.ToMap(state.Bounds);
         state.SetObstacles(snapshot.Obstacles.ToMap(state.Bounds));
@@ -81,9 +82,10 @@ public static class SimulationSnapshotJson
             state.Genomes.Add(NormalizeGenome(genome).Validated());
         }
 
-        foreach (var weights in snapshot.BrainWeights)
+        var brainArchitectureKinds = NormalizeBrainArchitectureKinds(snapshot);
+        for (var i = 0; i < snapshot.BrainWeights.Length; i++)
         {
-            state.Brains.Add(new NeuralBrainGenome(weights));
+            state.AddBrain(new NeuralBrainGenome(snapshot.BrainWeights[i]), brainArchitectureKinds[i]);
         }
 
         state.Creatures.AddRange(snapshot.Creatures.Select(NormalizeCreature));
@@ -150,15 +152,34 @@ public static class SimulationSnapshotJson
             _ = NormalizeGenome(genome).Validated();
         }
 
-        foreach (var weights in snapshot.BrainWeights)
+        var brainArchitectureKinds = NormalizeBrainArchitectureKinds(snapshot);
+        for (var i = 0; i < snapshot.BrainWeights.Length; i++)
         {
-            _ = new NeuralBrainGenome(weights);
+            _ = BrainFactory.Describe(brainArchitectureKinds[i]);
+            _ = new NeuralBrainGenome(snapshot.BrainWeights[i]);
         }
 
         _ = snapshot.Biomes.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         _ = snapshot.Obstacles.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         _ = snapshot.LocalFertility.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         return snapshot;
+    }
+
+    private static BrainArchitectureKind[] NormalizeBrainArchitectureKinds(SimulationSnapshot snapshot)
+    {
+        if (snapshot.BrainArchitectureKinds.Length == 0)
+        {
+            return Enumerable
+                .Repeat(snapshot.Scenario.BrainArchitectureKind, snapshot.BrainWeights.Length)
+                .ToArray();
+        }
+
+        if (snapshot.BrainArchitectureKinds.Length != snapshot.BrainWeights.Length)
+        {
+            throw new InvalidOperationException("Snapshot brain architecture count must match brain weight count.");
+        }
+
+        return snapshot.BrainArchitectureKinds;
     }
 
     private static CreatureGenome NormalizeGenome(CreatureGenome genome)

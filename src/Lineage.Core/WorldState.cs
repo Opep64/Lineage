@@ -52,6 +52,8 @@ public sealed class WorldState
 
     public List<NeuralBrainGenome> Brains { get; } = [];
 
+    public List<BrainArchitectureKind> BrainArchitectureKinds { get; } = [];
+
     internal long ResourceIndexVersion { get; private set; }
 
     internal long EggIndexVersion { get; private set; }
@@ -81,9 +83,14 @@ public sealed class WorldState
         return Genomes[genomeId];
     }
 
-    public int AddBrain(NeuralBrainGenome brain)
+    public int AddBrain(
+        NeuralBrainGenome brain,
+        BrainArchitectureKind architectureKind = BrainArchitectureKind.HybridNeural)
     {
+        ArgumentNullException.ThrowIfNull(brain);
+        _ = BrainFactory.Describe(architectureKind);
         Brains.Add(brain);
+        BrainArchitectureKinds.Add(architectureKind);
         return Brains.Count - 1;
     }
 
@@ -95,6 +102,18 @@ public sealed class WorldState
         }
 
         return Brains[brainId];
+    }
+
+    public BrainArchitectureKind GetBrainArchitectureKind(int brainId)
+    {
+        if ((uint)brainId >= (uint)Brains.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(brainId), "Creature brain ID does not exist in this world.");
+        }
+
+        return (uint)brainId < (uint)BrainArchitectureKinds.Count
+            ? BrainArchitectureKinds[brainId]
+            : BrainArchitectureKind.HybridNeural;
     }
 
     public void SetObstacles(ObstacleMap obstacles)

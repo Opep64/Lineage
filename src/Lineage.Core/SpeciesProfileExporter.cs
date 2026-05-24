@@ -123,6 +123,7 @@ public static class SpeciesProfileExporter
         var recordsById = state.LineageRecords.ToDictionary(record => record.Id);
         var founderId = FindFounderId(creature, recordsById);
         var brain = state.GetBrain(creature.BrainId);
+        var brainArchitectureKind = state.GetBrainArchitectureKind(creature.BrainId);
         var profileName = string.IsNullOrWhiteSpace(name)
             ? $"Species {founderId.Value}"
             : name.Trim();
@@ -132,6 +133,7 @@ public static class SpeciesProfileExporter
             Name = profileName,
             Notes = notes ?? string.Empty,
             Genome = state.GetGenome(creature.GenomeId),
+            BrainArchitectureKind = brainArchitectureKind,
             BrainHiddenNodeCount = brain.HiddenNodeCount,
             BrainWeights = brain.Weights.ToArray(),
             Source = new SpeciesProfileSource

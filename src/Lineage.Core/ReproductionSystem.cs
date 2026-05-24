@@ -8,8 +8,7 @@ public sealed class ReproductionSystem(
     float reproductivePrimeAgeSeconds = 240f,
     float reproductiveSenescenceAgeSeconds = 900f,
     float senescentFertilityMultiplier = 0.18f,
-    float crowdingFertilityPenalty = 0.65f,
-    BrainArchitectureKind brainArchitectureKind = BrainArchitectureKind.HybridNeural) : ISimulationSystem
+    float crowdingFertilityPenalty = 0.65f) : ISimulationSystem
 {
     private readonly float _reproductivePrimeAgeSeconds =
         ValidateNonNegative(reproductivePrimeAgeSeconds, nameof(reproductivePrimeAgeSeconds));
@@ -19,8 +18,6 @@ public sealed class ReproductionSystem(
         ValidateUnitInterval(senescentFertilityMultiplier, nameof(senescentFertilityMultiplier));
     private readonly float _crowdingFertilityPenalty =
         ValidateUnitInterval(crowdingFertilityPenalty, nameof(crowdingFertilityPenalty));
-    private readonly BrainArchitectureKind _brainArchitectureKind =
-        ValidateBrainArchitectureKind(brainArchitectureKind);
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -87,14 +84,19 @@ public sealed class ReproductionSystem(
 
             var childGenome = parentGenome.Mutated(state.Random);
             var childGenomeId = state.AddGenome(childGenome);
-            var childBrainId = parent.BrainId >= 0
-                ? state.AddBrain(BrainFactory.Mutate(
-                    _brainArchitectureKind,
-                    state.GetBrain(parent.BrainId),
-                    state.Random,
-                    parentGenome.MutationStrength,
-                    parentGenome.BrainMutationRate))
-                : -1;
+            var childBrainId = -1;
+            if (parent.BrainId >= 0)
+            {
+                var parentBrainKind = state.GetBrainArchitectureKind(parent.BrainId);
+                childBrainId = state.AddBrain(
+                    BrainFactory.Mutate(
+                        parentBrainKind,
+                        state.GetBrain(parent.BrainId),
+                        state.Random,
+                        parentGenome.MutationStrength,
+                        parentGenome.BrainMutationRate),
+                    parentBrainKind);
+            }
             var angle = state.Random.NextSingle(0f, MathF.Tau);
             var parentRadius = CreatureGrowth.EffectiveBodyRadius(parent, parentGenome);
             var childRadius = CreatureGrowth.EffectiveBodyRadius(default, childGenome);
@@ -166,10 +168,4 @@ public sealed class ReproductionSystem(
             : throw new ArgumentOutOfRangeException(name, "Fertility multiplier must be finite and between 0 and 1.");
     }
 
-    private static BrainArchitectureKind ValidateBrainArchitectureKind(BrainArchitectureKind value)
-    {
-        return Enum.IsDefined(value)
-            ? value
-            : throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported brain architecture kind.");
-    }
 }

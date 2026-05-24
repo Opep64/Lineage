@@ -83,6 +83,7 @@ public static class ViewerReportWriter
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Scenario", scenario.Name);
         WriteMetric(writer, "Pipeline", scenario.PipelineKind.ToString());
+        WriteMetric(writer, "Brain architecture", FormatBrainArchitectureKind(scenario.BrainArchitectureKind));
         WriteMetric(writer, "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
         WriteMetric(writer, "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
@@ -1718,6 +1719,15 @@ public static class ViewerReportWriter
             InitialBrainKind.FreshnessAwareScavenger => "Freshness-aware scavenger",
             InitialBrainKind.ForagerPredator => "Forager predator",
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
+            _ => kind.ToString()
+        };
+    }
+
+    private static string FormatBrainArchitectureKind(BrainArchitectureKind kind)
+    {
+        return kind switch
+        {
+            BrainArchitectureKind.HybridNeural => "Hybrid neural",
             _ => kind.ToString()
         };
     }

@@ -96,6 +96,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
     ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
+    ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
@@ -3663,6 +3664,22 @@ static void BrainFactoryMutatesHybridNeuralBrains()
         "Nonzero mutation should change at least one brain weight");
 }
 
+static void WorldStateTracksBrainArchitectureMetadata()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 304, systems: []);
+    var brainId = simulation.State.AddBrain(
+        NeuralBrainGenome.CreateZero(hiddenNodeCount: 1),
+        BrainArchitectureKind.HybridNeural);
+
+    AssertEqual(BrainArchitectureKind.HybridNeural, simulation.State.GetBrainArchitectureKind(brainId), "Stored brain architecture");
+    AssertThrows<ArgumentOutOfRangeException>(
+        () => simulation.State.GetBrainArchitectureKind(99),
+        "Missing brain architecture should be rejected");
+    AssertThrows<ArgumentOutOfRangeException>(
+        () => simulation.State.AddBrain(NeuralBrainGenome.CreateZero(), (BrainArchitectureKind)999),
+        "Unsupported brain architecture should be rejected by world state");
+}
+
 static void ScavengerForagerStarterBrainFollowsCarrionCues()
 {
     var simulation = new Simulation(new SimulationConfig(), seed: 407, systems: []);
@@ -5168,6 +5185,10 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     AssertEqual(3, first.State.Brains.Count, "Randomized founder brain count");
     AssertEqual(3, first.State.Creatures.Select(creature => creature.BrainId).Distinct().Count(), "Randomized founder brain IDs");
     AssertEqual(scenario.BrainHiddenNodeCount, randomBrain.HiddenNodeCount, "Randomized founder hidden nodes");
+    AssertTrue(
+        first.State.Brains.Select((_, brainId) => first.State.GetBrainArchitectureKind(brainId))
+            .All(kind => kind == BrainArchitectureKind.HybridNeural),
+        "Randomized founder brains should record architecture metadata");
 
     AssertTrue(
         randomBrain.Weights.Zip(seededBrain.Weights).Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
@@ -5192,6 +5213,10 @@ static void ScenarioFactorySupportsInitialBrainKinds()
 
     AssertEqual(1, seededSimulation.State.Brains.Count, "Seeded founder brain count");
     AssertEqual(1, seededSimulation.State.Creatures.Select(creature => creature.BrainId).Distinct().Count(), "Seeded founder brain IDs");
+    AssertEqual(
+        BrainArchitectureKind.HybridNeural,
+        seededSimulation.State.GetBrainArchitectureKind(0),
+        "Seeded founder brain architecture");
 
     for (var i = 0; i < seededBrain.Weights.Length; i++)
     {
@@ -5320,12 +5345,15 @@ static void SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains()
         creature.Id,
         "Probe species",
         "Round-trip test");
-    var roundTripped = SpeciesProfileJson.FromJson(SpeciesProfileJson.ToJson(profile));
+    var profileJson = SpeciesProfileJson.ToJson(profile);
+    var roundTripped = SpeciesProfileJson.FromJson(profileJson);
 
+    AssertTrue(profileJson.Contains("\"brainArchitectureKind\": \"hybridNeural\""), "Profile JSON should include brain architecture");
     AssertEqual("Probe species", roundTripped.Name, "Profile name");
     AssertEqual("Round-trip test", roundTripped.Notes, "Profile notes");
     AssertEqual(creature.Id.Value, roundTripped.Source.CreatureId, "Profile source creature");
     AssertEqual(creature.Generation, roundTripped.Source.Generation, "Profile source generation");
+    AssertEqual(BrainArchitectureKind.HybridNeural, roundTripped.BrainArchitectureKind, "Profile brain architecture");
     AssertEqual(4, roundTripped.BrainHiddenNodeCount, "Profile hidden node count");
     AssertClose(
         simulation.State.GetGenome(creature.GenomeId).BodyRadius,
@@ -5378,6 +5406,10 @@ static void SpeciesProfileInjectionCreatesFounderCreatures()
     AssertEqual(5, target.State.Stats.FounderCreatureCount, "Injected founder count");
     AssertEqual(genomeCountBefore + 1, target.State.Genomes.Count, "Injected genome count");
     AssertEqual(brainCountBefore + 1, target.State.Brains.Count, "Injected brain count");
+    AssertEqual(
+        profile.BrainArchitectureKind,
+        target.State.GetBrainArchitectureKind(result.BrainId),
+        "Injected brain architecture");
 
     foreach (var creature in target.State.Creatures)
     {
@@ -5766,7 +5798,9 @@ static void SimulationSnapshotsRestoreExactContinuation()
 
     original.RunSteps(50);
     var snapshot = SimulationSnapshot.Capture(scenario, original);
-    var roundTrippedSnapshot = SimulationSnapshotJson.FromJson(SimulationSnapshotJson.ToJson(snapshot));
+    var snapshotJson = SimulationSnapshotJson.ToJson(snapshot);
+    AssertTrue(snapshotJson.Contains("\"brainArchitectureKinds\""), "Snapshot JSON should include brain architectures");
+    var roundTrippedSnapshot = SimulationSnapshotJson.FromJson(snapshotJson);
     var restored = SimulationSnapshotJson.RestoreSimulation(roundTrippedSnapshot).Simulation;
 
     original.RunSteps(25);
@@ -5781,6 +5815,15 @@ static void SimulationSnapshotsRestoreExactContinuation()
     AssertEqual(original.State.LineageRecords.Count, restored.State.LineageRecords.Count, "Restored lineage count");
     AssertEqual(original.State.Stats.Snapshots.Count, restored.State.Stats.Snapshots.Count, "Restored snapshot count");
     AssertEqual(original.State.Obstacles.BlockedCellCount, restored.State.Obstacles.BlockedCellCount, "Restored obstacle count");
+    AssertEqual(original.State.Brains.Count, restored.State.Brains.Count, "Restored brain count");
+    AssertEqual(original.State.Brains.Count, roundTrippedSnapshot.BrainArchitectureKinds.Length, "Snapshot brain architecture count");
+    for (var brainId = 0; brainId < original.State.Brains.Count; brainId++)
+    {
+        AssertEqual(
+            original.State.GetBrainArchitectureKind(brainId),
+            restored.State.GetBrainArchitectureKind(brainId),
+            $"Restored brain {brainId} architecture");
+    }
 
     for (var i = 0; i < original.State.Creatures.Count; i++)
     {

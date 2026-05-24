@@ -60,7 +60,6 @@ public static class SimulationScenarioFactory
                 scenario.WorldSenseIntervalTicks,
                 scenario.CloseSenseRefreshProximity,
                 scenario.EnableSectorVision,
-                scenario.BrainArchitectureKind,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,
@@ -278,7 +277,7 @@ public static class SimulationScenarioFactory
         return state.AddBrain(BrainFactory.CreateStarter(
             scenario.BrainArchitectureKind,
             scenario.InitialBrainKind,
-            scenario.BrainHiddenNodeCount));
+            scenario.BrainHiddenNodeCount), scenario.BrainArchitectureKind);
     }
 
     private static int CreateFounderBrainId(
@@ -306,7 +305,7 @@ public static class SimulationScenarioFactory
         return state.AddBrain(BrainFactory.CreateRandom(
             scenario.BrainArchitectureKind,
             initialBrainRandom,
-            hiddenNodeCount: scenario.BrainHiddenNodeCount));
+            hiddenNodeCount: scenario.BrainHiddenNodeCount), scenario.BrainArchitectureKind);
     }
 
     private static SimVector2 RandomCreaturePosition(

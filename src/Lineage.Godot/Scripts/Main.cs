@@ -911,9 +911,7 @@ public partial class Main : Node2D
             creature.Position,
             biome,
             _scenario.CreateBiomeSeasonalAmplitudeProfile());
-        var brainText = creature.BrainId >= 0
-            ? $"{creature.BrainId} ({_simulation.State.GetBrain(creature.BrainId).HiddenNodeCount} hidden)"
-            : "none";
+        var brainText = FormatBrainText(creature.BrainId);
 
         return
             $"Selected #{creature.Id.Value}\n" +
@@ -1013,9 +1011,7 @@ public partial class Main : Node2D
         var survivalText = damagePerSecond > 0f && egg.Health / damagePerSecond < remainingSeconds
             ? $"fails in {egg.Health / damagePerSecond:0.0}s"
             : "viable at current exposure";
-        var brainText = egg.BrainId >= 0
-            ? $"{egg.BrainId} ({_simulation.State.GetBrain(egg.BrainId).HiddenNodeCount} hidden)"
-            : "none";
+        var brainText = FormatBrainText(egg.BrainId);
 
         return
             $"Selected egg #{egg.Id.Value}\n" +
@@ -1662,6 +1658,18 @@ public partial class Main : Node2D
     {
         var fixedDelta = MathF.Max(_simulation.Config.FixedDeltaSeconds, 0.0001f);
         return (value / fixedDelta).ToString("0.0", CultureInfo.InvariantCulture);
+    }
+
+    private string FormatBrainText(int brainId)
+    {
+        if (brainId < 0)
+        {
+            return "none";
+        }
+
+        var brain = _simulation.State.GetBrain(brainId);
+        var architecture = _simulation.State.GetBrainArchitectureKind(brainId);
+        return $"{brainId} ({FormatBrainArchitectureKind(architecture)}, {brain.HiddenNodeCount} hidden)";
     }
 
     private Color ColorForResource(ResourceKind kind, float fullness)
@@ -2917,6 +2925,15 @@ public partial class Main : Node2D
             BiomeMapKind.VerticalEdgeCorridorBands => "vertical corridor bands",
             BiomeMapKind.VerticalEdgeWideCorridorBands => "wide vertical corridor bands",
             _ => "noise"
+        };
+    }
+
+    private static string FormatBrainArchitectureKind(BrainArchitectureKind kind)
+    {
+        return kind switch
+        {
+            BrainArchitectureKind.HybridNeural => "hybrid neural",
+            _ => kind.ToString()
         };
     }
 

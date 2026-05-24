@@ -145,7 +145,6 @@ public static class SimulationPipelines
         int worldSenseIntervalTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = CreatureSensingSystem.DefaultCloseSenseRefreshProximity,
         bool enableSectorVision = CreatureSensingSystem.DefaultEnableSectorVision,
-        BrainArchitectureKind brainArchitectureKind = BrainArchitectureKind.HybridNeural,
         float biteDamagePerSecond = 0.25f,
         float biteEnergyCostPerSecond = 0.12f,
         float biteRangePadding = 1f,
@@ -229,8 +228,7 @@ public static class SimulationPipelines
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
                 reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
                 senescentFertilityMultiplier: senescentFertilityMultiplier,
-                crowdingFertilityPenalty: crowdingFertilityPenalty,
-                brainArchitectureKind: brainArchitectureKind),
+                crowdingFertilityPenalty: crowdingFertilityPenalty),
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new CreatureAttackSystem(

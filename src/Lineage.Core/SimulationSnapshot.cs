@@ -34,6 +34,8 @@ public sealed record SimulationSnapshot
 
     public float[][] BrainWeights { get; init; } = [];
 
+    public BrainArchitectureKind[] BrainArchitectureKinds { get; init; } = [];
+
     public CreatureLineageRecord[] LineageRecords { get; init; } = [];
 
     public SimulationStatsSnapshot[] StatsSnapshots { get; init; } = [];
@@ -107,6 +109,9 @@ public sealed record SimulationSnapshot
             Resources = state.Resources.ToArray(),
             Genomes = state.Genomes.ToArray(),
             BrainWeights = state.Brains.Select(brain => brain.Weights.ToArray()).ToArray(),
+            BrainArchitectureKinds = state.Brains
+                .Select((_, brainId) => state.GetBrainArchitectureKind(brainId))
+                .ToArray(),
             LineageRecords = state.LineageRecords.ToArray(),
             StatsSnapshots = state.Stats.Snapshots.ToArray(),
             CreatureBirthCount = state.Stats.CreatureBirthCount,
