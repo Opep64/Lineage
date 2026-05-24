@@ -22,7 +22,7 @@ public sealed record SimulationScenario
 
     public SimulationPipelineKind PipelineKind { get; init; } = SimulationPipelineKind.Neural;
 
-    public InitialBrainKind InitialBrainKind { get; init; } = InitialBrainKind.SeedForager;
+    public InitialBrainKind InitialBrainKind { get; init; } = InitialBrainKind.SectorForager;
 
     public int BrainHiddenNodeCount { get; init; } = NeuralBrainSchema.DefaultHiddenNodeCount;
 
@@ -42,13 +42,13 @@ public sealed record SimulationScenario
 
     public float ObstacleCellSize { get; init; } = 128f;
 
-    public float WorldWidth { get; init; } = 2_000f;
+    public float WorldWidth { get; init; } = 4_000f;
 
-    public float WorldHeight { get; init; } = 2_000f;
+    public float WorldHeight { get; init; } = 4_000f;
 
-    public float BiomeCellSize { get; init; } = 500f;
+    public float BiomeCellSize { get; init; } = 1_000f;
 
-    public float ResourceVoidBorderWidth { get; init; } = 80f;
+    public float ResourceVoidBorderWidth { get; init; } = 160f;
 
     public float FixedDeltaSeconds { get; init; } = 1f / 30f;
 
@@ -58,6 +58,8 @@ public sealed record SimulationScenario
 
     public float CloseSenseRefreshProximity { get; init; } = CreatureSensingSystem.DefaultCloseSenseRefreshProximity;
 
+    public bool EnableSectorVision { get; init; } = true;
+
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 
     public int InitialCreatureCount { get; init; } = 80;
@@ -66,21 +68,21 @@ public sealed record SimulationScenario
 
     public SpeciesScenarioSeed[] SpeciesSeeds { get; init; } = [];
 
-    public float InitialResourcesPerMillionArea { get; init; } = 165f;
+    public float InitialResourcesPerMillionArea { get; init; } = 28.75f;
 
-    public float InitialCreatureEnergyMin { get; init; } = 25f;
+    public float InitialCreatureEnergyMin { get; init; } = 45f;
 
-    public float InitialCreatureEnergyMax { get; init; } = 55f;
+    public float InitialCreatureEnergyMax { get; init; } = 85f;
 
     public float ResourceRadiusMin { get; init; } = 3f;
 
     public float ResourceRadiusMax { get; init; } = 8f;
 
-    public float ResourceCaloriesMin { get; init; } = 45f;
+    public float ResourceCaloriesMin { get; init; } = 55f;
 
-    public float ResourceCaloriesMax { get; init; } = 100f;
+    public float ResourceCaloriesMax { get; init; } = 120f;
 
-    public float ResourceMaxCalories { get; init; } = 100f;
+    public float ResourceMaxCalories { get; init; } = 120f;
 
     public float ResourceRegrowthMin { get; init; } = 0.35f;
 
@@ -94,15 +96,15 @@ public sealed record SimulationScenario
 
     public float ResourceClusterStrength { get; init; } = 0.2f;
 
-    public float ResourceClusterRadius { get; init; } = 180f;
+    public float ResourceClusterRadius { get; init; } = 360f;
 
     public float PlantLocalDispersalChance { get; init; } = 0.35f;
 
-    public float PlantLocalDispersalRadius { get; init; } = 220f;
+    public float PlantLocalDispersalRadius { get; init; } = 440f;
 
     public bool EnableLocalFertility { get; init; } = true;
 
-    public float LocalFertilityCellSize { get; init; } = 250f;
+    public float LocalFertilityCellSize { get; init; } = 500f;
 
     public float LocalFertilityMinimumMultiplier { get; init; } = 0.35f;
 
@@ -154,7 +156,7 @@ public sealed record SimulationScenario
 
     public float RichBiomeBasalCostMultiplier { get; init; } = 0.96f;
 
-    public float BasalEnergyPerSecond { get; init; } = 0.25f;
+    public float BasalEnergyPerSecond { get; init; } = 0.18f;
 
     public float BodyRadiusEnergyCostPerSecond { get; init; } = 0.04f;
 
@@ -188,7 +190,7 @@ public sealed record SimulationScenario
 
     public float EggEnvironmentalDamagePerSecond { get; init; } = 0.08f;
 
-    public float MovementEnergyPerSecond { get; init; } = 0.35f;
+    public float MovementEnergyPerSecond { get; init; } = 0.28f;
 
     public float MovementSpeedCostExponent { get; init; } = 1.6f;
 

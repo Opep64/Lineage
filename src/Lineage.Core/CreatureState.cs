@@ -57,6 +57,11 @@ public struct CreatureState
     public FoodContactKind FoodContactKind { get; set; }
 
     /// <summary>
+    /// Resource type currently within eating range when <see cref="FoodContactKind"/> is a resource.
+    /// </summary>
+    public ResourceKind FoodContactResourceKind { get; set; }
+
+    /// <summary>
     /// Resource or egg currently within eating range, or the default ID when no food is in contact.
     /// </summary>
     public EntityId FoodContactResourceId { get; set; }

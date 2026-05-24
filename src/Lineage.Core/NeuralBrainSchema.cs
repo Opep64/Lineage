@@ -9,7 +9,19 @@ public static class NeuralBrainSchema
 
     public const int MaxHiddenNodeCount = 64;
 
-    public const int InputCount = 46;
+    public const int VisionSectorInputStart = 46;
+
+    public const int VisionSectorChannelCount = 8;
+
+    public const int FoodContactInput = VisionSectorInputStart + VisionSectorSet.SectorCount * VisionSectorChannelCount;
+
+    public const int PlantFoodContactInput = FoodContactInput + 1;
+
+    public const int MeatFoodContactInput = FoodContactInput + 2;
+
+    public const int EggFoodContactInput = FoodContactInput + 3;
+
+    public const int InputCount = EggFoodContactInput + 1;
 
     public const int OutputCount = 7;
 
@@ -105,6 +117,22 @@ public static class NeuralBrainSchema
 
     public const int MovementBlockedInput = 45;
 
+    public const int VisionSectorPlantDensityOffset = 0;
+
+    public const int VisionSectorPlantProximityOffset = 1;
+
+    public const int VisionSectorMeatDensityOffset = 2;
+
+    public const int VisionSectorMeatProximityOffset = 3;
+
+    public const int VisionSectorEggDensityOffset = 4;
+
+    public const int VisionSectorEggProximityOffset = 5;
+
+    public const int VisionSectorCreatureDensityOffset = 6;
+
+    public const int VisionSectorCreatureProximityOffset = 7;
+
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 
     public const int PreyProximityInput = CreatureProximityInput;
@@ -126,4 +154,59 @@ public static class NeuralBrainSchema
     public const int MemoryForwardOutput = 5;
 
     public const int MemoryRightOutput = 6;
+
+    public static int VisionSectorPlantDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorPlantDensityOffset);
+    }
+
+    public static int VisionSectorPlantProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorPlantProximityOffset);
+    }
+
+    public static int VisionSectorMeatDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorMeatDensityOffset);
+    }
+
+    public static int VisionSectorMeatProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorMeatProximityOffset);
+    }
+
+    public static int VisionSectorEggDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorEggDensityOffset);
+    }
+
+    public static int VisionSectorEggProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorEggProximityOffset);
+    }
+
+    public static int VisionSectorCreatureDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorCreatureDensityOffset);
+    }
+
+    public static int VisionSectorCreatureProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorCreatureProximityOffset);
+    }
+
+    public static int GetVisionSectorInput(int sectorIndex, int channelOffset)
+    {
+        if ((uint)sectorIndex >= VisionSectorSet.SectorCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sectorIndex));
+        }
+
+        if ((uint)channelOffset >= VisionSectorChannelCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(channelOffset));
+        }
+
+        return VisionSectorInputStart + sectorIndex * VisionSectorChannelCount + channelOffset;
+    }
 }

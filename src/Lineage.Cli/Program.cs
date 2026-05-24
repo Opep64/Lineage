@@ -6193,6 +6193,7 @@ internal static class RunReportWriter
         {
             InitialBrainKind.SeedForager => "Seed forager",
             InitialBrainKind.ExplorerForager => "Explorer forager",
+            InitialBrainKind.SectorForager => "Sector forager",
             InitialBrainKind.ScavengerForager => "Scavenger forager",
             InitialBrainKind.FreshnessAwareScavenger => "Freshness-aware scavenger",
             InitialBrainKind.ForagerPredator => "Forager predator",

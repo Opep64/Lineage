@@ -801,7 +801,10 @@ public sealed class UniformSpatialIndex
         SimVector2 forward,
         bool hasLimitedVision,
         float visionCosThreshold,
-        float[] bodyRadii)
+        float visionAngleRadians,
+        float[] bodyRadii,
+        bool collectVisionSectors,
+        ref VisionSectorSet visionSectors)
     {
         if (queryRadius < 0f)
         {
@@ -822,6 +825,8 @@ public sealed class UniformSpatialIndex
         var queryRadiusSquared = queryRadius * queryRadius;
         var forwardX = forward.X;
         var forwardY = forward.Y;
+        var rightX = -forwardY;
+        var rightY = forwardX;
         var squaredVisionCosThreshold = visionCosThreshold * visionCosThreshold;
         var candidateCount = 0;
         var visibleCount = 0;
@@ -909,6 +914,24 @@ public sealed class UniformSpatialIndex
                     }
 
                     visibleCount++;
+                    if (collectVisionSectors
+                        && VisionSectorSet.TryGetSectorIndex(
+                            toOtherX,
+                            toOtherY,
+                            forwardX,
+                            forwardY,
+                            rightX,
+                            rightY,
+                            hasLimitedVision,
+                            visionAngleRadians,
+                            out var sectorIndex))
+                    {
+                        var centerDistance = MathF.Sqrt(distanceSquared);
+                        var edgeDistance = Math.Max(0f, centerDistance - otherRadius);
+                        var proximity = 1f - Math.Clamp(edgeDistance / senseRadius, 0f, 1f);
+                        visionSectors.AddCreature(sectorIndex, proximity);
+                    }
+
                     if (distanceSquared < nearestDistanceSquared)
                     {
                         nearestDistanceSquared = distanceSquared;

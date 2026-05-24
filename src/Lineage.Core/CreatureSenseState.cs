@@ -11,6 +11,8 @@ namespace Lineage.Core;
 /// </remarks>
 public struct CreatureSenseState
 {
+    public VisionSectorSet VisionSectors { get; set; }
+
     public bool FoodDetected { get; set; }
 
     public float FoodProximity { get; set; }
@@ -131,6 +133,17 @@ public struct CreatureSenseState
     /// Contact cue from the previous movement pass; 1 means movement was blocked by an obstacle.
     /// </summary>
     public float MovementBlocked { get; set; }
+
+    /// <summary>
+    /// Contact cue from the previous eating pass; 1 means edible food was within body reach.
+    /// </summary>
+    public float FoodContact { get; set; }
+
+    public float PlantFoodContact { get; set; }
+
+    public float MeatFoodContact { get; set; }
+
+    public float EggFoodContact { get; set; }
 
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }

@@ -16,6 +16,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumExpectedFoodTransfer = 0.001f;
     public const int DefaultWorldSenseIntervalTicks = 4;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
+    public const bool DefaultEnableSectorVision = false;
 
     private readonly UniformSpatialIndex _spatialIndex;
     private readonly BiomePressureProfile _biomeSpeedProfile;
@@ -26,6 +27,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly float _meatScentDensitySaturation;
     private readonly int _worldSenseIntervalTicks;
     private readonly float _closeSenseRefreshProximity;
+    private readonly bool _enableSectorVision;
 
     private readonly List<int> _plantResourceCandidates = [];
     private readonly IndexStampSet _seenPlantResourceCandidates = new();
@@ -45,7 +47,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float meatScentDensitySaturation = 1f,
         BiomePressureProfile? biomeSpeedProfile = null,
         int worldSenseIntervalTicks = DefaultWorldSenseIntervalTicks,
-        float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity)
+        float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity,
+        bool enableSectorVision = DefaultEnableSectorVision)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -83,6 +86,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _meatScentDensitySaturation = meatScentDensitySaturation;
         _worldSenseIntervalTicks = worldSenseIntervalTicks;
         _closeSenseRefreshProximity = closeSenseRefreshProximity;
+        _enableSectorVision = enableSectorVision;
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -130,6 +134,20 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             sensingProfile?.RecordInternalState(Stopwatch.GetTimestamp() - internalStateStartedAt);
 
             senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
+            senses.FoodContact = creature.IsTouchingFood ? 1f : 0f;
+            senses.PlantFoodContact = creature.IsTouchingFood
+                && creature.FoodContactKind == FoodContactKind.Resource
+                && creature.FoodContactResourceKind == ResourceKind.Plant
+                    ? 1f
+                    : 0f;
+            senses.MeatFoodContact = creature.IsTouchingFood
+                && creature.FoodContactKind == FoodContactKind.Resource
+                && creature.FoodContactResourceKind == ResourceKind.Meat
+                    ? 1f
+                    : 0f;
+            senses.EggFoodContact = creature.IsTouchingFood && creature.FoodContactKind == FoodContactKind.Egg
+                ? 1f
+                : 0f;
 
             var memorySenseStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
@@ -180,6 +198,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 _eggCandidates.Count,
                 Stopwatch.GetTimestamp() - eggQueryStartedAt);
 
+            var visionSectors = default(VisionSectorSet);
             var creatureVisibilityStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
@@ -193,7 +212,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 forward,
                 hasLimitedVision,
                 visionCosThreshold,
-                _cachedBodyRadii);
+                effectiveVisionAngle,
+                _cachedBodyRadii,
+                _enableSectorVision,
+                ref visionSectors);
             sensingProfile?.RecordCreatureQuery(
                 creatureVisibility,
                 Stopwatch.GetTimestamp() - creatureVisibilityStartedAt);
@@ -268,6 +290,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                if (_enableSectorVision
+                    && VisionSectorSet.TryGetSectorIndex(
+                        toResource,
+                        forward,
+                        right,
+                        hasLimitedVision,
+                        effectiveVisionAngle,
+                        out var sectorIndex))
+                {
+                    visionSectors.AddPlant(sectorIndex, proximity);
+                }
+
                 var foodScore = proximity * plantFoodEfficiency;
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
@@ -329,6 +363,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                if (_enableSectorVision
+                    && VisionSectorSet.TryGetSectorIndex(
+                        toResource,
+                        forward,
+                        right,
+                        hasLimitedVision,
+                        effectiveVisionAngle,
+                        out var sectorIndex))
+                {
+                    visionSectors.AddMeat(sectorIndex, proximity);
+                }
+
                 var foodScore = proximity * CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource));
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
@@ -382,6 +428,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                if (_enableSectorVision
+                    && VisionSectorSet.TryGetSectorIndex(
+                        toEgg,
+                        forward,
+                        right,
+                        hasLimitedVision,
+                        effectiveVisionAngle,
+                        out var sectorIndex))
+                {
+                    visionSectors.AddEgg(sectorIndex, proximity);
+                }
+
                 var foodScore = proximity * freshMeatFoodEfficiency;
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
@@ -406,6 +464,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
+            senses.VisionSectors = visionSectors;
             ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
             ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
 
