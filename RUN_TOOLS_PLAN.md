@@ -294,6 +294,7 @@ The launcher should eventually:
 - If a manifest says a run was active but the recorded CLI process is gone, the runner marks the run `lost`.
 - The CLI can write stdout/stderr logs directly via launcher-supplied log paths, so a runner restart does not leave the simulation dependent on an old redirected pipe.
 - The dashboard supports basic run-library management: status/scenario/search filters, sorting, seed display, expandable details/log tails, renaming, single-run delete, and selected-run bulk delete.
+- Selected runs can be exported to a compact Markdown comparison packet with final/live metrics, command line, and artifact paths for Codex analysis.
 
 ## Phase 2: Run Library
 
@@ -311,7 +312,7 @@ The launcher should eventually:
 - Add filters and sortable columns.
 - Aggregate multiple seeds/variants.
 - Summarize tail-window metrics.
-- Export selected run summaries to Markdown/JSON for Codex analysis.
+- Extend the selected-run Markdown export with JSON output and richer cross-run/tail-window summaries.
 
 ## Phase 4: Godot Handoff
 

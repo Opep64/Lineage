@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -243,6 +244,145 @@ public sealed partial class LineageRunManager
         }
 
         return new RunBulkDeleteResult(requestedIds.Length, deleted, skipped);
+    }
+
+    public string ExportRunsMarkdown(IReadOnlyList<string>? ids)
+    {
+        var requestedIds = (ids ?? Array.Empty<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var selectedRuns = requestedIds
+            .Select(id => _runs.TryGetValue(id, out var run) ? run : null)
+            .Where(run => run is not null)
+            .Cast<ManagedRun>()
+            .Select(run => (Run: run, Summary: ToSummary(run)))
+            .ToArray();
+
+        var builder = new StringBuilder();
+        builder.AppendLine("# Lineage Run Comparison Export");
+        builder.AppendLine();
+        builder.AppendLine($"Generated: {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        builder.AppendLine($"Requested runs: {requestedIds.Length.ToString(CultureInfo.InvariantCulture)}");
+        builder.AppendLine($"Included runs: {selectedRuns.Length.ToString(CultureInfo.InvariantCulture)}");
+        builder.AppendLine();
+
+        if (selectedRuns.Length == 0)
+        {
+            builder.AppendLine("No matching runs were found.");
+            return builder.ToString();
+        }
+
+        builder.AppendLine("## Summary Table");
+        builder.AppendLine();
+        AppendMarkdownTable(
+            builder,
+            [
+                "Run",
+                "Status",
+                "Scenario",
+                "Seed",
+                "Requested ticks",
+                "Final tick",
+                "Progress",
+                "Creatures",
+                "Eggs",
+                "Species",
+                "Births",
+                "Deaths",
+                "Max gen",
+                "Checkpoints",
+                "Stop reason"
+            ],
+            selectedRuns
+                .Select(run =>
+                {
+                    var summary = run.Summary;
+                    return new[]
+                    {
+                        MarkdownCell(summary.Name),
+                        MarkdownCell(summary.Status),
+                        MarkdownCell(summary.ScenarioName),
+                        MarkdownCell(summary.Seed),
+                        MarkdownCell(summary.Ticks),
+                        MarkdownCell(summary.CurrentTick),
+                        MarkdownCell(FormatPercent(summary.Progress)),
+                        MarkdownCell(summary.CreatureCount),
+                        MarkdownCell(summary.EggCount),
+                        MarkdownCell(summary.SpeciesClusterCount),
+                        MarkdownCell(summary.CreatureBirthCount),
+                        MarkdownCell(summary.CreatureDeathCount),
+                        MarkdownCell(summary.MaxGeneration),
+                        MarkdownCell(summary.CheckpointCount),
+                        MarkdownCell(summary.StopReason)
+                    };
+                })
+                .ToArray(),
+            [
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false
+            ]);
+
+        builder.AppendLine();
+        builder.AppendLine("## Run Details");
+
+        foreach (var (run, summary) in selectedRuns)
+        {
+            var manifest = run.Manifest;
+            builder.AppendLine();
+            builder.AppendLine($"### {EscapeMarkdownHeading(summary.Name)}");
+            builder.AppendLine();
+            AppendDetail(builder, "Id", summary.Id);
+            AppendDetail(builder, "Status", summary.Status);
+            AppendDetail(builder, "Scenario", $"{summary.ScenarioName} ({summary.ScenarioPath})");
+            AppendDetail(builder, "Seed", summary.Seed);
+            AppendDetail(builder, "Requested ticks", summary.Ticks);
+            AppendDetail(builder, "Completed steps", summary.CompletedSteps);
+            AppendDetail(builder, "Current tick", summary.CurrentTick);
+            AppendDetail(builder, "Progress", FormatPercent(summary.Progress));
+            AppendDetail(builder, "Creatures", summary.CreatureCount);
+            AppendDetail(builder, "Eggs", summary.EggCount);
+            AppendDetail(builder, "Species clusters", summary.SpeciesClusterCount);
+            AppendDetail(builder, "Births", summary.CreatureBirthCount);
+            AppendDetail(builder, "Deaths", summary.CreatureDeathCount);
+            AppendDetail(builder, "Max generation", summary.MaxGeneration);
+            AppendDetail(builder, "Checkpoints", summary.CheckpointCount);
+            AppendDetail(builder, "Stop reason", summary.StopReason);
+            AppendDetail(builder, "Exit code", summary.ExitCode);
+            AppendDetail(builder, "Process id", summary.ProcessId);
+            AppendDetail(builder, "Created", FormatDate(summary.CreatedAtUtc));
+            AppendDetail(builder, "Started", FormatDate(summary.StartedAtUtc));
+            AppendDetail(builder, "Ended", FormatDate(summary.EndedAtUtc));
+            AppendDetail(builder, "Wall time", FormatDuration(summary.StartedAtUtc, summary.EndedAtUtc));
+            AppendDetail(builder, "Run directory", summary.RunDirectory);
+            AppendDetail(builder, "Report", summary.ReportPath);
+            AppendDetail(builder, "Stats", summary.StatsPath);
+            AppendDetail(builder, "Final snapshot", summary.SnapshotPath);
+            AppendDetail(builder, "Checkpoint directory", summary.CheckpointDirectory);
+            AppendDetail(builder, "Latest checkpoint", summary.LatestCheckpointPath);
+            AppendDetail(builder, "Status file", summary.StatusPath);
+            AppendDetail(builder, "Stdout log", summary.StdoutPath);
+            AppendDetail(builder, "Stderr log", summary.StderrPath);
+            AppendDetail(builder, "Command", manifest.CommandLine);
+            AppendDetail(builder, "Error", manifest.Error);
+        }
+
+        return builder.ToString();
     }
 
     public bool DeleteRun(string id, bool deleteArtifacts)
@@ -718,6 +858,124 @@ public sealed partial class LineageRunManager
     private static string QuoteArgument(string argument)
     {
         return argument.Contains(' ') ? $"\"{argument}\"" : argument;
+    }
+
+    private static void AppendDetail(StringBuilder builder, string label, object? value)
+    {
+        var text = FormatMarkdownValue(value);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        builder.Append("- **").Append(label).Append(":** ").Append(text).AppendLine();
+    }
+
+    private static string FormatDate(DateTimeOffset? value)
+    {
+        return value?.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private static string FormatDuration(DateTimeOffset? startedAt, DateTimeOffset? endedAt)
+    {
+        if (startedAt is null)
+        {
+            return string.Empty;
+        }
+
+        var end = endedAt ?? DateTimeOffset.UtcNow;
+        var duration = end - startedAt.Value;
+        return duration.TotalSeconds < 60
+            ? $"{duration.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture)}s"
+            : $"{duration.TotalMinutes.ToString("0.0", CultureInfo.InvariantCulture)}m";
+    }
+
+    private static string FormatPercent(double value)
+    {
+        return (Math.Clamp(value, 0d, 1d) * 100d).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    }
+
+    private static string MarkdownCell(object? value)
+    {
+        return FormatMarkdownValue(value)
+            .Replace("|", "\\|", StringComparison.Ordinal)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal);
+    }
+
+    private static void AppendMarkdownTable(
+        StringBuilder builder,
+        string[] headers,
+        string[][] rows,
+        bool[] rightAlignedColumns)
+    {
+        var widths = new int[headers.Length];
+        for (var column = 0; column < headers.Length; column++)
+        {
+            widths[column] = Math.Max(headers[column].Length, rightAlignedColumns[column] ? 4 : 3);
+        }
+
+        foreach (var row in rows)
+        {
+            for (var column = 0; column < headers.Length; column++)
+            {
+                widths[column] = Math.Max(widths[column], row[column].Length);
+            }
+        }
+
+        AppendMarkdownTableRow(builder, headers, widths, rightAlignedColumns);
+        builder.Append('|');
+        for (var column = 0; column < headers.Length; column++)
+        {
+            var separator = rightAlignedColumns[column]
+                ? new string('-', widths[column] - 1) + ":"
+                : new string('-', widths[column]);
+            builder.Append(' ').Append(separator).Append(" |");
+        }
+
+        builder.AppendLine();
+
+        foreach (var row in rows)
+        {
+            AppendMarkdownTableRow(builder, row, widths, rightAlignedColumns);
+        }
+    }
+
+    private static void AppendMarkdownTableRow(
+        StringBuilder builder,
+        string[] cells,
+        int[] widths,
+        bool[] rightAlignedColumns)
+    {
+        builder.Append('|');
+        for (var column = 0; column < cells.Length; column++)
+        {
+            var cell = rightAlignedColumns[column]
+                ? cells[column].PadLeft(widths[column])
+                : cells[column].PadRight(widths[column]);
+            builder.Append(' ').Append(cell).Append(" |");
+        }
+
+        builder.AppendLine();
+    }
+
+    private static string FormatMarkdownValue(object? value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            DateTimeOffset date => FormatDate(date),
+            ulong unsigned => unsigned.ToString(CultureInfo.InvariantCulture),
+            int number => number.ToString(CultureInfo.InvariantCulture),
+            long number => number.ToString(CultureInfo.InvariantCulture),
+            double number => number.ToString("0.###", CultureInfo.InvariantCulture),
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty
+        };
+    }
+
+    private static string EscapeMarkdownHeading(string value)
+    {
+        return value.Replace("#", "\\#", StringComparison.Ordinal).Trim();
     }
 
     [GeneratedRegex("[^a-z0-9]+", RegexOptions.IgnoreCase)]

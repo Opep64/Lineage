@@ -27,7 +27,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -180,6 +181,15 @@ select {
   padding: 7px 9px;
 }
 
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -229,6 +239,34 @@ select {
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.export-panel {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.export-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.export-panel textarea {
+  display: block;
+  min-height: min(56vh, 540px);
+  max-height: 70vh;
+  resize: vertical;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: auto;
+  white-space: pre;
 }
 
 .table-wrap {

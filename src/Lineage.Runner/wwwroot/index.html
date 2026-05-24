@@ -48,6 +48,7 @@
       <div class="section-title">
         <h2>Runs</h2>
         <div class="section-actions">
+          <button id="exportButton" class="secondary" type="button" disabled>Export selected</button>
           <button id="bulkDeleteButton" class="danger" type="button" disabled>Delete selected</button>
           <button id="refreshButton" type="button">Refresh</button>
         </div>
@@ -73,6 +74,17 @@
           </select>
         </label>
         <div id="selectionStatus" class="selection-status">0 selected</div>
+      </div>
+      <div id="exportPanel" class="export-panel" hidden>
+        <div class="export-header">
+          <strong>Markdown Export</strong>
+          <div class="section-actions">
+            <button id="copyExportButton" class="secondary" type="button">Copy Markdown</button>
+            <button id="downloadExportButton" class="secondary" type="button">Download .md</button>
+            <button id="closeExportButton" class="secondary" type="button">Close</button>
+          </div>
+        </div>
+        <textarea id="exportText" readonly spellcheck="false" wrap="off"></textarea>
       </div>
       <div class="table-wrap">
         <table>

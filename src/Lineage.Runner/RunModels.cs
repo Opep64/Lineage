@@ -17,6 +17,8 @@ public sealed record RunRenameRequest(string Name);
 
 public sealed record RunBulkDeleteRequest(IReadOnlyList<string> Ids);
 
+public sealed record RunExportRequest(IReadOnlyList<string> Ids);
+
 public sealed record RunBulkDeleteResult(
     int Requested,
     int Deleted,

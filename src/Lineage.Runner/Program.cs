@@ -17,6 +17,9 @@ api.MapGet("/scenarios", (LineageRunManager manager) => Results.Ok(manager.ListS
 
 api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
 
+api.MapPost("/runs/export", (RunExportRequest request, LineageRunManager manager) =>
+    Results.Text(manager.ExportRunsMarkdown(request.Ids), "text/markdown"));
+
 api.MapGet("/runs/{id}", (string id, LineageRunManager manager) =>
 {
     var run = manager.GetRun(id);

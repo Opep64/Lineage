@@ -8,8 +8,14 @@ const runSearch = document.querySelector("#runSearch");
 const statusFilter = document.querySelector("#statusFilter");
 const scenarioFilter = document.querySelector("#scenarioFilter");
 const selectAllRuns = document.querySelector("#selectAllRuns");
+const exportButton = document.querySelector("#exportButton");
 const bulkDeleteButton = document.querySelector("#bulkDeleteButton");
 const selectionStatus = document.querySelector("#selectionStatus");
+const exportPanel = document.querySelector("#exportPanel");
+const exportText = document.querySelector("#exportText");
+const copyExportButton = document.querySelector("#copyExportButton");
+const downloadExportButton = document.querySelector("#downloadExportButton");
+const closeExportButton = document.querySelector("#closeExportButton");
 
 let refreshTimer = null;
 let allRuns = [];
@@ -276,6 +282,7 @@ function updateSelectionControls(runs = getVisibleRuns()) {
   selectAllRuns.checked = visibleSelectableIds.length > 0 && selectedVisibleCount === visibleSelectableIds.length;
   selectAllRuns.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleSelectableIds.length;
   selectAllRuns.disabled = visibleSelectableIds.length === 0;
+  exportButton.disabled = selectedRunIds.size === 0;
   bulkDeleteButton.disabled = selectedRunIds.size === 0;
   selectionStatus.textContent = `${selectedRunIds.size} selected`;
 }
@@ -403,6 +410,69 @@ bulkDeleteButton.addEventListener("click", async () => {
     : `Deleted ${result.deleted}; skipped ${result.skipped.length}`;
 });
 
+exportButton.addEventListener("click", async () => {
+  const ids = [...selectedRunIds];
+  if (ids.length === 0) {
+    return;
+  }
+
+  exportButton.disabled = true;
+  refreshStatus.textContent = "Exporting";
+  try {
+    const response = await fetch("/api/runs/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids })
+    });
+
+    if (!response.ok) {
+      refreshStatus.textContent = "Export failed";
+      return;
+    }
+
+    exportText.value = await response.text();
+    exportPanel.hidden = false;
+    refreshStatus.textContent = `Exported ${ids.length} run(s)`;
+  } finally {
+    updateSelectionControls();
+  }
+});
+
+copyExportButton.addEventListener("click", async () => {
+  if (!exportText.value) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(exportText.value);
+  } catch {
+    exportText.select();
+    document.execCommand("copy");
+  }
+
+  refreshStatus.textContent = "Export copied";
+});
+
+downloadExportButton.addEventListener("click", () => {
+  if (!exportText.value) {
+    return;
+  }
+
+  const downloadUrl = URL.createObjectURL(new Blob([exportText.value], { type: "text/markdown" }));
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = `lineage-run-export-${formatDownloadTimestamp(new Date())}.md`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+  refreshStatus.textContent = "Export downloaded";
+});
+
+closeExportButton.addEventListener("click", () => {
+  exportPanel.hidden = true;
+});
+
 for (const button of document.querySelectorAll("[data-sort]")) {
   button.addEventListener("click", () => {
     if (sortKey === button.dataset.sort) {
@@ -488,6 +558,10 @@ function formatSeed(value) {
 
 function formatDateTime(value) {
   return value ? new Date(value).toLocaleString() : "";
+}
+
+function formatDownloadTimestamp(value) {
+  return value.toISOString().slice(0, 19).replaceAll(":", "").replace("T", "-");
 }
 
 function formatLog(lines) {
