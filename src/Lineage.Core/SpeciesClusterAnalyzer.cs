@@ -125,6 +125,99 @@ public static class SpeciesClusterAnalyzer
             .ToArray();
     }
 
+    public static IReadOnlyList<SpeciesClusterBehaviorChange> AnalyzeBehaviorChanges(
+        WorldState state,
+        SpeciesClusterHistory history,
+        int maxClusters = 10,
+        int sampleSize = 32,
+        SpeciesClusterOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(history);
+        if (maxClusters <= 0 || sampleSize <= 0 || history.Clusters.Count == 0)
+        {
+            return Array.Empty<SpeciesClusterBehaviorChange>();
+        }
+
+        var resolvedOptions = options ?? SpeciesClusterOptions.Default;
+        var lineageClusters = BuildLineageClusters(state, resolvedOptions)
+            .Clusters
+            .ToDictionary(cluster => cluster.SpeciesId);
+        var livingClusters = BuildLivingClusters(state, resolvedOptions)
+            .ToDictionary(cluster => cluster.SpeciesId);
+        var changes = new List<SpeciesClusterBehaviorChange>();
+
+        foreach (var summary in history.Clusters.Take(maxClusters))
+        {
+            if (!lineageClusters.TryGetValue(summary.SpeciesId, out var lineageCluster))
+            {
+                continue;
+            }
+
+            var earlyRecords = lineageCluster.Records
+                .OrderBy(record => record.BirthTick)
+                .ThenBy(record => record.Id.Value)
+                .Take(sampleSize)
+                .ToArray();
+            var finalSampleKind = "final living";
+            CreatureState[] finalCreatures;
+            if (livingClusters.TryGetValue(summary.SpeciesId, out var livingCluster) &&
+                livingCluster.Members.Count > 0)
+            {
+                finalCreatures = livingCluster.Members
+                    .OrderBy(creature => creature.Id.Value)
+                    .Take(sampleSize)
+                    .ToArray();
+            }
+            else
+            {
+                finalSampleKind = "last-born extinct";
+                finalCreatures = lineageCluster.Records
+                    .OrderByDescending(record => record.BirthTick)
+                    .ThenBy(record => record.Id.Value)
+                    .Take(sampleSize)
+                    .Select(CreateAssayCreature)
+                    .ToArray();
+            }
+
+            var earlyBehavior = BehaviorAssay.Analyze(state, earlyRecords.Select(CreateAssayCreature));
+            var finalBehavior = BehaviorAssay.Analyze(state, finalCreatures);
+
+            changes.Add(new SpeciesClusterBehaviorChange(
+                Rank: changes.Count + 1,
+                SpeciesId: summary.SpeciesId,
+                Name: summary.Name,
+                EarlySampleCount: earlyBehavior.EvaluatedCreatureCount,
+                FinalSampleCount: finalBehavior.EvaluatedCreatureCount,
+                FinalSampleKind: finalSampleKind,
+                EarlyEcotype: earlyBehavior.Ecotype,
+                FinalEcotype: finalBehavior.Ecotype,
+                EarlyForagingBias: earlyBehavior.ForagingBias,
+                FinalForagingBias: finalBehavior.ForagingBias,
+                EarlyRottenMeatResponse: earlyBehavior.RottenMeatResponse,
+                FinalRottenMeatResponse: finalBehavior.RottenMeatResponse,
+                EarlyRiskResponse: earlyBehavior.RiskResponse,
+                FinalRiskResponse: finalBehavior.RiskResponse,
+                EarlyTerrainResponse: earlyBehavior.TerrainResponse,
+                FinalTerrainResponse: finalBehavior.TerrainResponse,
+                EarlyPredatorTendency: earlyBehavior.PredatorTendency,
+                FinalPredatorTendency: finalBehavior.PredatorTendency,
+                EarlyMovementStyle: earlyBehavior.MovementStyle,
+                FinalMovementStyle: finalBehavior.MovementStyle,
+                EarlyReproductionTendency: earlyBehavior.ReproductionTendency,
+                FinalReproductionTendency: finalBehavior.ReproductionTendency,
+                BaselineMoveDelta: finalBehavior.Baseline.MoveForward - earlyBehavior.Baseline.MoveForward,
+                PlantMoveDelta: finalBehavior.PlantAhead.MoveForward - earlyBehavior.PlantAhead.MoveForward,
+                MeatMoveDelta: finalBehavior.MeatAhead.MoveForward - earlyBehavior.MeatAhead.MoveForward,
+                RotScentMoveDelta: finalBehavior.RottenMeatScentAhead.MoveForward - earlyBehavior.RottenMeatScentAhead.MoveForward,
+                SmallAttackDelta: finalBehavior.SmallCreatureAhead.AttackShare - earlyBehavior.SmallCreatureAhead.AttackShare,
+                EggLayingDelta: finalBehavior.ReproductionReady.ReproduceShare - earlyBehavior.ReproductionReady.ReproduceShare,
+                Summary: SummarizeBehaviorChange(earlyBehavior, finalBehavior)));
+        }
+
+        return changes;
+    }
+
     public static SpeciesClusterRepresentative FindRepresentative(
         WorldState state,
         string clusterKey,
@@ -231,6 +324,79 @@ public static class SpeciesClusterAnalyzer
         }
 
         return clusters;
+    }
+
+    private static CreatureState CreateAssayCreature(CreatureLineageRecord record)
+    {
+        return new CreatureState
+        {
+            Id = record.Id,
+            ParentId = record.ParentId,
+            AgeSeconds = MathF.Max(0f, (float)(record.DeathElapsedSeconds ?? record.BirthElapsedSeconds) - (float)record.BirthElapsedSeconds),
+            Energy = record.BirthEnergy,
+            Generation = record.Generation,
+            GenomeId = record.GenomeId,
+            BrainId = record.BrainId
+        };
+    }
+
+    private static string SummarizeBehaviorChange(
+        BehaviorAssaySummary earlyBehavior,
+        BehaviorAssaySummary finalBehavior)
+    {
+        if (earlyBehavior.EvaluatedCreatureCount == 0 || finalBehavior.EvaluatedCreatureCount == 0)
+        {
+            return "behavior comparison unavailable";
+        }
+
+        var notes = new List<string>();
+        AddLabelChange(notes, "ecotype", earlyBehavior.Ecotype, finalBehavior.Ecotype);
+        AddLabelChange(notes, "food", earlyBehavior.ForagingBias, finalBehavior.ForagingBias);
+        AddLabelChange(notes, "attack", earlyBehavior.PredatorTendency, finalBehavior.PredatorTendency);
+        AddLabelChange(notes, "rot", earlyBehavior.RottenMeatResponse, finalBehavior.RottenMeatResponse);
+        AddLabelChange(notes, "terrain", earlyBehavior.TerrainResponse, finalBehavior.TerrainResponse);
+        AddLabelChange(notes, "eggs", earlyBehavior.ReproductionTendency, finalBehavior.ReproductionTendency);
+        AddDeltaChange(
+            notes,
+            "plant movement",
+            finalBehavior.PlantAhead.MoveForward - earlyBehavior.PlantAhead.MoveForward);
+        AddDeltaChange(
+            notes,
+            "meat movement",
+            finalBehavior.MeatAhead.MoveForward - earlyBehavior.MeatAhead.MoveForward);
+        AddDeltaChange(
+            notes,
+            "rot-scent movement",
+            finalBehavior.RottenMeatScentAhead.MoveForward - earlyBehavior.RottenMeatScentAhead.MoveForward);
+        AddDeltaChange(
+            notes,
+            "small-creature attack",
+            finalBehavior.SmallCreatureAhead.AttackShare - earlyBehavior.SmallCreatureAhead.AttackShare);
+        AddDeltaChange(
+            notes,
+            "egg-laying",
+            finalBehavior.ReproductionReady.ReproduceShare - earlyBehavior.ReproductionReady.ReproduceShare);
+
+        return notes.Count == 0
+            ? "no meaningful behavioral change detected"
+            : string.Join("; ", notes.Take(4));
+    }
+
+    private static void AddLabelChange(List<string> notes, string label, string earlyValue, string finalValue)
+    {
+        if (!string.Equals(earlyValue, finalValue, StringComparison.Ordinal))
+        {
+            notes.Add($"{label}: {earlyValue} -> {finalValue}");
+        }
+    }
+
+    private static void AddDeltaChange(List<string> notes, string label, float delta)
+    {
+        const float Threshold = 0.2f;
+        if (MathF.Abs(delta) >= Threshold)
+        {
+            notes.Add($"{label} {(delta > 0f ? "increased" : "decreased")} {MathF.Abs(delta):0.##}");
+        }
     }
 
     private static SpeciesClusterAccumulator ResolveCluster(
@@ -1489,6 +1655,37 @@ public readonly record struct SpeciesClusterBehaviorFingerprint(
     float SmallCreatureAttackShare,
     float LargeApproachAttackShare,
     float ReproductionReadyShare);
+
+public readonly record struct SpeciesClusterBehaviorChange(
+    int Rank,
+    int SpeciesId,
+    string Name,
+    int EarlySampleCount,
+    int FinalSampleCount,
+    string FinalSampleKind,
+    string EarlyEcotype,
+    string FinalEcotype,
+    string EarlyForagingBias,
+    string FinalForagingBias,
+    string EarlyRottenMeatResponse,
+    string FinalRottenMeatResponse,
+    string EarlyRiskResponse,
+    string FinalRiskResponse,
+    string EarlyTerrainResponse,
+    string FinalTerrainResponse,
+    string EarlyPredatorTendency,
+    string FinalPredatorTendency,
+    string EarlyMovementStyle,
+    string FinalMovementStyle,
+    string EarlyReproductionTendency,
+    string FinalReproductionTendency,
+    float BaselineMoveDelta,
+    float PlantMoveDelta,
+    float MeatMoveDelta,
+    float RotScentMoveDelta,
+    float SmallAttackDelta,
+    float EggLayingDelta,
+    string Summary);
 
 public readonly record struct SpeciesClusterRepresentative(
     int SpeciesId,

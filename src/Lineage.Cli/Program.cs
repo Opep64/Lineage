@@ -4132,6 +4132,7 @@ internal static class RunReportWriter
         var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
         var speciesBehaviorFingerprints = SpeciesClusterAnalyzer.AnalyzeBehaviorFingerprints(state, 10);
         var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots, 10);
+        var speciesBehaviorChanges = SpeciesClusterAnalyzer.AnalyzeBehaviorChanges(state, speciesHistory, 10);
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
@@ -4547,6 +4548,7 @@ internal static class RunReportWriter
 
         WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
+        WriteSpeciesBehaviorChangeSection(writer, speciesBehaviorChanges);
         WriteSpeciesClusterInterpretationSection(writer, SpeciesClusterAnalyzer.InterpretClusters(speciesSummaries, speciesHistory, 10));
         WriteSpeciesClusterHistorySection(writer, speciesHistory);
         WriteBehaviorAssaySection(writer, behaviorSummary);
@@ -5520,6 +5522,50 @@ internal static class RunReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteSpeciesBehaviorChangeSection(
+        StreamWriter writer,
+        IReadOnlyList<SpeciesClusterBehaviorChange> changes)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Species Behavior Change</h2>");
+        if (changes.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No species behavior change comparison was available.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Samples</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Eggs</th><th>Plant Move</th><th>Meat Move</th><th>Rot Move</th><th>Small Attack</th><th>Egg Laying</th><th>Summary</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var change in changes)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(change.Rank)}</td>" +
+                $"<td>{Html(change.Name)}</td>" +
+                $"<td>{Html($"{change.EarlySampleCount} early / {change.FinalSampleCount} {change.FinalSampleKind}")}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyEcotype, change.FinalEcotype))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyForagingBias, change.FinalForagingBias))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyRottenMeatResponse, change.FinalRottenMeatResponse))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyRiskResponse, change.FinalRiskResponse))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyTerrainResponse, change.FinalTerrainResponse))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyPredatorTendency, change.FinalPredatorTendency))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyMovementStyle, change.FinalMovementStyle))}</td>" +
+                $"<td>{Html(FormatChange(change.EarlyReproductionTendency, change.FinalReproductionTendency))}</td>" +
+                $"<td>{Html(FormatDelta(change.PlantMoveDelta))}</td>" +
+                $"<td>{Html(FormatDelta(change.MeatMoveDelta))}</td>" +
+                $"<td>{Html(FormatDelta(change.RotScentMoveDelta))}</td>" +
+                $"<td>{Html(FormatDelta(change.SmallAttackDelta))}</td>" +
+                $"<td>{Html(FormatDelta(change.EggLayingDelta))}</td>" +
+                $"<td>{Html(change.Summary)}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
     private static void WriteSpeciesClusterInterpretationSection(
         StreamWriter writer,
         IReadOnlyList<SpeciesClusterInterpretation> interpretations)
@@ -6064,6 +6110,18 @@ internal static class RunReportWriter
     private static string FormatPercent(float value)
     {
         return $"{value * 100f:0.0}%";
+    }
+
+    private static string FormatChange(string earlyValue, string finalValue)
+    {
+        return string.Equals(earlyValue, finalValue, StringComparison.Ordinal)
+            ? finalValue
+            : $"{earlyValue} -> {finalValue}";
+    }
+
+    private static string FormatDelta(float value)
+    {
+        return value.ToString("+0.###;-0.###;0", CultureInfo.InvariantCulture);
     }
 
     private static string FormatPlantRelocations(SimulationStats stats)

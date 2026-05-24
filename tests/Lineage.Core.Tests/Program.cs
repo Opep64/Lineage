@@ -5029,6 +5029,14 @@ static void SpeciesClusterHistoryTracksSnapshots()
     AssertTrue(interpretations.All(interpretation => !string.IsNullOrWhiteSpace(interpretation.TrendLabel)), "Species interpretations should include trend labels");
     AssertTrue(interpretations.All(interpretation => !string.IsNullOrWhiteSpace(interpretation.ImportanceLabel)), "Species interpretations should include importance labels");
     AssertTrue(interpretations.Any(interpretation => interpretation.EvidenceLabel.Contains("peak", StringComparison.Ordinal)), "Species interpretations should include history evidence");
+
+    var behaviorChanges = SpeciesClusterAnalyzer.AnalyzeBehaviorChanges(simulation.State, history);
+
+    AssertEqual(2, behaviorChanges.Count, "Species behavior change count");
+    AssertTrue(behaviorChanges.All(change => change.EarlySampleCount > 0), "Species behavior changes should include early samples");
+    AssertTrue(behaviorChanges.All(change => change.FinalSampleCount > 0), "Species behavior changes should include final samples");
+    AssertTrue(behaviorChanges.All(change => change.FinalSampleKind == "final living"), "Living species behavior changes should use final living samples");
+    AssertTrue(behaviorChanges.All(change => !string.IsNullOrWhiteSpace(change.Summary)), "Species behavior changes should include summaries");
 }
 
 static void ScenarioSpeciesRosterInjectsProfileFounders()
