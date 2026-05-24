@@ -86,6 +86,7 @@ public static class BrainFactory
             InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.SectorForager => NeuralBrainGenome.CreateSectorForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.OpportunisticForager => NeuralBrainGenome.CreateOpportunisticForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),

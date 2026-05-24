@@ -144,6 +144,46 @@ Migration follow-up tuning:
 
 - Applied `sector_soft_d20_even` to `scenarios/migration-pressure.json`: `SectorForager`, 20 resources per million area, less clumpy plant placement, and softer barren/sparse movement, speed, and basal-cost penalties. It keeps the original 1800 second season length, which makes the preset more conservative than the fast-season variant while still producing reliable right-side occupancy by 60k ticks.
 
+60k all-scenario validation after the clean-input checkpoint:
+
+- Output files:
+  - `out/clean_input_all_scenarios_60k.csv`
+  - `out/clean_input_all_scenarios_60k.html`
+- Healthy/stable presets: Gentle, Balanced, Harsh, Migration, Obstacle, and Terrain.
+- Weak presets: Carrion, Scavenger, Predation, and Omnivore. Carrion/Scavenger/Predation were mostly starvation collapses despite visible/contact meat cues, pointing at starter intent rather than ecology.
+- Root cause found: meat-oriented starters inherited a weak meat-contact eat weight from the seed forager. With the `-2.5` eat bias, a creature could reach meat but not intentionally eat it. Scavenger, freshness-aware scavenger, and predator starters now eat meat on contact.
+- Targeted 60k recheck after that starter fix:
+
+  | Scenario | Final pop | Tail pop | Tail meat share | Ticks/s |
+  | --- | ---: | ---: | ---: | ---: |
+  | Carrion Pressure | 20.3 | 28.5 | 0.128 | 9473 |
+  | Predation Pressure | 27.3 | 39.3 | 0.158 | 6076 |
+  | Scavenger Pressure | 23.3 | 32.0 | 0.107 | 11625 |
+  | Omnivore Pressure | 6.7 | 8.6 | 0.000 | 10968 |
+
+- Omnivore remained weak because it used the plant-first `SectorForager`, which correctly does not chase or eat meat. Added `OpportunisticForager`: plant-first sector foraging with weak visible-meat approach and intentional meat eating on contact, but no meat scent chase. Switched `scenarios/omnivore-pressure.json` to this starter.
+- Omnivore 60k probe with only `OpportunisticForager` averaged `41.7` final creatures, `43.2` tail creatures, `0.064` tail meat calorie share, and `8075` ticks/s. This is the selected low-density Omnivore tuning; higher resource variants were viable but less useful for preserving sparse pressure.
+
+Final 60k validation after the starter fixes and Omnivore starter change:
+
+- Output files:
+  - `out/clean_input_all_scenarios_60k_after_tuning.csv`
+  - `out/clean_input_all_scenarios_60k_after_tuning.html`
+- All ten presets completed across seeds 42-44 with no extinction statuses.
+
+  | Scenario | Final pop | Range | Tail pop | Tail meat share | Ticks/s |
+  | --- | ---: | --- | ---: | ---: | ---: |
+  | Gentle Foraging | 176.7 | 154-209 | 225.6 | 0.000 | 1438 |
+  | Balanced Foraging | 83.7 | 66-94 | 82.3 | 0.000 | 4069 |
+  | Harsh Foraging | 27.7 | 23-37 | 29.7 | 0.000 | 9532 |
+  | Scavenger Pressure | 23.3 | 14-35 | 32.0 | 0.107 | 11655 |
+  | Omnivore Pressure | 41.7 | 34-52 | 43.2 | 0.064 | 7879 |
+  | Predation Pressure | 27.3 | 25-30 | 39.3 | 0.158 | 6076 |
+  | Carrion Pressure | 20.3 | 15-26 | 28.5 | 0.128 | 9446 |
+  | Obstacle Pressure | 174.3 | 130-239 | 138.8 | 0.000 | 4037 |
+  | Terrain Pressure | 107.0 | 92-134 | 96.9 | 0.000 | 6661 |
+  | Migration Pressure | 111.0 | 94-133 | 67.0 | 0.000 | 3793 |
+
 ## Brain Architecture Decision
 
 - Keep the current fixed neural architecture as the active experiment path for now. This architecture blends direct input-to-output weights with optional hidden nodes, which gives the simulation continuity and keeps existing starter species, snapshots, profiles, and behavior assays useful while the new input model matures.

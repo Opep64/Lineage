@@ -8,6 +8,7 @@ public enum InitialBrainKind
     SeedForager,
     ExplorerForager,
     SectorForager,
+    OpportunisticForager,
     ScavengerForager,
     FreshnessAwareScavenger,
     ForagerPredator,

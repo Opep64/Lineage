@@ -75,6 +75,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Sector forager starter follows sector plant cues", SectorForagerStarterFollowsSectorPlantCues),
+    ("Opportunistic forager samples meat on contact", OpportunisticForagerSamplesMeatOnContact),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
@@ -87,6 +88,7 @@ var tests = new (string Name, Action Body)[]
     ("Scavenger forager starter brain follows carrion cues", ScavengerForagerStarterBrainFollowsCarrionCues),
     ("Freshness-aware scavenger starter brain avoids rot cues", FreshnessAwareScavengerStarterBrainAvoidsRotCues),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
+    ("Meat-oriented starters eat meat on contact", MeatOrientedStartersEatMeatOnContact),
     ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
     ("Neural brain migrates memory inputs and outputs", NeuralBrainMigratesMemoryInputsAndOutputs),
     ("Neural brain migrates rotten meat sensing inputs", NeuralBrainMigratesRottenMeatSensingInputs),
@@ -3137,6 +3139,11 @@ static void SectorForagerStarterFollowsSectorPlantCues()
     AssertTrue(!creature.Actions.WantsEat, "Sector forager should not treat egg contact like plant contact");
 }
 
+static void OpportunisticForagerSamplesMeatOnContact()
+{
+    AssertMeatContactTriggersEat(NeuralBrainGenome.CreateOpportunisticForager(), "Opportunistic forager");
+}
+
 static void SeedForagerSlowsDownNearFood()
 {
     var farMove = MeasureSeedForagerMove(resourcePosition: new SimVector2(100f, 20f));
@@ -3710,6 +3717,10 @@ static void BrainFactoryPreservesHybridStarterBrains()
         BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.SectorForager, hiddenNodeCount),
         "Sector forager hybrid brain");
     AssertBrainsClose(
+        NeuralBrainGenome.CreateOpportunisticForager(hiddenNodeCount),
+        BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.OpportunisticForager, hiddenNodeCount),
+        "Opportunistic forager hybrid brain");
+    AssertBrainsClose(
         NeuralBrainGenome.CreateScavengerForager(hiddenNodeCount),
         BrainFactory.CreateStarter(BrainArchitectureKind.HybridNeural, InitialBrainKind.ScavengerForager, hiddenNodeCount),
         "Scavenger forager hybrid brain");
@@ -3912,6 +3923,42 @@ static void ForagerPredatorStarterBrainHuntsCreatureCues()
     AssertTrue(summary.RiskResponse == "size-aware restraint", "Forager predator should be classified as size-aware around risk cues");
     AssertTrue(summary.Ecotype == "small-prey predator", "Forager predator should be classified as a small-prey predator");
     AssertTrue(summary.Baseline.AttackShare < 0.1f, "Forager predator should not attack without visible creature cues");
+}
+
+static void MeatOrientedStartersEatMeatOnContact()
+{
+    AssertMeatContactTriggersEat(NeuralBrainGenome.CreateScavengerForager(), "Scavenger forager");
+    AssertMeatContactTriggersEat(NeuralBrainGenome.CreateFreshnessAwareScavenger(), "Freshness-aware scavenger");
+    AssertMeatContactTriggersEat(NeuralBrainGenome.CreateForagerPredator(), "Forager predator");
+}
+
+static void AssertMeatContactTriggersEat(NeuralBrainGenome brain, string label)
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 414,
+        systems: [new NeuralControllerSystem(enableLegacyNearestFoodVisionInputs: false)]);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.3f,
+        CarrionAdaptation = 0.3f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(brain);
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        Hunger = 1f,
+        FoodContact = 1f,
+        MeatFoodContact = 1f
+    };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertTrue(simulation.State.Creatures[0].Actions.WantsEat, $"{label} should intentionally eat meat on body contact");
 }
 
 static void LineageBehaviorAssaysSummarizeTopFounderStrategies()
@@ -5404,6 +5451,18 @@ static void ScenarioFactorySupportsInitialBrainKinds()
     for (var i = 0; i < sectorBrain.Weights.Length; i++)
     {
         AssertClose(sectorBrain.Weights[i], sectorSimulation.State.Brains[0].Weights[i], 0.000001, $"Sector brain weight {i}");
+    }
+
+    var opportunisticSimulation = SimulationScenarioFactory.CreateSimulation(scenario with
+    {
+        InitialBrainKind = InitialBrainKind.OpportunisticForager
+    });
+    var opportunisticBrain = NeuralBrainGenome.CreateOpportunisticForager(scenario.BrainHiddenNodeCount);
+
+    AssertEqual(1, opportunisticSimulation.State.Brains.Count, "Opportunistic founder brain count");
+    for (var i = 0; i < opportunisticBrain.Weights.Length; i++)
+    {
+        AssertClose(opportunisticBrain.Weights[i], opportunisticSimulation.State.Brains[0].Weights[i], 0.000001, $"Opportunistic brain weight {i}");
     }
 
     var scavengerSimulation = SimulationScenarioFactory.CreateSimulation(scenario with

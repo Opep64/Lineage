@@ -2,7 +2,7 @@
   "name": "Omnivore Pressure",
   "seed": 20260519,
   "pipelineKind": "neural",
-  "initialBrainKind": "sectorForager",
+  "initialBrainKind": "opportunisticForager",
   "brainHiddenNodeCount": 4,
   "enableBiomes": true,
   "biomeMapKind": "generatedNoise",
