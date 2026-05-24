@@ -127,6 +127,7 @@ var tests = new (string Name, Action Body)[]
     ("Species clustering separates starter ecotypes", SpeciesClusteringSeparatesStarterEcotypes),
     ("Species clustering handles non-neural creatures", SpeciesClusteringHandlesNonNeuralCreatures),
     ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
+    ("Species behavior change highlights notable shifts", SpeciesBehaviorChangeHighlightsNotableShifts),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
@@ -5037,6 +5038,82 @@ static void SpeciesClusterHistoryTracksSnapshots()
     AssertTrue(behaviorChanges.All(change => change.FinalSampleCount > 0), "Species behavior changes should include final samples");
     AssertTrue(behaviorChanges.All(change => change.FinalSampleKind == "final living"), "Living species behavior changes should use final living samples");
     AssertTrue(behaviorChanges.All(change => !string.IsNullOrWhiteSpace(change.Summary)), "Species behavior changes should include summaries");
+}
+
+static void SpeciesBehaviorChangeHighlightsNotableShifts()
+{
+    var changes = new[]
+    {
+        new SpeciesClusterBehaviorChange(
+            Rank: 1,
+            SpeciesId: 10,
+            Name: "Stable",
+            EarlySampleCount: 8,
+            FinalSampleCount: 8,
+            FinalSampleKind: "final living",
+            EarlyEcotype: "generalist forager",
+            FinalEcotype: "generalist forager",
+            EarlyForagingBias: "mixed food response",
+            FinalForagingBias: "mixed food response",
+            EarlyRottenMeatResponse: "little freshness differentiation",
+            FinalRottenMeatResponse: "little freshness differentiation",
+            EarlyRiskResponse: "little risk differentiation",
+            FinalRiskResponse: "little risk differentiation",
+            EarlyTerrainResponse: "little terrain differentiation",
+            FinalTerrainResponse: "little terrain differentiation",
+            EarlyPredatorTendency: "rare attack response",
+            FinalPredatorTendency: "rare attack response",
+            EarlyMovementStyle: "moderate wandering",
+            FinalMovementStyle: "moderate wandering",
+            EarlyReproductionTendency: "readily lays completed eggs",
+            FinalReproductionTendency: "readily lays completed eggs",
+            BaselineMoveDelta: 0.04f,
+            PlantMoveDelta: 0.05f,
+            MeatMoveDelta: -0.05f,
+            RotScentMoveDelta: 0.02f,
+            SmallAttackDelta: 0.04f,
+            EggLayingDelta: 0.05f,
+            Summary: "no meaningful behavioral change detected"),
+        new SpeciesClusterBehaviorChange(
+            Rank: 2,
+            SpeciesId: 20,
+            Name: "Shifted",
+            EarlySampleCount: 8,
+            FinalSampleCount: 8,
+            FinalSampleKind: "final living",
+            EarlyEcotype: "generalist forager",
+            FinalEcotype: "generalist forager",
+            EarlyForagingBias: "mixed food response",
+            FinalForagingBias: "meat-biased forager",
+            EarlyRottenMeatResponse: "little freshness differentiation",
+            FinalRottenMeatResponse: "little freshness differentiation",
+            EarlyRiskResponse: "little risk differentiation",
+            FinalRiskResponse: "little risk differentiation",
+            EarlyTerrainResponse: "little terrain differentiation",
+            FinalTerrainResponse: "rough terrain specialist",
+            EarlyPredatorTendency: "rare attack response",
+            FinalPredatorTendency: "frequent attack response",
+            EarlyMovementStyle: "moderate wandering",
+            FinalMovementStyle: "moderate wandering",
+            EarlyReproductionTendency: "rare egg laying",
+            FinalReproductionTendency: "readily lays completed eggs",
+            BaselineMoveDelta: 0.1f,
+            PlantMoveDelta: -0.35f,
+            MeatMoveDelta: 0.3f,
+            RotScentMoveDelta: 0.02f,
+            SmallAttackDelta: 0.08f,
+            EggLayingDelta: 0.18f,
+            Summary: "synthetic shift")
+    };
+
+    var notable = SpeciesClusterAnalyzer.FindNotableBehaviorChanges(changes);
+
+    AssertEqual(1, notable.Count, "Notable behavior shift count");
+    AssertEqual(20, notable[0].SpeciesId, "Notable behavior shift species");
+    AssertTrue(notable[0].Score > 0f, "Notable behavior shift should have a score");
+    AssertTrue(notable[0].Summary.Contains("food response", StringComparison.Ordinal), "Notable behavior shift should mention food");
+    AssertTrue(notable[0].Summary.Contains("attack", StringComparison.Ordinal), "Notable behavior shift should mention attack");
+    AssertEqual(0, SpeciesClusterAnalyzer.FindNotableBehaviorChanges(changes, maxChanges: 0).Count, "Zero max notable behavior changes");
 }
 
 static void ScenarioSpeciesRosterInjectsProfileFounders()

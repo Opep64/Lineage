@@ -218,6 +218,44 @@ public static class SpeciesClusterAnalyzer
         return changes;
     }
 
+    public static IReadOnlyList<SpeciesClusterNotableBehaviorChange> FindNotableBehaviorChanges(
+        IReadOnlyList<SpeciesClusterBehaviorChange> changes,
+        int maxChanges = 6)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        if (maxChanges <= 0 || changes.Count == 0)
+        {
+            return Array.Empty<SpeciesClusterNotableBehaviorChange>();
+        }
+
+        var notableChanges = new List<SpeciesClusterNotableBehaviorChange>();
+        foreach (var change in changes)
+        {
+            var reasons = BuildNotableBehaviorChangeReasons(change);
+            if (reasons.Count == 0)
+            {
+                continue;
+            }
+
+            var orderedReasons = reasons
+                .OrderByDescending(reason => reason.Score)
+                .ThenBy(reason => reason.Text, StringComparer.Ordinal)
+                .ToArray();
+            notableChanges.Add(new SpeciesClusterNotableBehaviorChange(
+                Rank: change.Rank,
+                SpeciesId: change.SpeciesId,
+                Name: change.Name,
+                Score: orderedReasons.Sum(reason => reason.Score),
+                Summary: string.Join("; ", orderedReasons.Take(3).Select(reason => reason.Text))));
+        }
+
+        return notableChanges
+            .OrderByDescending(change => change.Score)
+            .ThenBy(change => change.Rank)
+            .Take(maxChanges)
+            .ToArray();
+    }
+
     public static SpeciesClusterRepresentative FindRepresentative(
         WorldState state,
         string clusterKey,
@@ -396,6 +434,52 @@ public static class SpeciesClusterAnalyzer
         if (MathF.Abs(delta) >= Threshold)
         {
             notes.Add($"{label} {(delta > 0f ? "increased" : "decreased")} {MathF.Abs(delta):0.##}");
+        }
+    }
+
+    private static List<BehaviorChangeReason> BuildNotableBehaviorChangeReasons(SpeciesClusterBehaviorChange change)
+    {
+        var reasons = new List<BehaviorChangeReason>();
+        AddNotableLabelChange(reasons, "food response", change.EarlyForagingBias, change.FinalForagingBias, 2.0f);
+        AddNotableLabelChange(reasons, "attack tendency", change.EarlyPredatorTendency, change.FinalPredatorTendency, 2.0f);
+        AddNotableLabelChange(reasons, "terrain response", change.EarlyTerrainResponse, change.FinalTerrainResponse, 1.8f);
+        AddNotableLabelChange(reasons, "egg-laying tendency", change.EarlyReproductionTendency, change.FinalReproductionTendency, 1.8f);
+        AddNotableLabelChange(reasons, "rotten meat response", change.EarlyRottenMeatResponse, change.FinalRottenMeatResponse, 1.5f);
+        AddNotableLabelChange(reasons, "risk response", change.EarlyRiskResponse, change.FinalRiskResponse, 1.5f);
+        AddNotableDelta(reasons, "plant seeking", change.PlantMoveDelta, threshold: 0.25f, baseScore: 1.2f);
+        AddNotableDelta(reasons, "meat seeking", change.MeatMoveDelta, threshold: 0.25f, baseScore: 1.2f);
+        AddNotableDelta(reasons, "rot-scent movement", change.RotScentMoveDelta, threshold: 0.25f, baseScore: 1.0f);
+        AddNotableDelta(reasons, "small-creature attack", change.SmallAttackDelta, threshold: 0.05f, baseScore: 1.4f);
+        AddNotableDelta(reasons, "egg laying", change.EggLayingDelta, threshold: 0.1f, baseScore: 1.2f);
+        return reasons;
+    }
+
+    private static void AddNotableLabelChange(
+        List<BehaviorChangeReason> reasons,
+        string label,
+        string earlyValue,
+        string finalValue,
+        float score)
+    {
+        if (!string.Equals(earlyValue, finalValue, StringComparison.Ordinal))
+        {
+            reasons.Add(new BehaviorChangeReason($"{label}: {earlyValue} -> {finalValue}", score));
+        }
+    }
+
+    private static void AddNotableDelta(
+        List<BehaviorChangeReason> reasons,
+        string label,
+        float delta,
+        float threshold,
+        float baseScore)
+    {
+        var magnitude = MathF.Abs(delta);
+        if (magnitude >= threshold)
+        {
+            reasons.Add(new BehaviorChangeReason(
+                $"{label} {(delta > 0f ? "increased" : "decreased")} {magnitude:0.##}",
+                baseScore + MathF.Min(magnitude, 1f)));
         }
     }
 
@@ -1525,6 +1609,8 @@ public static class SpeciesClusterAnalyzer
 
     private readonly record struct SpeciesHistorySample(long Tick, double ElapsedSeconds);
 
+    private readonly record struct BehaviorChangeReason(string Text, float Score);
+
     private sealed class SpeciesHistoryGenerationAccumulator
     {
         private readonly Dictionary<int, int> _generationCounts = [];
@@ -1685,6 +1771,13 @@ public readonly record struct SpeciesClusterBehaviorChange(
     float RotScentMoveDelta,
     float SmallAttackDelta,
     float EggLayingDelta,
+    string Summary);
+
+public readonly record struct SpeciesClusterNotableBehaviorChange(
+    int Rank,
+    int SpeciesId,
+    string Name,
+    float Score,
     string Summary);
 
 public readonly record struct SpeciesClusterRepresentative(

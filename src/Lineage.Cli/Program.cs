@@ -5569,6 +5569,32 @@ internal static class RunReportWriter
             return;
         }
 
+        var notableChanges = SpeciesClusterAnalyzer.FindNotableBehaviorChanges(changes);
+        writer.WriteLine("<h3>Notable Shifts</h3>");
+        if (notableChanges.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No notable behavior shifts crossed the report thresholds.</p>");
+        }
+        else
+        {
+            writer.WriteLine("<div class=\"table-wrap\"><table>");
+            writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Score</th><th>Change</th></tr></thead>");
+            writer.WriteLine("<tbody>");
+            foreach (var change in notableChanges)
+            {
+                writer.WriteLine(
+                    "<tr>" +
+                    $"<td>{Html(change.Rank)}</td>" +
+                    $"<td>{Html(change.Name)}</td>" +
+                    $"<td>{Html(change.Score.ToString("0.##", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(change.Summary)}</td>" +
+                    "</tr>");
+            }
+
+            writer.WriteLine("</tbody></table></div>");
+        }
+
+        writer.WriteLine("<h3>All Cluster Comparisons</h3>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Samples</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Eggs</th><th>Plant Move</th><th>Meat Move</th><th>Rot Move</th><th>Small Attack</th><th>Egg Laying</th><th>Summary</th></tr></thead>");
         writer.WriteLine("<tbody>");
