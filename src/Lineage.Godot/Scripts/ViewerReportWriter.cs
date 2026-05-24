@@ -86,6 +86,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Brain architecture", FormatBrainArchitectureKind(scenario.BrainArchitectureKind));
         WriteMetric(writer, "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
         WriteMetric(writer, "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Legacy nearest food vision inputs", scenario.EnableLegacyNearestFoodVisionInputs ? "enabled" : "disabled");
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "World size", $"{state.Bounds.Width:0} x {state.Bounds.Height:0}");
         WriteMetric(writer, "Resources per 1M area", resourceDensity.ToString("0.###", CultureInfo.InvariantCulture));

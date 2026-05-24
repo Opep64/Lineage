@@ -76,6 +76,7 @@ public readonly record struct BrainInputFrame(
                 senses.EggFoodContact),
             new InternalInputFrame(
                 senses.EnergyRatio,
+                senses.HealthRatio,
                 senses.Hunger,
                 genome.DietaryAdaptation,
                 senses.EggReserveRatio,
@@ -148,6 +149,7 @@ public readonly record struct BodyInputFrame(
 /// </summary>
 public readonly record struct InternalInputFrame(
     float EnergyRatio,
+    float HealthRatio,
     float Hunger,
     float DietaryMeatBias,
     float EggReserveRatio,

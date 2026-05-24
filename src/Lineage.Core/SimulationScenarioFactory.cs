@@ -60,6 +60,7 @@ public static class SimulationScenarioFactory
                 scenario.WorldSenseIntervalTicks,
                 scenario.CloseSenseRefreshProximity,
                 scenario.EnableSectorVision,
+                scenario.EnableLegacyNearestFoodVisionInputs,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,

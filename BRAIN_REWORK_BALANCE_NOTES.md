@@ -75,6 +75,75 @@ Base commit: `51f188d Add selected run Markdown export`.
 - Keep hidden-node support, but avoid assuming more hidden nodes solve perception problems.
 - If the schema changes, add migration tests for old saved brains.
 
+## 2026-05-24 Legacy Input Audit
+
+- Added `HealthRatio` as an internal body-state input. It is sensed as current creature health divided by birth-investment-scaled maximum health, appended to the neural schema so old brain weights migrate with neutral health wiring.
+- Remaining legacy/abstract visual inputs still exposed through `LegacyNeuralBrainAdapter`:
+  - generic diet-weighted food proximity/forward/right/density
+  - plant proximity/forward/right/density
+  - meat proximity/forward/right/density/freshness
+  - nearest visible creature proximity/forward/right/density plus relative size, speed, approach rate, and facing alignment
+- The sector vision inputs are closer to the target model because they expose category density/proximity by visual sector rather than one best global-ish target.
+- The most questionable legacy inputs are the generic food/plant/meat direction channels. They still collapse the visible arc into one best target, which can shortcut the search problem. They should eventually become compatibility-only inputs, with starter brains and scenarios moving toward sector/ray channels plus contact.
+- Creature relation signals are useful but still nearest-creature summaries. Later creature vision should probably move these into sector categories such as smaller/similar/larger creature density, proximity, and maybe approach/facing only for close/clear observations.
+- Current scent inputs are acceptable for now: meat and rot scent are lower-resolution directional gradients and can remain longer-range than sight.
+- Body/touch/proprioception inputs look aligned with the target model: terrain drag probes, obstacle probes, movement blocked, and food contact are local physical facts.
+- Legacy controller memory remains outside the standardized input frame by design. Future brain architectures should own memory internally.
+- Added `EnableLegacyNearestFoodVisionInputs` so a scenario can keep computing legacy food/plant/meat nearest-target diagnostics while withholding those proximity/forward/right channels from the brain. Density, sector vision, body contact, meat scent, rot scent, creature cues, terrain, and obstacle signals remain available.
+- Updated starter policies so legacy-derived seed/explorer/scavenger/predator brains have sector plant steering and contact-based eating. Scavengers also get sector meat steering. This prevents them from depending on generic nearest-food inputs to eat.
+- Switched the ten main checked-in scenarios to `enableLegacyNearestFoodVisionInputs: false`. A 10k, two-seed all-preset probe completed without extinction. The cleaner input path reduced some pressure scenarios, especially Migration, Scavenger, Carrion, Obstacle, and Terrain, but the runs remained viable enough to continue tuning.
+
+Follow-up 20k targeted probe:
+
+- Output files: `out/clean_input_pressure_probe_20k.csv` and `.html`.
+- Shape: Migration, Scavenger, Carrion, Terrain, and Obstacle; seeds 42-44; `base` uses clean input, `legacy_food` re-enables old nearest-food/plant/meat proximity/direction channels.
+
+| Scenario | Variant | Final pop | Tail pop | Food contact | Tail kcal/dist | Tail meal gap | East now | East run | TPS |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Carrion | clean | 21.0 | 21.6 | 0.338 | 0.208 | 32.1s | 0.616 | 1.000 | 12668 |
+| Carrion | legacy food | 34.7 | 35.2 | 0.397 | 0.192 | 27.1s | 0.775 | 1.000 | 10847 |
+| Migration | clean | 2.3 | 3.7 | 0.167 | 0.042 | 81.4s | 0.175 | 0.544 | 11764 |
+| Migration | legacy food | 26.3 | 33.8 | 0.036 | 0.105 | 68.6s | 0.866 | 0.876 | 7343 |
+| Obstacle | clean | 124.3 | 117.0 | 0.082 | 0.080 | 16.8s | 0.824 | 0.863 | 5763 |
+| Obstacle | legacy food | 74.7 | 82.7 | 0.151 | 0.096 | 35.2s | 0.885 | 0.891 | 5256 |
+| Scavenger | clean | 17.7 | 18.3 | 0.199 | 0.198 | 35.1s | 0.693 | 1.000 | 15285 |
+| Scavenger | legacy food | 29.3 | 27.6 | 0.207 | 0.204 | 24.8s | 0.704 | 1.000 | 13755 |
+| Terrain | clean | 49.7 | 57.5 | 0.166 | 0.079 | 74.1s | 1.000 | 1.000 | 7694 |
+| Terrain | legacy food | 49.0 | 52.9 | 0.253 | 0.205 | 65.0s | 1.000 | 1.000 | 6756 |
+
+Interpretation:
+
+- Migration is the only serious regression. Clean-input runs reached the far side much less often, and one seed went extinct by 20k. This scenario needs targeted tuning before it is a useful migration assay under sector/contact vision.
+- Scavenger and Carrion are lower-population but stable. They likely need later scavenger-specific tuning, but they are not blocking the sensory rework.
+- Terrain is roughly stable in final population despite less efficient food conversion. Obstacle improved in population, likely because cleaner input reduced over-commitment to old food directions around barriers.
+- The clean input path is usually faster because lower populations and fewer useful direct-input weights reduce work, but the speedup is not a pure engine optimization.
+
+Migration follow-up tuning:
+
+- Output files:
+  - `out/migration_clean_middle_probe_30k.csv`
+  - `out/migration_clean_middle_probe_30k.html`
+  - `out/migration_clean_top_probe_60k.csv`
+  - `out/migration_clean_top_probe_60k.html`
+- The untouched clean-input Migration preset collapsed by 30k-60k ticks: 30k averaged `0.3` final creatures and 60k was extinct across all three seeds.
+- Middle-ground 30k candidates showed that the `SectorForager` starter plus softer barren/sparse crossing was the main fix. The best 30k candidates reached the right-side region while staying viable:
+
+  | Variant | Final pop | Tail pop | East now | Middle | Right | Ticks/s |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | `sector_soft_d20` | 54.0 | 71.3 | 0.799 | 11.7 | 8.3 | 3534 |
+  | `sector_soft_d20_even` | 54.3 | 79.0 | 0.837 | 14.3 | 6.0 | 3336 |
+  | `sector_fast_soft_d20` | 40.0 | 55.4 | 0.832 | 12.7 | 8.0 | 3694 |
+
+- A longer 60k top-candidate probe gave the clearest signal:
+
+  | Variant | Final pop | Tail pop | East now | Middle | Right | Ticks/s |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | `sector_soft_d20` | 113.0 | 92.8 | 0.980 | 14.3 | 95.3 | 3798 |
+  | `sector_soft_d20_even` | 111.0 | 67.0 | 0.997 | 8.7 | 99.3 | 3985 |
+  | `sector_fast_soft_d20` | 125.0 | 91.5 | 0.982 | 12.7 | 104.7 | 3899 |
+
+- Applied `sector_soft_d20_even` to `scenarios/migration-pressure.json`: `SectorForager`, 20 resources per million area, less clumpy plant placement, and softer barren/sparse movement, speed, and basal-cost penalties. It keeps the original 1800 second season length, which makes the preset more conservative than the fast-season variant while still producing reliable right-side occupancy by 60k ticks.
+
 ## Brain Architecture Decision
 
 - Keep the current fixed neural architecture as the active experiment path for now. This architecture blends direct input-to-output weights with optional hidden nodes, which gives the simulation continuity and keeps existing starter species, snapshots, profiles, and behavior assays useful while the new input model matures.

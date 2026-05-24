@@ -62,6 +62,8 @@ public sealed record SimulationScenario
 
     public bool EnableSectorVision { get; init; } = true;
 
+    public bool EnableLegacyNearestFoodVisionInputs { get; init; } = true;
+
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 
     public int InitialCreatureCount { get; init; } = 80;

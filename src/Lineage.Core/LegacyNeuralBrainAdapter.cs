@@ -13,7 +13,8 @@ public static class LegacyNeuralBrainAdapter
     public static void FillInputs(
         in BrainInputFrame frame,
         in LegacyNeuralMemoryInputFrame memory,
-        Span<float> inputs)
+        Span<float> inputs,
+        bool enableLegacyNearestFoodVisionInputs = true)
     {
         if (inputs.Length < NeuralBrainSchema.InputCount)
         {
@@ -24,19 +25,23 @@ public static class LegacyNeuralBrainAdapter
 
         inputs[NeuralBrainSchema.BiasInput] = 1f;
         inputs[NeuralBrainSchema.EnergyRatioInput] = frame.Internal.EnergyRatio;
+        inputs[NeuralBrainSchema.HealthRatioInput] = frame.Internal.HealthRatio;
         inputs[NeuralBrainSchema.HungerInput] = frame.Internal.Hunger;
-        inputs[NeuralBrainSchema.FoodProximityInput] = frame.Vision.Food.Proximity;
-        inputs[NeuralBrainSchema.FoodForwardInput] = frame.Vision.Food.DirectionForward;
-        inputs[NeuralBrainSchema.FoodRightInput] = frame.Vision.Food.DirectionRight;
         inputs[NeuralBrainSchema.VisibleFoodDensityInput] = frame.Vision.Food.Density;
         inputs[NeuralBrainSchema.VisiblePlantDensityInput] = frame.Vision.Plant.Density;
-        inputs[NeuralBrainSchema.PlantProximityInput] = frame.Vision.Plant.Proximity;
-        inputs[NeuralBrainSchema.PlantForwardInput] = frame.Vision.Plant.DirectionForward;
-        inputs[NeuralBrainSchema.PlantRightInput] = frame.Vision.Plant.DirectionRight;
         inputs[NeuralBrainSchema.VisibleMeatDensityInput] = frame.Vision.Meat.Density;
-        inputs[NeuralBrainSchema.MeatProximityInput] = frame.Vision.Meat.Proximity;
-        inputs[NeuralBrainSchema.MeatForwardInput] = frame.Vision.Meat.DirectionForward;
-        inputs[NeuralBrainSchema.MeatRightInput] = frame.Vision.Meat.DirectionRight;
+        if (enableLegacyNearestFoodVisionInputs)
+        {
+            inputs[NeuralBrainSchema.FoodProximityInput] = frame.Vision.Food.Proximity;
+            inputs[NeuralBrainSchema.FoodForwardInput] = frame.Vision.Food.DirectionForward;
+            inputs[NeuralBrainSchema.FoodRightInput] = frame.Vision.Food.DirectionRight;
+            inputs[NeuralBrainSchema.PlantProximityInput] = frame.Vision.Plant.Proximity;
+            inputs[NeuralBrainSchema.PlantForwardInput] = frame.Vision.Plant.DirectionForward;
+            inputs[NeuralBrainSchema.PlantRightInput] = frame.Vision.Plant.DirectionRight;
+            inputs[NeuralBrainSchema.MeatProximityInput] = frame.Vision.Meat.Proximity;
+            inputs[NeuralBrainSchema.MeatForwardInput] = frame.Vision.Meat.DirectionForward;
+            inputs[NeuralBrainSchema.MeatRightInput] = frame.Vision.Meat.DirectionRight;
+        }
         inputs[NeuralBrainSchema.DietaryMeatBiasInput] = frame.Internal.DietaryMeatBias;
         inputs[NeuralBrainSchema.EggReserveRatioInput] = frame.Internal.EggReserveRatio;
         inputs[NeuralBrainSchema.ReproductionReadinessInput] = frame.Internal.ReproductionReadiness;

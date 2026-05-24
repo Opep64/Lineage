@@ -919,7 +919,7 @@ public partial class Main : Node2D
             $"Generation {creature.Generation}\n" +
             $"Genome {creature.GenomeId}  Brain {brainText}\n" +
             $"Energy {creature.Energy:0.0}\n" +
-            $"Health {creature.Health:0.00}\n" +
+            $"Health {creature.Health:0.00} ({senses.HealthRatio:P0})\n" +
             $"Age {creature.AgeSeconds:0.0}s\n" +
             $"Growth {maturityText} ({growthFactor:P0})\n" +
             $"Birth inv {creature.BirthInvestmentRatio:0.00}x\n" +

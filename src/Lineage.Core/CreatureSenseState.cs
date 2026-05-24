@@ -158,6 +158,11 @@ public struct CreatureSenseState
 
     public float EnergyRatio { get; set; }
 
+    /// <summary>
+    /// Current health relative to the creature's birth-investment-scaled maximum health.
+    /// </summary>
+    public float HealthRatio { get; set; }
+
     public float Hunger { get; set; }
 
     public float EggReserveRatio { get; set; }

@@ -584,6 +584,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float deltaSeconds)
     {
         var energyRatio = Math.Clamp(creature.Energy / genome.ReproductionEnergyThreshold, 0f, 1f);
+        var maxHealth = OffspringDevelopment.JuvenileGrowthScale(creature.BirthInvestmentRatio);
+        var healthRatio = maxHealth > 0f
+            ? Math.Clamp(creature.Health / maxHealth, 0f, 1f)
+            : 0f;
         var eggReserveRatio = Math.Clamp(creature.ReproductiveEnergy / genome.OffspringEnergyInvestment, 0f, 1f);
         var energySurplusRatio = Math.Clamp(
             (creature.Energy - genome.ReproductionEnergyThreshold) / Math.Max(1f, genome.OffspringEnergyInvestment),
@@ -602,6 +606,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             && creature.ReproductionCooldownSeconds <= 0f;
 
         senses.EnergyRatio = energyRatio;
+        senses.HealthRatio = healthRatio;
         senses.Hunger = 1f - energyRatio;
         senses.EggReserveRatio = eggReserveRatio;
         senses.EnergySurplusRatio = energySurplusRatio;
