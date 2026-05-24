@@ -8,6 +8,8 @@ namespace Lineage.Runner;
 
 public sealed partial class LineageRunManager
 {
+    private const string ProcessIdToken = "{pid}";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -76,9 +78,8 @@ public sealed partial class LineageRunManager
 
         var createdAt = DateTimeOffset.UtcNow;
         var scenarioName = Path.GetFileNameWithoutExtension(scenarioPath);
-        var id = $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{Random.Shared.Next(1000, 9999)}";
+        var id = $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{ProcessIdToken}";
         var runDirectory = Path.Combine(_runsRoot, id);
-        Directory.CreateDirectory(runDirectory);
 
         var manifest = new RunManifest
         {
@@ -105,15 +106,13 @@ public sealed partial class LineageRunManager
             StderrPath = Path.Combine(runDirectory, "stderr.log")
         };
 
+        var launchTarget = ResolveCliLaunchTarget();
         var arguments = BuildCliArguments(manifest);
-        manifest.CommandLine = $"dotnet {string.Join(' ', arguments.Select(QuoteArgument))}";
-        SaveManifest(manifest);
-
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = "dotnet",
+                FileName = launchTarget.FileName,
                 WorkingDirectory = _repoRoot,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -123,25 +122,44 @@ public sealed partial class LineageRunManager
             EnableRaisingEvents = true
         };
 
+        foreach (var argument in launchTarget.PrefixArguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
         foreach (var argument in arguments)
         {
             process.StartInfo.ArgumentList.Add(argument);
         }
 
         var managedRun = new ManagedRun(manifest, process);
-        if (!_runs.TryAdd(manifest.Id, managedRun))
-        {
-            throw new InvalidOperationException($"Run id collision for {manifest.Id}.");
-        }
-
         try
         {
-            process.Exited += (_, _) => MarkProcessExited(managedRun);
             process.Start();
+            ApplyProcessId(manifest, process.Id);
             manifest.Status = "running";
+            manifest.CommandLine = FormatCommandLine(
+                launchTarget.FileName,
+                launchTarget.PrefixArguments.Concat(BuildCliArguments(manifest)));
+            if (!_runs.TryAdd(manifest.Id, managedRun))
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+
+                throw new InvalidOperationException($"Run id collision for {manifest.Id}.");
+            }
+
             SaveManifest(manifest);
             _ = PumpOutputAsync(process.StandardOutput, manifest.StdoutPath);
             _ = PumpOutputAsync(process.StandardError, manifest.StderrPath);
+            process.Exited += (_, _) => MarkProcessExited(managedRun);
+            if (process.HasExited)
+            {
+                MarkProcessExited(managedRun);
+            }
+
             return ToSummary(managedRun);
         }
         catch
@@ -215,6 +233,7 @@ public sealed partial class LineageRunManager
             StartedAtUtc: manifest.StartedAtUtc,
             EndedAtUtc: manifest.EndedAtUtc,
             ExitCode: manifest.ExitCode,
+            ProcessId: manifest.ProcessId,
             RunDirectory: manifest.RunDirectory,
             StatsPath: manifest.StatsPath,
             ReportPath: manifest.ReportPath,
@@ -322,6 +341,27 @@ public sealed partial class LineageRunManager
         File.Move(tempPath, path, overwrite: true);
     }
 
+    private static void ApplyProcessId(RunManifest manifest, int processId)
+    {
+        var processIdText = processId.ToString(CultureInfo.InvariantCulture);
+        manifest.ProcessId = processId;
+        manifest.Id = ReplaceProcessIdToken(manifest.Id, processIdText);
+        manifest.RunDirectory = ReplaceProcessIdToken(manifest.RunDirectory, processIdText);
+        manifest.StatsPath = ReplaceProcessIdToken(manifest.StatsPath, processIdText);
+        manifest.ReportPath = ReplaceProcessIdToken(manifest.ReportPath, processIdText);
+        manifest.SnapshotPath = ReplaceProcessIdToken(manifest.SnapshotPath, processIdText);
+        manifest.CheckpointDirectory = ReplaceProcessIdToken(manifest.CheckpointDirectory, processIdText);
+        manifest.StatusPath = ReplaceProcessIdToken(manifest.StatusPath, processIdText);
+        manifest.ControlPath = ReplaceProcessIdToken(manifest.ControlPath, processIdText);
+        manifest.StdoutPath = ReplaceProcessIdToken(manifest.StdoutPath, processIdText);
+        manifest.StderrPath = ReplaceProcessIdToken(manifest.StderrPath, processIdText);
+    }
+
+    private static string ReplaceProcessIdToken(string value, string processId)
+    {
+        return value.Replace(ProcessIdToken, processId, StringComparison.OrdinalIgnoreCase);
+    }
+
     private string ResolveScenarioPath(string scenarioPath)
     {
         var path = Path.IsPathRooted(scenarioPath)
@@ -330,14 +370,32 @@ public sealed partial class LineageRunManager
         return Path.GetFullPath(path);
     }
 
+    private (string FileName, IReadOnlyList<string> PrefixArguments) ResolveCliLaunchTarget()
+    {
+        var configuration = ResolveBuildConfiguration();
+        var cliOutputDirectory = Path.Combine(_repoRoot, "src", "Lineage.Cli", "bin", configuration, "net8.0");
+        var executablePath = Path.Combine(
+            cliOutputDirectory,
+            OperatingSystem.IsWindows() ? "Lineage.Cli.exe" : "Lineage.Cli");
+        if (File.Exists(executablePath))
+        {
+            return (executablePath, Array.Empty<string>());
+        }
+
+        var dllPath = Path.Combine(cliOutputDirectory, "Lineage.Cli.dll");
+        if (File.Exists(dllPath))
+        {
+            return ("dotnet", [dllPath]);
+        }
+
+        throw new InvalidOperationException(
+            $"Could not find a built Lineage.Cli executable under {cliOutputDirectory}. Build the solution before launching runs.");
+    }
+
     private IReadOnlyList<string> BuildCliArguments(RunManifest manifest)
     {
         var args = new List<string>
         {
-            "run",
-            "--project",
-            Path.Combine(_repoRoot, "src", "Lineage.Cli", "Lineage.Cli.csproj"),
-            "--",
             "--scenario",
             manifest.ScenarioPath,
             "--ticks",
@@ -376,6 +434,28 @@ public sealed partial class LineageRunManager
         }
 
         return args;
+    }
+
+    private static string ResolveBuildConfiguration()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (string.Equals(directory.Name, "Debug", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(directory.Name, "Release", StringComparison.OrdinalIgnoreCase))
+            {
+                return directory.Name;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return "Debug";
+    }
+
+    private static string FormatCommandLine(string fileName, IEnumerable<string> arguments)
+    {
+        return string.Join(' ', new[] { fileName }.Concat(arguments).Select(QuoteArgument));
     }
 
     private static string FindRepositoryRoot()

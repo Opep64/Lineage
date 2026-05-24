@@ -68,6 +68,7 @@ function renderRuns(runs) {
           <span>Births</span><strong>${formatNumber(run.creatureBirthCount)}</strong>
           <span>Deaths</span><strong>${formatNumber(run.creatureDeathCount)}</strong>
           <span>Checkpoints</span><strong>${formatNumber(run.checkpointCount)}</strong>
+          <span>PID</span><strong>${run.processId ?? ""}</strong>
           <span>Exit</span><strong>${run.exitCode ?? ""}</strong>
         </div>
       </td>

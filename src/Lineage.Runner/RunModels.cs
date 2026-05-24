@@ -25,6 +25,7 @@ public sealed record RunSummary(
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? EndedAtUtc,
     int? ExitCode,
+    int? ProcessId,
     string RunDirectory,
     string StatsPath,
     string ReportPath,
@@ -78,6 +79,8 @@ public sealed class RunManifest
     public DateTimeOffset? EndedAtUtc { get; set; }
 
     public int? ExitCode { get; set; }
+
+    public int? ProcessId { get; set; }
 
     public string? Error { get; set; }
 

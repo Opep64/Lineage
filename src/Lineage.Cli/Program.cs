@@ -6,7 +6,7 @@ using Lineage.Core;
 
 try
 {
-    var options = RunOptions.Parse(args);
+    var options = RunOptions.Parse(args).ExpandProcessIdToken();
     if (options.ShowHelp)
     {
         PrintHelp();
@@ -926,6 +926,33 @@ internal sealed record RunOptions
 
     public bool IsBatch => BatchScenarioPaths.Count > 0 || BatchReportPath is not null;
 
+    public RunOptions ExpandProcessIdToken()
+    {
+        return this with
+        {
+            SaveScenarioPath = ExpandProcessIdToken(SaveScenarioPath),
+            OutputPath = ExpandProcessIdToken(OutputPath),
+            LineageOutputPath = ExpandProcessIdToken(LineageOutputPath),
+            TraitSummaryOutputPath = ExpandProcessIdToken(TraitSummaryOutputPath),
+            SpeciesSummaryOutputPath = ExpandProcessIdToken(SpeciesSummaryOutputPath),
+            SpeciesTrendOutputPath = ExpandProcessIdToken(SpeciesTrendOutputPath),
+            FounderSummaryOutputPath = ExpandProcessIdToken(FounderSummaryOutputPath),
+            GenerationSummaryOutputPath = ExpandProcessIdToken(GenerationSummaryOutputPath),
+            LineageTrendOutputPath = ExpandProcessIdToken(LineageTrendOutputPath),
+            ReportPath = ExpandProcessIdToken(ReportPath),
+            ProfileOutputPath = ExpandProcessIdToken(ProfileOutputPath),
+            SaveSnapshotPath = ExpandProcessIdToken(SaveSnapshotPath),
+            CheckpointDirectory = ExpandProcessIdToken(CheckpointDirectory),
+            StatusPath = ExpandProcessIdToken(StatusPath),
+            ControlPath = ExpandProcessIdToken(ControlPath),
+            ExportSpeciesPath = ExpandProcessIdToken(ExportSpeciesPath),
+            BatchReportPath = ExpandProcessIdToken(BatchReportPath),
+            BatchOutputDirectory = ExpandProcessIdToken(BatchOutputDirectory) ?? BatchOutputDirectory,
+            ProbeOutputPath = ExpandProcessIdToken(ProbeOutputPath),
+            ProbeReportPath = ExpandProcessIdToken(ProbeReportPath)
+        };
+    }
+
     public SimulationScenario CreateScenario()
     {
         var scenario = ScenarioPath is null
@@ -1285,6 +1312,13 @@ internal sealed record RunOptions
         return Path.Combine(
             string.IsNullOrWhiteSpace(directory) ? string.Empty : directory,
             $"{fileName}_{suffix}");
+    }
+
+    private static string? ExpandProcessIdToken(string? value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? value
+            : value.Replace("{pid}", Environment.ProcessId.ToString(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ReadValue(string[] args, ref int index, string optionName)
