@@ -394,6 +394,17 @@ Interpretation:
 - The current sector starter is too productive versus the baseline, with more eggs laid and higher final population. Treat it as a successful probe brain, not a tuned replacement.
 - This reinforces the next balance-pass need: lower plant density/resource availability and rebalance reproduction/egg investment around the richer perception model.
 
+## 2026-05-24 Creature Sector Size Diagnostics
+
+Extended brain-input diagnostics so reports can show whether living brains are wiring the new smaller/similar/larger creature sector inputs.
+
+Implementation notes:
+
+- Overall, lineage, species, CLI, and Godot-written reports now use "Sensory Brain Wiring" sections instead of the older freshness-only label.
+- The diagnostics report direct and hidden mean absolute weight magnitude for smaller, similar, and larger creature sector channels.
+- The diagnostics also report signed attack readouts for smaller and larger creature sector channels, which gives a quick signal for emerging predation or large-creature avoidance wiring.
+- This is report-only telemetry and does not alter simulation behavior.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

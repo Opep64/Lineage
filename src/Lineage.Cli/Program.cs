@@ -5936,7 +5936,7 @@ internal static class RunReportWriter
     private static void WriteBrainInputDiagnosticsSection(StreamWriter writer, BrainInputDiagnosticSummary summary)
     {
         writer.WriteLine("<section>");
-        writer.WriteLine("<h2>Freshness Brain Wiring</h2>");
+        writer.WriteLine("<h2>Sensory Brain Wiring</h2>");
         if (summary.EvaluatedCreatureCount == 0)
         {
             writer.WriteLine("<p class=\"empty\">No living neural creatures were available for brain-input diagnostics.</p>");
@@ -5948,12 +5948,20 @@ internal static class RunReportWriter
         WriteMetric(writer, "Brains evaluated", summary.EvaluatedCreatureCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Direct freshness magnitude", FormatBrainWeight(summary.DirectFreshnessWeightMagnitude));
         WriteMetric(writer, "Direct rot-scent magnitude", FormatBrainWeight(summary.DirectRotScentWeightMagnitude));
+        WriteMetric(writer, "Direct small-creature sectors", FormatBrainWeight(summary.DirectSmallerCreatureSectorWeightMagnitude));
+        WriteMetric(writer, "Direct similar-creature sectors", FormatBrainWeight(summary.DirectSimilarCreatureSectorWeightMagnitude));
+        WriteMetric(writer, "Direct large-creature sectors", FormatBrainWeight(summary.DirectLargerCreatureSectorWeightMagnitude));
         WriteMetric(writer, "Hidden freshness magnitude", FormatBrainWeight(summary.HiddenFreshnessWeightMagnitude));
         WriteMetric(writer, "Hidden rot-scent magnitude", FormatBrainWeight(summary.HiddenRotScentWeightMagnitude));
+        WriteMetric(writer, "Hidden small-creature sectors", FormatBrainWeight(summary.HiddenSmallerCreatureSectorWeightMagnitude));
+        WriteMetric(writer, "Hidden similar-creature sectors", FormatBrainWeight(summary.HiddenSimilarCreatureSectorWeightMagnitude));
+        WriteMetric(writer, "Hidden large-creature sectors", FormatBrainWeight(summary.HiddenLargerCreatureSectorWeightMagnitude));
         WriteMetric(writer, "Move from freshness", FormatSignedBrainWeight(summary.MoveFreshnessWeight));
         WriteMetric(writer, "Eat from freshness", FormatSignedBrainWeight(summary.EatFreshnessWeight));
         WriteMetric(writer, "Move from rot ahead", FormatSignedBrainWeight(summary.MoveRotScentForwardWeight));
         WriteMetric(writer, "Turn from rot right", FormatSignedBrainWeight(summary.TurnRotScentRightWeight));
+        WriteMetric(writer, "Attack small-creature sectors", FormatSignedBrainWeight(summary.AttackSmallerCreatureSectorWeight));
+        WriteMetric(writer, "Attack large-creature sectors", FormatSignedBrainWeight(summary.AttackLargerCreatureSectorWeight));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
     }
@@ -5963,7 +5971,7 @@ internal static class RunReportWriter
         IReadOnlyList<LineageBrainInputDiagnosticSummary> summaries)
     {
         writer.WriteLine("<section>");
-        writer.WriteLine("<h2>Lineage Freshness Wiring</h2>");
+        writer.WriteLine("<h2>Lineage Sensory Wiring</h2>");
         if (summaries.Count == 0)
         {
             writer.WriteLine("<p class=\"empty\">No living founder lineages were available for brain-input diagnostics.</p>");
@@ -5972,7 +5980,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Fresh Direct</th><th>Rot Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Ahead</th><th>Turn Rot Right</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Fresh Direct</th><th>Rot Direct</th><th>Small Direct</th><th>Similar Direct</th><th>Large Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Small Hidden</th><th>Similar Hidden</th><th>Large Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Ahead</th><th>Turn Rot Right</th><th>Attack Small</th><th>Attack Large</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -5984,12 +5992,20 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectFreshnessWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectSmallerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectSimilarCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectLargerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenFreshnessWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSmallerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSimilarCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenLargerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentForwardWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackSmallerCreatureSectorWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackLargerCreatureSectorWeight))}</td>" +
                 "</tr>");
         }
 
@@ -6002,7 +6018,7 @@ internal static class RunReportWriter
         IReadOnlyList<SpeciesClusterBrainInputDiagnosticSummary> summaries)
     {
         writer.WriteLine("<section>");
-        writer.WriteLine("<h2>Species Freshness Wiring</h2>");
+        writer.WriteLine("<h2>Species Sensory Wiring</h2>");
         if (summaries.Count == 0)
         {
             writer.WriteLine("<p class=\"empty\">No living neural species clusters were available for brain-input diagnostics.</p>");
@@ -6011,7 +6027,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Fresh Direct</th><th>Rot Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Density</th><th>Turn Rot Density</th><th>Move Rot Ahead</th><th>Turn Rot Right</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Fresh Direct</th><th>Rot Direct</th><th>Small Direct</th><th>Similar Direct</th><th>Large Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Small Hidden</th><th>Similar Hidden</th><th>Large Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Density</th><th>Turn Rot Density</th><th>Move Rot Ahead</th><th>Turn Rot Right</th><th>Attack Small</th><th>Attack Large</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -6024,14 +6040,22 @@ internal static class RunReportWriter
                 $"<td>{Html(diagnostics.EvaluatedCreatureCount)}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectFreshnessWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectSmallerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectSimilarCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectLargerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenFreshnessWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSmallerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSimilarCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenLargerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentDensityWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentDensityWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentForwardWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackSmallerCreatureSectorWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackLargerCreatureSectorWeight))}</td>" +
                 "</tr>");
         }
 
