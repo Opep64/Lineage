@@ -13,7 +13,7 @@ public static class NeuralBrainSchema
 
     public const int VisionSectorInputStart = 46;
 
-    public const int VisionSectorChannelCount = 8;
+    public const int VisionSectorChannelCount = 14;
 
     public const int FoodContactInput = VisionSectorInputStart + VisionSectorSet.SectorCount * VisionSectorChannelCount;
 
@@ -137,6 +137,18 @@ public static class NeuralBrainSchema
 
     public const int VisionSectorCreatureProximityOffset = 7;
 
+    public const int VisionSectorSmallerCreatureDensityOffset = 8;
+
+    public const int VisionSectorSmallerCreatureProximityOffset = 9;
+
+    public const int VisionSectorSimilarCreatureDensityOffset = 10;
+
+    public const int VisionSectorSimilarCreatureProximityOffset = 11;
+
+    public const int VisionSectorLargerCreatureDensityOffset = 12;
+
+    public const int VisionSectorLargerCreatureProximityOffset = 13;
+
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 
     public const int PreyProximityInput = CreatureProximityInput;
@@ -197,6 +209,36 @@ public static class NeuralBrainSchema
     public static int VisionSectorCreatureProximityInput(int sectorIndex)
     {
         return GetVisionSectorInput(sectorIndex, VisionSectorCreatureProximityOffset);
+    }
+
+    public static int VisionSectorSmallerCreatureDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorSmallerCreatureDensityOffset);
+    }
+
+    public static int VisionSectorSmallerCreatureProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorSmallerCreatureProximityOffset);
+    }
+
+    public static int VisionSectorSimilarCreatureDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorSimilarCreatureDensityOffset);
+    }
+
+    public static int VisionSectorSimilarCreatureProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorSimilarCreatureProximityOffset);
+    }
+
+    public static int VisionSectorLargerCreatureDensityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorLargerCreatureDensityOffset);
+    }
+
+    public static int VisionSectorLargerCreatureProximityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorLargerCreatureProximityOffset);
     }
 
     public static int GetVisionSectorInput(int sectorIndex, int channelOffset)

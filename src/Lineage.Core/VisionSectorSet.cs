@@ -68,8 +68,13 @@ public struct VisionSectorSet
 
     public void AddCreature(int sectorIndex, float proximity)
     {
+        AddCreature(sectorIndex, proximity, relativeBodySize: 0f);
+    }
+
+    public void AddCreature(int sectorIndex, float proximity, float relativeBodySize)
+    {
         var sector = Get(sectorIndex);
-        sector.AddCreature(proximity);
+        sector.AddCreature(proximity, relativeBodySize);
         Set(sectorIndex, sector);
         HasAnySignal = true;
     }
@@ -189,6 +194,18 @@ public struct VisionSectorSample
 
     public float CreatureProximity { get; private set; }
 
+    public float SmallerCreatureDensity { get; private set; }
+
+    public float SmallerCreatureProximity { get; private set; }
+
+    public float SimilarCreatureDensity { get; private set; }
+
+    public float SimilarCreatureProximity { get; private set; }
+
+    public float LargerCreatureDensity { get; private set; }
+
+    public float LargerCreatureProximity { get; private set; }
+
     public void AddPlant(float proximity)
     {
         PlantDensity = AddDensity(PlantDensity);
@@ -207,10 +224,26 @@ public struct VisionSectorSample
         EggProximity = Math.Max(EggProximity, ClampUnit(proximity));
     }
 
-    public void AddCreature(float proximity)
+    public void AddCreature(float proximity, float relativeBodySize)
     {
         CreatureDensity = AddDensity(CreatureDensity);
-        CreatureProximity = Math.Max(CreatureProximity, ClampUnit(proximity));
+        var clampedProximity = ClampUnit(proximity);
+        CreatureProximity = Math.Max(CreatureProximity, clampedProximity);
+        if (relativeBodySize < -0.2f)
+        {
+            SmallerCreatureDensity = AddDensity(SmallerCreatureDensity);
+            SmallerCreatureProximity = Math.Max(SmallerCreatureProximity, clampedProximity);
+        }
+        else if (relativeBodySize > 0.2f)
+        {
+            LargerCreatureDensity = AddDensity(LargerCreatureDensity);
+            LargerCreatureProximity = Math.Max(LargerCreatureProximity, clampedProximity);
+        }
+        else
+        {
+            SimilarCreatureDensity = AddDensity(SimilarCreatureDensity);
+            SimilarCreatureProximity = Math.Max(SimilarCreatureProximity, clampedProximity);
+        }
     }
 
     private static float AddDensity(float density)

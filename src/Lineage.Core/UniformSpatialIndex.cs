@@ -828,6 +828,19 @@ public sealed class UniformSpatialIndex
         var rightX = -forwardY;
         var rightY = forwardX;
         var squaredVisionCosThreshold = visionCosThreshold * visionCosThreshold;
+        var selfRadius = 0f;
+        if (collectVisionSectors)
+        {
+            selfRadius = bodyRadii[selfIndex];
+            if (selfRadius < 0f)
+            {
+                selfRadius = CreatureGrowth.EffectiveBodyRadius(
+                    creatures[selfIndex],
+                    state.GetGenome(creatures[selfIndex].GenomeId));
+                bodyRadii[selfIndex] = selfRadius;
+            }
+        }
+
         var candidateCount = 0;
         var visibleCount = 0;
         var nearestIndex = -1;
@@ -929,7 +942,9 @@ public sealed class UniformSpatialIndex
                         var centerDistance = MathF.Sqrt(distanceSquared);
                         var edgeDistance = Math.Max(0f, centerDistance - otherRadius);
                         var proximity = 1f - Math.Clamp(edgeDistance / senseRadius, 0f, 1f);
-                        visionSectors.AddCreature(sectorIndex, proximity);
+                        var radiusScale = MathF.Max(0.001f, MathF.Max(selfRadius, otherRadius));
+                        var relativeBodySize = Math.Clamp((otherRadius - selfRadius) / radiusScale, -1f, 1f);
+                        visionSectors.AddCreature(sectorIndex, proximity, relativeBodySize);
                     }
 
                     if (distanceSquared < nearestDistanceSquared)

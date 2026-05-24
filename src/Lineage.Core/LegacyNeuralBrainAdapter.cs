@@ -94,6 +94,12 @@ public static class LegacyNeuralBrainAdapter
             inputs[NeuralBrainSchema.VisionSectorEggProximityInput(sectorIndex)] = sector.EggProximity;
             inputs[NeuralBrainSchema.VisionSectorCreatureDensityInput(sectorIndex)] = sector.CreatureDensity;
             inputs[NeuralBrainSchema.VisionSectorCreatureProximityInput(sectorIndex)] = sector.CreatureProximity;
+            inputs[NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(sectorIndex)] = sector.SmallerCreatureDensity;
+            inputs[NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(sectorIndex)] = sector.SmallerCreatureProximity;
+            inputs[NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(sectorIndex)] = sector.SimilarCreatureDensity;
+            inputs[NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(sectorIndex)] = sector.SimilarCreatureProximity;
+            inputs[NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(sectorIndex)] = sector.LargerCreatureDensity;
+            inputs[NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(sectorIndex)] = sector.LargerCreatureProximity;
         }
     }
 

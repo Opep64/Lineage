@@ -184,6 +184,35 @@ Final 60k validation after the starter fixes and Omnivore starter change:
   | Terrain Pressure | 107.0 | 92-134 | 96.9 | 0.000 | 6661 |
   | Migration Pressure | 111.0 | 94-133 | 67.0 | 0.000 | 3793 |
 
+## 2026-05-24 Creature Sector Size Vision
+
+- Added richer creature sector vision without introducing abstract threat/prey labels. Each visual sector still reports generic creature density/proximity, and now also reports smaller, similar-size, and larger creature density/proximity.
+- Size buckets are based on relative body radius:
+  - smaller: visible creature is more than roughly 20% smaller
+  - similar: within roughly 20%
+  - larger: visible creature is more than roughly 20% larger
+- Starter brains do not use the new channels directly. This keeps founder behavior stable while allowing mutation to discover directional inputs for predation, avoidance, spacing, and social behavior.
+- Added migration for old 8-channel sector brains into the new 14-channel sector layout. Existing plant/meat/egg/generic-creature sector weights, food-contact weights, and health weights are remapped to their new indices; the new creature-size channels start neutral.
+- Output files:
+  - `out/creature_sector_size_probe_20k.csv`
+  - `out/creature_sector_size_probe_20k.html`
+  - `out/creature_sector_size_probe_60k.csv`
+  - `out/creature_sector_size_probe_60k.html`
+- 60k validation after adding the new channels completed all ten presets across seeds 42-44 with no extinctions:
+
+  | Scenario | Final pop | Range | Tail pop | Tail meat share | Ticks/s |
+  | --- | ---: | --- | ---: | ---: | ---: |
+  | Gentle Foraging | 194.3 | 181-214 | 229.3 | 0.000 | 1199 |
+  | Balanced Foraging | 103.3 | 80-121 | 92.3 | 0.000 | 3525 |
+  | Harsh Foraging | 33.0 | 17-50 | 35.3 | 0.000 | 8432 |
+  | Scavenger Pressure | 29.7 | 17-45 | 34.4 | 0.083 | 10881 |
+  | Omnivore Pressure | 41.3 | 40-43 | 41.0 | 0.049 | 7283 |
+  | Predation Pressure | 18.7 | 12-25 | 25.3 | 0.113 | 6510 |
+  | Carrion Pressure | 31.3 | 21-50 | 34.4 | 0.128 | 9059 |
+  | Obstacle Pressure | 192.7 | 159-214 | 150.4 | 0.000 | 3507 |
+  | Terrain Pressure | 122.7 | 69-171 | 111.1 | 0.000 | 5106 |
+  | Migration Pressure | 81.3 | 51-97 | 60.4 | 0.000 | 3799 |
+
 ## Brain Architecture Decision
 
 - Keep the current fixed neural architecture as the active experiment path for now. This architecture blends direct input-to-output weights with optional hidden nodes, which gives the simulation continuity and keeps existing starter species, snapshots, profiles, and behavior assays useful while the new input model matures.
