@@ -4936,6 +4936,13 @@ static void SpeciesClusteringSeparatesStarterEcotypes()
     AssertEqual(3, clusters.Count, "Starter ecotype cluster count");
     AssertTrue(clusters.Any(cluster => cluster.LivingCreatures == 4), "Seed and explorer starters should remain one plant-forager cluster");
     AssertEqual(2, clusters.Count(cluster => cluster.LivingCreatures == 2), "Scavenger and predator starters should split from plant foragers");
+
+    var fingerprints = SpeciesClusterAnalyzer.AnalyzeBehaviorFingerprints(simulation.State);
+
+    AssertEqual(3, fingerprints.Count, "Starter ecotype fingerprint count");
+    AssertTrue(fingerprints.All(fingerprint => fingerprint.EvaluatedCreatureCount == fingerprint.LivingCreatures), "Species fingerprints should evaluate each neural creature");
+    AssertTrue(fingerprints.Any(fingerprint => fingerprint.Ecotype == "small-prey predator"), "Species fingerprints should preserve predator behavior");
+    AssertTrue(fingerprints.Any(fingerprint => fingerprint.ForagingBias == "meat/egg-biased"), "Species fingerprints should preserve scavenger behavior");
 }
 
 static void SpeciesClusteringHandlesNonNeuralCreatures()

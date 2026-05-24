@@ -59,6 +59,7 @@ public static class ViewerReportWriter
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
         var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
+        var speciesBehaviorFingerprints = SpeciesClusterAnalyzer.AnalyzeBehaviorFingerprints(state, 10);
         var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots, 10);
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
         var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
@@ -411,6 +412,7 @@ public static class ViewerReportWriter
 
         WriteChartsSection(writer, state.Stats.Snapshots);
         WriteSpeciesClusterSection(writer, speciesSummaries);
+        WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
         WriteSpeciesClusterInterpretationSection(writer, SpeciesClusterAnalyzer.InterpretClusters(speciesSummaries, speciesHistory, 10));
         WriteSpeciesClusterHistorySection(writer, speciesHistory);
         WriteBehaviorAssaySection(writer, behaviorSummary);
@@ -1212,6 +1214,51 @@ public static class ViewerReportWriter
                 $"<td>{Html(FormatPercent(summary.AveragePlantDigestion))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AverageMeatDigestion))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AttackShare))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpeciesBehaviorFingerprintSection(
+        StreamWriter writer,
+        IReadOnlyList<SpeciesClusterBehaviorFingerprint> fingerprints)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Species Behavior Fingerprints</h2>");
+        if (fingerprints.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living neural creatures were available for species behavior fingerprints.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Search</th><th>Egg Laying</th><th>Plant Move</th><th>Meat Move</th><th>Rot Scent Move</th><th>Small Attack</th><th>Large Attack</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var fingerprint in fingerprints)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(fingerprint.Rank)}</td>" +
+                $"<td>{Html(fingerprint.Name)}</td>" +
+                $"<td>{Html($"{fingerprint.LivingCreatures} ({FormatPercent(fingerprint.LivingShare)})")}</td>" +
+                $"<td>{Html(fingerprint.EvaluatedCreatureCount)}</td>" +
+                $"<td>{Html(fingerprint.Ecotype)}</td>" +
+                $"<td>{Html(fingerprint.ForagingBias)}</td>" +
+                $"<td>{Html(fingerprint.RottenMeatResponse)}</td>" +
+                $"<td>{Html(fingerprint.RiskResponse)}</td>" +
+                $"<td>{Html(fingerprint.TerrainResponse)}</td>" +
+                $"<td>{Html(fingerprint.PredatorTendency)}</td>" +
+                $"<td>{Html(fingerprint.MovementStyle)}</td>" +
+                $"<td>{Html(fingerprint.SearchTendency)}</td>" +
+                $"<td>{Html(fingerprint.ReproductionTendency)}</td>" +
+                $"<td>{Html(fingerprint.PlantAheadMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(fingerprint.MeatAheadMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(fingerprint.RottenScentAheadMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(fingerprint.SmallCreatureAttackShare))}</td>" +
+                $"<td>{Html(FormatPercent(fingerprint.LargeApproachAttackShare))}</td>" +
                 "</tr>");
         }
 

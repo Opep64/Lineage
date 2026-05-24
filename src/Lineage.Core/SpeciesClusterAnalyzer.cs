@@ -67,6 +67,68 @@ public static class SpeciesClusterAnalyzer
 
         var resolvedOptions = options ?? SpeciesClusterOptions.Default;
         var recordsById = state.LineageRecords.ToDictionary(record => record.Id);
+        var clusters = BuildLivingClusters(state, resolvedOptions);
+
+        return clusters
+            .Select(cluster => SummarizeCluster(state, cluster, recordsById))
+            .OrderByDescending(summary => summary.LivingCreatures)
+            .ThenBy(summary => summary.SpeciesId)
+            .Take(maxClusters)
+            .Select((summary, index) => summary with { Rank = index + 1 })
+            .ToArray();
+    }
+
+    public static IReadOnlyList<SpeciesClusterBehaviorFingerprint> AnalyzeBehaviorFingerprints(
+        WorldState state,
+        int maxClusters = 10,
+        SpeciesClusterOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (maxClusters <= 0 || state.Creatures.Count == 0)
+        {
+            return Array.Empty<SpeciesClusterBehaviorFingerprint>();
+        }
+
+        var resolvedOptions = options ?? SpeciesClusterOptions.Default;
+        var totalLiving = Math.Max(1, state.Creatures.Count);
+        return BuildLivingClusters(state, resolvedOptions)
+            .OrderByDescending(cluster => cluster.Members.Count)
+            .ThenBy(cluster => cluster.SpeciesId)
+            .Take(maxClusters)
+            .Select((cluster, index) =>
+            {
+                var behavior = BehaviorAssay.Analyze(state, cluster.Members);
+                return new SpeciesClusterBehaviorFingerprint(
+                    Rank: index + 1,
+                    SpeciesId: cluster.SpeciesId,
+                    Name: GenerateName(cluster.SpeciesId),
+                    LivingCreatures: cluster.Members.Count,
+                    LivingShare: cluster.Members.Count / (float)totalLiving,
+                    EvaluatedCreatureCount: behavior.EvaluatedCreatureCount,
+                    Ecotype: behavior.Ecotype,
+                    ForagingBias: behavior.ForagingBias,
+                    RottenMeatResponse: behavior.RottenMeatResponse,
+                    RiskResponse: behavior.RiskResponse,
+                    TerrainResponse: behavior.TerrainResponse,
+                    PredatorTendency: behavior.PredatorTendency,
+                    MovementStyle: behavior.MovementStyle,
+                    SearchTendency: behavior.SearchTendency,
+                    ReproductionTendency: behavior.ReproductionTendency,
+                    BaselineMoveForward: behavior.Baseline.MoveForward,
+                    PlantAheadMoveForward: behavior.PlantAhead.MoveForward,
+                    MeatAheadMoveForward: behavior.MeatAhead.MoveForward,
+                    RottenScentAheadMoveForward: behavior.RottenMeatScentAhead.MoveForward,
+                    SmallCreatureAttackShare: behavior.SmallCreatureAhead.AttackShare,
+                    LargeApproachAttackShare: behavior.LargeCreatureApproaching.AttackShare,
+                    ReproductionReadyShare: behavior.ReproductionReady.ReproduceShare);
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<SpeciesClusterAccumulator> BuildLivingClusters(
+        WorldState state,
+        SpeciesClusterOptions resolvedOptions)
+    {
         if (state.LineageRecords.Count > 0)
         {
             var lineageClusters = BuildLineageClusters(state, resolvedOptions);
@@ -88,11 +150,6 @@ public static class SpeciesClusterAnalyzer
 
             return livingClusters.Values
                 .Where(cluster => cluster.Members.Count > 0)
-                .Select(cluster => SummarizeCluster(state, cluster, recordsById))
-                .OrderByDescending(summary => summary.LivingCreatures)
-                .ThenBy(summary => summary.SpeciesId)
-                .Take(maxClusters)
-                .Select((summary, index) => summary with { Rank = index + 1 })
                 .ToArray();
         }
 
@@ -139,13 +196,7 @@ public static class SpeciesClusterAnalyzer
             }
         }
 
-        return clusters
-            .Select(cluster => SummarizeCluster(state, cluster, recordsById))
-            .OrderByDescending(summary => summary.LivingCreatures)
-            .ThenBy(summary => summary.SpeciesId)
-            .Take(maxClusters)
-            .Select((summary, index) => summary with { Rank = index + 1 })
-            .ToArray();
+        return clusters;
     }
 
     public static SpeciesClusterHistory AnalyzeHistory(
@@ -1296,6 +1347,30 @@ public readonly record struct SpeciesClusterInterpretation(
     string TrendLabel,
     string ImportanceLabel,
     string EvidenceLabel);
+
+public readonly record struct SpeciesClusterBehaviorFingerprint(
+    int Rank,
+    int SpeciesId,
+    string Name,
+    int LivingCreatures,
+    float LivingShare,
+    int EvaluatedCreatureCount,
+    string Ecotype,
+    string ForagingBias,
+    string RottenMeatResponse,
+    string RiskResponse,
+    string TerrainResponse,
+    string PredatorTendency,
+    string MovementStyle,
+    string SearchTendency,
+    string ReproductionTendency,
+    float BaselineMoveForward,
+    float PlantAheadMoveForward,
+    float MeatAheadMoveForward,
+    float RottenScentAheadMoveForward,
+    float SmallCreatureAttackShare,
+    float LargeApproachAttackShare,
+    float ReproductionReadyShare);
 
 public sealed record SpeciesClusterHistory(
     IReadOnlyList<SpeciesClusterHistorySummary> Clusters,
