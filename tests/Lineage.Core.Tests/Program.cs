@@ -124,6 +124,7 @@ var tests = new (string Name, Action Body)[]
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
     ("Species clustering groups injected profile founders", SpeciesClusteringGroupsInjectedProfileFounders),
     ("Species clustering splits distinct brains", SpeciesClusteringSplitsDistinctBrains),
+    ("Species clustering separates starter ecotypes", SpeciesClusteringSeparatesStarterEcotypes),
     ("Species clustering handles non-neural creatures", SpeciesClusteringHandlesNonNeuralCreatures),
     ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
@@ -4900,6 +4901,41 @@ static void SpeciesClusteringSplitsDistinctBrains()
     AssertEqual(2, clusters.Count, "Distinct brain cluster count");
     AssertEqual(3, clusters[0].LivingCreatures, "Largest distinct brain cluster");
     AssertEqual(2, clusters[1].LivingCreatures, "Second distinct brain cluster");
+}
+
+static void SpeciesClusteringSeparatesStarterEcotypes()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 915,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        WorldWidth = 300f,
+        WorldHeight = 100f,
+        ResourceVoidBorderWidth = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var seedBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
+    var explorerBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateExplorerForager(4));
+    var scavengerBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateScavengerForager(4));
+    var predatorBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator(4));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 30f), energy: 35f, brainId: seedBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 30f), energy: 35f, brainId: seedBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(70f, 30f), energy: 35f, brainId: explorerBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(80f, 30f), energy: 35f, brainId: explorerBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(150f, 30f), energy: 35f, brainId: scavengerBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(160f, 30f), energy: 35f, brainId: scavengerBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(230f, 30f), energy: 35f, brainId: predatorBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(240f, 30f), energy: 35f, brainId: predatorBrainId);
+
+    var clusters = SpeciesClusterAnalyzer.Analyze(simulation.State);
+
+    AssertEqual(3, clusters.Count, "Starter ecotype cluster count");
+    AssertTrue(clusters.Any(cluster => cluster.LivingCreatures == 4), "Seed and explorer starters should remain one plant-forager cluster");
+    AssertEqual(2, clusters.Count(cluster => cluster.LivingCreatures == 2), "Scavenger and predator starters should split from plant foragers");
 }
 
 static void SpeciesClusteringHandlesNonNeuralCreatures()

@@ -67,6 +67,35 @@ public static class SpeciesClusterAnalyzer
 
         var resolvedOptions = options ?? SpeciesClusterOptions.Default;
         var recordsById = state.LineageRecords.ToDictionary(record => record.Id);
+        if (state.LineageRecords.Count > 0)
+        {
+            var lineageClusters = BuildLineageClusters(state, resolvedOptions);
+            var livingClusters = lineageClusters.Clusters.ToDictionary(
+                cluster => cluster.SpeciesId,
+                cluster => new SpeciesClusterAccumulator(
+                    cluster.SpeciesId,
+                    cluster.GenomeCentroid,
+                    cluster.BrainCentroid));
+
+            foreach (var creature in state.Creatures.OrderBy(creature => creature.Id.Value))
+            {
+                if (lineageClusters.RecordClusterById.TryGetValue(creature.Id, out var speciesId) &&
+                    livingClusters.TryGetValue(speciesId, out var cluster))
+                {
+                    cluster.Members.Add(creature);
+                }
+            }
+
+            return livingClusters.Values
+                .Where(cluster => cluster.Members.Count > 0)
+                .Select(cluster => SummarizeCluster(state, cluster, recordsById))
+                .OrderByDescending(summary => summary.LivingCreatures)
+                .ThenBy(summary => summary.SpeciesId)
+                .Take(maxClusters)
+                .Select((summary, index) => summary with { Rank = index + 1 })
+                .ToArray();
+        }
+
         var clusters = new List<SpeciesClusterAccumulator>();
 
         foreach (var creature in state.Creatures.OrderBy(creature => creature.Id.Value))
@@ -903,11 +932,16 @@ public static class SpeciesClusterAnalyzer
     private sealed class SpeciesClusterAccumulator
     {
         public SpeciesClusterAccumulator(CreatureState initialMember, float[] genomeFeatures, float[] brainFeatures)
+            : this(initialMember.Id.Value, genomeFeatures, brainFeatures)
         {
-            SpeciesId = initialMember.Id.Value;
+            Members.Add(initialMember);
+        }
+
+        public SpeciesClusterAccumulator(int speciesId, float[] genomeFeatures, float[] brainFeatures)
+        {
+            SpeciesId = speciesId;
             GenomeCentroid = genomeFeatures.ToArray();
             BrainCentroid = brainFeatures.ToArray();
-            Members.Add(initialMember);
         }
 
         public int SpeciesId { get; }
@@ -1015,7 +1049,7 @@ public sealed record SpeciesClusterOptions
 
     public float GenomeDistanceThreshold { get; init; } = 0.16f;
 
-    public float BrainDistanceThreshold { get; init; } = 0.16f;
+    public float BrainDistanceThreshold { get; init; } = 0.028f;
 
     public float CombinedDistanceThreshold { get; init; } = 0.16f;
 
