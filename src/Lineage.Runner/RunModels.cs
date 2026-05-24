@@ -13,6 +13,22 @@ public sealed record RunCreateRequest(
 
 public sealed record RunCommandRequest(string Command);
 
+public sealed record RunRenameRequest(string Name);
+
+public sealed record RunBulkDeleteRequest(IReadOnlyList<string> Ids);
+
+public sealed record RunBulkDeleteResult(
+    int Requested,
+    int Deleted,
+    IReadOnlyList<string> Skipped);
+
+public sealed record RunDetails(
+    RunSummary Run,
+    string CommandLine,
+    string? Error,
+    IReadOnlyList<string> StdoutTail,
+    IReadOnlyList<string> StderrTail);
+
 public sealed record RunSummary(
     string Id,
     string Name,

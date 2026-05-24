@@ -58,6 +58,23 @@ public sealed partial class LineageRunManager
         return _runs.TryGetValue(id, out var run) ? ToSummary(run) : null;
     }
 
+    public RunDetails? GetRunDetails(string id, int lineCount)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        var manifest = run.Manifest;
+        var maxLines = Math.Clamp(lineCount, 10, 300);
+        return new RunDetails(
+            Run: ToSummary(run),
+            CommandLine: manifest.CommandLine,
+            Error: manifest.Error,
+            StdoutTail: ReadTail(manifest.StdoutPath, maxLines),
+            StderrTail: ReadTail(manifest.StderrPath, maxLines));
+    }
+
     public async Task<RunSummary> StartRunAsync(RunCreateRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.ScenarioPath))
@@ -78,6 +95,7 @@ public sealed partial class LineageRunManager
 
         var createdAt = DateTimeOffset.UtcNow;
         var scenarioName = Path.GetFileNameWithoutExtension(scenarioPath);
+        var seed = request.Seed ?? TryReadScenarioSeed(scenarioPath);
         var id = $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{ProcessIdToken}";
         var runDirectory = Path.Combine(_runsRoot, id);
 
@@ -88,7 +106,7 @@ public sealed partial class LineageRunManager
             Status = "starting",
             ScenarioPath = Path.GetRelativePath(_repoRoot, scenarioPath),
             ScenarioName = scenarioName,
-            Seed = request.Seed,
+            Seed = seed,
             Ticks = request.Ticks,
             CheckpointIntervalTicks = request.CheckpointIntervalTicks,
             StopOnExtinction = request.StopOnExtinction,
@@ -179,6 +197,54 @@ public sealed partial class LineageRunManager
         return true;
     }
 
+    public RunSummary? RenameRun(string id, string name)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        var trimmedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedName))
+        {
+            throw new ArgumentException("Run name is required.");
+        }
+
+        if (trimmedName.Length > 160)
+        {
+            throw new ArgumentException("Run name must be 160 characters or fewer.");
+        }
+
+        run.Manifest.Name = trimmedName;
+        SaveManifest(run.Manifest);
+        return ToSummary(run);
+    }
+
+    public RunBulkDeleteResult DeleteRuns(IReadOnlyList<string> ids, bool deleteArtifacts)
+    {
+        var requestedIds = ids
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var deleted = 0;
+        var skipped = new List<string>();
+        foreach (var id in requestedIds)
+        {
+            if (DeleteRun(id, deleteArtifacts))
+            {
+                deleted++;
+            }
+            else
+            {
+                skipped.Add(id);
+            }
+        }
+
+        return new RunBulkDeleteResult(requestedIds.Length, deleted, skipped);
+    }
+
     public bool DeleteRun(string id, bool deleteArtifacts)
     {
         if (!_runs.TryGetValue(id, out var run))
@@ -191,12 +257,19 @@ public sealed partial class LineageRunManager
             return false;
         }
 
-        _runs.TryRemove(id, out _);
         if (deleteArtifacts && Directory.Exists(run.Manifest.RunDirectory))
         {
-            Directory.Delete(run.Manifest.RunDirectory, recursive: true);
+            try
+            {
+                Directory.Delete(run.Manifest.RunDirectory, recursive: true);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
+        _runs.TryRemove(id, out _);
         return true;
     }
 
@@ -440,6 +513,36 @@ public sealed partial class LineageRunManager
         }
     }
 
+    private static IReadOnlyList<string> ReadTail(string path, int maxLines)
+    {
+        if (!File.Exists(path) || maxLines <= 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            var lines = new Queue<string>(maxLines);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            while (reader.ReadLine() is { } line)
+            {
+                if (lines.Count == maxLines)
+                {
+                    lines.Dequeue();
+                }
+
+                lines.Enqueue(line);
+            }
+
+            return lines.ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     private void SaveManifest(RunManifest manifest)
     {
         Directory.CreateDirectory(manifest.RunDirectory);
@@ -476,6 +579,26 @@ public sealed partial class LineageRunManager
             ? scenarioPath
             : Path.Combine(_repoRoot, scenarioPath);
         return Path.GetFullPath(path);
+    }
+
+    private static ulong? TryReadScenarioSeed(string scenarioPath)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(scenarioPath));
+            if (document.RootElement.TryGetProperty("seed", out var seedElement)
+                && seedElement.ValueKind == JsonValueKind.Number
+                && seedElement.TryGetUInt64(out var seed))
+            {
+                return seed;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+
+        return null;
     }
 
     private (string FileName, IReadOnlyList<string> PrefixArguments) ResolveCliLaunchTarget()

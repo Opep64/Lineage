@@ -293,11 +293,15 @@ The launcher should eventually:
 - Reattached runs remain controllable through the file-based `control.json` protocol.
 - If a manifest says a run was active but the recorded CLI process is gone, the runner marks the run `lost`.
 - The CLI can write stdout/stderr logs directly via launcher-supplied log paths, so a runner restart does not leave the simulation dependent on an old redirected pipe.
+- The dashboard supports basic run-library management: status/scenario/search filters, sorting, seed display, expandable details/log tails, renaming, single-run delete, and selected-run bulk delete.
 
 ## Phase 2: Run Library
 
 - List completed and failed runs.
 - Open reports and output folders.
+- Rename runs.
+- Delete selected completed/failed/lost runs in bulk.
+- Add sortable columns and compact run details/log views.
 - Parse final summary metrics from stats CSV/report outputs.
 - Add tags and notes.
 - Import existing runs from `out/`.

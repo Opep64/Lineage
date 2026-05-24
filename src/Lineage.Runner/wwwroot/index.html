@@ -47,17 +47,43 @@
     <section>
       <div class="section-title">
         <h2>Runs</h2>
-        <button id="refreshButton" type="button">Refresh</button>
+        <div class="section-actions">
+          <button id="bulkDeleteButton" class="danger" type="button" disabled>Delete selected</button>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="run-tools">
+        <label>
+          Search
+          <input id="runSearch" type="search" placeholder="name, scenario, id">
+        </label>
+        <label>
+          Status
+          <select id="statusFilter">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="problem">Failed / lost</option>
+          </select>
+        </label>
+        <label>
+          Scenario
+          <select id="scenarioFilter">
+            <option value="all">All scenarios</option>
+          </select>
+        </label>
+        <div id="selectionStatus" class="selection-status">0 selected</div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Run</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Live</th>
-              <th>Outcome</th>
+              <th><input id="selectAllRuns" type="checkbox" aria-label="Select visible completed runs"></th>
+              <th><button class="sort-button" type="button" data-sort="name">Run <span data-sort-indicator="name"></span></button></th>
+              <th><button class="sort-button" type="button" data-sort="status">Status <span data-sort-indicator="status"></span></button></th>
+              <th><button class="sort-button" type="button" data-sort="progress">Progress <span data-sort-indicator="progress"></span></button></th>
+              <th><button class="sort-button" type="button" data-sort="creatures">Live <span data-sort-indicator="creatures"></span></button></th>
+              <th><button class="sort-button" type="button" data-sort="seed">Outcome / Seed <span data-sort-indicator="seed"></span></button></th>
               <th>Artifacts</th>
               <th>Actions</th>
             </tr>

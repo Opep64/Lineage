@@ -23,6 +23,12 @@ api.MapGet("/runs/{id}", (string id, LineageRunManager manager) =>
     return run is null ? Results.NotFound() : Results.Ok(run);
 });
 
+api.MapGet("/runs/{id}/details", (string id, int? lines, LineageRunManager manager) =>
+{
+    var details = manager.GetRunDetails(id, lines ?? 80);
+    return details is null ? Results.NotFound() : Results.Ok(details);
+});
+
 api.MapPost("/runs", async (RunCreateRequest request, LineageRunManager manager) =>
 {
     try
@@ -44,6 +50,22 @@ api.MapPost("/runs/{id}/checkpoint", (string id, LineageRunManager manager) =>
 
 api.MapPost("/runs/{id}/checkpoint-stop", (string id, LineageRunManager manager) =>
     manager.SendControl(id, "checkpoint-and-stop") ? Results.Accepted() : Results.NotFound());
+
+api.MapPatch("/runs/{id}", (string id, RunRenameRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        var run = manager.RenameRun(id, request.Name);
+        return run is null ? Results.NotFound() : Results.Ok(run);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/runs/bulk-delete", (RunBulkDeleteRequest request, LineageRunManager manager) =>
+    Results.Ok(manager.DeleteRuns(request.Ids, deleteArtifacts: true)));
 
 api.MapDelete("/runs/{id}", (string id, LineageRunManager manager) =>
     manager.DeleteRun(id, deleteArtifacts: true) ? Results.NoContent() : Results.Conflict());
