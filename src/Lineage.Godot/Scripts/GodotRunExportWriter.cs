@@ -27,6 +27,7 @@ public static class GodotRunExportWriter
         GodotLineageCsvWriter.Write(paths.LineagePath, state.LineageRecords);
         GodotTraitSummaryCsvWriter.Write(paths.TraitSummaryPath, state);
         GodotSpeciesClusterCsvWriter.Write(paths.SpeciesSummaryPath, state);
+        GodotSpeciesClusterTrendCsvWriter.Write(paths.SpeciesTrendPath, state.Stats.Snapshots, state);
         GodotFounderSummaryCsvWriter.Write(paths.FounderSummaryPath, state.LineageRecords);
         GodotGenerationSummaryCsvWriter.Write(paths.GenerationSummaryPath, state.LineageRecords);
         GodotLineageTrendCsvWriter.Write(paths.LineageTrendPath, state.Stats.Snapshots, state.LineageRecords);
@@ -39,6 +40,7 @@ public static class GodotRunExportWriter
             paths.LineagePath,
             paths.TraitSummaryPath,
             paths.SpeciesSummaryPath,
+            paths.SpeciesTrendPath,
             paths.FounderSummaryPath,
             paths.GenerationSummaryPath,
             paths.LineageTrendPath,
@@ -53,6 +55,7 @@ public sealed record GodotRunExportResult(
     string LineagePath,
     string TraitSummaryPath,
     string SpeciesSummaryPath,
+    string SpeciesTrendPath,
     string FounderSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
@@ -60,7 +63,7 @@ public sealed record GodotRunExportResult(
     string ReportPath,
     string SnapshotPath)
 {
-    public int FileCount => 10;
+    public int FileCount => 11;
 }
 
 internal sealed record GodotRunExportPaths(
@@ -68,6 +71,7 @@ internal sealed record GodotRunExportPaths(
     string LineagePath,
     string TraitSummaryPath,
     string SpeciesSummaryPath,
+    string SpeciesTrendPath,
     string FounderSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
@@ -82,6 +86,7 @@ internal sealed record GodotRunExportPaths(
             AddSuffix(statsPath, "lineage"),
             AddSuffix(statsPath, "traits"),
             AddSuffix(statsPath, "species"),
+            AddSuffix(statsPath, "species_trends"),
             AddSuffix(statsPath, "founders"),
             AddSuffix(statsPath, "generations"),
             AddSuffix(statsPath, "lineage_trends"),
@@ -509,6 +514,42 @@ internal static class GodotSpeciesClusterCsvWriter
     private static string Format(float value)
     {
         return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Escape(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
+
+internal static class GodotSpeciesClusterTrendCsvWriter
+{
+    public static void Write(
+        string path,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        WorldState state)
+    {
+        using var writer = GodotStatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("tick,elapsed_seconds,rank,species_id,name,living_creatures,total_living,living_share,min_generation,avg_generation,max_generation");
+
+        foreach (var row in SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots).Rows)
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                row.Tick.ToString(CultureInfo.InvariantCulture),
+                row.ElapsedSeconds.ToString("0.######", CultureInfo.InvariantCulture),
+                row.Rank.ToString(CultureInfo.InvariantCulture),
+                row.SpeciesId.ToString(CultureInfo.InvariantCulture),
+                Escape(row.Name),
+                row.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                row.TotalLiving.ToString(CultureInfo.InvariantCulture),
+                row.LivingShare.ToString("0.######", CultureInfo.InvariantCulture),
+                row.MinGeneration.ToString(CultureInfo.InvariantCulture),
+                row.AverageGeneration.ToString("0.######", CultureInfo.InvariantCulture),
+                row.MaxGeneration.ToString(CultureInfo.InvariantCulture)));
+        }
     }
 
     private static string Escape(string value)

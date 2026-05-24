@@ -15,6 +15,8 @@ namespace Lineage.Viewer;
 /// </remarks>
 public static class ViewerReportWriter
 {
+    private const int ReportTrendRowCount = 8;
+
     public static void Write(string path, SimulationScenario scenario, Simulation simulation)
     {
         var directory = Path.GetDirectoryName(path);
@@ -57,6 +59,7 @@ public static class ViewerReportWriter
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
         var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
+        var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots, 10);
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
         var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
         var seasonPressure = SeasonPressureAnalysis.Analyze(scenario, snapshots);
@@ -408,6 +411,7 @@ public static class ViewerReportWriter
 
         WriteChartsSection(writer, state.Stats.Snapshots);
         WriteSpeciesClusterSection(writer, speciesSummaries);
+        WriteSpeciesClusterHistorySection(writer, speciesHistory);
         WriteBehaviorAssaySection(writer, behaviorSummary);
         WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
         WriteBrainInputDiagnosticsSection(writer, brainInputDiagnostics);
@@ -1214,6 +1218,97 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteSpeciesClusterHistorySection(StreamWriter writer, SpeciesClusterHistory history)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Species Cluster History</h2>");
+        if (history.Clusters.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No lineage records were available for species history reconstruction.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Status</th><th>Births</th><th>Deaths</th><th>Final</th><th>Peak</th><th>First Birth</th><th>Peak Tick</th><th>Last Seen</th><th>Generation</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in history.Clusters)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(summary.Rank)}</td>" +
+                $"<td>{Html(summary.Name)}</td>" +
+                $"<td>{Html(summary.Status)}</td>" +
+                $"<td>{Html(summary.Births)}</td>" +
+                $"<td>{Html(summary.Deaths)}</td>" +
+                $"<td>{Html($"{summary.FinalLivingCreatures} ({FormatPercent(summary.FinalLivingShare)})")}</td>" +
+                $"<td>{Html($"{summary.PeakLivingCreatures} ({FormatPercent(summary.PeakLivingShare)})")}</td>" +
+                $"<td>{Html(summary.FirstBirthTick)}</td>" +
+                $"<td>{Html(summary.PeakTick)}</td>" +
+                $"<td>{Html(summary.LastLivingTick)}</td>" +
+                $"<td>{Html(FormatGenerationRange(summary.MinGeneration, summary.AverageGeneration, summary.MaxGeneration))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+
+        var selectedClusters = history.Clusters.Take(5).ToArray();
+        var selectedTicks = SelectReportTicks(history.Rows
+            .Select(row => row.Tick)
+            .Distinct()
+            .OrderBy(tick => tick)
+            .ToArray());
+        if (selectedClusters.Length > 0 && selectedTicks.Count > 0)
+        {
+            var rowByTickSpecies = history.Rows.ToDictionary(row => (row.Tick, row.SpeciesId));
+            var rowsByTick = history.Rows
+                .GroupBy(row => row.Tick)
+                .ToDictionary(group => group.Key, group => group.First().ElapsedSeconds);
+
+            writer.WriteLine("<h3>Cluster Counts Over Time</h3>");
+            writer.WriteLine("<div class=\"table-wrap\"><table>");
+            writer.Write("<thead><tr><th>Tick</th><th>Time</th><th>Total</th>");
+            foreach (var cluster in selectedClusters)
+            {
+                writer.Write($"<th>{Html(cluster.Name)}</th>");
+            }
+
+            writer.WriteLine("</tr></thead>");
+            writer.WriteLine("<tbody>");
+            foreach (var tick in selectedTicks)
+            {
+                var totalLiving = history.Rows
+                    .Where(row => row.Tick == tick)
+                    .Select(row => row.TotalLiving)
+                    .FirstOrDefault();
+                rowsByTick.TryGetValue(tick, out var elapsedSeconds);
+                writer.Write(
+                    "<tr>" +
+                    $"<td>{Html(tick)}</td>" +
+                    $"<td>{Html(elapsedSeconds.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(totalLiving)}</td>");
+
+                foreach (var cluster in selectedClusters)
+                {
+                    if (rowByTickSpecies.TryGetValue((tick, cluster.SpeciesId), out var row))
+                    {
+                        writer.Write($"<td>{Html($"{row.LivingCreatures} ({FormatPercent(row.LivingShare)})")}</td>");
+                    }
+                    else
+                    {
+                        writer.Write("<td>0</td>");
+                    }
+                }
+
+                writer.WriteLine("</tr>");
+            }
+
+            writer.WriteLine("</tbody></table></div>");
+        }
+
+        writer.WriteLine("</section>");
+    }
+
     private static void WriteLineageBehaviorAssaySection(StreamWriter writer, IReadOnlyList<LineageBehaviorAssaySummary> summaries)
     {
         writer.WriteLine("<section>");
@@ -1423,6 +1518,38 @@ public static class ViewerReportWriter
     private static string FormatPercent(float value)
     {
         return $"{value * 100f:0.0}%";
+    }
+
+    private static IReadOnlyList<long> SelectReportTicks(IReadOnlyList<long> ticks)
+    {
+        if (ticks.Count <= ReportTrendRowCount)
+        {
+            return ticks;
+        }
+
+        var selected = new List<long>();
+        long? lastTick = null;
+        for (var i = 0; i < ReportTrendRowCount; i++)
+        {
+            var index = (int)Math.Round(i * (ticks.Count - 1) / (double)(ReportTrendRowCount - 1));
+            var tick = ticks[index];
+            if (tick == lastTick)
+            {
+                continue;
+            }
+
+            selected.Add(tick);
+            lastTick = tick;
+        }
+
+        return selected;
+    }
+
+    private static string FormatGenerationRange(int min, float average, int max)
+    {
+        return min == max
+            ? $"{min} avg {average:0.##}"
+            : $"{min}-{max} avg {average:0.##}";
     }
 
     private static string FormatPlantRelocations(SimulationStats stats)

@@ -125,6 +125,7 @@ var tests = new (string Name, Action Body)[]
     ("Species clustering groups injected profile founders", SpeciesClusteringGroupsInjectedProfileFounders),
     ("Species clustering splits distinct brains", SpeciesClusteringSplitsDistinctBrains),
     ("Species clustering handles non-neural creatures", SpeciesClusteringHandlesNonNeuralCreatures),
+    ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
@@ -4916,6 +4917,47 @@ static void SpeciesClusteringHandlesNonNeuralCreatures()
 
     AssertEqual(1, clusters.Count, "Simple controller cluster count");
     AssertEqual(3, clusters[0].LivingCreatures, "Simple controller living count");
+}
+
+static void SpeciesClusterHistoryTracksSnapshots()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 914,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        StatsSnapshotIntervalTicks = 1,
+        WorldWidth = 300f,
+        WorldHeight = 100f,
+        ResourceVoidBorderWidth = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var saturatedWeights = new float[NeuralBrainGenome.DirectWeightCount];
+    Array.Fill(saturatedWeights, 8f);
+    var quietBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero());
+    var saturatedBrainId = simulation.State.AddBrain(new NeuralBrainGenome(saturatedWeights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 30f), energy: 35f, brainId: quietBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(180f, 30f), energy: 35f, brainId: saturatedBrainId);
+    simulation.RunSteps(3);
+
+    var history = SpeciesClusterAnalyzer.AnalyzeHistory(simulation.State, simulation.State.Stats.Snapshots);
+    var finalTick = simulation.State.Stats.Snapshots[^1].Tick;
+    var finalRows = history.Rows
+        .Where(row => row.Tick == finalTick)
+        .OrderBy(row => row.Rank)
+        .ToArray();
+
+    AssertEqual(2, history.Clusters.Count, "Species history cluster count");
+    AssertEqual(2, history.Clusters[0].FinalLivingCreatures, "Largest history cluster final living count");
+    AssertEqual(1, history.Clusters[1].FinalLivingCreatures, "Second history cluster final living count");
+    AssertEqual(2, finalRows.Length, "Species history final row count");
+    AssertEqual(3, finalRows.Sum(row => row.LivingCreatures), "Species history final living total");
+    AssertClose(2f / 3f, finalRows[0].LivingShare, 0.000001, "Species history final dominant share");
+    AssertTrue(history.Rows.All(row => row.Rank > 0), "Species history rows should be ranked");
 }
 
 static void ScenarioSpeciesRosterInjectsProfileFounders()

@@ -286,7 +286,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add scenario config files. JSON load/save done.
 - Add reproducible seeds. Done.
 - Add CLI/headless runner. Done.
-- Add simple CSV or JSON stats export. Stats, lineage, traits, founder, generation survival, and lineage trend CSVs done.
+- Add simple CSV or JSON stats export. Stats, lineage, traits, living species clusters, species cluster trends, founder, generation survival, and lineage trend CSVs done.
 - Add population graphs and death-cause summaries. Viewer graph done; CLI CSVs include death counters, founder summaries, generation survival, and lineage-over-time trends.
 - Add automated run report. HTML report with run summary, diagnostics, dominant lineage snapshots, trait summaries, founder lineages, and generation survival done.
 - Add inline report graphs. CLI and Godot viewer HTML reports now include SVG charts for population/eggs, plant/meat resource calories, foraging signals, and combat pressure. Done.
@@ -514,7 +514,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 
 ### Analysis: Taxonomy And Classification
 
-- Add an analysis/reporting layer that classifies evolved creatures without pretending the categories are absolute biological species. First pass done: `SpeciesClusterAnalyzer` groups living creatures by genome trait similarity plus neural-brain weight similarity, assigns deterministic readable cluster names, and writes the results to CLI/Godot CSV and HTML reports.
+- Add an analysis/reporting layer that classifies evolved creatures without pretending the categories are absolute biological species. First pass done: `SpeciesClusterAnalyzer` groups living creatures by genome trait similarity plus neural-brain weight similarity, assigns deterministic readable cluster names, and writes the results to CLI/Godot CSV and HTML reports. Cluster history is also reconstructed from lineage records and stats snapshots, then written to species trend CSVs and HTML report tables without affecting simulation behavior.
 - Use several complementary taxonomy views:
   - lineage taxonomy: ancestry, founder clades, branches, extinct/surviving descendant groups. Founder and lineage-trend reports exist.
   - genetic taxonomy: clustering by genome traits such as body size, speed, vision, diet, maturity, egg investment, mutation rates, and later terrain/temperature traits. First living-cluster pass done.
@@ -766,7 +766,7 @@ Core types currently present:
 - `SpeciesProfileJson`: JSON load/save helpers for `.species.json` files.
 - `SpeciesProfileExporter`: exports a selected, founder-lineage, or dominant living representative as a species profile.
 - `SpeciesProfileInjector`: injects a species profile into an existing world as new founders.
-- `SpeciesClusterAnalyzer`: report-only living population clustering by genome traits and neural brain weights. It assigns deterministic readable names, groups imported profile founders when they share genome/brain data, and does not affect simulation behavior.
+- `SpeciesClusterAnalyzer`: report-only living population clustering and reconstructed cluster history by genome traits and neural brain weights. It assigns deterministic readable names, groups imported profile founders when they share genome/brain data, writes current and trend reports, and does not affect simulation behavior.
 - `ResourcePlacement`: shared initial/relocated plant placement rules, including biome-weighted fallback and optional clustering around live plants.
 - `SimulationPipelineKind`: named pipeline selection for scenario runners.
 - `BiomeMap`: deterministic low-resolution biome grid used for resource density, resource void-border exclusion, and reports.

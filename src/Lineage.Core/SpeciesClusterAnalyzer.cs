@@ -119,6 +119,49 @@ public static class SpeciesClusterAnalyzer
             .ToArray();
     }
 
+    public static SpeciesClusterHistory AnalyzeHistory(
+        WorldState state,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        int maxClusters = 10,
+        SpeciesClusterOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(snapshots);
+        if (maxClusters <= 0 || snapshots.Count == 0 || state.LineageRecords.Count == 0)
+        {
+            return SpeciesClusterHistory.Empty;
+        }
+
+        var resolvedOptions = options ?? SpeciesClusterOptions.Default;
+        var clusters = BuildLineageClusters(state, resolvedOptions);
+        if (clusters.Clusters.Count == 0)
+        {
+            return SpeciesClusterHistory.Empty;
+        }
+
+        var rows = BuildHistoryRows(state.LineageRecords, snapshots, clusters.RecordClusterById);
+        var summaries = clusters.Clusters
+            .Select(cluster => SummarizeHistoryCluster(cluster, rows, state.Creatures.Count))
+            .OrderByDescending(summary => summary.PeakLivingCreatures)
+            .ThenByDescending(summary => summary.FinalLivingCreatures)
+            .ThenByDescending(summary => summary.Births)
+            .ThenBy(summary => summary.SpeciesId)
+            .Take(maxClusters)
+            .Select((summary, index) => summary with { Rank = index + 1 })
+            .ToArray();
+
+        var rankBySpecies = summaries.ToDictionary(summary => summary.SpeciesId, summary => summary.Rank);
+        var selectedSpecies = rankBySpecies.Keys.ToHashSet();
+        var selectedRows = rows
+            .Where(row => selectedSpecies.Contains(row.SpeciesId))
+            .Select(row => row with { Rank = rankBySpecies[row.SpeciesId] })
+            .OrderBy(row => row.Tick)
+            .ThenBy(row => row.Rank)
+            .ToArray();
+
+        return new SpeciesClusterHistory(summaries, selectedRows);
+    }
+
     private static SpeciesClusterSummary SummarizeCluster(
         WorldState state,
         SpeciesClusterAccumulator cluster,
@@ -305,6 +348,13 @@ public static class SpeciesClusterAnalyzer
         return features;
     }
 
+    private static float[] CreateBrainFeatures(WorldState state, int brainId)
+    {
+        return brainId >= 0
+            ? CreateBrainFeatures(state.GetBrain(brainId))
+            : Array.Empty<float>();
+    }
+
     private static float FeatureDistance(IReadOnlyList<float> first, IReadOnlyList<float> second)
     {
         var count = Math.Max(first.Count, second.Count);
@@ -351,6 +401,20 @@ public static class SpeciesClusterAnalyzer
             ? Math.Clamp(sparseDifference / (sparseScale + 4f), 0f, 1f)
             : 0f;
         return sparseDistance * 0.65f + denseDistance * 0.35f;
+    }
+
+    private static void UpdateCentroid(ref float[] centroid, float[] features, int count)
+    {
+        if (features.Length > centroid.Length)
+        {
+            Array.Resize(ref centroid, features.Length);
+        }
+
+        for (var i = 0; i < centroid.Length; i++)
+        {
+            var value = i < features.Length ? features[i] : 0f;
+            centroid[i] += (value - centroid[i]) / count;
+        }
     }
 
     private static float LinearFeature(float value, float min, float max)
@@ -417,6 +481,195 @@ public static class SpeciesClusterAnalyzer
         return "left region";
     }
 
+    private static LineageClusterBuildResult BuildLineageClusters(
+        WorldState state,
+        SpeciesClusterOptions options)
+    {
+        var clusters = new List<SpeciesLineageClusterAccumulator>();
+        var recordClusterById = new Dictionary<EntityId, int>();
+        foreach (var record in state.LineageRecords
+            .OrderBy(record => record.BirthTick)
+            .ThenBy(record => record.Id.Value))
+        {
+            var genomeFeatures = CreateGenomeFeatures(state.GetGenome(record.GenomeId));
+            var brainFeatures = CreateBrainFeatures(state, record.BrainId);
+            var bestIndex = -1;
+            var bestCombinedDistance = float.MaxValue;
+
+            for (var i = 0; i < clusters.Count; i++)
+            {
+                var cluster = clusters[i];
+                var genomeDistance = FeatureDistance(genomeFeatures, cluster.GenomeCentroid);
+                var brainDistance = BrainDistance(brainFeatures, cluster.BrainCentroid);
+                var combinedDistance = options.GenomeWeight * genomeDistance
+                    + options.BrainWeight * brainDistance;
+
+                if (genomeDistance > options.GenomeDistanceThreshold ||
+                    brainDistance > options.BrainDistanceThreshold ||
+                    combinedDistance > options.CombinedDistanceThreshold)
+                {
+                    continue;
+                }
+
+                if (combinedDistance < bestCombinedDistance)
+                {
+                    bestCombinedDistance = combinedDistance;
+                    bestIndex = i;
+                }
+            }
+
+            if (bestIndex < 0)
+            {
+                clusters.Add(new SpeciesLineageClusterAccumulator(record, genomeFeatures, brainFeatures));
+                bestIndex = clusters.Count - 1;
+            }
+            else
+            {
+                clusters[bestIndex].Add(record, genomeFeatures, brainFeatures);
+            }
+
+            recordClusterById[record.Id] = clusters[bestIndex].SpeciesId;
+        }
+
+        return new LineageClusterBuildResult(clusters, recordClusterById);
+    }
+
+    private static IReadOnlyList<SpeciesClusterHistoryRow> BuildHistoryRows(
+        IReadOnlyList<CreatureLineageRecord> records,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyDictionary<EntityId, int> recordClusterById)
+    {
+        var births = records
+            .OrderBy(record => record.BirthTick)
+            .ThenBy(record => record.Id.Value)
+            .ToArray();
+        var deaths = records
+            .Where(record => record.DeathTick is not null)
+            .OrderBy(record => record.DeathTick!.Value)
+            .ThenBy(record => record.Id.Value)
+            .ToArray();
+        var orderedSnapshots = snapshots
+            .OrderBy(snapshot => snapshot.Tick)
+            .ToArray();
+        var activeClusters = new Dictionary<int, SpeciesHistoryGenerationAccumulator>();
+        var overallGenerations = new SpeciesHistoryGenerationAccumulator();
+        var rows = new List<SpeciesClusterHistoryRow>();
+        var birthIndex = 0;
+        var deathIndex = 0;
+
+        foreach (var snapshot in orderedSnapshots)
+        {
+            while (birthIndex < births.Length && births[birthIndex].BirthTick <= snapshot.Tick)
+            {
+                AddActiveRecord(activeClusters, overallGenerations, births[birthIndex], recordClusterById);
+                birthIndex++;
+            }
+
+            while (deathIndex < deaths.Length && deaths[deathIndex].DeathTick!.Value <= snapshot.Tick)
+            {
+                RemoveActiveRecord(activeClusters, overallGenerations, deaths[deathIndex], recordClusterById);
+                deathIndex++;
+            }
+
+            if (overallGenerations.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var pair in activeClusters
+                .Where(pair => pair.Value.Count > 0)
+                .OrderByDescending(pair => pair.Value.Count)
+                .ThenBy(pair => pair.Key))
+            {
+                rows.Add(new SpeciesClusterHistoryRow(
+                    snapshot.Tick,
+                    snapshot.ElapsedSeconds,
+                    Rank: 0,
+                    SpeciesId: pair.Key,
+                    Name: GenerateName(pair.Key),
+                    LivingCreatures: pair.Value.Count,
+                    TotalLiving: overallGenerations.Count,
+                    LivingShare: pair.Value.Count / (float)overallGenerations.Count,
+                    MinGeneration: pair.Value.MinGeneration,
+                    AverageGeneration: pair.Value.AverageGeneration,
+                    MaxGeneration: pair.Value.MaxGeneration));
+            }
+        }
+
+        return rows;
+    }
+
+    private static SpeciesClusterHistorySummary SummarizeHistoryCluster(
+        SpeciesLineageClusterAccumulator cluster,
+        IReadOnlyList<SpeciesClusterHistoryRow> rows,
+        int finalPopulation)
+    {
+        var clusterRows = rows
+            .Where(row => row.SpeciesId == cluster.SpeciesId)
+            .ToArray();
+        var peakRow = clusterRows
+            .OrderByDescending(row => row.LivingCreatures)
+            .ThenBy(row => row.Tick)
+            .FirstOrDefault();
+        var firstTick = cluster.Records.Min(record => record.BirthTick);
+        var finalLiving = cluster.Records.Count(record => record.IsAlive);
+        var deaths = cluster.Records.Count(record => !record.IsAlive);
+        var lastLivingTick = clusterRows.Length == 0
+            ? firstTick
+            : clusterRows.Max(row => row.Tick);
+        var status = finalLiving > 0 ? "alive" : "extinct";
+
+        return new SpeciesClusterHistorySummary(
+            Rank: 0,
+            SpeciesId: cluster.SpeciesId,
+            Name: GenerateName(cluster.SpeciesId),
+            Births: cluster.Records.Count,
+            Deaths: deaths,
+            FinalLivingCreatures: finalLiving,
+            FinalLivingShare: finalPopulation > 0 ? finalLiving / (float)finalPopulation : 0f,
+            PeakLivingCreatures: peakRow.LivingCreatures,
+            PeakLivingShare: peakRow.LivingShare,
+            FirstBirthTick: firstTick,
+            PeakTick: clusterRows.Length == 0 ? firstTick : peakRow.Tick,
+            LastLivingTick: lastLivingTick,
+            MinGeneration: cluster.Records.Min(record => record.Generation),
+            AverageGeneration: (float)cluster.Records.Average(record => record.Generation),
+            MaxGeneration: cluster.Records.Max(record => record.Generation),
+            Status: status);
+    }
+
+    private static void AddActiveRecord(
+        IDictionary<int, SpeciesHistoryGenerationAccumulator> activeClusters,
+        SpeciesHistoryGenerationAccumulator overallGenerations,
+        CreatureLineageRecord record,
+        IReadOnlyDictionary<EntityId, int> recordClusterById)
+    {
+        var speciesId = recordClusterById[record.Id];
+        if (!activeClusters.TryGetValue(speciesId, out var accumulator))
+        {
+            accumulator = new SpeciesHistoryGenerationAccumulator();
+            activeClusters.Add(speciesId, accumulator);
+        }
+
+        accumulator.Add(record.Generation);
+        overallGenerations.Add(record.Generation);
+    }
+
+    private static void RemoveActiveRecord(
+        IReadOnlyDictionary<int, SpeciesHistoryGenerationAccumulator> activeClusters,
+        SpeciesHistoryGenerationAccumulator overallGenerations,
+        CreatureLineageRecord record,
+        IReadOnlyDictionary<EntityId, int> recordClusterById)
+    {
+        var speciesId = recordClusterById[record.Id];
+        if (activeClusters.TryGetValue(speciesId, out var accumulator))
+        {
+            accumulator.Remove(record.Generation);
+        }
+
+        overallGenerations.Remove(record.Generation);
+    }
+
     private sealed class SpeciesClusterAccumulator
     {
         public SpeciesClusterAccumulator(CreatureState initialMember, float[] genomeFeatures, float[] brainFeatures)
@@ -440,24 +693,86 @@ public static class SpeciesClusterAnalyzer
             Members.Add(member);
             var genomeCentroid = GenomeCentroid;
             var brainCentroid = BrainCentroid;
-            UpdateCentroid(ref genomeCentroid, genomeFeatures, Members.Count);
-            UpdateCentroid(ref brainCentroid, brainFeatures, Members.Count);
+            SpeciesClusterAnalyzer.UpdateCentroid(ref genomeCentroid, genomeFeatures, Members.Count);
+            SpeciesClusterAnalyzer.UpdateCentroid(ref brainCentroid, brainFeatures, Members.Count);
             GenomeCentroid = genomeCentroid;
             BrainCentroid = brainCentroid;
         }
+    }
 
-        private static void UpdateCentroid(ref float[] centroid, float[] features, int count)
+    private sealed class SpeciesLineageClusterAccumulator
+    {
+        public SpeciesLineageClusterAccumulator(CreatureLineageRecord initialRecord, float[] genomeFeatures, float[] brainFeatures)
         {
-            if (features.Length > centroid.Length)
+            SpeciesId = initialRecord.Id.Value;
+            GenomeCentroid = genomeFeatures.ToArray();
+            BrainCentroid = brainFeatures.ToArray();
+            Records.Add(initialRecord);
+        }
+
+        public int SpeciesId { get; }
+
+        public List<CreatureLineageRecord> Records { get; } = [];
+
+        public float[] GenomeCentroid { get; private set; }
+
+        public float[] BrainCentroid { get; private set; }
+
+        public void Add(CreatureLineageRecord record, float[] genomeFeatures, float[] brainFeatures)
+        {
+            Records.Add(record);
+            var genomeCentroid = GenomeCentroid;
+            var brainCentroid = BrainCentroid;
+            SpeciesClusterAnalyzer.UpdateCentroid(ref genomeCentroid, genomeFeatures, Records.Count);
+            SpeciesClusterAnalyzer.UpdateCentroid(ref brainCentroid, brainFeatures, Records.Count);
+            GenomeCentroid = genomeCentroid;
+            BrainCentroid = brainCentroid;
+        }
+    }
+
+    private sealed record LineageClusterBuildResult(
+        IReadOnlyList<SpeciesLineageClusterAccumulator> Clusters,
+        IReadOnlyDictionary<EntityId, int> RecordClusterById);
+
+    private sealed class SpeciesHistoryGenerationAccumulator
+    {
+        private readonly Dictionary<int, int> _generationCounts = [];
+        private int _sumGenerations;
+
+        public int Count { get; private set; }
+
+        public int MinGeneration => Count == 0 ? 0 : _generationCounts.Keys.Min();
+
+        public int MaxGeneration => Count == 0 ? 0 : _generationCounts.Keys.Max();
+
+        public float AverageGeneration => Count == 0 ? 0f : _sumGenerations / (float)Count;
+
+        public void Add(int generation)
+        {
+            _generationCounts.TryGetValue(generation, out var count);
+            _generationCounts[generation] = count + 1;
+            _sumGenerations += generation;
+            Count++;
+        }
+
+        public void Remove(int generation)
+        {
+            if (!_generationCounts.TryGetValue(generation, out var count) || count <= 0)
             {
-                Array.Resize(ref centroid, features.Length);
+                return;
             }
 
-            for (var i = 0; i < centroid.Length; i++)
+            if (count == 1)
             {
-                var value = i < features.Length ? features[i] : 0f;
-                centroid[i] += (value - centroid[i]) / count;
+                _generationCounts.Remove(generation);
             }
+            else
+            {
+                _generationCounts[generation] = count - 1;
+            }
+
+            _sumGenerations -= generation;
+            Count--;
         }
     }
 }
@@ -513,3 +828,43 @@ public readonly record struct SpeciesClusterSummary(
     string DietLabel,
     string TacticLabel,
     string RegionLabel);
+
+public sealed record SpeciesClusterHistory(
+    IReadOnlyList<SpeciesClusterHistorySummary> Clusters,
+    IReadOnlyList<SpeciesClusterHistoryRow> Rows)
+{
+    public static SpeciesClusterHistory Empty { get; } = new(
+        Array.Empty<SpeciesClusterHistorySummary>(),
+        Array.Empty<SpeciesClusterHistoryRow>());
+}
+
+public readonly record struct SpeciesClusterHistorySummary(
+    int Rank,
+    int SpeciesId,
+    string Name,
+    int Births,
+    int Deaths,
+    int FinalLivingCreatures,
+    float FinalLivingShare,
+    int PeakLivingCreatures,
+    float PeakLivingShare,
+    long FirstBirthTick,
+    long PeakTick,
+    long LastLivingTick,
+    int MinGeneration,
+    float AverageGeneration,
+    int MaxGeneration,
+    string Status);
+
+public readonly record struct SpeciesClusterHistoryRow(
+    long Tick,
+    double ElapsedSeconds,
+    int Rank,
+    int SpeciesId,
+    string Name,
+    int LivingCreatures,
+    int TotalLiving,
+    float LivingShare,
+    int MinGeneration,
+    float AverageGeneration,
+    int MaxGeneration);

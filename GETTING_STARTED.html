@@ -240,7 +240,7 @@
         <li><code>Load</code>: loads a scenario JSON file into the editor and restarts the viewer</li>
         <li><code>Save</code> / <code>Save As</code>: writes the edited scenario as CLI-compatible JSON</li>
         <li><code>Collapse</code> / <code>Expand</code>: shrinks the launcher to a small strip and moves realtime stats into the left column</li>
-        <li><code>Run CLI</code>: saves the edited scenario to <code>out/godot_cli_scenario.json</code>, then runs <code>Lineage.Cli</code> with the requested tick count, stats CSV, HTML report path, and final snapshot path</li>
+        <li><code>Run CLI</code>: saves the edited scenario to <code>out/godot_cli_scenario.json</code>, then runs <code>Lineage.Cli</code> with the requested tick count, stats CSV, derived CSV sidecars, HTML report path, and final snapshot path</li>
         <li><code>Write Current Report</code>: writes an HTML report with graphs and behavior assays from the simulation currently running in Godot, without rerunning the CLI</li>
         <li><code>Open Report</code>: opens the last successful CLI or viewer HTML report in your default browser</li>
         <li><code>Snapshot JSON</code>: sets where a Godot-triggered CLI run writes its final simulation snapshot</li>
@@ -402,6 +402,7 @@
         <li><code>--lineage-output &lt;path&gt;</code>: lineage CSV output path</li>
         <li><code>--traits-output &lt;path&gt;</code>: final trait summary CSV output path</li>
         <li><code>--species-output &lt;path&gt;</code>: living species cluster summary CSV output path</li>
+        <li><code>--species-trends-output &lt;path&gt;</code>: species cluster trend CSV output path</li>
         <li><code>--founders-output &lt;path&gt;</code>: founder summary CSV output path</li>
         <li><code>--generations-output &lt;path&gt;</code>: generation survival CSV output path</li>
         <li><code>--lineage-trends-output &lt;path&gt;</code>: founder lineage trend CSV output path</li>
@@ -428,8 +429,8 @@
 
       <p>
         The CLI currently writes a global stats CSV, a lineage CSV, a final living
-        trait summary CSV, a living species cluster CSV, a founder lineage summary CSV, and a generation survival
-        CSV, plus a lineage trend CSV. If only
+        trait summary CSV, a living species cluster CSV, a species cluster trend CSV, a founder lineage summary CSV, and a generation survival
+        CSV, plus a founder lineage trend CSV. If only
         <code>--output</code> is provided, the other filenames are derived from it.
         The stats CSV includes plant and meat resource counts/calories plus egg predation deaths and foraging diagnostics such as food-seeing share,
         plant-seeing share, meat-seeing share, food-contact share, eating share,
@@ -441,7 +442,7 @@
         range/angle.
         If <code>--report</code> is provided, it also writes an HTML report with
         outcome totals, inline SVG graphs, standardized behavior and risk assays, per-lineage ecotype summaries, foraging diagnostics, predation diagnostics, biome resource distribution, diet/digestion summaries, trend notes, diagnostics, dominant lineage snapshots, top
-        founder lineages, final living trait summaries, and generation survival.
+        species cluster history, founder lineages, final living trait summaries, and generation survival.
         If <code>--save-snapshot</code> is provided, the final world state can be
         opened from the Godot launcher's <code>Load Snapshot File</code> button.
         If <code>--checkpoint-interval</code> is provided, each checkpoint JSON is
