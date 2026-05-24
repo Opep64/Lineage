@@ -127,7 +127,13 @@ public static class SpeciesClusterAnalyzer
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(snapshots);
-        if (maxClusters <= 0 || snapshots.Count == 0 || state.LineageRecords.Count == 0)
+        if (maxClusters <= 0 || state.LineageRecords.Count == 0)
+        {
+            return SpeciesClusterHistory.Empty;
+        }
+
+        var samples = BuildHistorySamples(state, snapshots);
+        if (samples.Count == 0)
         {
             return SpeciesClusterHistory.Empty;
         }
@@ -139,10 +145,10 @@ public static class SpeciesClusterAnalyzer
             return SpeciesClusterHistory.Empty;
         }
 
-        var rows = BuildHistoryRows(state.LineageRecords, snapshots, clusters.RecordClusterById);
+        var rows = BuildHistoryRows(state.LineageRecords, samples, clusters.RecordClusterById);
         var diversityRows = BuildDiversityRows(rows);
         var summaries = clusters.Clusters
-            .Select(cluster => SummarizeHistoryCluster(cluster, rows, snapshots, state.Creatures.Count))
+            .Select(cluster => SummarizeHistoryCluster(cluster, rows, samples, state.Creatures.Count))
             .OrderByDescending(summary => summary.PeakLivingCreatures)
             .ThenByDescending(summary => summary.FinalLivingCreatures)
             .ThenByDescending(summary => summary.Births)
@@ -484,6 +490,22 @@ public static class SpeciesClusterAnalyzer
         return "left region";
     }
 
+    private static IReadOnlyList<SpeciesHistorySample> BuildHistorySamples(
+        WorldState state,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    {
+        var sampleByTick = new SortedDictionary<long, double>();
+        foreach (var snapshot in snapshots)
+        {
+            sampleByTick[snapshot.Tick] = snapshot.ElapsedSeconds;
+        }
+
+        sampleByTick[state.Tick] = state.ElapsedSeconds;
+        return sampleByTick
+            .Select(pair => new SpeciesHistorySample(pair.Key, pair.Value))
+            .ToArray();
+    }
+
     private static LineageClusterBuildResult BuildLineageClusters(
         WorldState state,
         SpeciesClusterOptions options)
@@ -539,7 +561,7 @@ public static class SpeciesClusterAnalyzer
 
     private static IReadOnlyList<SpeciesClusterHistoryRow> BuildHistoryRows(
         IReadOnlyList<CreatureLineageRecord> records,
-        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyList<SpeciesHistorySample> samples,
         IReadOnlyDictionary<EntityId, int> recordClusterById)
     {
         var births = records
@@ -551,24 +573,21 @@ public static class SpeciesClusterAnalyzer
             .OrderBy(record => record.DeathTick!.Value)
             .ThenBy(record => record.Id.Value)
             .ToArray();
-        var orderedSnapshots = snapshots
-            .OrderBy(snapshot => snapshot.Tick)
-            .ToArray();
         var activeClusters = new Dictionary<int, SpeciesHistoryGenerationAccumulator>();
         var overallGenerations = new SpeciesHistoryGenerationAccumulator();
         var rows = new List<SpeciesClusterHistoryRow>();
         var birthIndex = 0;
         var deathIndex = 0;
 
-        foreach (var snapshot in orderedSnapshots)
+        foreach (var sample in samples)
         {
-            while (birthIndex < births.Length && births[birthIndex].BirthTick <= snapshot.Tick)
+            while (birthIndex < births.Length && births[birthIndex].BirthTick <= sample.Tick)
             {
                 AddActiveRecord(activeClusters, overallGenerations, births[birthIndex], recordClusterById);
                 birthIndex++;
             }
 
-            while (deathIndex < deaths.Length && deaths[deathIndex].DeathTick!.Value <= snapshot.Tick)
+            while (deathIndex < deaths.Length && deaths[deathIndex].DeathTick!.Value <= sample.Tick)
             {
                 RemoveActiveRecord(activeClusters, overallGenerations, deaths[deathIndex], recordClusterById);
                 deathIndex++;
@@ -585,8 +604,8 @@ public static class SpeciesClusterAnalyzer
                 .ThenBy(pair => pair.Key))
             {
                 rows.Add(new SpeciesClusterHistoryRow(
-                    snapshot.Tick,
-                    snapshot.ElapsedSeconds,
+                    sample.Tick,
+                    sample.ElapsedSeconds,
                     Rank: 0,
                     SpeciesId: pair.Key,
                     Name: GenerateName(pair.Key),
@@ -605,7 +624,7 @@ public static class SpeciesClusterAnalyzer
     private static SpeciesClusterHistorySummary SummarizeHistoryCluster(
         SpeciesLineageClusterAccumulator cluster,
         IReadOnlyList<SpeciesClusterHistoryRow> rows,
-        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyList<SpeciesHistorySample> samples,
         int finalPopulation)
     {
         var clusterRows = rows
@@ -624,7 +643,7 @@ public static class SpeciesClusterAnalyzer
         var status = finalLiving > 0 ? "alive" : "extinct";
         var lifecycle = ClassifyLifecycle(
             clusterRows,
-            snapshots,
+            samples,
             finalLiving,
             finalLivingShare: finalPopulation > 0 ? finalLiving / (float)finalPopulation : 0f,
             peakLiving: peakRow.LivingCreatures,
@@ -696,7 +715,7 @@ public static class SpeciesClusterAnalyzer
 
     private static string ClassifyLifecycle(
         IReadOnlyList<SpeciesClusterHistoryRow> clusterRows,
-        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyList<SpeciesHistorySample> samples,
         int finalLiving,
         float finalLivingShare,
         int peakLiving,
@@ -704,13 +723,13 @@ public static class SpeciesClusterAnalyzer
         long firstBirthTick,
         long lastLivingTick)
     {
-        if (clusterRows.Count == 0 || snapshots.Count == 0)
+        if (clusterRows.Count == 0 || samples.Count == 0)
         {
             return finalLiving > 0 ? "unsampled survivor" : "unsampled extinct";
         }
 
-        var firstSnapshotTick = snapshots[0].Tick;
-        var finalSnapshotTick = snapshots[^1].Tick;
+        var firstSnapshotTick = samples[0].Tick;
+        var finalSnapshotTick = samples[^1].Tick;
         var runSpan = Math.Max(1L, finalSnapshotTick - firstSnapshotTick);
         var firstSeenTick = clusterRows.Min(row => row.Tick);
         var peakTick = clusterRows
@@ -734,6 +753,17 @@ public static class SpeciesClusterAnalyzer
             return lastLivingTick < finalSnapshotTick ? "went extinct" : "extinct at final";
         }
 
+        var isEarlySurvivor = firstBirthTick <= firstSnapshotTick + runSpan * 0.1f && lastLivingTick >= finalSnapshotTick;
+        if (isEarlySurvivor && finalLivingShare >= 0.45f)
+        {
+            return "persistent dominant";
+        }
+
+        if (isEarlySurvivor)
+        {
+            return "early survivor";
+        }
+
         if (finalLivingShare >= 0.35f && firstSeenTick > firstSnapshotTick + runSpan * 0.25f)
         {
             return "late replacement";
@@ -752,11 +782,6 @@ public static class SpeciesClusterAnalyzer
         if (firstSeenTick > firstSnapshotTick + runSpan * 0.5f)
         {
             return "emerged late";
-        }
-
-        if (firstBirthTick <= firstSnapshotTick + runSpan * 0.1f && lastLivingTick >= finalSnapshotTick)
-        {
-            return "early survivor";
         }
 
         if (peakShare >= 0.25f && finalLivingShare < peakShare * 0.35f)
@@ -780,6 +805,21 @@ public static class SpeciesClusterAnalyzer
         var finalDiversity = diversityRows[^1];
         notes.Add(
             $"Final diversity: {finalDiversity.ActiveClusterCount} active cluster(s); {finalDiversity.DominantName} holds {finalDiversity.DominantLivingShare * 100f:0.0}% of living creatures.");
+
+        if (finalDiversity.ActiveClusterCount == 1 && summaries.Count == 1)
+        {
+            notes.Add(
+                "Cluster differentiation is low: the sampled run stayed within one cluster, so species reporting is not yet showing a meaningful split.");
+        }
+        else
+        {
+            var tinyFinalClusters = summaries.Count(summary => summary.FinalLivingCreatures is > 0 and <= 2);
+            if (finalDiversity.ActiveClusterCount >= 8 && tinyFinalClusters >= finalDiversity.ActiveClusterCount / 2)
+            {
+                notes.Add(
+                    "Cluster signal may be fragmented: many active clusters contain only one or two living creatures.");
+            }
+        }
 
         var peakDiversity = diversityRows
             .OrderByDescending(row => row.ActiveClusterCount)
@@ -923,6 +963,8 @@ public static class SpeciesClusterAnalyzer
     private sealed record LineageClusterBuildResult(
         IReadOnlyList<SpeciesLineageClusterAccumulator> Clusters,
         IReadOnlyDictionary<EntityId, int> RecordClusterById);
+
+    private readonly record struct SpeciesHistorySample(long Tick, double ElapsedSeconds);
 
     private sealed class SpeciesHistoryGenerationAccumulator
     {

@@ -4927,7 +4927,7 @@ static void SpeciesClusterHistoryTracksSnapshots()
         PipelineKind = SimulationPipelineKind.Neural,
         InitialCreatureCount = 0,
         InitialResourcesPerMillionArea = 0f,
-        StatsSnapshotIntervalTicks = 1,
+        StatsSnapshotIntervalTicks = 2,
         WorldWidth = 300f,
         WorldHeight = 100f,
         ResourceVoidBorderWidth = 0f
@@ -4945,7 +4945,7 @@ static void SpeciesClusterHistoryTracksSnapshots()
     simulation.RunSteps(3);
 
     var history = SpeciesClusterAnalyzer.AnalyzeHistory(simulation.State, simulation.State.Stats.Snapshots);
-    var finalTick = simulation.State.Stats.Snapshots[^1].Tick;
+    var finalTick = simulation.State.Tick;
     var finalRows = history.Rows
         .Where(row => row.Tick == finalTick)
         .OrderBy(row => row.Rank)
@@ -4960,6 +4960,8 @@ static void SpeciesClusterHistoryTracksSnapshots()
     AssertTrue(history.Rows.All(row => row.Rank > 0), "Species history rows should be ranked");
     AssertTrue(history.Clusters.All(cluster => !string.IsNullOrWhiteSpace(cluster.LifecycleLabel)), "Species history clusters should have lifecycle labels");
     AssertTrue(history.DiversityRows.Count > 0, "Species history should include diversity rows");
+    AssertEqual(simulation.State.Tick, history.DiversityRows[^1].Tick, "Species history should include current final tick");
+    AssertEqual(simulation.State.Creatures.Count, history.DiversityRows[^1].TotalLiving, "Species history final diversity total should match current world state");
     AssertEqual(2, history.DiversityRows[^1].ActiveClusterCount, "Species history final active cluster count");
     AssertClose(2f / 3f, history.DiversityRows[^1].DominantLivingShare, 0.000001, "Species history final dominant diversity share");
     AssertTrue(history.Notes.Count > 0, "Species history should include interpretation notes");

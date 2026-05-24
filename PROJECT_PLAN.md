@@ -530,6 +530,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Brain fingerprints should use standardized sensory situations and record output responses. Two brains can be considered similar if they react similarly, even if their internal wiring differs.
 - Behavioral assays could measure food-seeking efficiency, plant/meat preference, egg predation tendency, movement style, reproduction timing, risk tolerance, terrain avoidance, social signal response, or seasonal migration once those systems exist.
 - Reports should distinguish relatedness from convergence. Two creatures may be genetically close but behaviorally different, or unrelated lineages may evolve similar ecotypes.
+- A 2026-05-24 cluster-quality smoke pass ran 12k ticks at seed 42 for Balanced, Terrain Pressure, Migration Pressure, Scavenger Pressure, and Predation Pressure. All five remained a single active species cluster through the sampled history, with final populations matching the synthetic final history tick. This suggests current thresholds are not over-splitting short low-generation runs; reports now flag these as low-differentiation `persistent dominant` populations rather than implying a meaningful species split. Revisit threshold tuning with longer or deliberately divergent multi-starter runs before treating cluster counts as ecological diversity.
 - Possible report vocabulary:
   - clade: ancestry group
   - morphotype: body/trait cluster
