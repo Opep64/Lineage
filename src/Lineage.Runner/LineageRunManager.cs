@@ -114,8 +114,8 @@ public sealed partial class LineageRunManager
             {
                 FileName = launchTarget.FileName,
                 WorkingDirectory = _repoRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false,
                 UseShellExecute = false,
                 CreateNoWindow = true
             },
@@ -152,8 +152,6 @@ public sealed partial class LineageRunManager
             }
 
             SaveManifest(manifest);
-            _ = PumpOutputAsync(process.StandardOutput, manifest.StdoutPath);
-            _ = PumpOutputAsync(process.StandardError, manifest.StderrPath);
             process.Exited += (_, _) => MarkProcessExited(managedRun);
             if (process.HasExited)
             {
@@ -171,7 +169,7 @@ public sealed partial class LineageRunManager
 
     public bool SendControl(string id, string command)
     {
-        if (!_runs.TryGetValue(id, out var run) || !run.IsRunning)
+        if (!_runs.TryGetValue(id, out var run) || !RefreshRunLifecycle(run).IsRunning)
         {
             return false;
         }
@@ -188,7 +186,7 @@ public sealed partial class LineageRunManager
             return false;
         }
 
-        if (run.IsRunning)
+        if (RefreshRunLifecycle(run).IsRunning)
         {
             return false;
         }
@@ -214,6 +212,7 @@ public sealed partial class LineageRunManager
 
     private RunSummary ToSummary(ManagedRun run)
     {
+        run = RefreshRunLifecycle(run);
         var manifest = run.Manifest;
         var status = ReadStatus(manifest.StatusPath);
         var isRunning = run.IsRunning;
@@ -261,6 +260,11 @@ public sealed partial class LineageRunManager
 
     private void MarkProcessExited(ManagedRun run)
     {
+        if (!run.TryRecordExit())
+        {
+            return;
+        }
+
         var manifest = run.Manifest;
         var process = run.Process;
         manifest.ExitCode = process?.ExitCode;
@@ -289,9 +293,14 @@ public sealed partial class LineageRunManager
 
                 if (manifest.Status is "running" or "starting")
                 {
-                    manifest.Status = "unknown";
-                    manifest.EndedAtUtc ??= DateTimeOffset.UtcNow;
-                    SaveManifest(manifest);
+                    var restored = TryRestoreRunningProcess(manifest);
+                    if (restored is not null)
+                    {
+                        _runs.TryAdd(manifest.Id, restored);
+                        continue;
+                    }
+
+                    MarkMissingProcess(manifest);
                 }
 
                 _runs.TryAdd(manifest.Id, new ManagedRun(manifest, null));
@@ -303,16 +312,115 @@ public sealed partial class LineageRunManager
         }
     }
 
-    private static async Task PumpOutputAsync(StreamReader reader, string path)
+    private ManagedRun RefreshRunLifecycle(ManagedRun run)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await using var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-        await using var writer = new StreamWriter(stream);
-        while (await reader.ReadLineAsync() is { } line)
+        if (run.Process is not null)
         {
-            await writer.WriteLineAsync(line);
-            await writer.FlushAsync();
+            if (run.IsRunning)
+            {
+                return run;
+            }
+
+            MarkProcessExited(run);
         }
+
+        return run;
+    }
+
+    private ManagedRun? TryRestoreRunningProcess(RunManifest manifest)
+    {
+        var process = TryOpenLiveProcess(manifest);
+        if (process is null)
+        {
+            return null;
+        }
+
+        manifest.Status = "running";
+        manifest.EndedAtUtc = null;
+        manifest.ExitCode = null;
+        manifest.Error = null;
+        SaveManifest(manifest);
+
+        var run = new ManagedRun(manifest, process);
+        process.Exited += (_, _) => MarkProcessExited(run);
+        if (process.HasExited)
+        {
+            MarkProcessExited(run);
+        }
+
+        return run;
+    }
+
+    private static Process? TryOpenLiveProcess(RunManifest manifest)
+    {
+        if (manifest.ProcessId is not > 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var process = Process.GetProcessById(manifest.ProcessId.Value);
+            if (process.HasExited || !ProcessMatchesManifest(process, manifest))
+            {
+                process.Dispose();
+                return null;
+            }
+
+            process.EnableRaisingEvents = true;
+            return process;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool ProcessMatchesManifest(Process process, RunManifest manifest)
+    {
+        try
+        {
+            var name = process.ProcessName;
+            if (!name.Contains("Lineage.Cli", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(name, "dotnet", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (manifest.StartedAtUtc is not { } startedAt)
+            {
+                return true;
+            }
+
+            var startedAtUtc = new DateTimeOffset(process.StartTime.ToUniversalTime(), TimeSpan.Zero);
+            return startedAtUtc >= startedAt.AddSeconds(-10)
+                && startedAtUtc <= startedAt.AddMinutes(2);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void MarkMissingProcess(RunManifest manifest)
+    {
+        var status = ReadStatus(manifest.StatusPath);
+        if (status is not null && string.Equals(status.State, "completed", StringComparison.OrdinalIgnoreCase))
+        {
+            manifest.Status = "completed";
+            manifest.EndedAtUtc ??= status.UpdatedAtUtc == default ? DateTimeOffset.UtcNow : status.UpdatedAtUtc;
+            manifest.Error ??= "Runner restarted after the CLI completed; exit code was not captured.";
+        }
+        else
+        {
+            manifest.Status = "lost";
+            manifest.EndedAtUtc ??= DateTimeOffset.UtcNow;
+            manifest.Error = manifest.ProcessId is null
+                ? "Runner restarted with no recorded CLI process id."
+                : $"Runner restarted, but CLI process {manifest.ProcessId.Value.ToString(CultureInfo.InvariantCulture)} was not found.";
+        }
+
+        SaveManifest(manifest);
     }
 
     private static CliStatusFile? ReadStatus(string path)
@@ -412,6 +520,10 @@ public sealed partial class LineageRunManager
             manifest.StatusPath,
             "--control",
             manifest.ControlPath,
+            "--stdout-log",
+            manifest.StdoutPath,
+            "--stderr-log",
+            manifest.StderrPath,
             "--status-interval",
             "100"
         };
@@ -490,6 +602,8 @@ public sealed partial class LineageRunManager
 
     private sealed class ManagedRun(RunManifest manifest, Process? process)
     {
+        private int _exitRecorded;
+
         public RunManifest Manifest { get; } = manifest;
 
         public Process? Process { get; private set; } = process;
@@ -500,6 +614,11 @@ public sealed partial class LineageRunManager
         {
             Process?.Dispose();
             Process = null;
+        }
+
+        public bool TryRecordExit()
+        {
+            return Interlocked.Exchange(ref _exitRecorded, 1) == 0;
         }
     }
 }

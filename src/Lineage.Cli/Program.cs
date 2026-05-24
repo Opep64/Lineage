@@ -4,9 +4,12 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Lineage.Core;
 
+ConsoleLogRedirect? consoleLogRedirect = null;
+
 try
 {
     var options = RunOptions.Parse(args).ExpandProcessIdToken();
+    consoleLogRedirect = ConsoleLogRedirect.Create(options.StdoutLogPath, options.StderrLogPath);
     if (options.ShowHelp)
     {
         PrintHelp();
@@ -40,6 +43,10 @@ catch (Exception ex)
 {
     Console.Error.WriteLine(ex.Message);
     Environment.ExitCode = 1;
+}
+finally
+{
+    consoleLogRedirect?.Dispose();
 }
 
 static void PrintHelp()
@@ -78,6 +85,8 @@ static void PrintHelp()
           --checkpoint-dir <dir>      Directory for checkpoint JSON files.
           --status <path>            Periodically write machine-readable run status JSON.
           --control <path>           Poll a JSON control file for stop/checkpoint requests.
+          --stdout-log <path>        Append console output to a file.
+          --stderr-log <path>        Append console errors to a file.
           --status-interval <n>      Status write interval in ticks. Default: 100
           --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
           --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
@@ -857,6 +866,10 @@ internal sealed record RunOptions
 
     public string? ControlPath { get; init; }
 
+    public string? StdoutLogPath { get; init; }
+
+    public string? StderrLogPath { get; init; }
+
     public int StatusIntervalTicks { get; init; } = 100;
 
     public bool StopOnExtinction { get; init; }
@@ -945,6 +958,8 @@ internal sealed record RunOptions
             CheckpointDirectory = ExpandProcessIdToken(CheckpointDirectory),
             StatusPath = ExpandProcessIdToken(StatusPath),
             ControlPath = ExpandProcessIdToken(ControlPath),
+            StdoutLogPath = ExpandProcessIdToken(StdoutLogPath),
+            StderrLogPath = ExpandProcessIdToken(StderrLogPath),
             ExportSpeciesPath = ExpandProcessIdToken(ExportSpeciesPath),
             BatchReportPath = ExpandProcessIdToken(BatchReportPath),
             BatchOutputDirectory = ExpandProcessIdToken(BatchOutputDirectory) ?? BatchOutputDirectory,
@@ -1165,6 +1180,12 @@ internal sealed record RunOptions
                     break;
                 case "--control":
                     options = options with { ControlPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--stdout-log":
+                    options = options with { StdoutLogPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--stderr-log":
+                    options = options with { StderrLogPath = ReadValue(args, ref i, arg) };
                     break;
                 case "--status-interval":
                     options = options with { StatusIntervalTicks = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
@@ -1422,6 +1443,56 @@ internal sealed record RunOptions
 
         var choices = string.Join(", ", Enum.GetNames<InitialCreatureSpawnRegion>());
         throw new ArgumentException($"{optionName} must be one of: {choices}.");
+    }
+}
+
+internal sealed class ConsoleLogRedirect : IDisposable
+{
+    private readonly StreamWriter? _stdout;
+    private readonly StreamWriter? _stderr;
+
+    private ConsoleLogRedirect(StreamWriter? stdout, StreamWriter? stderr)
+    {
+        _stdout = stdout;
+        _stderr = stderr;
+    }
+
+    public static ConsoleLogRedirect? Create(string? stdoutPath, string? stderrPath)
+    {
+        var stdout = string.IsNullOrWhiteSpace(stdoutPath) ? null : OpenAppendWriter(stdoutPath);
+        var stderr = string.IsNullOrWhiteSpace(stderrPath) ? null : OpenAppendWriter(stderrPath);
+
+        if (stdout is not null)
+        {
+            Console.SetOut(stdout);
+        }
+
+        if (stderr is not null)
+        {
+            Console.SetError(stderr);
+        }
+
+        return stdout is null && stderr is null ? null : new ConsoleLogRedirect(stdout, stderr);
+    }
+
+    public void Dispose()
+    {
+        _stdout?.Dispose();
+        _stderr?.Dispose();
+    }
+
+    private static StreamWriter OpenAppendWriter(string path)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        return new StreamWriter(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+        {
+            AutoFlush = true
+        };
     }
 }
 

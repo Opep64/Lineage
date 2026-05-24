@@ -287,7 +287,8 @@
       <ul>
         <li>The runner can also be started directly from its built executable after a build: <code>.\src\Lineage.Runner\bin\Debug\net8.0\Lineage.Runner.exe --urls http://localhost:5088</code></li>
         <li>If port <code>5088</code> is already in use, choose another local port in the <code>--urls</code> value.</li>
-        <li>Keep the runner open while important long runs are active. The first runner slice persists run manifests and status files, but it does not yet fully reattach to and control CLI child processes after the runner is restarted.</li>
+        <li>The runner reloads manifests on startup and reattaches to live CLI processes by process id, so status and control actions can continue after a runner restart.</li>
+        <li>If a manifest says a run was active but the recorded CLI process is gone, the runner marks it <code>lost</code> instead of pretending it is still controllable.</li>
         <li>If you need to rebuild while the runner executable is active, stop the <code>Lineage.Runner</code> process first so Windows can replace the executable.</li>
       </ul>
     </section>

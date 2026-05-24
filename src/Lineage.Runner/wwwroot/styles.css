@@ -99,6 +99,7 @@ h2 {
 }
 
 .run-state.running,
+.run-state.starting,
 .run-state.stopping {
   border-color: #9db8ec;
   background: #ecf3ff;
@@ -112,6 +113,7 @@ h2 {
 }
 
 .run-state.failed,
+.run-state.lost,
 .run-state.unknown {
   border-color: #f0b5af;
   background: #fff3f1;

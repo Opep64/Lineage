@@ -285,6 +285,15 @@ The launcher should eventually:
 - Support clean stop and checkpoint-and-stop.
 - Write a completed/failed run record.
 
+### Current Phase 1 Behavior
+
+- Dashboard-launched runs get a per-run manifest and output folder under `out/runs/<run-id>/`.
+- Run ids end with the launched CLI process id so the dashboard display, manifest, and operating-system process line up.
+- The runner reloads manifests on startup and reattaches to still-live CLI processes by process id.
+- Reattached runs remain controllable through the file-based `control.json` protocol.
+- If a manifest says a run was active but the recorded CLI process is gone, the runner marks the run `lost`.
+- The CLI can write stdout/stderr logs directly via launcher-supplied log paths, so a runner restart does not leave the simulation dependent on an old redirected pipe.
+
 ## Phase 2: Run Library
 
 - List completed and failed runs.
