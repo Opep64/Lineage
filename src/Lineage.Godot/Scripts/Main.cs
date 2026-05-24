@@ -85,6 +85,7 @@ public partial class Main : Node2D
     private SpeciesProfile? _loadedSpeciesProfile;
     private string? _loadedSpeciesProfilePath;
     private EntityId _pendingSpeciesExportCreatureId;
+    private bool _pendingSpeciesExportClusterRepresentative;
     private string? _pendingSpeciesExportName;
     private string? _pendingSpeciesExportNotes;
     private bool _isPanning;
@@ -2351,6 +2352,7 @@ public partial class Main : Node2D
         _scenarioEditor.LoadCheckpointFileRequested += OpenLoadCheckpointDialog;
         _scenarioEditor.LoadSnapshotRequested += LoadSnapshotFromPath;
         _scenarioEditor.ExportSelectedSpeciesRequested += OpenExportSelectedSpeciesDialog;
+        _scenarioEditor.ExportSelectedSpeciesClusterRequested += OpenExportSelectedSpeciesClusterDialog;
         _scenarioEditor.LoadSpeciesProfileRequested += OpenLoadSpeciesProfileDialog;
         _scenarioEditor.InjectSpeciesRequested += InjectLoadedSpeciesProfile;
         _scenarioEditor.MapToggleRequested += () => SetMapVisible(!_renderMap);
@@ -2429,6 +2431,7 @@ public partial class Main : Node2D
 
         var request = _scenarioEditor.ReadSpeciesExportRequest();
         _pendingSpeciesExportCreatureId = selected.Id;
+        _pendingSpeciesExportClusterRepresentative = false;
         _pendingSpeciesExportName = request.Name;
         _pendingSpeciesExportNotes = request.Notes;
 
@@ -2436,6 +2439,40 @@ public partial class Main : Node2D
             ? $"species_{selected.Id.Value}"
             : SanitizeFileName(request.Name);
         _saveSpeciesProfileDialog.CurrentFile = ToSpeciesProfileFileName(profileName);
+        _saveSpeciesProfileDialog.PopupCenteredRatio(0.75f);
+    }
+
+    private void OpenExportSelectedSpeciesClusterDialog()
+    {
+        if (!TryGetSelectedCreature(out var selected))
+        {
+            _scenarioEditor.SetStatus("Select a living creature before exporting a species cluster profile.");
+            return;
+        }
+
+        SpeciesClusterRepresentative representative;
+        try
+        {
+            representative = SpeciesClusterAnalyzer.FindRepresentativeForCreature(_simulation.State, selected.Id);
+        }
+        catch (Exception ex)
+        {
+            _scenarioEditor.SetStatus($"Species cluster export failed: {ex.Message}");
+            return;
+        }
+
+        var request = _scenarioEditor.ReadSpeciesExportRequest();
+        _pendingSpeciesExportCreatureId = selected.Id;
+        _pendingSpeciesExportClusterRepresentative = true;
+        _pendingSpeciesExportName = request.Name;
+        _pendingSpeciesExportNotes = request.Notes;
+
+        var profileName = string.IsNullOrWhiteSpace(request.Name)
+            ? representative.Name
+            : SanitizeFileName(request.Name);
+        _saveSpeciesProfileDialog.CurrentFile = ToSpeciesProfileFileName(profileName);
+        _scenarioEditor.SetStatus(
+            $"Ready to export cluster {representative.Name}; representative creature #{representative.CreatureId.Value}.");
         _saveSpeciesProfileDialog.PopupCenteredRatio(0.75f);
     }
 
@@ -2473,12 +2510,19 @@ public partial class Main : Node2D
         try
         {
             path = SpeciesProfileJson.WithFileExtension(path);
-            var profile = SpeciesProfileExporter.ExportCreature(
-                _scenario,
-                _simulation.State,
-                _pendingSpeciesExportCreatureId,
-                _pendingSpeciesExportName,
-                _pendingSpeciesExportNotes);
+            var profile = _pendingSpeciesExportClusterRepresentative
+                ? SpeciesProfileExporter.ExportSpeciesClusterRepresentativeForCreature(
+                    _scenario,
+                    _simulation.State,
+                    _pendingSpeciesExportCreatureId,
+                    _pendingSpeciesExportName,
+                    _pendingSpeciesExportNotes)
+                : SpeciesProfileExporter.ExportCreature(
+                    _scenario,
+                    _simulation.State,
+                    _pendingSpeciesExportCreatureId,
+                    _pendingSpeciesExportName,
+                    _pendingSpeciesExportNotes);
             SpeciesProfileJson.Save(path, profile);
             _loadedSpeciesProfile = profile;
             _loadedSpeciesProfilePath = path;
@@ -2493,6 +2537,7 @@ public partial class Main : Node2D
         finally
         {
             _pendingSpeciesExportCreatureId = default;
+            _pendingSpeciesExportClusterRepresentative = false;
             _pendingSpeciesExportName = null;
             _pendingSpeciesExportNotes = null;
         }

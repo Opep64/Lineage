@@ -294,7 +294,7 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add batch scenario comparison runner/report. Preset gentle/balanced/harsh comparison and custom repeated `--batch-scenario` inputs done; comparison reports now include injury deaths and final predation-pressure metrics. Done.
 - Add lightweight probe runner. `--probe` runs multi-scenario/multi-seed tuning sweeps without per-run reports, snapshots, or lineage CSV suites; it writes one compact CSV and one compact HTML summary, with optional extinction/runaway-population early stops. Done.
 - Add temporary probe variants. `--probe-variant <name:key=value,...>` runs the checked-in base scenario plus named in-memory JSON-property overrides, so tuning candidates can be compared without editing scenario files. Probe CSVs and HTML reports keep `scenario`, `variant`, and override text separate. Done.
-- Add species profile export/import. Species profiles live in `species/`, use the `.species.json` suffix, and store one representative genome plus neural brain that can be injected into another run. CLI and Godot can export selected/dominant species profiles and load them later. Done.
+- Add species profile export/import. Species profiles live in `species/`, use the `.species.json` suffix, and store one representative genome plus neural brain that can be injected into another run. CLI and Godot can export selected/dominant species profiles, plus the closest living representative of a report species cluster, and load them later. Done.
 - Add scenario species rosters. `SimulationScenario.SpeciesSeeds` can define repeatable starting mixes from species profiles with count, spawn region, optional energy override, and enabled flag. CLI, probe runs, and Godot launch apply enabled roster entries at startup; scenarios with enabled species seeds skip generic starter creatures. Done.
 
 ### Phase 6: Stronger Evolutionary Pressure
@@ -666,6 +666,7 @@ Useful CLI options:
 - `--export-species <path>`
 - `--export-species-creature <id>`
 - `--export-species-founder <id>`
+- `--export-species-cluster <id|name>`
 - `--export-species-name <text>`
 - `--export-species-notes <text>`
 - `--batch-scenario <path>`
@@ -756,7 +757,7 @@ Current viewer overlays:
 - scenario launcher/editor with visual launch, scenario load/save, CLI run controls, current viewer report export, collapsed mode, and last-report browser launch
 - CLI snapshot controls with configurable snapshot path, arbitrary snapshot load, and last-snapshot load
 - CLI checkpoint controls with configurable interval/folder, checkpoint file load, and latest-checkpoint load
-- species profile controls for exporting the selected creature, loading profiles, live injection, and adding loaded profiles to the current scenario's startup roster
+- species profile controls for exporting the selected creature or selected creature's cluster representative, loading profiles, live injection, and adding loaded profiles to the current scenario's startup roster
 - HUD food and creature render modes showing individual versus density rendering
 - HUD telemetry for actual simulation ticks/sec, frame time, visible estimates, and draw counts
 - HUD foraging telemetry for food-seeing share, calories eaten per second, average meal gap, search distance, calories per distance, and average vision range/angle
@@ -772,9 +773,9 @@ Core types currently present:
 - `SimulationScenarioSpeciesSeeder`: applies scenario species rosters by resolving profile paths and injecting founder creatures.
 - `SpeciesProfile`: portable representative species profile containing one genome and neural brain.
 - `SpeciesProfileJson`: JSON load/save helpers for `.species.json` files.
-- `SpeciesProfileExporter`: exports a selected, founder-lineage, or dominant living representative as a species profile.
+- `SpeciesProfileExporter`: exports a selected, founder-lineage, dominant-living, or species-cluster representative as a species profile.
 - `SpeciesProfileInjector`: injects a species profile into an existing world as new founders.
-- `SpeciesClusterAnalyzer`: report-only living population clustering and reconstructed cluster history by genome traits and neural brain weights. It assigns deterministic readable names, groups imported profile founders when they share genome/brain data, writes current/trend reports plus lifecycle/diversity interpretation, and does not affect simulation behavior.
+- `SpeciesClusterAnalyzer`: report-only living population clustering and reconstructed cluster history by genome traits and neural brain weights. It assigns deterministic readable names, groups imported profile founders when they share genome/brain data, writes current/trend reports plus lifecycle/diversity interpretation, selects closest-to-centroid living representatives for export, and does not affect simulation behavior.
 - `ResourcePlacement`: shared initial/relocated plant placement rules, including biome-weighted fallback and optional clustering around live plants.
 - `SimulationPipelineKind`: named pipeline selection for scenario runners.
 - `BiomeMap`: deterministic low-resolution biome grid used for resource density, resource void-border exclusion, and reports.

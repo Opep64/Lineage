@@ -43,6 +43,28 @@ public static class SpeciesProfileExporter
         return CreateProfile(scenario, state, representative, name, notes);
     }
 
+    public static SpeciesProfile ExportSpeciesClusterRepresentative(
+        SimulationScenario scenario,
+        WorldState state,
+        string clusterKey,
+        string? name = null,
+        string? notes = null)
+    {
+        var representative = SpeciesClusterAnalyzer.FindRepresentative(state, clusterKey);
+        return ExportSpeciesClusterRepresentative(scenario, state, representative, name, notes);
+    }
+
+    public static SpeciesProfile ExportSpeciesClusterRepresentativeForCreature(
+        SimulationScenario scenario,
+        WorldState state,
+        EntityId creatureId,
+        string? name = null,
+        string? notes = null)
+    {
+        var representative = SpeciesClusterAnalyzer.FindRepresentativeForCreature(state, creatureId);
+        return ExportSpeciesClusterRepresentative(scenario, state, representative, name, notes);
+    }
+
     public static SpeciesProfile ExportDominantLivingLineageRepresentative(
         SimulationScenario scenario,
         WorldState state,
@@ -63,6 +85,22 @@ public static class SpeciesProfileExporter
             .Key;
 
         return ExportFounderLineageRepresentative(scenario, state, dominantFounderId, name, notes);
+    }
+
+    private static SpeciesProfile ExportSpeciesClusterRepresentative(
+        SimulationScenario scenario,
+        WorldState state,
+        SpeciesClusterRepresentative representative,
+        string? name,
+        string? notes)
+    {
+        var profileName = string.IsNullOrWhiteSpace(name)
+            ? representative.Name
+            : name.Trim();
+        var profileNotes = string.IsNullOrWhiteSpace(notes)
+            ? $"Representative of species cluster {representative.Name} ({representative.SpeciesId}); closest living creature to cluster centroid."
+            : notes;
+        return ExportCreature(scenario, state, representative.CreatureId, profileName, profileNotes);
     }
 
     private static SpeciesProfile CreateProfile(

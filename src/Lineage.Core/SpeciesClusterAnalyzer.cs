@@ -70,7 +70,7 @@ public static class SpeciesClusterAnalyzer
         var clusters = BuildLivingClusters(state, resolvedOptions);
 
         return clusters
-            .Select(cluster => SummarizeCluster(state, cluster, recordsById))
+            .Select(cluster => SummarizeCluster(state, cluster, recordsById, resolvedOptions))
             .OrderByDescending(summary => summary.LivingCreatures)
             .ThenBy(summary => summary.SpeciesId)
             .Take(maxClusters)
@@ -123,6 +123,40 @@ public static class SpeciesClusterAnalyzer
                     ReproductionReadyShare: behavior.ReproductionReady.ReproduceShare);
             })
             .ToArray();
+    }
+
+    public static SpeciesClusterRepresentative FindRepresentative(
+        WorldState state,
+        string clusterKey,
+        SpeciesClusterOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (string.IsNullOrWhiteSpace(clusterKey))
+        {
+            throw new ArgumentException("Species cluster key is required.", nameof(clusterKey));
+        }
+
+        var resolvedOptions = options ?? SpeciesClusterOptions.Default;
+        var clusters = BuildLivingClusters(state, resolvedOptions);
+        var cluster = ResolveCluster(clusters, clusterKey);
+        return SelectRepresentative(state, cluster, resolvedOptions);
+    }
+
+    public static SpeciesClusterRepresentative FindRepresentativeForCreature(
+        WorldState state,
+        EntityId creatureId,
+        SpeciesClusterOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var resolvedOptions = options ?? SpeciesClusterOptions.Default;
+        var clusters = BuildLivingClusters(state, resolvedOptions);
+        var cluster = clusters.FirstOrDefault(candidate => candidate.Members.Any(member => member.Id == creatureId));
+        if (cluster is null)
+        {
+            throw new InvalidOperationException($"Living creature {creatureId.Value} was not found in a species cluster.");
+        }
+
+        return SelectRepresentative(state, cluster, resolvedOptions);
     }
 
     private static IReadOnlyList<SpeciesClusterAccumulator> BuildLivingClusters(
@@ -197,6 +231,83 @@ public static class SpeciesClusterAnalyzer
         }
 
         return clusters;
+    }
+
+    private static SpeciesClusterAccumulator ResolveCluster(
+        IReadOnlyList<SpeciesClusterAccumulator> clusters,
+        string clusterKey)
+    {
+        var normalized = clusterKey.Trim();
+        if (normalized.StartsWith('#'))
+        {
+            normalized = normalized[1..].Trim();
+        }
+
+        if (int.TryParse(normalized, out var speciesId))
+        {
+            var byId = clusters.FirstOrDefault(cluster => cluster.SpeciesId == speciesId);
+            if (byId is not null)
+            {
+                return byId;
+            }
+        }
+
+        var byName = clusters.FirstOrDefault(cluster =>
+            string.Equals(GenerateName(cluster.SpeciesId), normalized, StringComparison.OrdinalIgnoreCase));
+        if (byName is not null)
+        {
+            return byName;
+        }
+
+        throw new InvalidOperationException($"No living species cluster matched '{clusterKey}'.");
+    }
+
+    private static SpeciesClusterRepresentative SelectRepresentative(
+        WorldState state,
+        SpeciesClusterAccumulator cluster,
+        SpeciesClusterOptions options)
+    {
+        if (cluster.Members.Count == 0)
+        {
+            throw new InvalidOperationException($"Species cluster {cluster.SpeciesId} has no living representatives.");
+        }
+
+        var totalLiving = Math.Max(1, state.Creatures.Count);
+        var representative = cluster.Members
+            .Select(creature =>
+            {
+                var genomeFeatures = CreateGenomeFeatures(state.GetGenome(creature.GenomeId));
+                var brainFeatures = creature.BrainId >= 0
+                    ? CreateBrainFeatures(state.GetBrain(creature.BrainId))
+                    : Array.Empty<float>();
+                var genomeDistance = FeatureDistance(genomeFeatures, cluster.GenomeCentroid);
+                var brainDistance = BrainDistance(brainFeatures, cluster.BrainCentroid);
+                var combinedDistance = options.GenomeWeight * genomeDistance + options.BrainWeight * brainDistance;
+                return new
+                {
+                    Creature = creature,
+                    GenomeDistance = genomeDistance,
+                    BrainDistance = brainDistance,
+                    CombinedDistance = combinedDistance
+                };
+            })
+            .OrderBy(candidate => candidate.CombinedDistance)
+            .ThenBy(candidate => candidate.GenomeDistance)
+            .ThenBy(candidate => candidate.BrainDistance)
+            .ThenByDescending(candidate => candidate.Creature.Generation)
+            .ThenByDescending(candidate => candidate.Creature.Energy)
+            .ThenBy(candidate => candidate.Creature.Id.Value)
+            .First();
+
+        return new SpeciesClusterRepresentative(
+            SpeciesId: cluster.SpeciesId,
+            Name: GenerateName(cluster.SpeciesId),
+            CreatureId: representative.Creature.Id,
+            LivingCreatures: cluster.Members.Count,
+            LivingShare: cluster.Members.Count / (float)totalLiving,
+            GenomeDistance: representative.GenomeDistance,
+            BrainDistance: representative.BrainDistance,
+            CombinedDistance: representative.CombinedDistance);
     }
 
     public static SpeciesClusterHistory AnalyzeHistory(
@@ -320,9 +431,11 @@ public static class SpeciesClusterAnalyzer
     private static SpeciesClusterSummary SummarizeCluster(
         WorldState state,
         SpeciesClusterAccumulator cluster,
-        IReadOnlyDictionary<EntityId, CreatureLineageRecord> recordsById)
+        IReadOnlyDictionary<EntityId, CreatureLineageRecord> recordsById,
+        SpeciesClusterOptions options)
     {
         var totalLiving = Math.Max(1, state.Creatures.Count);
+        var representative = SelectRepresentative(state, cluster, options);
         var founderCounts = new Dictionary<EntityId, int>();
         var minGeneration = int.MaxValue;
         var maxGeneration = 0;
@@ -410,6 +523,8 @@ public static class SpeciesClusterAnalyzer
             FounderCount: founderCounts.Count,
             DominantFounderId: dominantFounder.Key,
             DominantFounderLivingCreatures: dominantFounder.Value,
+            RepresentativeCreatureId: representative.CreatureId,
+            RepresentativeDistance: representative.CombinedDistance,
             MinGeneration: minGeneration == int.MaxValue ? 0 : minGeneration,
             AverageGeneration: totalGeneration / count,
             MaxGeneration: maxGeneration,
@@ -551,6 +666,7 @@ public static class SpeciesClusterAnalyzer
         if (summary is { } current)
         {
             parts.Add($"living {current.LivingCreatures} ({current.LivingShare * 100f:0.0}%)");
+            parts.Add($"representative #{current.RepresentativeCreatureId.Value}");
             parts.Add($"generation {current.MinGeneration}/{current.AverageGeneration:0.0}/{current.MaxGeneration}");
             parts.Add($"genome div {current.AverageGenomeDistance:0.###}");
             parts.Add($"brain div {current.AverageBrainDistance:0.###}");
@@ -1310,6 +1426,8 @@ public readonly record struct SpeciesClusterSummary(
     int FounderCount,
     EntityId DominantFounderId,
     int DominantFounderLivingCreatures,
+    EntityId RepresentativeCreatureId,
+    float RepresentativeDistance,
     int MinGeneration,
     float AverageGeneration,
     int MaxGeneration,
@@ -1371,6 +1489,16 @@ public readonly record struct SpeciesClusterBehaviorFingerprint(
     float SmallCreatureAttackShare,
     float LargeApproachAttackShare,
     float ReproductionReadyShare);
+
+public readonly record struct SpeciesClusterRepresentative(
+    int SpeciesId,
+    string Name,
+    EntityId CreatureId,
+    int LivingCreatures,
+    float LivingShare,
+    float GenomeDistance,
+    float BrainDistance,
+    float CombinedDistance);
 
 public sealed record SpeciesClusterHistory(
     IReadOnlyList<SpeciesClusterHistorySummary> Clusters,

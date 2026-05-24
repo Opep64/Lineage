@@ -4943,6 +4943,17 @@ static void SpeciesClusteringSeparatesStarterEcotypes()
     AssertTrue(fingerprints.All(fingerprint => fingerprint.EvaluatedCreatureCount == fingerprint.LivingCreatures), "Species fingerprints should evaluate each neural creature");
     AssertTrue(fingerprints.Any(fingerprint => fingerprint.Ecotype == "small-prey predator"), "Species fingerprints should preserve predator behavior");
     AssertTrue(fingerprints.Any(fingerprint => fingerprint.ForagingBias == "meat/egg-biased"), "Species fingerprints should preserve scavenger behavior");
+
+    var predatorFingerprint = fingerprints.First(fingerprint => fingerprint.Ecotype == "small-prey predator");
+    var representative = SpeciesClusterAnalyzer.FindRepresentative(simulation.State, predatorFingerprint.Name);
+    var profile = SpeciesProfileExporter.ExportSpeciesClusterRepresentative(
+        scenario,
+        simulation.State,
+        predatorFingerprint.SpeciesId.ToString());
+
+    AssertEqual(predatorFingerprint.SpeciesId, representative.SpeciesId, "Cluster representative species id");
+    AssertEqual(predatorFingerprint.Name, profile.Name, "Cluster export default profile name");
+    AssertEqual(representative.CreatureId.Value, profile.Source.CreatureId, "Cluster export representative creature");
 }
 
 static void SpeciesClusteringHandlesNonNeuralCreatures()

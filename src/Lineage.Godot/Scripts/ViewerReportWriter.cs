@@ -1193,7 +1193,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -1205,6 +1205,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
                 $"<td>{Html(summary.FounderCount)}</td>" +
                 $"<td>#{Html(summary.DominantFounderId.Value)} ({Html(summary.DominantFounderLivingCreatures)})</td>" +
+                $"<td>#{Html(summary.RepresentativeCreatureId.Value)} ({Html(summary.RepresentativeDistance.ToString("0.###", CultureInfo.InvariantCulture))})</td>" +
                 $"<td>{Html($"{summary.MinGeneration}/{summary.AverageGeneration:0.#}/{summary.MaxGeneration}")}</td>" +
                 $"<td>{Html(summary.DietLabel)}</td>" +
                 $"<td>{Html(summary.TacticLabel)}</td>" +

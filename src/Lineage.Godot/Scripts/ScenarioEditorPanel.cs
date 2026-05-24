@@ -89,6 +89,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
     public event Action? ExportSelectedSpeciesRequested;
 
+    public event Action? ExportSelectedSpeciesClusterRequested;
+
     public event Action? LoadSpeciesProfileRequested;
 
     public event Action? InjectSpeciesRequested;
@@ -478,7 +480,9 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         root.AddChild(CreateFieldRow("Export name", _speciesNameInput));
         root.AddChild(CreateFieldRow("Export notes", _speciesNotesInput));
-        root.AddChild(CreateButton("Export Selected Creature", () => ExportSelectedSpeciesRequested?.Invoke()));
+        root.AddChild(BuildButtonRow(
+            CreateButton("Export Selected Creature", () => ExportSelectedSpeciesRequested?.Invoke()),
+            CreateButton("Export Selected Cluster", () => ExportSelectedSpeciesClusterRequested?.Invoke())));
         _lastSpeciesExportLabel = new Label
         {
             Text = "No species profile exported yet.",
@@ -511,7 +515,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         var note = new Label
         {
-            Text = "Export stores the selected living creature's genome and brain. Inject adds loaded profile copies to the current world. Add Loaded To Scenario saves the loaded profile as part of this scenario's repeatable starting roster.",
+            Text = "Export stores either the selected living creature or the closest representative of its species cluster. Inject adds loaded profile copies to the current world. Add Loaded To Scenario saves the loaded profile as part of this scenario's repeatable starting roster.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         root.AddChild(note);

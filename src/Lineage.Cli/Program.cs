@@ -76,6 +76,10 @@ static void PrintHelp()
           --save-snapshot <path>     Save final simulation snapshot JSON.
           --checkpoint-interval <n>  Save loadable snapshot checkpoints every n ticks.
           --checkpoint-dir <dir>      Directory for checkpoint JSON files.
+          --status <path>            Periodically write machine-readable run status JSON.
+          --control <path>           Poll a JSON control file for stop/checkpoint requests.
+          --status-interval <n>      Status write interval in ticks. Default: 100
+          --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
           --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
           --inject-species-count <n> Founder count per injected profile. Default: 10
           --inject-species-region <region> Spawn region for injected species. Default: uniform
@@ -83,6 +87,7 @@ static void PrintHelp()
           --export-species <path>    Export a species profile, usually species/name.species.json.
           --export-species-creature <id> Export this living creature ID instead of the dominant lineage.
           --export-species-founder <id> Export a representative from this founder lineage.
+          --export-species-cluster <id|name> Export the closest living representative of this species cluster.
           --export-species-name <text> Name for the exported species profile.
           --export-species-notes <text> Notes for the exported species profile.
           --batch-scenario <path>    Add a scenario to a batch comparison. Can repeat.
@@ -126,7 +131,9 @@ static RunResult RunSingle(RunOptions options)
     var stopwatch = Stopwatch.StartNew();
 
     var outputPaths = options.ResolveOutputPaths(scenario);
-    var checkpoints = RunSimulation(options, scenario, simulation, outputPaths);
+    var runFiles = new CliRunFiles(options, scenario, outputPaths);
+    var runResult = RunSimulation(options, scenario, simulation, outputPaths, runFiles);
+    var checkpoints = runResult.Checkpoints;
     stopwatch.Stop();
 
     if (options.SaveSnapshotPath is not null)
@@ -135,6 +142,7 @@ static RunResult RunSingle(RunOptions options)
     }
 
     WriteRunOutputs(options, scenario, simulation, stopwatch.Elapsed, outputPaths, checkpoints);
+    runFiles.WriteStatus("completed", simulation, runResult.CompletedSteps, checkpoints, runResult.StopReason);
 
     SpeciesProfile? exportedSpecies = null;
     if (options.ExportSpeciesPath is not null)
@@ -214,9 +222,12 @@ static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions op
 
 static SpeciesProfile ExportSpeciesProfile(RunOptions options, SimulationScenario scenario, WorldState state)
 {
-    if (options.ExportSpeciesCreatureId is not null && options.ExportSpeciesFounderId is not null)
+    var selectorCount = (options.ExportSpeciesCreatureId is null ? 0 : 1)
+        + (options.ExportSpeciesFounderId is null ? 0 : 1)
+        + (options.ExportSpeciesClusterKey is null ? 0 : 1);
+    if (selectorCount > 1)
     {
-        throw new ArgumentException("--export-species-creature and --export-species-founder cannot both be used.");
+        throw new ArgumentException("--export-species-creature, --export-species-founder, and --export-species-cluster cannot be combined.");
     }
 
     if (options.ExportSpeciesCreatureId is not null)
@@ -239,6 +250,16 @@ static SpeciesProfile ExportSpeciesProfile(RunOptions options, SimulationScenari
             options.ExportSpeciesNotes);
     }
 
+    if (options.ExportSpeciesClusterKey is not null)
+    {
+        return SpeciesProfileExporter.ExportSpeciesClusterRepresentative(
+            scenario,
+            state,
+            options.ExportSpeciesClusterKey,
+            options.ExportSpeciesName,
+            options.ExportSpeciesNotes);
+    }
+
     return SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
         scenario,
         state,
@@ -246,11 +267,12 @@ static SpeciesProfile ExportSpeciesProfile(RunOptions options, SimulationScenari
         options.ExportSpeciesNotes);
 }
 
-static IReadOnlyList<CheckpointArtifact> RunSimulation(
+static SimulationRunResult RunSimulation(
     RunOptions options,
     SimulationScenario scenario,
     Simulation simulation,
-    OutputPaths outputPaths)
+    OutputPaths outputPaths,
+    CliRunFiles runFiles)
 {
     if (options.ProfileEndTick is not null
         && options.ProfileEndTick.Value <= (options.ProfileStartTick ?? 0))
@@ -258,7 +280,7 @@ static IReadOnlyList<CheckpointArtifact> RunSimulation(
         throw new ArgumentException("--profile-end-tick must be greater than --profile-start-tick.");
     }
 
-    if (options.CheckpointIntervalTicks is null && !options.HasProfileWindow)
+    if (options.CheckpointIntervalTicks is null && !options.HasProfileWindow && !runFiles.RequiresStepLoop)
     {
         simulation.RunSteps(options.Ticks);
         if (simulation.Profile is not null)
@@ -266,7 +288,7 @@ static IReadOnlyList<CheckpointArtifact> RunSimulation(
             simulation.Profile.IsActive = false;
         }
 
-        return Array.Empty<CheckpointArtifact>();
+        return new SimulationRunResult(Array.Empty<CheckpointArtifact>(), options.Ticks, null);
     }
 
     string? checkpointDirectory = null;
@@ -278,16 +300,56 @@ static IReadOnlyList<CheckpointArtifact> RunSimulation(
     }
 
     var checkpoints = new List<CheckpointArtifact>();
+    long completedSteps = 0;
+    string? stopReason = null;
+    runFiles.WriteStatus("running", simulation, completedSteps, checkpoints);
     for (var i = 0; i < options.Ticks; i++)
     {
         SetProfileWindowActivity(options, simulation);
         simulation.Step();
+        completedSteps++;
         if (options.CheckpointIntervalTicks is not null
             && simulation.State.Tick % options.CheckpointIntervalTicks.Value == 0)
         {
             var path = Path.Combine(checkpointDirectory!, $"tick_{simulation.State.Tick:D10}.json");
             SimulationSnapshotJson.Save(path, SimulationSnapshot.Capture(scenario, simulation));
             checkpoints.Add(new CheckpointArtifact(simulation.State.Tick, path));
+        }
+
+        var command = runFiles.ReadControlCommand();
+        if (command.RequestsCheckpoint)
+        {
+            checkpoints.Add(runFiles.SaveCheckpoint(scenario, simulation, "requested"));
+        }
+
+        if (command.RequestsStop)
+        {
+            stopReason = command.Kind == CliRunControlKind.CheckpointAndStop
+                ? "checkpoint-and-stop"
+                : "stop-requested";
+        }
+
+        if (stopReason is null
+            && options.StopOnExtinction
+            && simulation.State.Creatures.Count == 0
+            && simulation.State.Eggs.Count == 0)
+        {
+            stopReason = "extinction";
+        }
+
+        if (runFiles.ShouldWriteStatus(completedSteps) || stopReason is not null)
+        {
+            runFiles.WriteStatus(
+                stopReason is null ? "running" : "stopping",
+                simulation,
+                completedSteps,
+                checkpoints,
+                stopReason);
+        }
+
+        if (stopReason is not null)
+        {
+            break;
         }
     }
 
@@ -296,7 +358,7 @@ static IReadOnlyList<CheckpointArtifact> RunSimulation(
         simulation.Profile.IsActive = false;
     }
 
-    return checkpoints;
+    return new SimulationRunResult(checkpoints, completedSteps, stopReason);
 }
 
 static void SetProfileWindowActivity(RunOptions options, Simulation simulation)
@@ -791,6 +853,14 @@ internal sealed record RunOptions
 
     public string? CheckpointDirectory { get; init; }
 
+    public string? StatusPath { get; init; }
+
+    public string? ControlPath { get; init; }
+
+    public int StatusIntervalTicks { get; init; } = 100;
+
+    public bool StopOnExtinction { get; init; }
+
     public IReadOnlyList<string> InjectSpeciesPaths { get; init; } = Array.Empty<string>();
 
     public int InjectSpeciesCount { get; init; } = 10;
@@ -804,6 +874,8 @@ internal sealed record RunOptions
     public int? ExportSpeciesCreatureId { get; init; }
 
     public int? ExportSpeciesFounderId { get; init; }
+
+    public string? ExportSpeciesClusterKey { get; init; }
 
     public string? ExportSpeciesName { get; init; }
 
@@ -1061,6 +1133,18 @@ internal sealed record RunOptions
                 case "--checkpoint-dir":
                     options = options with { CheckpointDirectory = ReadValue(args, ref i, arg) };
                     break;
+                case "--status":
+                    options = options with { StatusPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--control":
+                    options = options with { ControlPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--status-interval":
+                    options = options with { StatusIntervalTicks = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--stop-on-extinction":
+                    options = options with { StopOnExtinction = true };
+                    break;
                 case "--inject-species":
                     options = options with { InjectSpeciesPaths = Append(options.InjectSpeciesPaths, ReadValue(args, ref i, arg)) };
                     break;
@@ -1081,6 +1165,9 @@ internal sealed record RunOptions
                     break;
                 case "--export-species-founder":
                     options = options with { ExportSpeciesFounderId = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--export-species-cluster":
+                    options = options with { ExportSpeciesClusterKey = ReadValue(args, ref i, arg) };
                     break;
                 case "--export-species-name":
                     options = options with { ExportSpeciesName = ReadValue(args, ref i, arg) };
@@ -2700,7 +2787,7 @@ internal static class SpeciesClusterCsvWriter
     public static void Write(string path, WorldState state)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("rank,species_id,name,living_creatures,living_share,founder_count,dominant_founder_id,dominant_founder_living,min_generation,avg_generation,max_generation,avg_energy,avg_age_seconds,avg_genome_distance,avg_brain_distance,avg_body_radius,avg_max_speed,avg_vision_range,avg_dietary_adaptation,avg_carrion_adaptation,avg_plant_digestion,avg_meat_digestion,avg_fresh_meat_digestion,avg_stale_meat_digestion,avg_bite_strength,avg_damage_resistance,recent_plant_kcal,recent_meat_kcal,eating_share,attack_share,current_east_progress_share,right_region_share,diet_label,tactic_label,region_label");
+        writer.WriteLine("rank,species_id,name,living_creatures,living_share,founder_count,dominant_founder_id,dominant_founder_living,representative_creature_id,representative_distance,min_generation,avg_generation,max_generation,avg_energy,avg_age_seconds,avg_genome_distance,avg_brain_distance,avg_body_radius,avg_max_speed,avg_vision_range,avg_dietary_adaptation,avg_carrion_adaptation,avg_plant_digestion,avg_meat_digestion,avg_fresh_meat_digestion,avg_stale_meat_digestion,avg_bite_strength,avg_damage_resistance,recent_plant_kcal,recent_meat_kcal,eating_share,attack_share,current_east_progress_share,right_region_share,diet_label,tactic_label,region_label");
 
         foreach (var summary in SpeciesClusterAnalyzer.Analyze(state))
         {
@@ -2714,6 +2801,8 @@ internal static class SpeciesClusterCsvWriter
                 summary.FounderCount.ToString(CultureInfo.InvariantCulture),
                 summary.DominantFounderId.Value.ToString(CultureInfo.InvariantCulture),
                 summary.DominantFounderLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.RepresentativeCreatureId.Value.ToString(CultureInfo.InvariantCulture),
+                Format(summary.RepresentativeDistance),
                 summary.MinGeneration.ToString(CultureInfo.InvariantCulture),
                 Format(summary.AverageGeneration),
                 summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
@@ -5357,7 +5446,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -5369,6 +5458,7 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatPercent(summary.LivingShare))}</td>" +
                 $"<td>{Html(summary.FounderCount)}</td>" +
                 $"<td>#{Html(summary.DominantFounderId.Value)} ({Html(summary.DominantFounderLivingCreatures)})</td>" +
+                $"<td>#{Html(summary.RepresentativeCreatureId.Value)} ({Html(summary.RepresentativeDistance.ToString("0.###", CultureInfo.InvariantCulture))})</td>" +
                 $"<td>{Html(FormatGenerationRange(summary.MinGeneration, summary.AverageGeneration, summary.MaxGeneration))}</td>" +
                 $"<td>{Html(summary.DietLabel)}</td>" +
                 $"<td>{Html(summary.TacticLabel)}</td>" +
