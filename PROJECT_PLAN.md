@@ -185,9 +185,9 @@ Performance/ecology update from 2026-05-22:
 - Current baseline numbers live in `PERFORMANCE_BASELINES.md`; after the plant dormancy pass, Balanced Foraging 20k with full profiling is about 16.756 seconds on the current machine.
 - This changed scenario outcomes intentionally, so future comparisons should use the plant-dormancy baseline rather than the pre-dormancy counts.
 
-Brain rework and sparse-balance branch update from 2026-05-25:
+Brain rework and sparse-balance update from 2026-05-25:
 
-- Active branch: `codex-brain-rework-balance-pass`.
+- Branch outcome: `codex-brain-rework-balance-pass` was merged back to `main`.
 - Detailed research log: `docs/experiments/2026-05-brain-rework-balance.md`.
 - Branch goals:
   - make perception more local and embodied, especially replacing perfect nearest-food style inputs with directional vision sectors

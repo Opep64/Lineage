@@ -1,7 +1,7 @@
 # Lineage Performance Baselines
 
 Created: 2026-05-22
-Updated: 2026-05-23
+Updated: 2026-05-25
 
 This file records performance baselines for repeatable CLI runs. Use these numbers as reference points when judging whether future performance work changes behavior or speed.
 
@@ -10,92 +10,116 @@ This file records performance baselines for repeatable CLI runs. Use these numbe
 Context:
 
 - Build: Release
-- Command shape: `dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --scenario <scenario> --ticks 10000 --seed 42 --no-output`
+- Commit: `d51ca23`
+- Command shape: `dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --probe --ticks <ticks> --probe-seeds <seeds> --probe-scenario <scenario>`
 - Default spatial cell size: `64`
 - Default world sensing cadence: expensive world queries refresh every `4` ticks, with close-range refresh at proximity `0.85`
-- Spatial index mode: array-backed grid cells; persistent dirty resource/egg cells; stamp-array resource/egg candidate dedupe; squared-distance sensing scan filters; specialized visible-creature scan with lazy trait caching; dormant depleted plants stay out of the resource index until respawn; creature cells still rebuild every tick
-- Neural mode: direct-output evaluation skips hidden-layer math while hidden-output weights are all zero
-- World size for checked-in primary presets: `2000 x 2000`
-- Date measured: 2026-05-23
+- Spatial index mode: array-backed grid cells; persistent dirty resource/egg cells; stamp-array resource/egg candidate dedupe; squared-distance sensing scan filters; specialized visible-creature scan with lazy trait caching; dormant depleted plants stay out of the resource index until respawn; creature cells still rebuild every tick.
+- Vision mode: sector vision enabled; legacy nearest-food and nearest-creature vision inputs disabled in authored scenarios.
+- Neural mode: `HybridNeural` default; `HiddenLayerNeural` available per scenario.
+- World size for checked-in primary presets: current sparse `4000 x 4000` style scenarios.
+- Date measured: 2026-05-25
 
 Output file:
 
-- `out\performance_hidden_skip_20260523\primary_10k_seed42.csv`
+- `out\main_baseline_20260525\primary_10k_seed42.csv`
 
-| Scenario | Ticks | Seed | Wall time | Final creatures | Eggs | Births | Deaths | Starvation | Injury | Max generation |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gentle Foraging | 10000 | 42 | 1.497s | 67 | 21 | 107 | 40 | 40 | 0 | 1 |
-| Balanced Foraging | 10000 | 42 | 1.186s | 40 | 7 | 108 | 68 | 68 | 0 | 1 |
-| Harsh Foraging | 10000 | 42 | 1.375s | 11 | 2 | 87 | 76 | 76 | 0 | 1 |
-| Scavenger Pressure | 10000 | 42 | 1.513s | 45 | 9 | 106 | 61 | 61 | 0 | 1 |
-| Omnivore Pressure | 10000 | 42 | 1.183s | 16 | 0 | 98 | 82 | 82 | 0 | 1 |
-| Predation Pressure | 10000 | 42 | 1.646s | 55 | 1 | 141 | 86 | 57 | 29 | 1 |
+| Scenario | Ticks | Seed | Wall time | Ticks/s | Final creatures | Eggs | Births | Deaths | Max generation |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 10000 | 42 | 1.078s | 9279.5 | 75 | 1 | 130 | 55 | 1 |
+| Carrion Pressure | 10000 | 42 | 2.033s | 4918.8 | 100 | 25 | 175 | 75 | 1 |
+| Gentle Foraging | 10000 | 42 | 1.470s | 6803.2 | 66 | 3 | 105 | 39 | 1 |
+| Harsh Foraging | 10000 | 42 | 1.143s | 8747.9 | 50 | 13 | 103 | 53 | 1 |
+| Migration Pressure | 10000 | 42 | 2.956s | 3383.0 | 157 | 6 | 230 | 73 | 1 |
+| Obstacle Pressure | 10000 | 42 | 1.248s | 8014.5 | 74 | 3 | 142 | 68 | 1 |
+| Omnivore Pressure | 10000 | 42 | 1.167s | 8568.9 | 72 | 1 | 129 | 57 | 1 |
+| Predation Pressure | 10000 | 42 | 2.043s | 4895.9 | 62 | 13 | 208 | 146 | 1 |
+| Predator Prey Pressure | 10000 | 42 | 1.804s | 5541.8 | 77 | 15 | 188 | 111 | 1 |
+| Scavenger Pressure | 10000 | 42 | 1.603s | 6237.9 | 102 | 28 | 156 | 54 | 1 |
+| Terrain Pressure | 10000 | 42 | 1.405s | 7115.8 | 64 | 1 | 157 | 93 | 1 |
 
-Delta from the previous plant-dormancy baseline:
-
-| Scenario | Plant-dormancy wall time | Current wall time | Delta |
-| --- | ---: | ---: | ---: |
-| Gentle Foraging | 9.983s | 1.497s | -85.0% |
-| Balanced Foraging | 3.731s | 1.186s | -68.2% |
-| Harsh Foraging | 1.567s | 1.375s | -12.3% |
-| Scavenger Pressure | 2.460s | 1.513s | -38.5% |
-| Omnivore Pressure | 1.850s | 1.183s | -36.1% |
-| Predation Pressure | 1.885s | 1.646s | -12.7% |
-
-The checked scenario outcomes intentionally changed because expensive world sensing is now time-sliced. This makes creatures less perfectly responsive to distant food and other creatures, so these numbers should replace the pre time-slicing results for future comparisons.
+All 11 runs completed without extinction or population-cap stops. This baseline replaces the older 2026-05-23 dense/nearest-input numbers for normal mainline comparisons.
 
 ## Balanced Tail Profile
 
 Command:
 
 ```powershell
-dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --scenario .\scenarios\balanced-foraging.json --ticks 10000 --seed 42 --profile --profile-start-tick 8000 --profile-end-tick 10000 --profile-output .\out\performance_hidden_skip_20260523\balanced_10k_tail_profile.csv --no-output
+dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --scenario .\scenarios\balanced-foraging.json --ticks 10000 --seed 42 --profile --profile-start-tick 8000 --profile-end-tick 10000 --profile-output .\out\main_baseline_20260525\balanced_10k_tail_profile.csv --no-output
 ```
 
 Output files:
 
-- `out\performance_hidden_skip_20260523\balanced_10k_tail_profile.csv`
-- `out\performance_hidden_skip_20260523\balanced_10k_tail_profile_sensing.csv`
+- `out\main_baseline_20260525\balanced_10k_tail_profile.csv`
+- `out\main_baseline_20260525\balanced_10k_tail_profile_sensing.csv`
 
 Tail profile window: ticks `8000-10000`, `2000` profiled steps.
 
 | System | Time | Share | Avg per profiled tick |
 | --- | ---: | ---: | ---: |
-| CreatureSensingSystem | 95.410ms | 38.0% | 0.0477ms |
-| ResourceRegrowthSystem | 47.632ms | 19.0% | 0.0238ms |
-| NeuralControllerSystem | 26.619ms | 10.6% | 0.0133ms |
-| MovementSystem | 15.488ms | 6.2% | 0.0077ms |
-| MetabolismSystem | 12.844ms | 5.1% | 0.0064ms |
-| StatsRecordingSystem | 12.313ms | 4.9% | 0.0062ms |
-| EatingSystem | 12.212ms | 4.9% | 0.0061ms |
-| CreatureAttackSystem | 11.024ms | 4.4% | 0.0055ms |
+| CreatureSensingSystem | 136.862ms | 39.9% | 0.0684ms |
+| NeuralControllerSystem | 95.723ms | 27.9% | 0.0479ms |
+| ResourceRegrowthSystem | 25.562ms | 7.5% | 0.0128ms |
+| CreatureAttackSystem | 15.823ms | 4.6% | 0.0079ms |
+| EatingSystem | 15.152ms | 4.4% | 0.0076ms |
+| StatsRecordingSystem | 11.906ms | 3.5% | 0.0060ms |
+| MovementSystem | 11.650ms | 3.4% | 0.0058ms |
+| MetabolismSystem | 9.627ms | 2.8% | 0.0048ms |
 
 Sensing tail profile:
 
 | Phase | Time | Queries | Candidates/query | Notes |
 | --- | ---: | ---: | ---: | --- |
-| World sense refresh | 0.000ms | 78687 | 0.67 refreshes/update | 52560 refreshed, 26127 skipped; scheduled 8799, close 43761 |
-| Resource query | 16.563ms | 52560 | 5.85 | Plant 5.70/query, meat 0.15/query |
-| Resource scan | 13.697ms | 52560 | 5.85 | Visible plants 60886, visible meat 321 |
-| Egg query/scan | 5.415ms | 52560 | 0.35 | Visible eggs 1311 |
-| Creature query/scan | 5.832ms | 52560 | 2.40 | Visible creatures 27611 |
-| Creature setup | 5.530ms | 78687 | 1.00 | Per-creature setup before optional world query |
-| Sense finalization | 7.994ms | 78687 | 1.00 | Sense density, target projection, and state write-back |
+| World sense refresh | 0.000ms | 136398 | 0.56 refreshes/update | 76904 refreshed, 59494 skipped; scheduled 19847, close 57057 |
+| Resource query | 20.288ms | 76904 | 0.86 | Plant 0.45/query, meat 0.41/query |
+| Resource scan | 10.820ms | 76904 | 0.86 | Visible plants 28093, visible meat 18620 |
+| Egg query/scan | 8.219ms | 76904 | 0.26 | Visible eggs 7435 |
+| Creature query/scan | 9.046ms | 76904 | 1.22 | Visible creatures 8200 |
+| Terrain sense | 14.575ms | 136398 | 1.00 | Terrain drag probes |
+| Obstacle sense | 2.443ms | 76904 | 0.00 | No obstacle candidates in Balanced |
+| Creature setup/internal/finalization | 31.549ms | 136398 | 1.00 | Setup, body/internal inputs, and write-back |
 
-Targeted comparison from the plant-dormancy baseline to the current baseline:
+The richer post-merge input frame has shifted more time into neural evaluation. Sensing is still the largest cost, but `NeuralControllerSystem` is now the clear second-place cost in Balanced tail profiling.
 
-| Measurement | Plant-dormancy baseline | Current baseline | Delta |
-| --- | ---: | ---: | ---: |
-| Profiled system time, balanced tail | 1734.359ms | 250.908ms | -85.5% |
-| `CreatureSensingSystem`, balanced tail | 1141.289ms | 95.410ms | -91.6% |
-| Resource query time, sensing tail | 201.784ms | 16.563ms | -91.8% |
-| Resource scan time, sensing tail | 150.796ms | 13.697ms | -90.9% |
-| Egg query/scan time, sensing tail | 240.716ms | 5.415ms | -97.8% |
-| Creature query/scan time, sensing tail | 255.032ms | 5.832ms | -97.7% |
+## Stability Reference
 
-## Profiling Exercise Comparison
+Output files:
 
-These are broader comparisons from the start of the profiling exercise to the current implementation. They include multiple accepted changes, especially the resource/meat query split, persistent dirty resource/egg indexing, array-backed grid cells, stamp-array resource/egg candidate dedupe, squared-distance sensing scan filters, specialized visible-creature scan, dormant depleted-plant respawn, default `64` spatial cells, obstacle sensing support, time-sliced expensive world sensing, and hidden-layer short-circuiting while hidden-output weights are zero.
+- `out\main_stability_20260525\focused_60k_seeds42-44.csv`
+- `out\main_stability_20260525\focused_60k_seeds42-44.html`
+- `out\main_stability_20260525\weak_90k_seeds42-44.csv`
+- `out\main_stability_20260525\weak_90k_seeds42-44.html`
+
+60k focused pass, seeds `42-44`:
+
+| Scenario | Runs | Status | Avg final | Final range | Avg ticks/s | Avg tail population | Max generation | Avg tail meal gap |
+| --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 3 | Completed | 31.7 | 26-35 | 10336.9 | 22.9 | 6 | 52.0s |
+| Carrion Pressure | 3 | Completed | 36.7 | 29-44 | 5492.1 | 56.3 | 5 | 41.7s |
+| Harsh Foraging | 3 | Completed | 20.7 | 15-28 | 11755.3 | 26.5 | 6 | 68.4s |
+| Migration Pressure | 3 | Completed | 89.0 | 43-114 | 4227.7 | 86.5 | 6 | 60.1s |
+| Obstacle Pressure | 3 | Completed | 90.3 | 69-123 | 6604.4 | 65.7 | 5 | 23.8s |
+| Omnivore Pressure | 3 | Completed | 24.0 | 18-28 | 11134.0 | 25.8 | 6 | 41.1s |
+| Predation Pressure | 3 | Completed | 25.3 | 20-32 | 7720.1 | 24.8 | 8 | 27.4s |
+| Predator Prey Pressure | 3 | Completed | 40.0 | 33-44 | 6234.4 | 46.6 | 7 | 37.9s |
+| Scavenger Pressure | 3 | Completed | 48.0 | 44-55 | 5694.6 | 57.9 | 6 | 40.0s |
+| Terrain Pressure | 3 | Completed | 76.7 | 73-82 | 7812.4 | 66.2 | 7 | 41.8s |
+
+90k weak-scenario pass, seeds `42-44`:
+
+| Scenario | Runs | Status | Avg final | Final range | Avg ticks/s | Avg tail population | Max generation | Avg tail meal gap |
+| --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 3 | Completed | 27.7 | 11-50 | 10514.1 | 26.6 | 8 | 92.7s |
+| Carrion Pressure | 3 | Completed | 60.0 | 48-67 | 5371.1 | 58.3 | 9 | 40.1s |
+| Harsh Foraging | 3 | Completed | 21.3 | 17-27 | 11502.9 | 23.3 | 7 | 70.7s |
+| Omnivore Pressure | 3 | Completed | 25.3 | 17-31 | 11550.5 | 26.3 | 9 | 41.4s |
+| Predation Pressure | 3 | Completed | 18.3 | 10-26 | 8162.6 | 23.8 | 11 | 23.9s |
+
+No scenario JSON changes were made from this pass. The current sparse balance is viable through 60k and the focused weak scenarios remained viable through 90k, but Balanced and Predation both produced low single-seed tail windows that should be watched in longer runs.
+
+## Historical Profiling Exercise Comparison
+
+These are older 2026-05-23 comparisons from the start of the profiling exercise to the pre-brain-rework implementation. They include multiple accepted changes, especially the resource/meat query split, persistent dirty resource/egg indexing, array-backed grid cells, stamp-array resource/egg candidate dedupe, squared-distance sensing scan filters, specialized visible-creature scan, dormant depleted-plant respawn, default `64` spatial cells, obstacle sensing support, time-sliced expensive world sensing, and hidden-layer short-circuiting while hidden-output weights are zero.
 
 | Run | Start-of-profiling number | Current number | Delta |
 | --- | ---: | ---: | ---: |
@@ -104,12 +128,12 @@ These are broader comparisons from the start of the profiling exercise to the cu
 | `CreatureSensingSystem`, 20000-tick profile | 56888.488ms | 1202.769ms | -97.9% |
 | `SpatialIndexRebuildSystem`, 20000-tick profile | 2147.808ms | 33.717ms | -98.4% |
 
-Current 20000-tick profile output files:
+2026-05-23 20000-tick profile output files:
 
 - `out\performance_hidden_skip_20260523\balanced_20k_profile.csv`
 - `out\performance_hidden_skip_20260523\balanced_20k_profile_sensing.csv`
 
-Current 20000-tick sensing profile highlights:
+2026-05-23 20000-tick sensing profile highlights:
 
 | Phase | Time | Queries | Candidates/query | Notes |
 | --- | ---: | ---: | ---: | --- |

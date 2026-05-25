@@ -37,10 +37,11 @@ This is the starting point for future Codex threads. Read this file first, then 
 
 ## Current Branch Context
 
-- Branch: `codex-brain-rework-balance-pass`
-- Status: merge-ready after automated validation and user manual Godot spot-check.
-- Main branch outcome: sector vision, BrainFactory, optional hidden-layer brain, lower-density sparse ecology, habitat-constrained plant relocation, and long-run export fixes.
+- Branch: `main`
+- Status: brain rework and sparse-balance work merged; mainline baseline refreshed.
+- Main branch outcome: sector vision, BrainFactory, optional hidden-layer brain, lower-density sparse ecology, habitat-constrained plant relocation, long-run export fixes, and refreshed post-merge stability/performance baselines.
 - Detailed branch log: `docs/experiments/2026-05-brain-rework-balance.md`
+- Latest mainline baseline log: `docs/experiments/2026-05-main-baseline-stability.md`
 
 ## Maintenance Rules
 

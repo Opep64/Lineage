@@ -6,10 +6,12 @@ This file is for work that is not done yet. If a mechanic is implemented, move i
 
 ## Merge And Baseline Follow-Up
 
-Status: near-term
+Status: completed enough for current mainline
 
-- Merge `codex-brain-rework-balance-pass` back to main after documentation cleanup.
-- Refresh performance and balance baselines on main after merge.
+- `codex-brain-rework-balance-pass` has been merged back to `main`.
+- Mainline performance and balance baselines were refreshed on 2026-05-25.
+- Current baseline details live in `PERFORMANCE_BASELINES.md`.
+- Evidence log: `docs/experiments/2026-05-main-baseline-stability.md`.
 - Decide whether `docs/experiments/2026-05-brain-rework-balance.md` should stay as a full research log or be compressed later.
 
 ## Brain Architecture

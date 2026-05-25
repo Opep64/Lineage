@@ -191,13 +191,15 @@ Reports include:
 
 ## Current Validation Snapshot
 
-Recent branch validation:
+Recent mainline validation:
 
 - 157 core tests passed.
 - Release solution build passed.
-- Godot headless launch passed.
-- Broad 20k probe across 11 scenarios and seeds 42-44 completed 33/33 runs with no extinctions and no population cap trips.
-- Godot export smoke wrote all 12 viewer export files and reloaded the snapshot.
-- CLI-run-style output smoke wrote sidecars, report, snapshot, scenario JSON, and checkpoints, then resumed from snapshot.
+- Post-merge 10k seed-42 baseline across 11 checked scenarios completed with no extinctions and no population-cap trips.
+- Post-merge 60k stability pass across 10 scenarios and seeds 42-44 completed 30/30 runs with no extinctions.
+- Post-merge 90k weak-scenario pass across Balanced, Carrion, Harsh, Omnivore, and Predation completed 15/15 runs with no extinctions.
+- Balanced 10k tail profile now shows `CreatureSensingSystem` at 39.9% and `NeuralControllerSystem` at 27.9% of profiled system time.
+- Earlier Godot export smoke wrote all 12 viewer export files and reloaded the snapshot.
+- Earlier CLI-run-style output smoke wrote sidecars, report, snapshot, scenario JSON, and checkpoints, then resumed from snapshot.
 
-See `docs/experiments/2026-05-brain-rework-balance.md` for the detailed branch evidence.
+See `docs/experiments/2026-05-brain-rework-balance.md` for the detailed branch evidence and `docs/experiments/2026-05-main-baseline-stability.md` for the post-merge mainline baseline.
