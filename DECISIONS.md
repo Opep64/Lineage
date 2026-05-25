@@ -221,6 +221,7 @@ Decision:
 Rationale:
 
 - Hidden-layer brains are viable, but not yet clearly superior across all pressures.
+- A 150k weak-scenario comparison with 8 hidden nodes completed without extinction, but Predation Pressure had thinner worst-seed populations than Hybrid.
 - Keeping hybrid default avoids destabilizing all scenarios while perception/balance work continues.
 
 Status: active.

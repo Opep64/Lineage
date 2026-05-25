@@ -19,7 +19,7 @@ Status: completed enough for current mainline
 Status: active design direction
 
 - Keep `HybridNeural` default until hidden-layer and sector-vision behavior has more long-run evidence.
-- Compare `HiddenLayerNeural` fairly after the new perception and sparse balance work settles.
+- Continue comparing `HiddenLayerNeural`; the 8-node architecture passed the 150k weak-scenario matrix, but Predation Pressure remained thinner than Hybrid in worst seeds.
 - Consider a fully generic brain interface beyond `BrainFactory`, where specific brain implementations own opaque genome/state payloads.
 - Future brain candidates:
   - fixed layered neural net with no direct path

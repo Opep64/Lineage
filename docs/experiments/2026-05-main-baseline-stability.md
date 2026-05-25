@@ -199,3 +199,54 @@ Readout:
 - Carrion Pressure looks healthier than earlier carrion-specific long checks.
 - Harsh Foraging and Predation Pressure remain deliberately narrow-margin scenarios. They survived this pass, but their low final populations make them the first places to watch after future mechanics.
 - No tuning changes are recommended solely from this pass. If future longer runs show repeated late extinctions, tune food-gap recovery, reserve handling, or reproduction pacing before raising plant density.
+
+## 150k HiddenLayerNeural Follow-Up
+
+Temporary scenario copies were generated under `out\main_stability_20260525_long\hidden_layer_scenarios` from the same five scenario JSON files, with:
+
+- `brainArchitectureKind`: `hiddenLayerNeural`
+- `brainHiddenNodeCount`: `8`
+
+Output:
+
+- `out\main_stability_20260525_long\hidden8_150k_seeds42-46.csv`
+- `out\main_stability_20260525_long\hidden8_150k_seeds42-46.html`
+
+Command:
+
+```powershell
+dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --probe --ticks 150000 --probe-seeds 42,43,44,45,46 --probe-scenario .\out\main_stability_20260525_long\hidden_layer_scenarios\balanced-foraging.json --probe-scenario .\out\main_stability_20260525_long\hidden_layer_scenarios\harsh-foraging.json --probe-scenario .\out\main_stability_20260525_long\hidden_layer_scenarios\carrion-pressure.json --probe-scenario .\out\main_stability_20260525_long\hidden_layer_scenarios\omnivore-pressure.json --probe-scenario .\out\main_stability_20260525_long\hidden_layer_scenarios\predation-pressure.json --probe-output out\main_stability_20260525_long\hidden8_150k_seeds42-46.csv --probe-report out\main_stability_20260525_long\hidden8_150k_seeds42-46.html --probe-stop-on-extinction --probe-max-population 5000
+```
+
+Result:
+
+- 25/25 runs completed.
+- No extinctions.
+- No population cap stops.
+- Total wall time: 438.729s.
+
+| Scenario | Runs | Status | Avg final | Range | Avg ticks/s | Avg tail pop | Tail pop range | Max gen | Avg tail meal gap |
+| --- | ---: | --- | ---: | --- | ---: | ---: | --- | ---: | ---: |
+| Balanced Foraging HiddenLayerNeural | 5 | Completed | 40.2 | 35-48 | 8015.9 | 43.8 | 39.4-50.5 | 13 | 88.3s |
+| Carrion Pressure HiddenLayerNeural | 5 | Completed | 68.2 | 57-77 | 5468.7 | 55.8 | 53.5-58.7 | 15 | 35.0s |
+| Harsh Foraging HiddenLayerNeural | 5 | Completed | 26.6 | 16-38 | 11315.9 | 22.5 | 13.0-28.9 | 15 | 74.2s |
+| Omnivore Pressure HiddenLayerNeural | 5 | Completed | 30.4 | 24-35 | 10847.5 | 28.8 | 25.0-31.4 | 12 | 39.1s |
+| Predation Pressure HiddenLayerNeural | 5 | Completed | 14.0 | 4-25 | 10719.9 | 17.2 | 8.7-28.6 | 15 | 22.6s |
+
+Comparison with the default hybrid 150k pass:
+
+| Scenario | Hybrid avg final | Hidden8 avg final | Delta | Hybrid range | Hidden8 range |
+| --- | ---: | ---: | ---: | --- | --- |
+| Balanced Foraging | 44.4 | 40.2 | -4.2 | 36-52 | 35-48 |
+| Carrion Pressure | 67.2 | 68.2 | +1.0 | 52-83 | 57-77 |
+| Harsh Foraging | 21.6 | 26.6 | +5.0 | 7-30 | 16-38 |
+| Omnivore Pressure | 26.0 | 30.4 | +4.4 | 20-37 | 24-35 |
+| Predation Pressure | 16.2 | 14.0 | -2.2 | 8-26 | 4-25 |
+
+Readout:
+
+- Hidden8 is viable in the same weak-scenario matrix.
+- Hidden8 looks at least competitive in Carrion, Harsh, and Omnivore.
+- Hidden8 is slightly behind Hybrid in Balanced.
+- Predation remains the main caution: Hidden8 survived, but two seeds ended at `4` and `5` creatures.
+- Keep `HybridNeural` as the default for now. Hidden8 should continue to be tested, especially after future predation/combat tuning or richer interaction mechanics.

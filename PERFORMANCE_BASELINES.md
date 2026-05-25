@@ -91,6 +91,8 @@ Output files:
 - `out\main_stability_20260525\weak_90k_seeds42-44.html`
 - `out\main_stability_20260525_long\weak_150k_seeds42-46.csv`
 - `out\main_stability_20260525_long\weak_150k_seeds42-46.html`
+- `out\main_stability_20260525_long\hidden8_150k_seeds42-46.csv`
+- `out\main_stability_20260525_long\hidden8_150k_seeds42-46.html`
 
 60k focused pass, seeds `42-44`:
 
@@ -130,6 +132,28 @@ No scenario JSON changes were made from this pass. The current sparse balance is
 | Predation Pressure | 5 | Completed | 16.2 | 8-26 | 8836.6 | 15.2 | 13.5-19.1 | 18 | 23.8s |
 
 The 150k pass completed with no extinctions and no population-cap stops. Harsh and Predation remain thin, with single-seed final populations of `7` and `8`, so future mechanics or tuning should continue to watch for late-collapse sensitivity there.
+
+150k `HiddenLayerNeural` pass, 8 hidden nodes, seeds `42-46`:
+
+| Scenario | Runs | Status | Avg final | Final range | Avg ticks/s | Avg tail population | Tail population range | Max generation | Avg tail meal gap |
+| --- | ---: | --- | ---: | --- | ---: | ---: | --- | ---: | ---: |
+| Balanced Foraging | 5 | Completed | 40.2 | 35-48 | 8015.9 | 43.8 | 39.4-50.5 | 13 | 88.3s |
+| Carrion Pressure | 5 | Completed | 68.2 | 57-77 | 5468.7 | 55.8 | 53.5-58.7 | 15 | 35.0s |
+| Harsh Foraging | 5 | Completed | 26.6 | 16-38 | 11315.9 | 22.5 | 13.0-28.9 | 15 | 74.2s |
+| Omnivore Pressure | 5 | Completed | 30.4 | 24-35 | 10847.5 | 28.8 | 25.0-31.4 | 12 | 39.1s |
+| Predation Pressure | 5 | Completed | 14.0 | 4-25 | 10719.9 | 17.2 | 8.7-28.6 | 15 | 22.6s |
+
+Comparison with the default `HybridNeural` 150k pass:
+
+| Scenario | Hybrid avg final | Hidden8 avg final | Delta | Hybrid range | Hidden8 range |
+| --- | ---: | ---: | ---: | --- | --- |
+| Balanced Foraging | 44.4 | 40.2 | -4.2 | 36-52 | 35-48 |
+| Carrion Pressure | 67.2 | 68.2 | +1.0 | 52-83 | 57-77 |
+| Harsh Foraging | 21.6 | 26.6 | +5.0 | 7-30 | 16-38 |
+| Omnivore Pressure | 26.0 | 30.4 | +4.4 | 20-37 | 24-35 |
+| Predation Pressure | 16.2 | 14.0 | -2.2 | 8-26 | 4-25 |
+
+Hidden8 also completed the 150k weak-scenario matrix without extinction. It is viable enough to keep testing, but this pass does not justify making it the default yet because Predation Pressure became thinner in the worst seeds.
 
 ## Historical Profiling Exercise Comparison
 
