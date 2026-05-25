@@ -4,6 +4,15 @@ Created: 2026-05-19
 
 This file is the working context for the evolution simulator project. It is meant to help future threads quickly recover the current direction, decisions, and next steps.
 
+Documentation map:
+
+- Start with `DOCS_INDEX.md`.
+- Current implemented mechanics live in `IMPLEMENTED_STATE.md`.
+- Unimplemented plans and open design directions live in `ROADMAP.md`.
+- Active design decisions live in `DECISIONS.md`.
+- Performance numbers live in `PERFORMANCE_BASELINES.md`.
+- Detailed experiment logs live under `docs/experiments/`.
+
 ## Project Goal
 
 Build an evolution simulator in the spirit of embodied artificial-life sandboxes such as The Bibites, while exploring richer ecology, local perception, imperfect navigation, environmental pressure, and eventual social behavior.
@@ -179,7 +188,7 @@ Performance/ecology update from 2026-05-22:
 Brain rework and sparse-balance branch update from 2026-05-25:
 
 - Active branch: `codex-brain-rework-balance-pass`.
-- Temporary detailed research log: `BRAIN_REWORK_BALANCE_NOTES.md`.
+- Detailed research log: `docs/experiments/2026-05-brain-rework-balance.md`.
 - Branch goals:
   - make perception more local and embodied, especially replacing perfect nearest-food style inputs with directional vision sectors
   - introduce a brain factory so multiple brain architectures can coexist and be compared
@@ -218,8 +227,8 @@ Brain rework and sparse-balance branch update from 2026-05-25:
   - keep `HiddenLayerNeural` available for scenario comparison, with 8 hidden nodes as its default
   - do not prewire memory; memory should be able to evolve, but not be handed to the starter as a solved behavior
 - Remaining before merging this branch back:
-  - optionally do one manual interactive Godot spot-check for scenario editing and opening reports, since automated headless checks cannot click the UI
-  - decide whether to keep `BRAIN_REWORK_BALANCE_NOTES.md` as a committed research log or fold its important parts into this plan and remove it
+  - manual interactive Godot spot-check for scenario editing and opening reports is complete
+  - keep `docs/experiments/2026-05-brain-rework-balance.md` as the detailed research log for now
   - after merge, refresh any baseline numbers that future performance or balance comparisons will use
 
 ## Initial Scope

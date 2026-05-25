@@ -1,10 +1,10 @@
-# Brain Rework And Balance Branch Notes
+# Brain Rework And Balance Experiment Log
 
-Temporary notes for branch `codex-brain-rework-balance-pass`.
+Detailed notes for branch `codex-brain-rework-balance-pass`.
 
 Base commit: `51f188d Add selected run Markdown export`.
 
-Current status: branch outcomes are now summarized in `PROJECT_PLAN.md`. Keep this file as the detailed experimental log unless we decide to fold it down before merge.
+Current status: branch outcomes are summarized in `IMPLEMENTED_STATE.md`, `ROADMAP.md`, `DECISIONS.md`, and `PROJECT_PLAN.md`. Keep this file as the detailed experimental evidence trail.
 
 ## Goals
 

@@ -3,7 +3,7 @@
 Created: 2026-05-23
 Updated: 2026-05-24
 
-This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Keep core simulation, Godot viewer, scenario mechanics, and ecology-roadmap notes in `PROJECT_PLAN.md`; use this file for workflow tooling around runs.
+This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Start with `DOCS_INDEX.md` for the full documentation map. Keep current implemented mechanics in `IMPLEMENTED_STATE.md`, future mechanics in `ROADMAP.md`, and use this file only for workflow tooling around runs.
 
 ## Goal
 
