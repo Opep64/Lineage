@@ -207,12 +207,18 @@ Brain rework and sparse-balance branch update from 2026-05-25:
   - broad 20k probe across 11 scenarios and seeds 42-44 completed 33/33 runs with no extinctions and no population cap trips
   - broad probe outputs: `out/merge_readiness_20260525/broad_20k.csv` and `out/merge_readiness_20260525/broad_20k.html`
   - broad probe average final populations ranged from `26.7` in Harsh Foraging to `103.7` in Gentle Foraging
+- Godot/CLI sanity validation:
+  - a temporary ignored harness under `out/godot_export_sanity` called `GodotRunExportWriter` directly
+  - the Godot export smoke wrote all 12 viewer export files at tick 1500 and reloaded the exported snapshot at the same tick
+  - a CLI-run-style smoke using the Godot output naming convention wrote report, snapshot, sidecars, and two checkpoints under `out/godot_cli_sanity_20260525`
+  - the CLI successfully resumed from the exported snapshot for 10 additional ticks
+  - Godot headless launch still passed after the export checks
 - Current design decision:
   - keep `HybridNeural` as the default until the new perception/balance work has had more long-run validation
   - keep `HiddenLayerNeural` available for scenario comparison, with 8 hidden nodes as its default
   - do not prewire memory; memory should be able to evolve, but not be handed to the starter as a solved behavior
 - Remaining before merging this branch back:
-  - verify Godot can launch, edit scenarios, and export current runs after the refactor
+  - optionally do one manual interactive Godot spot-check for scenario editing and opening reports, since automated headless checks cannot click the UI
   - decide whether to keep `BRAIN_REWORK_BALANCE_NOTES.md` as a committed research log or fold its important parts into this plan and remove it
   - after merge, refresh any baseline numbers that future performance or balance comparisons will use
 

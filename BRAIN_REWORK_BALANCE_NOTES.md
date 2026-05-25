@@ -24,7 +24,7 @@ Current status: branch outcomes are now summarized in `PROJECT_PLAN.md`. Keep th
 
 ## Pre-Merge TODOs
 
-- Verify Godot live run export after the streaming/sampled snapshot fix on one long run. The previous UI-thread blocking and snapshot out-of-memory issues have been addressed, but large reports can still be slow and should remain a later optimization target.
+- Optionally do one manual interactive Godot spot-check for scenario editing and opening reports before merge. Automated checks now cover headless launch, direct viewer export writing, CLI-run-style output naming, snapshot reload, and checkpoint output, but they cannot click the UI.
 
 ## Current Hypotheses
 
@@ -1292,6 +1292,35 @@ Interpretation:
 - No broad-probe scenario went extinct.
 - No run hit the 5000 population cap.
 - This is a smoke/regression probe, not a replacement for the focused 60k/90k baselines above.
+
+## 2026-05-25 Godot And CLI Sanity Pass
+
+Ran automated checks around the Godot-facing paths that changed during the branch.
+
+Direct viewer export smoke:
+
+- Temporary ignored harness: `out/godot_export_sanity`.
+- The harness references `Lineage.Core` and compiles the viewer export/report writers directly from `src/Lineage.Godot/Scripts`.
+- It loaded `scenarios/balanced-foraging.json`, stepped to tick 1500, called `GodotRunExportWriter.Write`, checked all 12 expected files, and reloaded the exported snapshot.
+- Output directory: `out/godot_export_sanity_20260525`.
+- Result: snapshot reloaded at tick 1500.
+
+CLI-run-style smoke:
+
+- Used the same output naming convention as the Godot CLI Run tab: `out/<experiment>/<experiment>_stats.csv`, `<experiment>_report.html`, `<experiment>_snapshot.json`, `<experiment>_scenario.json`, and `checkpoints`.
+- Output directory: `out/godot_cli_sanity_20260525`.
+- Ran Balanced Foraging for 1000 ticks through `dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj`.
+- Wrote report, snapshot, stats sidecars, and two checkpoints at ticks 500 and 1000.
+- Reloaded the exported snapshot through the CLI and continued for 10 ticks.
+
+Godot launch smoke:
+
+- `Godot_v4.6.2-stable_mono_win64_console.exe --headless --path src\Lineage.Godot --quit-after 2` passed.
+
+Interpretation:
+
+- The branch has automated coverage for export bundle writing, output naming, snapshot reload, checkpoint writing, and Godot startup.
+- A final manual UI spot-check is still useful before merge because automation here does not click the launcher controls or verify browser opening.
 
 ## Open Questions
 
