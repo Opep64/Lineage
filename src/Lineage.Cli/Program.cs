@@ -4472,6 +4472,8 @@ internal static class RunReportWriter
         WriteMetric(writer, "Brain architecture", FormatBrainArchitectureKind(scenario.BrainArchitectureKind));
         WriteMetric(writer, "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
         WriteMetric(writer, "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Legacy nearest food vision inputs", scenario.EnableLegacyNearestFoodVisionInputs ? "enabled" : "disabled");
+        WriteMetric(writer, "Legacy nearest creature vision inputs", scenario.EnableLegacyNearestCreatureVisionInputs ? "enabled" : "disabled");
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Ticks requested", options.Ticks.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Final tick", state.Tick.ToString(CultureInfo.InvariantCulture));

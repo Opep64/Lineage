@@ -15,6 +15,7 @@
   "worldSenseIntervalTicks": 4,
   "enableSectorVision": true,
   "enableLegacyNearestFoodVisionInputs": false,
+  "enableLegacyNearestCreatureVisionInputs": false,
   "statsSnapshotIntervalTicks": 10,
   "initialCreatureCount": 0,
   "initialMaxSpeed": 28,

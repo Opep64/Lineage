@@ -14,7 +14,8 @@ public static class LegacyNeuralBrainAdapter
         in BrainInputFrame frame,
         in LegacyNeuralMemoryInputFrame memory,
         Span<float> inputs,
-        bool enableLegacyNearestFoodVisionInputs = true)
+        bool enableLegacyNearestFoodVisionInputs = true,
+        bool enableLegacyNearestCreatureVisionInputs = true)
     {
         if (inputs.Length < NeuralBrainSchema.InputCount)
         {
@@ -46,16 +47,19 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.EggReserveRatioInput] = frame.Internal.EggReserveRatio;
         inputs[NeuralBrainSchema.ReproductionReadinessInput] = frame.Internal.ReproductionReadiness;
         inputs[NeuralBrainSchema.VisibleCreatureDensityInput] = frame.Vision.Creature.Density;
-        inputs[NeuralBrainSchema.CreatureProximityInput] = frame.Vision.Creature.Proximity;
-        inputs[NeuralBrainSchema.CreatureForwardInput] = frame.Vision.Creature.DirectionForward;
-        inputs[NeuralBrainSchema.CreatureRightInput] = frame.Vision.Creature.DirectionRight;
+        if (enableLegacyNearestCreatureVisionInputs)
+        {
+            inputs[NeuralBrainSchema.CreatureProximityInput] = frame.Vision.Creature.Proximity;
+            inputs[NeuralBrainSchema.CreatureForwardInput] = frame.Vision.Creature.DirectionForward;
+            inputs[NeuralBrainSchema.CreatureRightInput] = frame.Vision.Creature.DirectionRight;
+            inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput] = frame.Vision.CreatureRelativeBodySize;
+            inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = frame.Vision.CreatureRelativeSpeed;
+            inputs[NeuralBrainSchema.CreatureApproachRateInput] = frame.Vision.CreatureApproachRate;
+            inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = frame.Vision.CreatureFacingAlignment;
+        }
         inputs[NeuralBrainSchema.MeatScentDensityInput] = frame.Scent.Meat.Density;
         inputs[NeuralBrainSchema.MeatScentForwardInput] = frame.Scent.Meat.DirectionForward;
         inputs[NeuralBrainSchema.MeatScentRightInput] = frame.Scent.Meat.DirectionRight;
-        inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput] = frame.Vision.CreatureRelativeBodySize;
-        inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = frame.Vision.CreatureRelativeSpeed;
-        inputs[NeuralBrainSchema.CreatureApproachRateInput] = frame.Vision.CreatureApproachRate;
-        inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = frame.Vision.CreatureFacingAlignment;
         inputs[NeuralBrainSchema.CurrentTerrainDragInput] = frame.Body.CurrentTerrainDrag;
         inputs[NeuralBrainSchema.ForwardTerrainDragInput] = frame.Body.ForwardTerrainDrag;
         inputs[NeuralBrainSchema.LeftTerrainDragInput] = frame.Body.LeftTerrainDrag;

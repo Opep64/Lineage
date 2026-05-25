@@ -15,6 +15,7 @@
   "worldSenseIntervalTicks": 4,
   "enableSectorVision": true,
   "enableLegacyNearestFoodVisionInputs": false,
+  "enableLegacyNearestCreatureVisionInputs": false,
   "statsSnapshotIntervalTicks": 30,
   "initialCreatureCount": 120,
   "initialCreatureSpawnRegion": "leftThird",

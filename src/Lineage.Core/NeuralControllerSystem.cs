@@ -9,7 +9,8 @@ public sealed class NeuralControllerSystem(
     float attackThreshold = 0.25f,
     float memoryDecayPerSecond = 0.06f,
     float memoryWriteRatePerSecond = 2.5f,
-    bool enableLegacyNearestFoodVisionInputs = true) : ISimulationSystem
+    bool enableLegacyNearestFoodVisionInputs = true,
+    bool enableLegacyNearestCreatureVisionInputs = true) : ISimulationSystem
 {
     public const float DefaultAttackThreshold = 0.25f;
     public const float DefaultMemoryDecayPerSecond = 0.06f;
@@ -20,6 +21,7 @@ public sealed class NeuralControllerSystem(
     private readonly float _memoryDecayPerSecond = ValidateNonNegative(memoryDecayPerSecond, nameof(memoryDecayPerSecond));
     private readonly float _memoryWriteRatePerSecond = ValidateNonNegative(memoryWriteRatePerSecond, nameof(memoryWriteRatePerSecond));
     private readonly bool _enableLegacyNearestFoodVisionInputs = enableLegacyNearestFoodVisionInputs;
+    private readonly bool _enableLegacyNearestCreatureVisionInputs = enableLegacyNearestCreatureVisionInputs;
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -46,7 +48,8 @@ public sealed class NeuralControllerSystem(
                 inputFrame,
                 legacyMemoryInputs,
                 inputs,
-                _enableLegacyNearestFoodVisionInputs);
+                _enableLegacyNearestFoodVisionInputs,
+                _enableLegacyNearestCreatureVisionInputs);
             outputs.Clear();
             brain.Evaluate(inputs, outputs);
 

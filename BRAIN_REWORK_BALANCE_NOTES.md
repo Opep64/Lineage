@@ -829,6 +829,75 @@ Interpretation:
 - Predator Prey uses injected species profiles, so the architecture override does not transform those saved starter brains. Its base and Hidden8 population results match exactly for that reason; only minor runner overhead differs.
 - Keep the hybrid architecture as the default for now. Hidden-layer brains are viable enough to keep, but the fair comparison should wait until the remaining senses are fully wired and until roster scenarios can inject hidden-layer starter species profiles or explicitly transform profile brains at load time.
 
+## 2026-05-25 Clean Creature Vision Toggle
+
+Added `EnableLegacyNearestCreatureVisionInputs` as the creature-side companion to the earlier nearest-food toggle.
+
+Implementation notes:
+
+- The sensing system still computes nearest-creature diagnostics for UI/reporting and compatibility.
+- The neural adapter now gates the old nearest-creature brain inputs:
+  - creature proximity
+  - creature forward/right direction
+  - relative body size
+  - relative speed
+  - approach rate
+  - facing alignment
+- Aggregate visible creature density remains available because it is a density/crowding cue rather than an exact nearest-target cue.
+- Sector creature inputs remain available: generic creature density/proximity, smaller/similar/larger creature density/proximity, and sector-local approach/facing cues.
+- Checked-in scenarios now set both `enableLegacyNearestFoodVisionInputs` and `enableLegacyNearestCreatureVisionInputs` to `false`.
+- Reports now show both legacy input toggles.
+- Existing predator starter behavior still works with legacy nearest food and nearest creature inputs disabled, using sector creature cues plus body contact.
+
+Validation files:
+
+- `out/creature_clean_validation_20260525/nearest_creature_toggle_20k.csv`
+- `out/creature_clean_validation_20260525/nearest_creature_toggle_20k.html`
+- `out/creature_clean_validation_20260525/nearest_creature_clean_base_60k.csv`
+- `out/creature_clean_validation_20260525/nearest_creature_clean_base_60k.html`
+
+20k toggle comparison, seeds 42-44:
+
+| Scenario | Variant | Avg final pop | Range | Tail pop | Starvation | Injury | Tail attack | Fresh kill | Avg ticks/s |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | Clean creature | 53.3 | 51-55 | 72.6 | 180.0 | 0.0 | 0.00% | 0.00% | 1156.1 |
+| Balanced Foraging | Legacy creature | 54.3 | 43-64 | 70.8 | 176.3 | 0.0 | 0.00% | 0.00% | 1155.6 |
+| Migration Pressure | Clean creature | 59.0 | 57-63 | 78.1 | 254.0 | 0.0 | 0.00% | 0.00% | 618.3 |
+| Migration Pressure | Legacy creature | 61.0 | 51-66 | 77.2 | 253.0 | 0.0 | 0.00% | 0.00% | 602.3 |
+| Predation Pressure | Clean creature | 32.3 | 27-42 | 35.3 | 120.0 | 122.7 | 4.34% | 8.05% | 1194.1 |
+| Predation Pressure | Legacy creature | 21.0 | 17-24 | 22.9 | 93.3 | 140.0 | 6.32% | 7.72% | 1290.8 |
+| Predator Prey Pressure | Clean creature | 55.0 | 50-58 | 68.7 | 220.3 | 17.3 | 0.49% | 0.33% | 932.9 |
+| Predator Prey Pressure | Legacy creature | 48.7 | 46-52 | 65.0 | 219.0 | 16.7 | 0.69% | 1.76% | 924.8 |
+
+60k clean-creature base validation, seeds 42-44:
+
+| Scenario | Avg final pop | Range | Tail pop | Starvation | Injury | Max gen | Tail attack | Fresh kill | Meat share | Avg ticks/s |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 31.0 | 24-36 | 36.1 | 361.3 | 0.0 | 6.7 | 0.00% | 0.00% | 0.00% | 1490.6 |
+| Migration Pressure | 123.3 | 117-127 | 115.6 | 597.0 | 0.0 | 6.3 | 0.00% | 0.00% | 0.03% | 636.7 |
+| Predation Pressure | 17.7 | 6-24 | 21.3 | 210.0 | 226.7 | 5.7 | 3.02% | 8.47% | 20.30% | 1690.8 |
+| Predator Prey Pressure | 45.0 | 40-48 | 47.4 | 443.7 | 21.0 | 6.3 | 0.02% | 0.00% | 9.26% | 1190.3 |
+
+Interpretation:
+
+- Removing nearest-creature inputs is safe for Balanced and Migration in this sample; results are close to the legacy-creature comparison.
+- Predation remains viable but thin at 60k. The clean creature path reduced mutual over-aggression in the 20k comparison, but one 60k seed ended with only 6 survivors.
+- Predator Prey remains stable. The injected roster still trends toward mostly scavenging/carrion ecology rather than sustained active predation.
+- No starter-weight patch was needed for this step because sector creature cues plus contact already preserved predator starter behavior under the clean toggle.
+
+Behavior-assay follow-up:
+
+- Report behavior probes now use sector creature cues while suppressing the old nearest-creature inputs. This keeps species/ecotype assays aligned with the checked-in scenario perception path.
+- Creature assay row labels now say `Creature sector ahead`, `Small creature sector ahead`, `Large creature sector approaching`, and similar names so reports no longer imply exact nearest-creature target inputs.
+- The predator starter assay now distinguishes generic same-size creature sectors from smaller-prey sectors. It still turns toward side creature sectors and attacks smaller creature sectors, but it no longer reports automatic attack against the generic same-size creature-ahead probe.
+- Smoke report: `out/creature_sector_assay_smoke_20260525/predation_report.html`.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 154 tests.
+- `dotnet build Lineage.slnx -v:minimal` passed.
+- Godot headless project load passed.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

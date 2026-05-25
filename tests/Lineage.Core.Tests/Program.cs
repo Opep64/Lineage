@@ -69,6 +69,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sector vision buckets visible categories", CreatureSectorVisionBucketsVisibleCategories),
     ("Legacy neural adapter maps grouped brain inputs", LegacyNeuralAdapterMapsGroupedBrainInputs),
     ("Legacy neural adapter can suppress nearest food vision inputs", LegacyNeuralAdapterCanSuppressNearestFoodVisionInputs),
+    ("Legacy neural adapter can suppress nearest creature vision inputs", LegacyNeuralAdapterCanSuppressNearestCreatureVisionInputs),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
     ("Neural controller consumes sector vision inputs", NeuralControllerConsumesSectorVisionInputs),
     ("Neural controller writes spatial memory", NeuralControllerWritesSpatialMemory),
@@ -2914,6 +2915,64 @@ static void LegacyNeuralAdapterCanSuppressNearestFoodVisionInputs()
     AssertClose(-0.78f, inputs[NeuralBrainSchema.MeatScentRightInput], 0.000001, "Meat scent right remains available");
 }
 
+static void LegacyNeuralAdapterCanSuppressNearestCreatureVisionInputs()
+{
+    var genome = CreatureGenome.Baseline;
+    var sectors = default(VisionSectorSet);
+    sectors.AddCreature(8, 0.9f, relativeBodySize: -0.35f, approachRate: 0.45f, facingAlignment: 0.25f);
+    var senses = new CreatureSenseState
+    {
+        CreatureDetected = true,
+        CreatureProximity = 0.7f,
+        CreatureDirectionForward = 0.6f,
+        CreatureDirectionRight = -0.3f,
+        VisibleCreatureDensity = 0.42f,
+        CreatureRelativeBodySize = -0.35f,
+        CreatureRelativeSpeed = 0.18f,
+        CreatureApproachRate = 0.45f,
+        CreatureFacingAlignment = 0.25f,
+        VisionSectors = sectors
+    };
+
+    var frame = BrainInputFrame.FromSenses(senses, genome);
+    Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
+
+    LegacyNeuralBrainAdapter.FillInputs(
+        frame,
+        default,
+        inputs,
+        enableLegacyNearestCreatureVisionInputs: false);
+
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureProximityInput], 0.000001, "Creature proximity input is suppressed");
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureForwardInput], 0.000001, "Creature forward input is suppressed");
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureRightInput], 0.000001, "Creature right input is suppressed");
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput], 0.000001, "Creature relative size input is suppressed");
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureRelativeSpeedInput], 0.000001, "Creature relative speed input is suppressed");
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureApproachRateInput], 0.000001, "Creature approach input is suppressed");
+    AssertClose(0f, inputs[NeuralBrainSchema.CreatureFacingAlignmentInput], 0.000001, "Creature facing input is suppressed");
+    AssertClose(0.42f, inputs[NeuralBrainSchema.VisibleCreatureDensityInput], 0.000001, "Creature density remains available");
+    AssertClose(
+        0.125f,
+        inputs[NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(8)],
+        0.000001,
+        "Sector smaller-creature density remains available");
+    AssertClose(
+        0.9f,
+        inputs[NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(8)],
+        0.000001,
+        "Sector smaller-creature proximity remains available");
+    AssertClose(
+        0.45f,
+        inputs[NeuralBrainSchema.VisionSectorCreatureApproachRateInput(8)],
+        0.000001,
+        "Sector creature approach remains available");
+    AssertClose(
+        0.25f,
+        inputs[NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(8)],
+        0.000001,
+        "Sector creature facing remains available");
+}
+
 static void NeuralControllerTurnsSensesIntoActions()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 32f);
@@ -3118,7 +3177,12 @@ static void ForagerPredatorTurnsCreatureContactIntoAttackIntent()
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
         seed: 308,
-        systems: [new NeuralControllerSystem(enableLegacyNearestFoodVisionInputs: false)]);
+        systems:
+        [
+            new NeuralControllerSystem(
+                enableLegacyNearestFoodVisionInputs: false,
+                enableLegacyNearestCreatureVisionInputs: false)
+        ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
@@ -3257,7 +3321,12 @@ static void PredatorStarterFollowsSectorCreatureCues()
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
         seed: 416,
-        systems: [new NeuralControllerSystem(enableLegacyNearestFoodVisionInputs: false)]);
+        systems:
+        [
+            new NeuralControllerSystem(
+                enableLegacyNearestFoodVisionInputs: false,
+                enableLegacyNearestCreatureVisionInputs: false)
+        ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
@@ -4255,7 +4324,7 @@ static void ForagerPredatorStarterBrainHuntsCreatureCues()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Forager predator should still eat close plants");
-    AssertTrue(summary.CreatureAhead.AttackShare > 0.9f, "Forager predator should attack close visible creatures ahead");
+    AssertTrue(summary.CreatureAhead.AttackShare < 0.2f, "Forager predator should not treat a same-size creature sector as automatic prey");
     AssertTrue(summary.CreatureRight.Turn > 0.8f, "Forager predator should turn toward visible creatures on the right");
     AssertTrue(summary.SmallCreatureAhead.AttackShare > 0.9f, "Forager predator should attack smaller visible creatures");
     AssertTrue(summary.LargeCreatureApproaching.AttackShare < 0.2f, "Forager predator should hold back from large approaching creatures");

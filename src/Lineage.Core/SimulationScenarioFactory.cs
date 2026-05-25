@@ -61,6 +61,7 @@ public static class SimulationScenarioFactory
                 scenario.CloseSenseRefreshProximity,
                 scenario.EnableSectorVision,
                 scenario.EnableLegacyNearestFoodVisionInputs,
+                scenario.EnableLegacyNearestCreatureVisionInputs,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,

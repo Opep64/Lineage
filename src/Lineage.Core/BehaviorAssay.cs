@@ -107,12 +107,12 @@ public static class BehaviorAssay
             meatScentRight.ToResult("Meat scent right"),
             rottenMeatScentAhead.ToResult("Rotten meat scent ahead"),
             rottenMeatScentRight.ToResult("Rotten meat scent right"),
-            creatureAhead.ToResult("Creature ahead"),
-            creatureRight.ToResult("Creature right"),
-            smallCreatureAhead.ToResult("Small creature ahead"),
-            largeCreatureAhead.ToResult("Large creature ahead"),
-            largeCreatureApproaching.ToResult("Large creature approaching"),
-            largeCreatureFacingAway.ToResult("Large creature facing away"),
+            creatureAhead.ToResult("Creature sector ahead"),
+            creatureRight.ToResult("Creature sector right"),
+            smallCreatureAhead.ToResult("Small creature sector ahead"),
+            largeCreatureAhead.ToResult("Large creature sector ahead"),
+            largeCreatureApproaching.ToResult("Large creature sector approaching"),
+            largeCreatureFacingAway.ToResult("Large creature sector facing away"),
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
@@ -198,7 +198,11 @@ public static class BehaviorAssay
     {
         var inputFrame = BrainInputFrame.FromSenses(senses, genome);
         var legacyMemoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(senses);
-        LegacyNeuralBrainAdapter.FillInputs(inputFrame, legacyMemoryInputs, inputs);
+        LegacyNeuralBrainAdapter.FillInputs(
+            inputFrame,
+            legacyMemoryInputs,
+            inputs,
+            enableLegacyNearestCreatureVisionInputs: false);
         outputs.Clear();
         brain.Evaluate(inputs, outputs);
         var actionOutputs = LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs);
@@ -343,16 +347,38 @@ public static class BehaviorAssay
 
     private static CreatureSenseState CreateCreatureAheadSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            CreatureDetected = true,
-            CreatureProximity = 0.92f,
-            CreatureDirectionForward = 1f,
-            VisibleCreatureDensity = 0.18f,
-            CreatureRelativeBodySize = -0.15f,
-            CreatureApproachRate = 0.2f,
-            CreatureFacingAlignment = 0.15f
-        };
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.92f,
+                CreatureDirectionForward = 1f,
+                VisibleCreatureDensity = 0.18f,
+                CreatureRelativeBodySize = -0.15f,
+                CreatureApproachRate = 0.2f,
+                CreatureFacingAlignment = 0.15f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.92f,
+            relativeBodySize: -0.15f,
+            approachRate: 0.2f,
+            facingAlignment: 0.15f);
+    }
+
+    private static CreatureSenseState WithCreatureSector(
+        CreatureSenseState senses,
+        int sectorIndex,
+        float proximity,
+        float relativeBodySize,
+        float approachRate = 0f,
+        float facingAlignment = 0f)
+    {
+        var sectors = senses.VisionSectors;
+        sectors.AddCreature(sectorIndex, proximity, relativeBodySize, approachRate, facingAlignment);
+        senses.VisionSectors = sectors;
+        senses.CreatureDetected = true;
+        senses.VisibleCreatureDensity = MathF.Max(senses.VisibleCreatureDensity, 0.125f);
+        return senses;
     }
 
     private static CreatureSenseState CreateMeatScentAheadSenses()
@@ -403,75 +429,104 @@ public static class BehaviorAssay
 
     private static CreatureSenseState CreateCreatureRightSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            CreatureDetected = true,
-            CreatureProximity = 0.72f,
-            CreatureDirectionRight = 1f,
-            VisibleCreatureDensity = 0.14f,
-            CreatureRelativeBodySize = -0.1f,
-            CreatureFacingAlignment = -0.1f
-        };
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.72f,
+                CreatureDirectionRight = 1f,
+                VisibleCreatureDensity = 0.14f,
+                CreatureRelativeBodySize = -0.1f,
+                CreatureFacingAlignment = -0.1f
+            },
+            sectorIndex: 8,
+            proximity: 0.72f,
+            relativeBodySize: -0.1f,
+            facingAlignment: -0.1f);
     }
 
     private static CreatureSenseState CreateSmallCreatureAheadSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            CreatureDetected = true,
-            CreatureProximity = 0.85f,
-            CreatureDirectionForward = 1f,
-            VisibleCreatureDensity = 0.16f,
-            CreatureRelativeBodySize = -0.45f,
-            CreatureRelativeSpeed = -0.1f,
-            CreatureApproachRate = 0.05f,
-            CreatureFacingAlignment = 0.05f
-        };
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.85f,
+                CreatureDirectionForward = 1f,
+                VisibleCreatureDensity = 0.16f,
+                CreatureRelativeBodySize = -0.45f,
+                CreatureRelativeSpeed = -0.1f,
+                CreatureApproachRate = 0.05f,
+                CreatureFacingAlignment = 0.05f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.85f,
+            relativeBodySize: -0.45f,
+            approachRate: 0.05f,
+            facingAlignment: 0.05f);
     }
 
     private static CreatureSenseState CreateLargeCreatureAheadSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            CreatureDetected = true,
-            CreatureProximity = 0.85f,
-            CreatureDirectionForward = 1f,
-            VisibleCreatureDensity = 0.16f,
-            CreatureRelativeBodySize = 0.55f,
-            CreatureRelativeSpeed = 0.1f,
-            CreatureApproachRate = 0.05f,
-            CreatureFacingAlignment = 0.05f
-        };
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.85f,
+                CreatureDirectionForward = 1f,
+                VisibleCreatureDensity = 0.16f,
+                CreatureRelativeBodySize = 0.55f,
+                CreatureRelativeSpeed = 0.1f,
+                CreatureApproachRate = 0.05f,
+                CreatureFacingAlignment = 0.05f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.85f,
+            relativeBodySize: 0.55f,
+            approachRate: 0.05f,
+            facingAlignment: 0.05f);
     }
 
     private static CreatureSenseState CreateLargeCreatureApproachingSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            CreatureDetected = true,
-            CreatureProximity = 0.78f,
-            CreatureDirectionForward = 1f,
-            VisibleCreatureDensity = 0.18f,
-            CreatureRelativeBodySize = 0.55f,
-            CreatureRelativeSpeed = 0.35f,
-            CreatureApproachRate = 0.75f,
-            CreatureFacingAlignment = 0.9f
-        };
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.78f,
+                CreatureDirectionForward = 1f,
+                VisibleCreatureDensity = 0.18f,
+                CreatureRelativeBodySize = 0.55f,
+                CreatureRelativeSpeed = 0.35f,
+                CreatureApproachRate = 0.75f,
+                CreatureFacingAlignment = 0.9f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.78f,
+            relativeBodySize: 0.55f,
+            approachRate: 0.75f,
+            facingAlignment: 0.9f);
     }
 
     private static CreatureSenseState CreateLargeCreatureFacingAwaySenses()
     {
-        return CreateBaselineSenses() with
-        {
-            CreatureDetected = true,
-            CreatureProximity = 0.78f,
-            CreatureDirectionForward = 1f,
-            VisibleCreatureDensity = 0.18f,
-            CreatureRelativeBodySize = 0.55f,
-            CreatureRelativeSpeed = 0.2f,
-            CreatureApproachRate = -0.25f,
-            CreatureFacingAlignment = -0.9f
-        };
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.78f,
+                CreatureDirectionForward = 1f,
+                VisibleCreatureDensity = 0.18f,
+                CreatureRelativeBodySize = 0.55f,
+                CreatureRelativeSpeed = 0.2f,
+                CreatureApproachRate = -0.25f,
+                CreatureFacingAlignment = -0.9f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.78f,
+            relativeBodySize: 0.55f,
+            approachRate: -0.25f,
+            facingAlignment: -0.9f);
     }
 
     private static CreatureSenseState CreateSlowTerrainHereSenses()

@@ -146,6 +146,7 @@ public static class SimulationPipelines
         float closeSenseRefreshProximity = CreatureSensingSystem.DefaultCloseSenseRefreshProximity,
         bool enableSectorVision = CreatureSensingSystem.DefaultEnableSectorVision,
         bool enableLegacyNearestFoodVisionInputs = true,
+        bool enableLegacyNearestCreatureVisionInputs = true,
         float biteDamagePerSecond = 0.25f,
         float biteEnergyCostPerSecond = 0.12f,
         float biteRangePadding = 1f,
@@ -220,7 +221,8 @@ public static class SimulationPipelines
             new NeuralControllerSystem(
                 memoryDecayPerSecond: memoryDecayPerSecond,
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,
-                enableLegacyNearestFoodVisionInputs: enableLegacyNearestFoodVisionInputs),
+                enableLegacyNearestFoodVisionInputs: enableLegacyNearestFoodVisionInputs,
+                enableLegacyNearestCreatureVisionInputs: enableLegacyNearestCreatureVisionInputs),
             new MovementSystem(biomeMovementCostProfile, biomeSpeedProfile, movementSpeedCostExponent),
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex, requireEatIntent: true),
