@@ -514,6 +514,14 @@ tr.is-expanded td {
   overflow-wrap: anywhere;
 }
 
+.run-error {
+  max-width: 260px;
+  margin-top: 5px;
+  color: var(--danger);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: max-content max-content;

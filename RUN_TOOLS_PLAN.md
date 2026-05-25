@@ -303,6 +303,7 @@ The launcher should eventually:
 - If a manifest says a run was active but the recorded CLI process is gone, the runner marks the run `lost`.
 - The CLI can write stdout/stderr logs directly via launcher-supplied log paths, so a runner restart does not leave the simulation dependent on an old redirected pipe.
 - The dashboard supports basic run-library management: status/scenario/search filters, sorting, seed display, expandable details/log tails, renaming, single-run delete, and selected-run bulk delete.
+- Failed, lost, and unknown runs surface a concise failure reason from runner diagnostics or the last stderr line when available.
 - Selected runs can be exported to a compact Markdown comparison packet with final/live metrics, command line, and artifact paths for Codex analysis.
 - New dashboard-launched runs save a resolved scenario JSON beside the run manifest and surface compact scenario identity: brain architecture, starter brain, vision mode, world size, resource density, terrain, and meat-pressure knobs.
 - The launcher has a first grouped scenario-options editor. It builds tabs from `SimulationScenario` fields, lets a run start from edited scenario JSON, writes the generated launch scenario under `out/runs/_launch_scenarios/`, and still saves the CLI-resolved scenario beside the run manifest.

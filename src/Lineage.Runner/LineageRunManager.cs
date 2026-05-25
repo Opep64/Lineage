@@ -204,12 +204,13 @@ public sealed partial class LineageRunManager
             return null;
         }
 
+        var summary = ToSummary(run);
         var manifest = run.Manifest;
         var maxLines = Math.Clamp(lineCount, 10, 300);
         return new RunDetails(
-            Run: ToSummary(run),
+            Run: summary,
             CommandLine: manifest.CommandLine,
-            Error: manifest.Error,
+            Error: manifest.Error ?? summary.FailureReason,
             StdoutTail: ReadTail(manifest.StdoutPath, maxLines),
             StderrTail: ReadTail(manifest.StderrPath, maxLines));
     }
@@ -726,6 +727,7 @@ public sealed partial class LineageRunManager
             EndedAtUtc: manifest.EndedAtUtc,
             ExitCode: manifest.ExitCode,
             ProcessId: manifest.ProcessId,
+            FailureReason: BuildFailureReason(manifest, statusText),
             RunDirectory: manifest.RunDirectory,
             StatsPath: manifest.StatsPath,
             ReportPath: manifest.ReportPath,
@@ -749,6 +751,36 @@ public sealed partial class LineageRunManager
             CheckpointCount: status?.CheckpointCount ?? 0,
             IsRunning: isRunning,
             HasReport: File.Exists(manifest.ReportPath));
+    }
+
+    private static string? BuildFailureReason(RunManifest manifest, string status)
+    {
+        if (!IsProblemStatus(status))
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.Error))
+        {
+            return manifest.Error.Trim();
+        }
+
+        var stderrLine = ReadLastNonEmptyLine(manifest.StderrPath);
+        if (!string.IsNullOrWhiteSpace(stderrLine))
+        {
+            return stderrLine;
+        }
+
+        return manifest.ExitCode is { } exitCode && exitCode != 0
+            ? $"Process exited with code {exitCode.ToString(CultureInfo.InvariantCulture)}."
+            : null;
+    }
+
+    private static bool IsProblemStatus(string status)
+    {
+        return status.Equals("failed", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("lost", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("unknown", StringComparison.OrdinalIgnoreCase);
     }
 
     private void MarkProcessExited(ManagedRun run)
@@ -1043,6 +1075,14 @@ public sealed partial class LineageRunManager
         {
             return Array.Empty<string>();
         }
+    }
+
+    private static string? ReadLastNonEmptyLine(string path)
+    {
+        return ReadTail(path, 20)
+            .Reverse()
+            .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line))
+            ?.Trim();
     }
 
     private void SaveManifest(RunManifest manifest)

@@ -129,6 +129,7 @@ public sealed record RunSummary(
     DateTimeOffset? EndedAtUtc,
     int? ExitCode,
     int? ProcessId,
+    string? FailureReason,
     string RunDirectory,
     string StatsPath,
     string ReportPath,

@@ -631,6 +631,7 @@ function renderRuns() {
       <td>
         <span class="run-state ${statusClass(run.status)}">${escapeHtml(run.status || "unknown")}</span>
         ${run.stopReason ? `<div class="run-sub">${escapeHtml(run.stopReason)}</div>` : ""}
+        ${run.failureReason ? `<div class="run-error">${escapeHtml(run.failureReason)}</div>` : ""}
       </td>
       <td>
         <div>${Math.round(progress * 1000) / 10}%</div>
@@ -758,6 +759,7 @@ function getVisibleRuns() {
       run.scenarioPath,
       formatScenarioInline(run.scenarioSummary),
       run.status,
+      run.failureReason,
       run.seed,
       run.processId
     ].some((value) => String(value ?? "").toLowerCase().includes(query));
