@@ -107,6 +107,19 @@ api.MapPost("/runs/{id}/rerun", async (string id, LineageRunManager manager) =>
     }
 });
 
+api.MapPost("/runs/{id}/continue", async (string id, RunContinueRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        var result = await manager.ContinueRunAsync(id, request);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/runs/{id}/stop", (string id, LineageRunManager manager) =>
     manager.SendControl(id, "stop") ? Results.Accepted() : Results.NotFound());
 

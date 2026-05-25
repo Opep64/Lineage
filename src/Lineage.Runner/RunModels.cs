@@ -47,7 +47,8 @@ public sealed record RunCreateRequest(
     ulong? Seed,
     int? CheckpointIntervalTicks,
     bool StopOnExtinction,
-    JsonElement? Scenario);
+    JsonElement? Scenario,
+    string? LoadSnapshotPath = null);
 
 public sealed record RunCommandRequest(string Command);
 
@@ -65,6 +66,12 @@ public sealed record RunBulkDeleteResult(
 public sealed record RunRerunResult(
     RunSummary Run,
     bool DeletedOriginal);
+
+public sealed record RunContinueRequest(int Ticks);
+
+public sealed record RunContinueResult(
+    RunSummary Run,
+    string SnapshotPath);
 
 public sealed record RunDetails(
     RunSummary Run,
@@ -165,6 +172,8 @@ public sealed class RunManifest
     public string Status { get; set; } = "created";
 
     public string ScenarioPath { get; set; } = string.Empty;
+
+    public string LoadSnapshotPath { get; set; } = string.Empty;
 
     public string ScenarioName { get; set; } = string.Empty;
 

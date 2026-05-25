@@ -309,6 +309,7 @@ The launcher should eventually:
 - The launcher has a first grouped scenario-options editor. It builds tabs from `SimulationScenario` fields, lets a run start from edited scenario JSON, writes the generated launch scenario under `out/runs/_launch_scenarios/`, and still saves the CLI-resolved scenario beside the run manifest.
 - Run rows can clone settings back into the launch form. The clone path prefers the run's `resolved_scenario.json`, falls back to the generated launch scenario, then falls back to the original scenario file so users can duplicate an experiment and make small changes.
 - Non-running rows can be rerun after a confirmation prompt. The replacement run uses the prior resolved/launch settings, starts with a fresh process-id-based run id, and then removes the old run artifacts if the replacement starts.
+- Non-running rows can continue in place from the latest checkpoint or final snapshot, reusing the same run record and output folder.
 - The scenario-options editor supports search, basic/all filtering, changed-field highlighting, and reset actions for the current group or all loaded scenario options.
 - Edited launcher settings can be saved as managed user scenarios under `scenarios/user/`.
 - Scenarios directly under `scenarios/` are protected development presets. The dashboard can archive launcher-created user scenarios to `out/scenario-trash/`, but it does not delete protected project scenarios or manually dropped-in user files.

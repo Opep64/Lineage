@@ -278,6 +278,40 @@ public sealed partial class LineageRunManager
         return new RunRerunResult(replacement, deletedOriginal);
     }
 
+    public async Task<RunContinueResult?> ContinueRunAsync(string id, RunContinueRequest request)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        if (request.Ticks <= 0)
+        {
+            throw new ArgumentException("Additional ticks must be positive.");
+        }
+
+        run = RefreshRunLifecycle(run);
+        if (run.IsRunning)
+        {
+            throw new InvalidOperationException("Running simulations cannot be continued from a checkpoint.");
+        }
+
+        var manifest = run.Manifest;
+        var snapshotPath = ResolveContinuationSnapshotPath(manifest);
+        manifest.LoadSnapshotPath = snapshotPath;
+        manifest.Ticks = request.Ticks;
+        manifest.Status = "starting";
+        manifest.EndedAtUtc = null;
+        manifest.ExitCode = null;
+        manifest.Error = null;
+        TryDeleteFile(manifest.StatusPath);
+        TryDeleteFile($"{manifest.StatusPath}.tmp");
+        TryDeleteFile(manifest.ControlPath);
+
+        var continued = StartManagedRun(run, addToRuns: false);
+        return new RunContinueResult(continued, Path.GetRelativePath(_repoRoot, snapshotPath));
+    }
+
     public async Task<RunSummary> StartRunAsync(RunCreateRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.ScenarioPath))
@@ -302,6 +336,7 @@ public sealed partial class LineageRunManager
         var id = $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{ProcessIdToken}";
         var runDirectory = Path.Combine(_runsRoot, id);
         var launchScenarioPath = WriteLaunchScenarioIfProvided(request.Scenario, createdAt, scenarioName);
+        var loadSnapshotPath = ResolveLoadSnapshotPath(request.LoadSnapshotPath);
 
         var manifest = new RunManifest
         {
@@ -309,6 +344,7 @@ public sealed partial class LineageRunManager
             Name = $"{scenarioName} {createdAt:yyyy-MM-dd HH:mm:ss}",
             Status = "starting",
             ScenarioPath = Path.GetRelativePath(_repoRoot, scenarioPath),
+            LoadSnapshotPath = loadSnapshotPath,
             ScenarioName = scenarioName,
             LaunchScenarioPath = launchScenarioPath,
             ResolvedScenarioPath = Path.Combine(runDirectory, "resolved_scenario.json"),
@@ -330,6 +366,34 @@ public sealed partial class LineageRunManager
             StderrPath = Path.Combine(runDirectory, "stderr.log")
         };
 
+        var managedRun = new ManagedRun(manifest, null);
+        try
+        {
+            return StartManagedRun(managedRun, addToRuns: true);
+        }
+        catch
+        {
+            DeleteLaunchScenario(manifest);
+            _runs.TryRemove(manifest.Id, out _);
+            throw;
+        }
+    }
+
+    public bool SendControl(string id, string command)
+    {
+        if (!_runs.TryGetValue(id, out var run) || !RefreshRunLifecycle(run).IsRunning)
+        {
+            return false;
+        }
+
+        var request = new RunCommandRequest(command);
+        File.WriteAllText(run.Manifest.ControlPath, JsonSerializer.Serialize(request, JsonOptions));
+        return true;
+    }
+
+    private RunSummary StartManagedRun(ManagedRun managedRun, bool addToRuns)
+    {
+        var manifest = managedRun.Manifest;
         var launchTarget = ResolveCliLaunchTarget();
         var arguments = BuildCliArguments(manifest);
         var process = new Process
@@ -356,16 +420,21 @@ public sealed partial class LineageRunManager
             process.StartInfo.ArgumentList.Add(argument);
         }
 
-        var managedRun = new ManagedRun(manifest, process);
+        managedRun.AttachProcess(process);
         try
         {
             process.Start();
             ApplyProcessId(manifest, process.Id);
+            manifest.StartedAtUtc = DateTimeOffset.UtcNow;
+            manifest.EndedAtUtc = null;
+            manifest.ExitCode = null;
+            manifest.Error = null;
             manifest.Status = "running";
             manifest.CommandLine = FormatCommandLine(
                 launchTarget.FileName,
                 launchTarget.PrefixArguments.Concat(BuildCliArguments(manifest)));
-            if (!_runs.TryAdd(manifest.Id, managedRun))
+
+            if (addToRuns && !_runs.TryAdd(manifest.Id, managedRun))
             {
                 if (!process.HasExited)
                 {
@@ -386,22 +455,9 @@ public sealed partial class LineageRunManager
         }
         catch
         {
-            DeleteLaunchScenario(manifest);
-            _runs.TryRemove(manifest.Id, out _);
+            managedRun.DisposeProcess();
             throw;
         }
-    }
-
-    public bool SendControl(string id, string command)
-    {
-        if (!_runs.TryGetValue(id, out var run) || !RefreshRunLifecycle(run).IsRunning)
-        {
-            return false;
-        }
-
-        var request = new RunCommandRequest(command);
-        File.WriteAllText(run.Manifest.ControlPath, JsonSerializer.Serialize(request, JsonOptions));
-        return true;
     }
 
     private string WriteLaunchScenarioIfProvided(JsonElement? scenarioElement, DateTimeOffset createdAt, string scenarioName)
@@ -586,6 +642,7 @@ public sealed partial class LineageRunManager
             AppendDetail(builder, "Id", summary.Id);
             AppendDetail(builder, "Status", summary.Status);
             AppendDetail(builder, "Scenario", $"{summary.ScenarioName} ({summary.ScenarioPath})");
+            AppendDetail(builder, "Loaded snapshot", manifest.LoadSnapshotPath);
             AppendDetail(builder, "Launch scenario", summary.LaunchScenarioPath);
             AppendDetail(builder, "Resolved scenario", summary.ResolvedScenarioPath);
             AppendDetail(builder, "Scenario source", summary.ScenarioSummary?.IsResolvedSnapshot == true ? "resolved run snapshot" : "current scenario file fallback");
@@ -862,6 +919,7 @@ public sealed partial class LineageRunManager
             manifest.ResolvedScenarioPath = Path.Combine(manifest.RunDirectory, "resolved_scenario.json");
         }
 
+        manifest.LoadSnapshotPath ??= string.Empty;
         manifest.LaunchScenarioPath ??= string.Empty;
     }
 
@@ -1085,6 +1143,22 @@ public sealed partial class LineageRunManager
             ?.Trim();
     }
 
+    private static void TryDeleteFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
     private void SaveManifest(RunManifest manifest)
     {
         Directory.CreateDirectory(manifest.RunDirectory);
@@ -1128,6 +1202,59 @@ public sealed partial class LineageRunManager
         return string.IsNullOrWhiteSpace(manifest.LaunchScenarioPath)
             ? manifest.ScenarioPath
             : manifest.LaunchScenarioPath;
+    }
+
+    private string ResolveLoadSnapshotPath(string? loadSnapshotPath)
+    {
+        if (string.IsNullOrWhiteSpace(loadSnapshotPath))
+        {
+            return string.Empty;
+        }
+
+        var resolvedPath = ResolveArtifactPath(loadSnapshotPath);
+        if (!File.Exists(resolvedPath))
+        {
+            throw new FileNotFoundException("Snapshot file was not found.", loadSnapshotPath);
+        }
+
+        return resolvedPath;
+    }
+
+    private string ResolveContinuationSnapshotPath(RunManifest manifest)
+    {
+        var status = ReadStatus(manifest.StatusPath);
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status?.LatestCheckpointPath))
+        {
+            candidates.Add(status.LatestCheckpointPath);
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.CheckpointDirectory))
+        {
+            var checkpointDirectory = ResolveArtifactPath(manifest.CheckpointDirectory);
+            if (Directory.Exists(checkpointDirectory))
+            {
+                candidates.AddRange(Directory
+                    .EnumerateFiles(checkpointDirectory, "*.json", SearchOption.TopDirectoryOnly)
+                    .OrderByDescending(File.GetLastWriteTimeUtc));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(manifest.SnapshotPath))
+        {
+            candidates.Add(manifest.SnapshotPath);
+        }
+
+        foreach (var candidate in candidates)
+        {
+            var path = ResolveArtifactPath(candidate);
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        throw new FileNotFoundException("No checkpoint or final snapshot was found for this run.", manifest.Id);
     }
 
     private string ResolveScenarioPath(string scenarioPath)
@@ -1382,10 +1509,20 @@ public sealed partial class LineageRunManager
 
     private IReadOnlyList<string> BuildCliArguments(RunManifest manifest)
     {
-        var args = new List<string>
+        var args = new List<string>();
+        if (string.IsNullOrWhiteSpace(manifest.LoadSnapshotPath))
         {
-            "--scenario",
-            EffectiveCliScenarioPath(manifest),
+            args.Add("--scenario");
+            args.Add(EffectiveCliScenarioPath(manifest));
+        }
+        else
+        {
+            args.Add("--load-snapshot");
+            args.Add(manifest.LoadSnapshotPath);
+        }
+
+        args.AddRange(new[]
+        {
             "--save-scenario",
             EffectiveResolvedScenarioPath(manifest),
             "--ticks",
@@ -1408,7 +1545,7 @@ public sealed partial class LineageRunManager
             manifest.StderrPath,
             "--status-interval",
             "100"
-        };
+        });
 
         if (manifest.Seed is not null)
         {
@@ -1834,6 +1971,13 @@ public sealed partial class LineageRunManager
         public Process? Process { get; private set; } = process;
 
         public bool IsRunning => Process is { HasExited: false };
+
+        public void AttachProcess(Process process)
+        {
+            DisposeProcess();
+            Process = process;
+            Interlocked.Exchange(ref _exitRecorded, 0);
+        }
 
         public void DisposeProcess()
         {

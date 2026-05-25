@@ -665,6 +665,7 @@ function renderRuns() {
         <div class="actions">
           <button class="secondary" data-action="clone" data-id="${escapeHtml(run.id)}">Clone Settings</button>
           <button class="secondary" data-action="rerun" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Rerun</button>
+          <button class="secondary" data-action="continue" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Continue</button>
           <button class="secondary" data-action="details" data-id="${escapeHtml(run.id)}">${isExpanded ? "Hide" : "Details"}</button>
           <button class="secondary" data-action="rename" data-id="${escapeHtml(run.id)}">Rename</button>
           <button class="secondary" data-action="checkpoint" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint</button>
@@ -916,6 +917,11 @@ runsBody.addEventListener("click", async (event) => {
 
   if (action === "rerun") {
     await rerunRun(id);
+    return;
+  }
+
+  if (action === "continue") {
+    await continueRun(id);
     return;
   }
 
@@ -1193,6 +1199,31 @@ async function rerunRun(id) {
   refreshStatus.textContent = result.deletedOriginal
     ? `Rerun started: ${result.run.name}`
     : `Rerun started: ${result.run.name}; original artifacts were kept`;
+}
+
+async function continueRun(id) {
+  const run = allRuns.find((candidate) => candidate.id === id);
+  const name = run?.name || id;
+  const remainingTicks = Number(run?.ticks || 0) - Number(run?.completedSteps || 0);
+  const ticks = remainingTicks > 0
+    ? Math.ceil(remainingTicks)
+    : Math.max(1, Number(run?.ticks || document.querySelector("#ticks").value || 20000));
+
+  refreshStatus.textContent = `Continuing ${name} for ${formatNumber(ticks)} tick(s)`;
+  const response = await fetch(`/api/runs/${encodeURIComponent(id)}/continue`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ticks })
+  });
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Continue failed." }));
+    refreshStatus.textContent = problem.error || "Continue failed.";
+    return;
+  }
+
+  const result = await response.json();
+  await loadRuns();
+  refreshStatus.textContent = `Continued from ${result.snapshotPath}: ${result.run.name}`;
 }
 
 function ensureScenarioOption(path, name) {
