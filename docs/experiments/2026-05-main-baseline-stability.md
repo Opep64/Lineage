@@ -164,3 +164,38 @@ Suggested next evidence before changing scenario knobs:
 - Run a longer overnight pass, likely 150k-250k ticks on Balanced, Harsh, Omnivore, Predation, and Carrion with seeds 42-46.
 - If those show repeated late extinctions, tune around recovery from long meal gaps first rather than simply increasing plant density.
 - Keep this pass as the new baseline for future mechanics or performance work.
+
+## 150k Weak-Scenario Follow-Up
+
+Output:
+
+- `out\main_stability_20260525_long\weak_150k_seeds42-46.csv`
+- `out\main_stability_20260525_long\weak_150k_seeds42-46.html`
+
+Command:
+
+```powershell
+dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --probe --ticks 150000 --probe-seeds 42,43,44,45,46 --probe-scenario .\scenarios\balanced-foraging.json --probe-scenario .\scenarios\harsh-foraging.json --probe-scenario .\scenarios\carrion-pressure.json --probe-scenario .\scenarios\omnivore-pressure.json --probe-scenario .\scenarios\predation-pressure.json --probe-output out\main_stability_20260525_long\weak_150k_seeds42-46.csv --probe-report out\main_stability_20260525_long\weak_150k_seeds42-46.html --probe-stop-on-extinction --probe-max-population 5000
+```
+
+Result:
+
+- 25/25 runs completed.
+- No extinctions.
+- No population cap stops.
+- Total wall time: 482.972s.
+
+| Scenario | Runs | Status | Avg final | Range | Avg ticks/s | Avg tail pop | Tail pop range | Max gen | Avg tail meal gap |
+| --- | ---: | --- | ---: | --- | ---: | ---: | --- | ---: | ---: |
+| Balanced Foraging | 5 | Completed | 44.4 | 36-52 | 8017.6 | 37.3 | 29.8-42.7 | 14 | 79.3s |
+| Carrion Pressure | 5 | Completed | 67.2 | 52-83 | 4794.7 | 53.1 | 44.6-56.7 | 13 | 35.8s |
+| Harsh Foraging | 5 | Completed | 21.6 | 7-30 | 10497.5 | 19.2 | 9.3-27.5 | 13 | 66.9s |
+| Omnivore Pressure | 5 | Completed | 26.0 | 20-37 | 10260.6 | 22.2 | 13.3-35.6 | 13 | 44.7s |
+| Predation Pressure | 5 | Completed | 16.2 | 8-26 | 8836.6 | 15.2 | 13.5-19.1 | 18 | 23.8s |
+
+Readout:
+
+- The sparse rebalance is stable enough to continue feature work.
+- Carrion Pressure looks healthier than earlier carrion-specific long checks.
+- Harsh Foraging and Predation Pressure remain deliberately narrow-margin scenarios. They survived this pass, but their low final populations make them the first places to watch after future mechanics.
+- No tuning changes are recommended solely from this pass. If future longer runs show repeated late extinctions, tune food-gap recovery, reserve handling, or reproduction pacing before raising plant density.

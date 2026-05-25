@@ -89,6 +89,8 @@ Output files:
 - `out\main_stability_20260525\focused_60k_seeds42-44.html`
 - `out\main_stability_20260525\weak_90k_seeds42-44.csv`
 - `out\main_stability_20260525\weak_90k_seeds42-44.html`
+- `out\main_stability_20260525_long\weak_150k_seeds42-46.csv`
+- `out\main_stability_20260525_long\weak_150k_seeds42-46.html`
 
 60k focused pass, seeds `42-44`:
 
@@ -116,6 +118,18 @@ Output files:
 | Predation Pressure | 3 | Completed | 18.3 | 10-26 | 8162.6 | 23.8 | 11 | 23.9s |
 
 No scenario JSON changes were made from this pass. The current sparse balance is viable through 60k and the focused weak scenarios remained viable through 90k, but Balanced and Predation both produced low single-seed tail windows that should be watched in longer runs.
+
+150k weak-scenario pass, seeds `42-46`:
+
+| Scenario | Runs | Status | Avg final | Final range | Avg ticks/s | Avg tail population | Tail population range | Max generation | Avg tail meal gap |
+| --- | ---: | --- | ---: | --- | ---: | ---: | --- | ---: | ---: |
+| Balanced Foraging | 5 | Completed | 44.4 | 36-52 | 8017.6 | 37.3 | 29.8-42.7 | 14 | 79.3s |
+| Carrion Pressure | 5 | Completed | 67.2 | 52-83 | 4794.7 | 53.1 | 44.6-56.7 | 13 | 35.8s |
+| Harsh Foraging | 5 | Completed | 21.6 | 7-30 | 10497.5 | 19.2 | 9.3-27.5 | 13 | 66.9s |
+| Omnivore Pressure | 5 | Completed | 26.0 | 20-37 | 10260.6 | 22.2 | 13.3-35.6 | 13 | 44.7s |
+| Predation Pressure | 5 | Completed | 16.2 | 8-26 | 8836.6 | 15.2 | 13.5-19.1 | 18 | 23.8s |
+
+The 150k pass completed with no extinctions and no population-cap stops. Harsh and Predation remain thin, with single-seed final populations of `7` and `8`, so future mechanics or tuning should continue to watch for late-collapse sensitivity there.
 
 ## Historical Profiling Exercise Comparison
 

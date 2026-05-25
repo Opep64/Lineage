@@ -198,6 +198,7 @@ Recent mainline validation:
 - Post-merge 10k seed-42 baseline across 11 checked scenarios completed with no extinctions and no population-cap trips.
 - Post-merge 60k stability pass across 10 scenarios and seeds 42-44 completed 30/30 runs with no extinctions.
 - Post-merge 90k weak-scenario pass across Balanced, Carrion, Harsh, Omnivore, and Predation completed 15/15 runs with no extinctions.
+- Post-merge 150k weak-scenario pass across Balanced, Carrion, Harsh, Omnivore, and Predation with seeds 42-46 completed 25/25 runs with no extinctions.
 - Balanced 10k tail profile now shows `CreatureSensingSystem` at 39.9% and `NeuralControllerSystem` at 27.9% of profiled system time.
 - Earlier Godot export smoke wrote all 12 viewer export files and reloaded the snapshot.
 - Earlier CLI-run-style output smoke wrote sidecars, report, snapshot, scenario JSON, and checkpoints, then resumed from snapshot.
