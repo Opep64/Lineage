@@ -1124,6 +1124,42 @@ Verification:
 - `dotnet build Lineage.slnx -c Release -v:minimal` passed.
 - Godot headless smoke test passed.
 
+## 2026-05-25 Focused Habitat Stability Baseline
+
+After committing habitat-constrained plant relocation and long-export snapshot streaming, reran focused 60k and 90k probes against the scenarios most likely to expose sparse-food instability.
+
+Output files:
+
+- `out/habitat_stability_20260525/focused_60k.csv`
+- `out/habitat_stability_20260525/focused_60k.html`
+- `out/habitat_stability_20260525/focused_90k.csv`
+- `out/habitat_stability_20260525/focused_90k.html`
+
+60k results:
+
+| Scenario | Final avg | Final range | Tail avg | Starvation avg | Injury avg | Global reloc avg | Tail depleted fertility | Avg TPS |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 31.7 | 26-35 | 22.9 | 246.7 | 0.0 | 524.7 | 87.2% | 9503 |
+| Harsh Foraging | 20.7 | 15-28 | 26.5 | 208.3 | 0.0 | 679.3 | 89.6% | 11034 |
+| Omnivore Pressure | 24.0 | 18-28 | 25.8 | 246.7 | 0.0 | 565.0 | 93.1% | 10877 |
+| Predation Pressure | 25.3 | 20-32 | 24.8 | 201.3 | 230.0 | 694.7 | 92.3% | 7478 |
+
+90k results:
+
+| Scenario | Final avg | Final range | Tail avg | Starvation avg | Injury avg | Global reloc avg | Tail depleted fertility | Avg TPS |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 27.7 | 11-50 | 26.6 | 333.0 | 0.0 | 731.0 | 86.8% | 9656 |
+| Harsh Foraging | 21.3 | 17-27 | 23.3 | 275.7 | 0.0 | 989.0 | 86.2% | 10643 |
+| Omnivore Pressure | 25.3 | 17-31 | 26.3 | 320.0 | 0.0 | 828.3 | 91.6% | 10697 |
+| Predation Pressure | 18.3 | 10-26 | 23.8 | 255.0 | 319.3 | 990.0 | 94.3% | 7679 |
+
+Interpretation:
+
+- All 24 focused runs completed; no extinctions at 60k or 90k.
+- The weak scenarios still show pressure, especially Predation and the low Balanced seed, but they did not collapse.
+- Habitat relocation did not remove the broad local fertility exhaustion signal. Tail depleted fertility remains high, especially Omnivore and Predation.
+- This is now the focused sparse-balance baseline for later brain/vision comparisons.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
