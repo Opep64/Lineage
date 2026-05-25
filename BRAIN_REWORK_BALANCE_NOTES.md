@@ -426,6 +426,34 @@ Implementation notes:
 - Reports also include signed attack readouts for approach and facing sectors, which should help identify emerging predator/prey or defensive responses.
 - This is report-only telemetry and does not alter simulation behavior.
 
+## 2026-05-24 Creature Sector Motion Probe
+
+Ran a 30k tick comparison after adding creature sector motion channels and diagnostics.
+
+```powershell
+dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --probe --ticks 30000 --probe-seeds 42,43,44 --probe-scenario .\scenarios\balanced-foraging.json --probe-scenario .\scenarios\predation-pressure.json --probe-scenario .\scenarios\scavenger-pressure.json --probe-variant sector_on:enableSectorVision=true --probe-stop-on-extinction --probe-max-population 5000
+```
+
+Final output files:
+
+- `out/brain_rework_sector_eval_20260524/sector_motion_probe_30k.csv`
+- `out/brain_rework_sector_eval_20260524/sector_motion_probe_30k.html`
+
+| Scenario | Variant | Avg final creatures | Range | Avg ticks/s | Status |
+| --- | --- | ---: | --- | ---: | --- |
+| Balanced Foraging | base | 54.7 | 40-75 | 2322.8 | Completed |
+| Balanced Foraging | sector_on | 54.7 | 40-75 | 2475.3 | Completed |
+| Predation Pressure | base | 42.7 | 32-61 | 4610.3 | Completed |
+| Predation Pressure | sector_on | 42.7 | 32-61 | 4543.5 | Completed |
+| Scavenger Pressure | base | 25.7 | 19-31 | 9046.8 | Completed |
+| Scavenger Pressure | sector_on | 25.7 | 19-31 | 8817.2 | Completed |
+
+Interpretation:
+
+- Adding sector creature approach/facing channels did not destabilize these 30k probes.
+- Base and sector-on final populations matched exactly for the sampled seeds in all three scenarios.
+- Performance stayed close enough to continue with the vision branch. Predation and scavenger sector-on were slightly slower; Balanced sector-on was slightly faster in this sample.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
