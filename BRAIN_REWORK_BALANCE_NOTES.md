@@ -1160,6 +1160,51 @@ Interpretation:
 - Habitat relocation did not remove the broad local fertility exhaustion signal. Tail depleted fertility remains high, especially Omnivore and Predation.
 - This is now the focused sparse-balance baseline for later brain/vision comparisons.
 
+## 2026-05-25 Hybrid vs Hidden-Layer Brain Baseline
+
+Compared the current hybrid neural architecture against `HiddenLayerNeural` using the same focused scenarios and seeds as the habitat baseline.
+
+Output files:
+
+- `out/brain_arch_compare_20260525/hybrid_vs_hidden_60k.csv`
+- `out/brain_arch_compare_20260525/hybrid_vs_hidden_60k.html`
+- `out/brain_arch_compare_20260525/hybrid_vs_hidden_90k.csv`
+- `out/brain_arch_compare_20260525/hybrid_vs_hidden_90k.html`
+
+60k results:
+
+| Scenario | Variant | Final avg | Final range | Tail avg | Food seen | Food contact | Eating | kcal/u | Starvation | Injury | Avg TPS |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | Hybrid | 31.7 | 26-35 | 22.9 | 34.1% | 29.6% | 11.4% | 0.1127 | 246.7 | 0.0 | 9562 |
+| Balanced Foraging | Hidden | 35.3 | 27-41 | 41.5 | 48.4% | 47.7% | 17.3% | 0.1440 | 298.0 | 0.0 | 5544 |
+| Harsh Foraging | Hybrid | 20.7 | 15-28 | 26.5 | 53.5% | 48.4% | 18.3% | 0.2408 | 208.3 | 0.0 | 11016 |
+| Harsh Foraging | Hidden | 20.3 | 18-22 | 20.2 | 50.7% | 49.2% | 20.0% | 0.1536 | 200.0 | 0.0 | 8050 |
+| Omnivore Pressure | Hybrid | 24.0 | 18-28 | 25.8 | 22.9% | 20.1% | 11.7% | 0.1052 | 246.7 | 0.0 | 10913 |
+| Omnivore Pressure | Hidden | 27.7 | 21-34 | 32.8 | 25.0% | 21.8% | 11.4% | 0.0694 | 264.7 | 0.0 | 7086 |
+| Predation Pressure | Hybrid | 25.3 | 20-32 | 24.8 | 55.9% | 44.1% | 22.7% | 0.2113 | 201.3 | 230.0 | 7454 |
+| Predation Pressure | Hidden | 15.3 | 9-22 | 22.1 | 60.4% | 63.0% | 34.0% | 0.3637 | 188.0 | 263.0 | 6659 |
+
+90k results:
+
+| Scenario | Variant | Final avg | Final range | Tail avg | Food seen | Food contact | Eating | kcal/u | Starvation | Injury | Avg TPS |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | Hybrid | 27.7 | 11-50 | 26.6 | 46.0% | 53.2% | 17.7% | 0.2704 | 333.0 | 0.0 | 9591 |
+| Balanced Foraging | Hidden | 38.7 | 30-47 | 43.6 | 55.8% | 50.9% | 14.9% | 0.1417 | 428.3 | 0.0 | 5534 |
+| Harsh Foraging | Hybrid | 21.3 | 17-27 | 23.3 | 52.9% | 49.7% | 23.0% | 0.3049 | 275.7 | 0.0 | 10586 |
+| Harsh Foraging | Hidden | 14.0 | 9-21 | 20.3 | 62.3% | 48.3% | 15.9% | 0.1091 | 270.7 | 0.0 | 8597 |
+| Omnivore Pressure | Hybrid | 25.3 | 17-31 | 26.3 | 35.8% | 30.4% | 11.8% | 0.1086 | 320.0 | 0.0 | 10593 |
+| Omnivore Pressure | Hidden | 30.0 | 24-34 | 32.5 | 38.8% | 37.2% | 20.0% | 0.1422 | 359.0 | 0.0 | 7363 |
+| Predation Pressure | Hybrid | 18.3 | 10-26 | 23.8 | 49.0% | 38.4% | 27.3% | 0.3587 | 255.0 | 319.3 | 7747 |
+| Predation Pressure | Hidden | 19.7 | 11-31 | 18.8 | 49.1% | 45.2% | 26.6% | 0.1852 | 232.3 | 337.3 | 7520 |
+
+Interpretation:
+
+- Hidden-layer brains are viable under the sparse/habitat baseline. No comparison run went extinct at 60k or 90k.
+- Hidden-layer is stronger in Balanced and Omnivore, roughly comparable in Predation by 90k, and weaker in Harsh.
+- Hidden-layer is significantly slower in foraging-only scenarios, roughly 58-81% of hybrid TPS in this pass. Predation is closer because non-brain costs dominate more there.
+- This is enough to keep the hidden-layer architecture in play, but not enough to make it the default yet.
+- Next useful step is likely starter/tuning support for hidden-layer brains, especially Harsh survivability, before adding more brain architectures.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
