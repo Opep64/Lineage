@@ -11,6 +11,7 @@ public sealed class NeuralControllerSystem(
     float memoryWriteRatePerSecond = 2.5f,
     bool enableLegacyNearestFoodVisionInputs = true) : ISimulationSystem
 {
+    public const float DefaultAttackThreshold = 0.25f;
     public const float DefaultMemoryDecayPerSecond = 0.06f;
     public const float DefaultMemoryWriteRatePerSecond = 2.5f;
 
@@ -73,6 +74,9 @@ public sealed class NeuralControllerSystem(
             {
                 MoveForward = actionOutputs.MoveForward,
                 Turn = actionOutputs.Turn,
+                EatOutput = actionOutputs.Eat,
+                ReproduceOutput = actionOutputs.Reproduce,
+                AttackOutput = actionOutputs.Attack,
                 WantsEat = actionOutputs.Eat > eatThreshold,
                 WantsReproduce = actionOutputs.Reproduce > reproduceThreshold,
                 WantsAttack = actionOutputs.Attack > attackThreshold,

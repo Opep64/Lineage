@@ -569,6 +569,64 @@ Interpretation:
 - Throughput drops in the themed scenarios because the starters survive/reproduce more actively and spend more time with richer perception/action behavior.
 - The next predation-specific pass should probably add clearer attack near-miss diagnostics before further increasing bite pressure or predator starter aggression.
 
+## 2026-05-25 Predation Near-Miss Diagnostics
+
+Added diagnostics to split the predation chain into visibility, physical contact, raw attack output, gated attack intent, and actual damage.
+
+Implementation notes:
+
+- `CreatureActionState` now stores raw eat/reproduce/attack outputs in addition to boolean intents.
+- `SimulationStatsSnapshot` now records creature contact count, attack intent count, intent-while-touching, touch-without-intent, raw-positive attack, raw-near-gate attack, near-gate-while-touching, average raw attack output, and average touching attack output.
+- CLI/Godot stats CSV exports include the new fields.
+- CLI and Godot HTML reports show the new predation metrics and graph contact/intent/near-miss lines.
+- The Godot HUD and selected-creature inspector expose the new attack/contact output values for live debugging.
+
+Validation files:
+
+- `out/predation_near_miss_diagnostics_20260525/predation_near_miss.csv`
+- `out/predation_near_miss_diagnostics_20260525/predation_near_miss.html`
+- `out/predation_near_miss_diagnostics_20260525/single_stats.csv`
+- `out/predation_near_miss_diagnostics_20260525/single_report.html`
+
+Focused 10k predation probe, seeds 42/43/44:
+
+| Seed | Final creatures | Tail contact | Tail attack intent | Tail intent-touch | Tail touch no intent | Tail near-gate touch | Tail avg attack | Tail avg touching attack | Fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 59 | 5.4% | 4.6% | 1.8% | 3.6% | 0.2% | -0.891 | -0.399 | 0.0% |
+| 43 | 76 | 12.0% | 9.7% | 3.6% | 8.4% | 0.2% | -0.768 | -0.294 | 20.1% |
+| 44 | 70 | 9.7% | 6.8% | 3.2% | 6.5% | 0.6% | -0.817 | -0.185 | 7.6% |
+
+Interpretation:
+
+- Contact does occur, but much of it happens with no attack intent.
+- Raw attack outputs are strongly negative on average, even while touching, so this looks more like a brain/output gating problem than a bite-range problem.
+- Near-gate attack cases are rare; most misses are not close to the threshold.
+- The next predation step should tune predator starter/selection pressure toward stronger attack output under contact and small-prey sector cues before changing bite damage.
+
+Starter cleanup:
+
+- Restored close visual plant proximity as an eat-intent cue for sector-based starters; eating still requires physical food contact.
+- Gave scavenger/predator starters close visual meat proximity as an eat-intent cue so behavior assays continue to classify them as scavenger/predator rather than plant-biased generalists.
+- Let lateral meat sectors contribute a little forward movement, so a creature can move while turning toward side meat.
+- Let lateral small-creature sectors contribute attack intent, so the predator starter can begin committing before the target is perfectly centered.
+
+Post-cleanup 10k predation probe:
+
+| Seed | Final creatures | Tail contact | Tail attack intent | Tail intent-touch | Tail touch no intent | Tail near-gate touch | Tail avg attack | Tail avg touching attack | Fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 61 | 4.4% | 3.4% | 1.8% | 2.7% | 0.0% | -0.918 | -0.272 | 8.7% |
+| 43 | 76 | 9.5% | 7.9% | 3.7% | 5.8% | 0.3% | -0.810 | -0.174 | 0.0% |
+| 44 | 71 | 7.7% | 6.2% | 2.7% | 5.0% | 0.2% | -0.843 | -0.176 | 4.1% |
+
+The cleanup made the starter tests green and preserved the same main diagnostic: attack output is still mostly negative on contact, so the next predation pass should tune attack output under contact/prey cues before changing combat damage.
+
+Verification:
+
+- `dotnet build Lineage.slnx -v:minimal` passed.
+- The focused probe and one single-run CSV/report export completed and wrote the new columns.
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 150 tests.
+- Godot headless project load passed.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

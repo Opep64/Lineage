@@ -810,7 +810,8 @@ public partial class Main : Node2D
             $"Eating {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Raw {snapshot.TotalCaloriesEatenPerSecond:0.0}/s  Digest {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s\n" +
             $"Food src P {snapshot.TotalPlantCaloriesEatenPerSecond:0.0}/s  C {snapshot.TotalCarcassCaloriesEatenPerSecond:0.0}/s  Egg {snapshot.TotalEggCaloriesEatenPerSecond:0.0}/s\n" +
             $"Creatures seen {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageVisibleCreatureDensity:0.00}\n" +
-            $"Attacking {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.00}/s  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
+            $"Contact {FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount))}  intent {FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount))}  touch+intent {FormatPercent(Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Attack raw {snapshot.AverageAttackOutput:0.00}  near touch {FormatPercent(Share(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount))}  dmg {snapshot.TotalAttackDamagePerSecond:0.00}/s\n" +
             $"Meal gap {snapshot.AverageSecondsSinceLastMeal:0.0}s  Vision {snapshot.AverageVisionRange:0}/{ToDegrees(snapshot.AverageVisionAngleRadians):0}deg\n" +
             $"Search {snapshot.TotalDistanceTraveledPerSecond:0}u/s  meal dist {snapshot.AverageDistanceSinceLastMeal:0}u  kcal/u {snapshot.CaloriesEatenPerDistance:0.00}\n" +
             $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}  Map {(_renderMap ? "on" : "off")}\n" +
@@ -836,7 +837,8 @@ public partial class Main : Node2D
             $"Plant kcal {snapshot.TotalPlantCalories:0}  Meat kcal {snapshot.TotalMeatCalories:0}\n" +
             $"Digested {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s  Gut {snapshot.AverageGutFillRatio * 100f:0}%\n" +
             $"Seen F {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  C {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Attack {FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount))}  Dmg {snapshot.TotalAttackDamagePerSecond:0.0}/s\n" +
+            $"Attack intent {FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount))}  contact {FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Attack dmg {snapshot.TotalAttackDamagePerSecond:0.0}/s  raw {snapshot.AverageAttackOutput:0.00}\n" +
             $"Eat {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
             $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}";
@@ -1000,6 +1002,9 @@ public partial class Main : Node2D
             $"Creature facing {senses.CreatureFacingAlignment:0.00}\n\n" +
             $"Move {creature.Actions.MoveForward:0.00}\n" +
             $"Turn {creature.Actions.Turn:0.00}\n" +
+            $"Eat output {creature.Actions.EatOutput:0.00}\n" +
+            $"Repro output {creature.Actions.ReproduceOutput:0.00}\n" +
+            $"Attack output {creature.Actions.AttackOutput:0.00}\n" +
             $"Eat intent {creature.Actions.WantsEat}\n" +
             $"Attack intent {creature.Actions.WantsAttack}\n" +
             $"Reproduce {creature.Actions.WantsReproduce}";

@@ -15,6 +15,7 @@ public sealed class StatsRecordingSystem(
     SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global) : ISimulationSystem
 {
     private const float ActiveHiddenOutputWeightThreshold = 0.05f;
+    private const float RawAttackPositiveThreshold = 0f;
     private const int PlantPatchinessGridAxisCells = 10;
     private const int PlantPatchinessGridCellCount = PlantPatchinessGridAxisCells * PlantPatchinessGridAxisCells;
 
@@ -124,6 +125,13 @@ public sealed class StatsRecordingSystem(
         var eatingCreatureCount = 0;
         var rottenMeatDamagedCreatureCount = 0;
         var attackingCreatureCount = 0;
+        var creatureContactCreatureCount = 0;
+        var attackIntentCreatureCount = 0;
+        var attackIntentWhileTouchingCreatureCount = 0;
+        var attackNoIntentContactCreatureCount = 0;
+        var rawAttackPositiveCreatureCount = 0;
+        var rawAttackNearGateCreatureCount = 0;
+        var rawAttackNearGateWhileTouchingCreatureCount = 0;
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
         var activeMemoryCreatureCount = 0;
@@ -137,6 +145,8 @@ public sealed class StatsRecordingSystem(
         var memoryUserRightRegionCount = 0;
         var nonMemoryUserRightRegionCount = 0;
         var nonAttackingCreatureCount = 0;
+        var totalAttackOutput = 0f;
+        var totalTouchingAttackOutput = 0f;
         var barrenCreatureCount = 0;
         var sparseCreatureCount = 0;
         var grasslandCreatureCount = 0;
@@ -375,6 +385,41 @@ public sealed class StatsRecordingSystem(
             if (creature.LastCaloriesEaten > 0f)
             {
                 eatingCreatureCount++;
+            }
+
+            totalAttackOutput += creature.Actions.AttackOutput;
+            if (creature.Actions.AttackOutput > RawAttackPositiveThreshold)
+            {
+                rawAttackPositiveCreatureCount++;
+                if (creature.Actions.AttackOutput <= NeuralControllerSystem.DefaultAttackThreshold)
+                {
+                    rawAttackNearGateCreatureCount++;
+                }
+            }
+
+            if (creature.Actions.WantsAttack)
+            {
+                attackIntentCreatureCount++;
+            }
+
+            if (creature.IsTouchingCreature)
+            {
+                creatureContactCreatureCount++;
+                totalTouchingAttackOutput += creature.Actions.AttackOutput;
+                if (creature.Actions.WantsAttack)
+                {
+                    attackIntentWhileTouchingCreatureCount++;
+                }
+                else
+                {
+                    attackNoIntentContactCreatureCount++;
+                }
+
+                if (creature.Actions.AttackOutput > RawAttackPositiveThreshold
+                    && creature.Actions.AttackOutput <= NeuralControllerSystem.DefaultAttackThreshold)
+                {
+                    rawAttackNearGateWhileTouchingCreatureCount++;
+                }
             }
 
             if (creature.LastAttackDamageDealt > 0f)
@@ -735,6 +780,15 @@ public sealed class StatsRecordingSystem(
             totalGutPlantShare / divisor,
             totalGutMeatShare / divisor,
             attackingCreatureCount,
+            creatureContactCreatureCount,
+            attackIntentCreatureCount,
+            attackIntentWhileTouchingCreatureCount,
+            attackNoIntentContactCreatureCount,
+            rawAttackPositiveCreatureCount,
+            rawAttackNearGateCreatureCount,
+            rawAttackNearGateWhileTouchingCreatureCount,
+            totalAttackOutput / divisor,
+            creatureContactCreatureCount > 0 ? totalTouchingAttackOutput / creatureContactCreatureCount : 0f,
             attackDamagePerSecond,
             totalSecondsSinceLastMeal / divisor,
             distanceTraveledPerSecond,

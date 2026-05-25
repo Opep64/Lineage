@@ -4747,8 +4747,14 @@ static void StatsRecordingCapturesAggregateSnapshot()
         LeftObstacle = 0.25f,
         RightObstacle = 0.1f
     };
-    seeingCreature.Actions = new CreatureActionState { WantsReproduce = true };
+    seeingCreature.Actions = new CreatureActionState
+    {
+        WantsReproduce = true,
+        WantsAttack = true,
+        AttackOutput = 0.8f
+    };
     seeingCreature.IsTouchingFood = true;
+    seeingCreature.IsTouchingCreature = true;
     seeingCreature.LastMovementBlocked = true;
     seeingCreature.LastCaloriesEaten = 4.25f;
     seeingCreature.LastPlantCaloriesEaten = 2.5f;
@@ -4792,6 +4798,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     searchingCreature.SecondsSinceLastMeal = 6f;
     searchingCreature.LastDistanceTraveled = 5f;
     searchingCreature.DistanceSinceLastMeal = 12f;
+    searchingCreature.Actions = new CreatureActionState { AttackOutput = 0.1f };
+    searchingCreature.IsTouchingCreature = true;
     simulation.State.Creatures[1] = searchingCreature;
     simulation.State.SpawnResourcePatch(new ResourcePatchState
     {
@@ -4914,6 +4922,15 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.4f, snapshot.AverageGutPlantShare, 0.000001, "Average gut plant share");
     AssertClose(0.1f, snapshot.AverageGutMeatShare, 0.000001, "Average gut meat share");
     AssertEqual(1, snapshot.AttackingCreatureCount, "Attacking creature count");
+    AssertEqual(2, snapshot.CreatureContactCreatureCount, "Creature contact count");
+    AssertEqual(1, snapshot.AttackIntentCreatureCount, "Attack intent count");
+    AssertEqual(1, snapshot.AttackIntentWhileTouchingCreatureCount, "Attack intent while touching count");
+    AssertEqual(1, snapshot.AttackNoIntentContactCreatureCount, "Contact without attack intent count");
+    AssertEqual(2, snapshot.RawAttackPositiveCreatureCount, "Raw attack positive count");
+    AssertEqual(1, snapshot.RawAttackNearGateCreatureCount, "Raw attack near gate count");
+    AssertEqual(1, snapshot.RawAttackNearGateWhileTouchingCreatureCount, "Raw attack near gate while touching count");
+    AssertClose(0.45f, snapshot.AverageAttackOutput, 0.000001, "Average attack output");
+    AssertClose(0.45f, snapshot.AverageTouchingAttackOutput, 0.000001, "Average touching attack output");
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
     AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AverageDietaryAdaptation, 0.000001, "Average dietary adaptation");
     AssertClose(CreatureGenome.Baseline.CarrionAdaptation, snapshot.AverageCarrionAdaptation, 0.000001, "Average carrion adaptation");

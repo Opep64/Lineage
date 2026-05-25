@@ -256,7 +256,16 @@ public static class ViewerReportWriter
         writer.WriteLine("<h2>Predation Diagnostics</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Seeing creatures", FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount)));
-        WriteMetric(writer, "Attacking this tick", FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Creature contact", FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Attack intent", FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Intent while touching", FormatPercent(Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Touch no intent", FormatPercent(Share(snapshot.AttackNoIntentContactCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Raw attack > 0", FormatPercent(Share(snapshot.RawAttackPositiveCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Raw attack near gate", FormatPercent(Share(snapshot.RawAttackNearGateCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Near gate while touching", FormatPercent(Share(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Avg raw attack", snapshot.AverageAttackOutput.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg touching attack", snapshot.AverageTouchingAttackOutput.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Damage-dealing this tick", FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Attack damage", $"{snapshot.TotalAttackDamagePerSecond:0.###} health/s");
         WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
         WriteMetric(writer, "Injury deaths", state.Stats.InjuryDeathCount.ToString(CultureInfo.InvariantCulture));
@@ -988,7 +997,9 @@ public static class ViewerReportWriter
             "Combat pressure",
             "",
             snapshots,
-            new ChartSeries("Attacking %", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Damage-dealing %", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Avg raw attack", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageAttackOutput).ToArray()),
+            new ChartSeries("Avg touch attack", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageTouchingAttackOutput).ToArray()),
             new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()));
         WriteLineChart(
             writer,
@@ -1016,7 +1027,10 @@ public static class ViewerReportWriter
             "%",
             snapshots,
             new ChartSeries("Seeing creatures", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Attacking", "#e05a47", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Contact", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Intent", "#e05a47", snapshots.Select(snapshot => Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Intent touch", "#9d3434", snapshots.Select(snapshot => Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Near gate touch", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Fresh kill share", "#8f4cb8", snapshots.Select(snapshot => snapshot.FreshKillCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Fresh meat share", "#d69d2f", snapshots.Select(snapshot => snapshot.FreshMeatCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Meat energy share", "#b84a4a", snapshots.Select(snapshot => snapshot.MeatDigestedEnergyShare * 100f).ToArray()));

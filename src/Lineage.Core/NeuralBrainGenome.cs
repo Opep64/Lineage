@@ -239,6 +239,7 @@ public sealed class NeuralBrainGenome
         SeedSectorCreatureHuntingWeights(weights);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 5.0f);
+        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatProximityInput, 4.0f);
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
@@ -273,6 +274,7 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MovementBlockedInput, -1.5f);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.BiasInput, -2.5f);
+        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantProximityInput, 4.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
@@ -354,6 +356,7 @@ public sealed class NeuralBrainGenome
         SeedSectorMeatForagingWeights(weights);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 5.0f);
+        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatProximityInput, 4.0f);
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.3f);
@@ -396,8 +399,8 @@ public sealed class NeuralBrainGenome
 
             Set(weights, NeuralBrainSchema.TurnOutput, meatDensityInput, side * 1.2f);
             Set(weights, NeuralBrainSchema.TurnOutput, meatProximityInput, side * 2.1f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatDensityInput, centerBias * 0.15f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatProximityInput, centerBias * 0.7f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatDensityInput, 0.15f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatProximityInput, 0.25f + centerBias * 0.45f);
         }
     }
 
@@ -428,8 +431,9 @@ public sealed class NeuralBrainGenome
             Set(weights, NeuralBrainSchema.MoveForwardOutput, similarProximityInput, centerBias * 0.35f);
             Set(weights, NeuralBrainSchema.MoveForwardOutput, largerProximityInput, -centerBias * 0.45f);
 
-            Set(weights, NeuralBrainSchema.AttackOutput, smallerDensityInput, centerBias * 1.6f);
-            Set(weights, NeuralBrainSchema.AttackOutput, smallerProximityInput, centerBias * 4.2f);
+            var smallerAttackBias = 0.65f + centerBias * 0.35f;
+            Set(weights, NeuralBrainSchema.AttackOutput, smallerDensityInput, smallerAttackBias * 1.6f);
+            Set(weights, NeuralBrainSchema.AttackOutput, smallerProximityInput, smallerAttackBias * 4.2f);
             Set(weights, NeuralBrainSchema.AttackOutput, similarProximityInput, centerBias * 1.2f);
             Set(weights, NeuralBrainSchema.AttackOutput, largerProximityInput, -centerBias * 2.2f);
             Set(weights, NeuralBrainSchema.AttackOutput, approachInput, -centerBias * 0.8f);

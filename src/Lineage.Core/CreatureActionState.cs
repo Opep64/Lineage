@@ -9,6 +9,12 @@ public struct CreatureActionState
 
     public float Turn { get; set; }
 
+    public float EatOutput { get; set; }
+
+    public float ReproduceOutput { get; set; }
+
+    public float AttackOutput { get; set; }
+
     public bool WantsEat { get; set; }
 
     public bool WantsReproduce { get; set; }
