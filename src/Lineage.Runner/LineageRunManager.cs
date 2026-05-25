@@ -63,15 +63,7 @@ public sealed partial class LineageRunManager
             throw new FileNotFoundException("Scenario file was not found.", scenarioPath);
         }
 
-        var scenario = SimulationScenarioJson.Load(resolvedPath);
-        var scenarioJson = SimulationScenarioJson.ToJson(scenario);
-        var scenarioObject = JsonNode.Parse(scenarioJson)?.AsObject()
-            ?? throw new InvalidOperationException("Scenario JSON did not contain an object.");
-
-        return new ScenarioEditorDefinition(
-            Path.GetRelativePath(_repoRoot, resolvedPath),
-            scenarioObject,
-            ScenarioFieldDefinitions);
+        return BuildScenarioEditor(resolvedPath);
     }
 
     public IReadOnlyList<RunSummary> ListRuns()
@@ -102,6 +94,31 @@ public sealed partial class LineageRunManager
             Error: manifest.Error,
             StdoutTail: ReadTail(manifest.StdoutPath, maxLines),
             StderrTail: ReadTail(manifest.StderrPath, maxLines));
+    }
+
+    public RunCloneSettings? GetRunCloneSettings(string id)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        run = RefreshRunLifecycle(run);
+        var manifest = run.Manifest;
+        var cloneScenarioPath = ResolveCloneScenarioPath(manifest);
+        var launchScenarioPath = File.Exists(ResolveScenarioPath(manifest.ScenarioPath))
+            ? manifest.ScenarioPath
+            : Path.GetRelativePath(_repoRoot, cloneScenarioPath);
+
+        return new RunCloneSettings(
+            SourceRunId: manifest.Id,
+            SourceRunName: manifest.Name,
+            ScenarioPath: launchScenarioPath,
+            Ticks: manifest.Ticks,
+            Seed: manifest.Seed,
+            CheckpointIntervalTicks: manifest.CheckpointIntervalTicks,
+            StopOnExtinction: manifest.StopOnExtinction,
+            ScenarioEditor: BuildScenarioEditor(cloneScenarioPath));
     }
 
     public async Task<RunSummary> StartRunAsync(RunCreateRequest request)
@@ -546,6 +563,8 @@ public sealed partial class LineageRunManager
             ScenarioSummary: ReadScenarioSummary(manifest),
             Seed: status?.Seed ?? manifest.Seed,
             Ticks: manifest.Ticks,
+            CheckpointIntervalTicks: manifest.CheckpointIntervalTicks,
+            StopOnExtinction: manifest.StopOnExtinction,
             CreatedAtUtc: manifest.CreatedAtUtc,
             StartedAtUtc: manifest.StartedAtUtc,
             EndedAtUtc: manifest.EndedAtUtc,
@@ -920,6 +939,49 @@ public sealed partial class LineageRunManager
             ? scenarioPath
             : Path.Combine(_repoRoot, scenarioPath);
         return Path.GetFullPath(path);
+    }
+
+    private ScenarioEditorDefinition BuildScenarioEditor(string resolvedPath)
+    {
+        var scenario = SimulationScenarioJson.Load(resolvedPath);
+        var scenarioJson = SimulationScenarioJson.ToJson(scenario);
+        var scenarioObject = JsonNode.Parse(scenarioJson)?.AsObject()
+            ?? throw new InvalidOperationException("Scenario JSON did not contain an object.");
+
+        return new ScenarioEditorDefinition(
+            Path.GetRelativePath(_repoRoot, resolvedPath),
+            scenarioObject,
+            ScenarioFieldDefinitions);
+    }
+
+    private string ResolveCloneScenarioPath(RunManifest manifest)
+    {
+        var candidates = new[]
+        {
+            ResolveArtifactPath(EffectiveResolvedScenarioPath(manifest)),
+            ResolveArtifactPath(manifest.LaunchScenarioPath),
+            ResolveScenarioPath(manifest.ScenarioPath)
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (!string.IsNullOrWhiteSpace(candidate) && File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new FileNotFoundException("No scenario artifact was found for this run.", manifest.Id);
+    }
+
+    private string ResolveArtifactPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        return Path.IsPathRooted(path) ? Path.GetFullPath(path) : ResolveScenarioPath(path);
     }
 
     private static ulong? TryReadScenarioSeed(string scenarioPath)

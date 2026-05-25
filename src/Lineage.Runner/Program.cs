@@ -44,6 +44,19 @@ api.MapGet("/runs/{id}/details", (string id, int? lines, LineageRunManager manag
     return details is null ? Results.NotFound() : Results.Ok(details);
 });
 
+api.MapGet("/runs/{id}/clone-settings", (string id, LineageRunManager manager) =>
+{
+    try
+    {
+        var settings = manager.GetRunCloneSettings(id);
+        return settings is null ? Results.NotFound() : Results.Ok(settings);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/runs", async (RunCreateRequest request, LineageRunManager manager) =>
 {
     try

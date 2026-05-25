@@ -53,6 +53,16 @@ public sealed record RunDetails(
     IReadOnlyList<string> StdoutTail,
     IReadOnlyList<string> StderrTail);
 
+public sealed record RunCloneSettings(
+    string SourceRunId,
+    string SourceRunName,
+    string ScenarioPath,
+    int Ticks,
+    ulong? Seed,
+    int? CheckpointIntervalTicks,
+    bool StopOnExtinction,
+    ScenarioEditorDefinition ScenarioEditor);
+
 public sealed record RunScenarioSummary(
     string Path,
     bool IsResolvedSnapshot,
@@ -92,6 +102,8 @@ public sealed record RunSummary(
     RunScenarioSummary? ScenarioSummary,
     ulong? Seed,
     int Ticks,
+    int? CheckpointIntervalTicks,
+    bool StopOnExtinction,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? EndedAtUtc,

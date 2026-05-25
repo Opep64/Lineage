@@ -350,6 +350,7 @@ function renderRuns() {
       </td>
       <td>
         <div class="actions">
+          <button class="secondary" data-action="clone" data-id="${escapeHtml(run.id)}">Clone Settings</button>
           <button class="secondary" data-action="details" data-id="${escapeHtml(run.id)}">${isExpanded ? "Hide" : "Details"}</button>
           <button class="secondary" data-action="rename" data-id="${escapeHtml(run.id)}">Rename</button>
           <button class="secondary" data-action="checkpoint" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint</button>
@@ -593,6 +594,11 @@ runsBody.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "clone") {
+    await cloneRunSettings(id);
+    return;
+  }
+
   if (action === "details") {
     await toggleRunDetails(id);
     return;
@@ -777,6 +783,43 @@ async function renameRun(id) {
   }
 
   await loadRuns();
+}
+
+async function cloneRunSettings(id) {
+  refreshStatus.textContent = "Loading clone settings";
+  const response = await fetch(`/api/runs/${encodeURIComponent(id)}/clone-settings`);
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Clone settings unavailable." }));
+    refreshStatus.textContent = problem.error || "Clone settings unavailable.";
+    return;
+  }
+
+  const settings = await response.json();
+  ensureScenarioOption(settings.scenarioPath, settings.scenarioEditor?.scenario?.name || settings.scenarioPath);
+  scenarioSelect.value = settings.scenarioPath;
+  document.querySelector("#ticks").value = settings.ticks;
+  document.querySelector("#seed").value = settings.seed ?? "";
+  document.querySelector("#checkpointInterval").value = settings.checkpointIntervalTicks ?? "";
+  document.querySelector("#stopOnExtinction").checked = Boolean(settings.stopOnExtinction);
+
+  scenarioEditor = settings.scenarioEditor;
+  activeScenarioGroup = scenarioEditorGroups()[0] || null;
+  scenarioOptionsPanel.hidden = false;
+  renderScenarioEditor();
+  formMessage.textContent = `Loaded settings from ${settings.sourceRunName}.`;
+  refreshStatus.textContent = "Clone settings loaded";
+  document.querySelector(".launch-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function ensureScenarioOption(path, name) {
+  if ([...scenarioSelect.options].some((option) => option.value === path)) {
+    return;
+  }
+
+  const option = document.createElement("option");
+  option.value = path;
+  option.textContent = `${name} (${path})`;
+  scenarioSelect.append(option);
 }
 
 async function toggleRunDetails(id) {
