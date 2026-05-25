@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=20260525-scenario-editor">
 </head>
 <body>
   <header class="app-header">
@@ -41,6 +41,14 @@
         </label>
         <button type="submit">Start CLI Run</button>
       </form>
+      <div class="scenario-options-header">
+        <button id="scenarioOptionsToggle" class="secondary" type="button">Scenario Options</button>
+        <span id="scenarioOptionsStatus" class="scenario-options-status"></span>
+      </div>
+      <div id="scenarioOptionsPanel" class="scenario-options-panel" hidden>
+        <div id="scenarioTabs" class="scenario-tabs" role="tablist" aria-label="Scenario option groups"></div>
+        <div id="scenarioFields" class="scenario-fields"></div>
+      </div>
       <p id="formMessage" class="form-message" role="status"></p>
     </section>
 
@@ -106,6 +114,6 @@
     </section>
   </main>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=20260525-scenario-editor"></script>
 </body>
 </html>

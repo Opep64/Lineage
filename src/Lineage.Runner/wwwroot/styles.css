@@ -203,6 +203,83 @@ textarea {
   min-height: 16px;
 }
 
+.scenario-options-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.scenario-options-status {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scenario-options-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.scenario-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+button.scenario-tab {
+  border-color: var(--line);
+  background: #fff;
+  color: var(--muted);
+}
+
+button.scenario-tab.is-active {
+  border-color: var(--accent);
+  background: #eef4ff;
+  color: var(--accent-strong);
+}
+
+.scenario-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.scenario-field {
+  min-width: 0;
+}
+
+.scenario-field-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scenario-field-boolean {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  min-height: 62px;
+}
+
+.scenario-field-boolean input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.scenario-field-json {
+  grid-column: 1 / -1;
+}
+
+.scenario-field-json textarea {
+  min-height: 140px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
 .form-message {
   min-height: 20px;
   margin-top: 10px;

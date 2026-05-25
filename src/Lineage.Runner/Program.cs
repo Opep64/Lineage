@@ -15,6 +15,18 @@ var api = app.MapGroup("/api");
 
 api.MapGet("/scenarios", (LineageRunManager manager) => Results.Ok(manager.ListScenarios()));
 
+api.MapGet("/scenario-editor", (string path, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.GetScenarioEditor(path));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
 
 api.MapPost("/runs/export", (RunExportRequest request, LineageRunManager manager) =>

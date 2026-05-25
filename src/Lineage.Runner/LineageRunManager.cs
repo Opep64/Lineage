@@ -1,9 +1,13 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Lineage.Core;
 
 namespace Lineage.Runner;
 
@@ -16,6 +20,8 @@ public sealed partial class LineageRunManager
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
     };
+
+    private static readonly IReadOnlyList<ScenarioFieldDefinition> ScenarioFieldDefinitions = BuildScenarioFieldDefinitions();
 
     private readonly ConcurrentDictionary<string, ManagedRun> _runs = [];
     private readonly string _repoRoot;
@@ -44,6 +50,30 @@ public sealed partial class LineageRunManager
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Select(path => new ScenarioOption(Path.GetFileNameWithoutExtension(path), Path.GetRelativePath(_repoRoot, path)))
             .ToArray();
+    }
+
+    public ScenarioEditorDefinition GetScenarioEditor(string scenarioPath)
+    {
+        if (string.IsNullOrWhiteSpace(scenarioPath))
+        {
+            throw new ArgumentException("Scenario path is required.");
+        }
+
+        var resolvedPath = ResolveScenarioPath(scenarioPath);
+        if (!File.Exists(resolvedPath))
+        {
+            throw new FileNotFoundException("Scenario file was not found.", scenarioPath);
+        }
+
+        var scenario = SimulationScenarioJson.Load(resolvedPath);
+        var scenarioJson = SimulationScenarioJson.ToJson(scenario);
+        var scenarioObject = JsonNode.Parse(scenarioJson)?.AsObject()
+            ?? throw new InvalidOperationException("Scenario JSON did not contain an object.");
+
+        return new ScenarioEditorDefinition(
+            Path.GetRelativePath(_repoRoot, resolvedPath),
+            scenarioObject,
+            ScenarioFieldDefinitions);
     }
 
     public IReadOnlyList<RunSummary> ListRuns()
@@ -96,9 +126,10 @@ public sealed partial class LineageRunManager
 
         var createdAt = DateTimeOffset.UtcNow;
         var scenarioName = Path.GetFileNameWithoutExtension(scenarioPath);
-        var seed = request.Seed ?? TryReadScenarioSeed(scenarioPath);
+        var seed = request.Seed ?? TryReadScenarioSeed(request.Scenario) ?? TryReadScenarioSeed(scenarioPath);
         var id = $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{ProcessIdToken}";
         var runDirectory = Path.Combine(_runsRoot, id);
+        var launchScenarioPath = WriteLaunchScenarioIfProvided(request.Scenario, createdAt, scenarioName);
 
         var manifest = new RunManifest
         {
@@ -107,6 +138,8 @@ public sealed partial class LineageRunManager
             Status = "starting",
             ScenarioPath = Path.GetRelativePath(_repoRoot, scenarioPath),
             ScenarioName = scenarioName,
+            LaunchScenarioPath = launchScenarioPath,
+            ResolvedScenarioPath = Path.Combine(runDirectory, "resolved_scenario.json"),
             Seed = seed,
             Ticks = request.Ticks,
             CheckpointIntervalTicks = request.CheckpointIntervalTicks,
@@ -181,6 +214,7 @@ public sealed partial class LineageRunManager
         }
         catch
         {
+            DeleteLaunchScenario(manifest);
             _runs.TryRemove(manifest.Id, out _);
             throw;
         }
@@ -196,6 +230,24 @@ public sealed partial class LineageRunManager
         var request = new RunCommandRequest(command);
         File.WriteAllText(run.Manifest.ControlPath, JsonSerializer.Serialize(request, JsonOptions));
         return true;
+    }
+
+    private string WriteLaunchScenarioIfProvided(JsonElement? scenarioElement, DateTimeOffset createdAt, string scenarioName)
+    {
+        if (scenarioElement is null
+            || scenarioElement.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            return string.Empty;
+        }
+
+        var scenario = SimulationScenarioJson.FromJson(scenarioElement.Value.GetRawText());
+        var launchScenarioDirectory = Path.Combine(_runsRoot, "_launch_scenarios");
+        Directory.CreateDirectory(launchScenarioDirectory);
+        var launchScenarioPath = Path.Combine(
+            launchScenarioDirectory,
+            $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{Guid.NewGuid():N}.json");
+        SimulationScenarioJson.Save(launchScenarioPath, scenario);
+        return launchScenarioPath;
     }
 
     public RunSummary? RenameRun(string id, string name)
@@ -283,6 +335,10 @@ public sealed partial class LineageRunManager
                 "Run",
                 "Status",
                 "Scenario",
+                "Brain",
+                "Starter",
+                "World",
+                "Plants/M",
                 "Seed",
                 "Requested ticks",
                 "Final tick",
@@ -305,6 +361,10 @@ public sealed partial class LineageRunManager
                         MarkdownCell(summary.Name),
                         MarkdownCell(summary.Status),
                         MarkdownCell(summary.ScenarioName),
+                        MarkdownCell(summary.ScenarioSummary?.BrainArchitectureKind),
+                        MarkdownCell(summary.ScenarioSummary?.InitialBrainKind),
+                        MarkdownCell(FormatScenarioWorld(summary.ScenarioSummary)),
+                        MarkdownCell(FormatScenarioDensity(summary.ScenarioSummary)),
                         MarkdownCell(summary.Seed),
                         MarkdownCell(summary.Ticks),
                         MarkdownCell(summary.CurrentTick),
@@ -324,6 +384,10 @@ public sealed partial class LineageRunManager
                 false,
                 false,
                 false,
+                false,
+                false,
+                false,
+                true,
                 true,
                 true,
                 true,
@@ -350,6 +414,15 @@ public sealed partial class LineageRunManager
             AppendDetail(builder, "Id", summary.Id);
             AppendDetail(builder, "Status", summary.Status);
             AppendDetail(builder, "Scenario", $"{summary.ScenarioName} ({summary.ScenarioPath})");
+            AppendDetail(builder, "Launch scenario", summary.LaunchScenarioPath);
+            AppendDetail(builder, "Resolved scenario", summary.ResolvedScenarioPath);
+            AppendDetail(builder, "Scenario source", summary.ScenarioSummary?.IsResolvedSnapshot == true ? "resolved run snapshot" : "current scenario file fallback");
+            AppendDetail(builder, "Scenario brain", FormatScenarioBrain(summary.ScenarioSummary));
+            AppendDetail(builder, "Scenario vision", FormatScenarioVision(summary.ScenarioSummary));
+            AppendDetail(builder, "Scenario world", FormatScenarioWorld(summary.ScenarioSummary));
+            AppendDetail(builder, "Scenario resources", FormatScenarioResources(summary.ScenarioSummary));
+            AppendDetail(builder, "Scenario terrain", FormatScenarioTerrain(summary.ScenarioSummary));
+            AppendDetail(builder, "Scenario meat", FormatScenarioMeat(summary.ScenarioSummary));
             AppendDetail(builder, "Seed", summary.Seed);
             AppendDetail(builder, "Requested ticks", summary.Ticks);
             AppendDetail(builder, "Completed steps", summary.CompletedSteps);
@@ -397,11 +470,16 @@ public sealed partial class LineageRunManager
             return false;
         }
 
-        if (deleteArtifacts && Directory.Exists(run.Manifest.RunDirectory))
+        if (deleteArtifacts)
         {
             try
             {
-                Directory.Delete(run.Manifest.RunDirectory, recursive: true);
+                if (Directory.Exists(run.Manifest.RunDirectory))
+                {
+                    Directory.Delete(run.Manifest.RunDirectory, recursive: true);
+                }
+
+                DeleteLaunchScenario(run.Manifest);
             }
             catch
             {
@@ -411,6 +489,32 @@ public sealed partial class LineageRunManager
 
         _runs.TryRemove(id, out _);
         return true;
+    }
+
+    private void DeleteLaunchScenario(RunManifest manifest)
+    {
+        if (string.IsNullOrWhiteSpace(manifest.LaunchScenarioPath)
+            || !File.Exists(manifest.LaunchScenarioPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var fullPath = Path.GetFullPath(manifest.LaunchScenarioPath);
+            var launchScenarioRoot = Path.GetFullPath(Path.Combine(_runsRoot, "_launch_scenarios"));
+            var relativePath = Path.GetRelativePath(launchScenarioRoot, fullPath);
+            if (relativePath.StartsWith("..", StringComparison.Ordinal)
+                || Path.IsPathRooted(relativePath))
+            {
+                return;
+            }
+
+            File.Delete(fullPath);
+        }
+        catch
+        {
+        }
     }
 
     public string? GetReportPath(string id)
@@ -439,6 +543,9 @@ public sealed partial class LineageRunManager
             Status: statusText,
             ScenarioPath: manifest.ScenarioPath,
             ScenarioName: manifest.ScenarioName,
+            LaunchScenarioPath: manifest.LaunchScenarioPath,
+            ResolvedScenarioPath: EffectiveResolvedScenarioPath(manifest),
+            ScenarioSummary: ReadScenarioSummary(manifest),
             Seed: status?.Seed ?? manifest.Seed,
             Ticks: manifest.Ticks,
             CreatedAtUtc: manifest.CreatedAtUtc,
@@ -504,6 +611,8 @@ public sealed partial class LineageRunManager
                     continue;
                 }
 
+                EnsureManifestDefaults(manifest);
+
                 if (manifest.Status is "running" or "starting")
                 {
                     var restored = TryRestoreRunningProcess(manifest);
@@ -538,6 +647,17 @@ public sealed partial class LineageRunManager
         }
 
         return run;
+    }
+
+    private static void EnsureManifestDefaults(RunManifest manifest)
+    {
+        if (string.IsNullOrWhiteSpace(manifest.ResolvedScenarioPath)
+            && !string.IsNullOrWhiteSpace(manifest.RunDirectory))
+        {
+            manifest.ResolvedScenarioPath = Path.Combine(manifest.RunDirectory, "resolved_scenario.json");
+        }
+
+        manifest.LaunchScenarioPath ??= string.Empty;
     }
 
     private ManagedRun? TryRestoreRunningProcess(RunManifest manifest)
@@ -653,6 +773,74 @@ public sealed partial class LineageRunManager
         }
     }
 
+    private RunScenarioSummary? ReadScenarioSummary(RunManifest manifest)
+    {
+        var resolvedScenarioPath = EffectiveResolvedScenarioPath(manifest);
+        if (File.Exists(resolvedScenarioPath))
+        {
+            return ReadScenarioSummary(resolvedScenarioPath, isResolvedSnapshot: true);
+        }
+
+        var sourceScenarioPath = ResolveScenarioPath(manifest.ScenarioPath);
+        return File.Exists(sourceScenarioPath)
+            ? ReadScenarioSummary(sourceScenarioPath, isResolvedSnapshot: false)
+            : null;
+    }
+
+    private static RunScenarioSummary? ReadScenarioSummary(string path, bool isResolvedSnapshot)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            var worldWidth = GetDouble(root, "worldWidth");
+            var worldHeight = GetDouble(root, "worldHeight");
+            var resourceDensity = GetDouble(root, "initialResourcesPerMillionArea");
+            var calculatedResourceCount = worldWidth is not null && worldHeight is not null && resourceDensity is not null
+                ? (int?)Math.Max(0, (int)Math.Round(resourceDensity.Value * worldWidth.Value * worldHeight.Value / 1_000_000d))
+                : null;
+
+            var brainArchitectureKind = GetString(root, "brainArchitectureKind") ?? "hybridNeural";
+            var initialBrainKind = GetString(root, "initialBrainKind") ?? "sectorForager";
+            var brainHiddenNodeCount = GetInt32(root, "brainHiddenNodeCount")
+                ?? (string.Equals(brainArchitectureKind, "hiddenLayerNeural", StringComparison.OrdinalIgnoreCase) ? 8 : 4);
+
+            return new RunScenarioSummary(
+                Path: path,
+                IsResolvedSnapshot: isResolvedSnapshot,
+                Name: GetString(root, "name"),
+                Seed: GetUInt64(root, "seed"),
+                PipelineKind: GetString(root, "pipelineKind"),
+                BrainArchitectureKind: brainArchitectureKind,
+                InitialBrainKind: initialBrainKind,
+                BrainHiddenNodeCount: brainHiddenNodeCount,
+                EnableSectorVision: GetBoolean(root, "enableSectorVision"),
+                EnableLegacyNearestFoodVisionInputs: GetBoolean(root, "enableLegacyNearestFoodVisionInputs"),
+                EnableLegacyNearestCreatureVisionInputs: GetBoolean(root, "enableLegacyNearestCreatureVisionInputs"),
+                WorldWidth: worldWidth,
+                WorldHeight: worldHeight,
+                InitialCreatureCount: GetInt32(root, "initialCreatureCount"),
+                InitialResourcesPerMillionArea: resourceDensity,
+                InitialResourceCount: calculatedResourceCount ?? GetInt32(root, "initialResourceCount"),
+                BiomeMapKind: GetString(root, "biomeMapKind"),
+                EnableObstacles: GetBoolean(root, "enableObstacles"),
+                ObstacleMapKind: GetString(root, "obstacleMapKind"),
+                ResourceVoidBorderWidth: GetDouble(root, "resourceVoidBorderWidth"),
+                VisionAngleDegrees: GetDouble(root, "visionAngleRadians") is { } radians
+                    ? radians * 180d / Math.PI
+                    : null,
+                DeathMeatCaloriesPerBodyRadius: GetDouble(root, "deathMeatCaloriesPerBodyRadius"),
+                DeathMeatEnergyFraction: GetDouble(root, "deathMeatEnergyFraction"),
+                MeatDecayCaloriesPerSecond: GetDouble(root, "meatDecayCaloriesPerSecond"),
+                RottenMeatDamagePerRawKcal: GetDouble(root, "rottenMeatDamagePerRawKcal"),
+                SpeciesSeedCount: CountEnabledSpeciesSeeds(root));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static IReadOnlyList<string> ReadTail(string path, int maxLines)
     {
         if (!File.Exists(path) || maxLines <= 0)
@@ -698,6 +886,7 @@ public sealed partial class LineageRunManager
         manifest.ProcessId = processId;
         manifest.Id = ReplaceProcessIdToken(manifest.Id, processIdText);
         manifest.RunDirectory = ReplaceProcessIdToken(manifest.RunDirectory, processIdText);
+        manifest.ResolvedScenarioPath = ReplaceProcessIdToken(manifest.ResolvedScenarioPath, processIdText);
         manifest.StatsPath = ReplaceProcessIdToken(manifest.StatsPath, processIdText);
         manifest.ReportPath = ReplaceProcessIdToken(manifest.ReportPath, processIdText);
         manifest.SnapshotPath = ReplaceProcessIdToken(manifest.SnapshotPath, processIdText);
@@ -711,6 +900,20 @@ public sealed partial class LineageRunManager
     private static string ReplaceProcessIdToken(string value, string processId)
     {
         return value.Replace(ProcessIdToken, processId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string EffectiveResolvedScenarioPath(RunManifest manifest)
+    {
+        return string.IsNullOrWhiteSpace(manifest.ResolvedScenarioPath)
+            ? Path.Combine(manifest.RunDirectory, "resolved_scenario.json")
+            : manifest.ResolvedScenarioPath;
+    }
+
+    private static string EffectiveCliScenarioPath(RunManifest manifest)
+    {
+        return string.IsNullOrWhiteSpace(manifest.LaunchScenarioPath)
+            ? manifest.ScenarioPath
+            : manifest.LaunchScenarioPath;
     }
 
     private string ResolveScenarioPath(string scenarioPath)
@@ -736,6 +939,30 @@ public sealed partial class LineageRunManager
         catch
         {
             return null;
+        }
+
+        return null;
+    }
+
+    private static ulong? TryReadScenarioSeed(JsonElement? scenarioElement)
+    {
+        if (scenarioElement is null
+            || scenarioElement.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (TryGetProperty(scenarioElement.Value, "seed", out var seedElement)
+                && seedElement.ValueKind == JsonValueKind.Number
+                && seedElement.TryGetUInt64(out var seed))
+            {
+                return seed;
+            }
+        }
+        catch
+        {
         }
 
         return null;
@@ -768,7 +995,9 @@ public sealed partial class LineageRunManager
         var args = new List<string>
         {
             "--scenario",
-            manifest.ScenarioPath,
+            EffectiveCliScenarioPath(manifest),
+            "--save-scenario",
+            EffectiveResolvedScenarioPath(manifest),
             "--ticks",
             manifest.Ticks.ToString(CultureInfo.InvariantCulture),
             "--output",
@@ -895,6 +1124,113 @@ public sealed partial class LineageRunManager
         return (Math.Clamp(value, 0d, 1d) * 100d).ToString("0.0", CultureInfo.InvariantCulture) + "%";
     }
 
+    private static string FormatScenarioBrain(RunScenarioSummary? summary)
+    {
+        if (summary is null)
+        {
+            return string.Empty;
+        }
+
+        var brain = summary.BrainArchitectureKind ?? "unknown";
+        var starter = summary.InitialBrainKind ?? "unknown";
+        var hidden = summary.BrainHiddenNodeCount is null
+            ? string.Empty
+            : $", hidden {summary.BrainHiddenNodeCount.Value.ToString(CultureInfo.InvariantCulture)}";
+        return $"{brain}, {starter}{hidden}";
+    }
+
+    private static string FormatScenarioVision(RunScenarioSummary? summary)
+    {
+        if (summary is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            ", ",
+            new[]
+            {
+                summary.EnableSectorVision is null ? null : $"sector {FormatBoolean(summary.EnableSectorVision.Value)}",
+                summary.EnableLegacyNearestFoodVisionInputs is null ? null : $"legacy food {FormatBoolean(summary.EnableLegacyNearestFoodVisionInputs.Value)}",
+                summary.EnableLegacyNearestCreatureVisionInputs is null ? null : $"legacy creature {FormatBoolean(summary.EnableLegacyNearestCreatureVisionInputs.Value)}",
+                summary.VisionAngleDegrees is null ? null : $"vision {summary.VisionAngleDegrees.Value.ToString("0.#", CultureInfo.InvariantCulture)} deg"
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatScenarioWorld(RunScenarioSummary? summary)
+    {
+        if (summary?.WorldWidth is null || summary.WorldHeight is null)
+        {
+            return string.Empty;
+        }
+
+        return $"{summary.WorldWidth.Value.ToString("0.###", CultureInfo.InvariantCulture)} x {summary.WorldHeight.Value.ToString("0.###", CultureInfo.InvariantCulture)}";
+    }
+
+    private static string FormatScenarioDensity(RunScenarioSummary? summary)
+    {
+        return summary?.InitialResourcesPerMillionArea?.ToString("0.###", CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private static string FormatScenarioResources(RunScenarioSummary? summary)
+    {
+        if (summary is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            ", ",
+            new[]
+            {
+                summary.InitialResourcesPerMillionArea is null ? null : $"{summary.InitialResourcesPerMillionArea.Value.ToString("0.###", CultureInfo.InvariantCulture)}/M",
+                summary.InitialResourceCount is null ? null : $"{summary.InitialResourceCount.Value.ToString(CultureInfo.InvariantCulture)} initial plants",
+                summary.ResourceVoidBorderWidth is null ? null : $"{summary.ResourceVoidBorderWidth.Value.ToString("0.###", CultureInfo.InvariantCulture)} void border",
+                summary.InitialCreatureCount is null ? null : $"{summary.InitialCreatureCount.Value.ToString(CultureInfo.InvariantCulture)} starting creatures",
+                summary.SpeciesSeedCount == 0 ? null : $"{summary.SpeciesSeedCount.ToString(CultureInfo.InvariantCulture)} species seed(s)"
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatScenarioTerrain(RunScenarioSummary? summary)
+    {
+        if (summary is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            ", ",
+            new[]
+            {
+                summary.BiomeMapKind is null ? null : $"biomes {summary.BiomeMapKind}",
+                summary.EnableObstacles is null ? null : $"obstacles {FormatBoolean(summary.EnableObstacles.Value)}",
+                summary.ObstacleMapKind is null ? null : $"obstacle map {summary.ObstacleMapKind}"
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatScenarioMeat(RunScenarioSummary? summary)
+    {
+        if (summary is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            ", ",
+            new[]
+            {
+                summary.DeathMeatCaloriesPerBodyRadius is null ? null : $"death meat/body-radius {summary.DeathMeatCaloriesPerBodyRadius.Value.ToString("0.###", CultureInfo.InvariantCulture)}",
+                summary.DeathMeatEnergyFraction is null ? null : $"death energy {FormatPercent(summary.DeathMeatEnergyFraction.Value)}",
+                summary.MeatDecayCaloriesPerSecond is null ? null : $"decay {summary.MeatDecayCaloriesPerSecond.Value.ToString("0.###", CultureInfo.InvariantCulture)} kcal/s",
+                summary.RottenMeatDamagePerRawKcal is null ? null : $"rot damage {summary.RottenMeatDamagePerRawKcal.Value.ToString("0.###", CultureInfo.InvariantCulture)}"
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatBoolean(bool value)
+    {
+        return value ? "on" : "off";
+    }
+
     private static string MarkdownCell(object? value)
     {
         return FormatMarkdownValue(value)
@@ -976,6 +1312,284 @@ public sealed partial class LineageRunManager
     private static string EscapeMarkdownHeading(string value)
     {
         return value.Replace("#", "\\#", StringComparison.Ordinal).Trim();
+    }
+
+    private static string? GetString(JsonElement element, string propertyName)
+    {
+        return TryGetProperty(element, propertyName, out var property)
+            ? property.ValueKind switch
+            {
+                JsonValueKind.String => property.GetString(),
+                JsonValueKind.Number => property.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => null
+            }
+            : null;
+    }
+
+    private static bool? GetBoolean(JsonElement element, string propertyName)
+    {
+        if (!TryGetProperty(element, propertyName, out var property))
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null
+        };
+    }
+
+    private static int? GetInt32(JsonElement element, string propertyName)
+    {
+        return TryGetProperty(element, propertyName, out var property)
+            && property.ValueKind == JsonValueKind.Number
+            && property.TryGetInt32(out var value)
+                ? value
+                : null;
+    }
+
+    private static ulong? GetUInt64(JsonElement element, string propertyName)
+    {
+        return TryGetProperty(element, propertyName, out var property)
+            && property.ValueKind == JsonValueKind.Number
+            && property.TryGetUInt64(out var value)
+                ? value
+                : null;
+    }
+
+    private static double? GetDouble(JsonElement element, string propertyName)
+    {
+        return TryGetProperty(element, propertyName, out var property)
+            && property.ValueKind == JsonValueKind.Number
+            && property.TryGetDouble(out var value)
+                ? value
+                : null;
+    }
+
+    private static int CountEnabledSpeciesSeeds(JsonElement element)
+    {
+        if (!TryGetProperty(element, "speciesSeeds", out var speciesSeeds)
+            || speciesSeeds.ValueKind != JsonValueKind.Array)
+        {
+            return 0;
+        }
+
+        var count = 0;
+        foreach (var speciesSeed in speciesSeeds.EnumerateArray())
+        {
+            if (speciesSeed.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (GetBoolean(speciesSeed, "enabled") != false)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static IReadOnlyList<ScenarioFieldDefinition> BuildScenarioFieldDefinitions()
+    {
+        return typeof(SimulationScenario)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+            .Where(property => property.GetMethod is not null)
+            .Select(property =>
+            {
+                var propertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                var type = ScenarioEditorType(propertyType);
+                var enumValues = propertyType.IsEnum
+                    ? Enum.GetNames(propertyType).Select(JsonOptions.PropertyNamingPolicy!.ConvertName).ToArray()
+                    : Array.Empty<string>();
+
+                return new ScenarioFieldDefinition(
+                    property.Name,
+                    JsonName(property),
+                    ToLabel(property.Name),
+                    ScenarioFieldGroup(property.Name),
+                    type,
+                    enumValues,
+                    IsAdvancedScenarioField(property.Name));
+            })
+            .ToArray();
+    }
+
+    private static string ScenarioEditorType(Type type)
+    {
+        if (type == typeof(bool))
+        {
+            return "boolean";
+        }
+
+        if (type.IsEnum)
+        {
+            return "enum";
+        }
+
+        if (type == typeof(string))
+        {
+            return "text";
+        }
+
+        return IsNumberType(type) ? "number" : "json";
+    }
+
+    private static bool IsNumberType(Type type)
+    {
+        return type == typeof(byte)
+            || type == typeof(short)
+            || type == typeof(int)
+            || type == typeof(long)
+            || type == typeof(ushort)
+            || type == typeof(uint)
+            || type == typeof(ulong)
+            || type == typeof(float)
+            || type == typeof(double)
+            || type == typeof(decimal);
+    }
+
+    private static string JsonName(PropertyInfo property)
+    {
+        return property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
+            ?? JsonOptions.PropertyNamingPolicy!.ConvertName(property.Name);
+    }
+
+    private static string ToLabel(string name)
+    {
+        var builder = new StringBuilder(name.Length + 8);
+        for (var i = 0; i < name.Length; i++)
+        {
+            var current = name[i];
+            if (i > 0
+                && char.IsUpper(current)
+                && (char.IsLower(name[i - 1]) || (i + 1 < name.Length && char.IsLower(name[i + 1]))))
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(current);
+        }
+
+        return builder.ToString();
+    }
+
+    private static string ScenarioFieldGroup(string name)
+    {
+        if (name is "Name" or "Seed" or "PipelineKind" or "InitialCreatureCount" or "InitialCreatureSpawnRegion" or "StatsSnapshotIntervalTicks")
+        {
+            return "Basics";
+        }
+
+        if (name.Contains("Brain", StringComparison.Ordinal)
+            || name.Contains("Vision", StringComparison.Ordinal)
+            || name.Contains("Sense", StringComparison.Ordinal)
+            || name.Contains("Memory", StringComparison.Ordinal))
+        {
+            return "Brain & Vision";
+        }
+
+        if (name.Contains("World", StringComparison.Ordinal)
+            || name.Contains("Biome", StringComparison.Ordinal)
+            || name.Contains("Obstacle", StringComparison.Ordinal)
+            || name.Contains("Terrain", StringComparison.Ordinal)
+            || name.Contains("Spatial", StringComparison.Ordinal)
+            || name is "FixedDeltaSeconds")
+        {
+            return "World & Terrain";
+        }
+
+        if (name.Contains("Resource", StringComparison.Ordinal)
+            || name.Contains("Plant", StringComparison.Ordinal)
+            || name.Contains("Fertility", StringComparison.Ordinal))
+        {
+            return "Plants";
+        }
+
+        if (name.Contains("Season", StringComparison.Ordinal))
+        {
+            return "Seasons";
+        }
+
+        if (name.Contains("Reproduction", StringComparison.Ordinal)
+            || name.Contains("Reproductive", StringComparison.Ordinal)
+            || name.Contains("Offspring", StringComparison.Ordinal)
+            || name.Contains("Egg", StringComparison.Ordinal)
+            || name.Contains("Maturity", StringComparison.Ordinal)
+            || name.Contains("Senescent", StringComparison.Ordinal)
+            || name.Contains("Crowding", StringComparison.Ordinal)
+            || name.Contains("InitialCreatureEnergy", StringComparison.Ordinal))
+        {
+            return "Reproduction";
+        }
+
+        if (name.Contains("Diet", StringComparison.Ordinal)
+            || name.Contains("Carrion", StringComparison.Ordinal)
+            || name.Contains("Meat", StringComparison.Ordinal)
+            || name.Contains("Bite", StringComparison.Ordinal)
+            || name.Contains("Damage", StringComparison.Ordinal)
+            || name.Contains("Eat", StringComparison.Ordinal)
+            || name.Contains("Gut", StringComparison.Ordinal)
+            || name.Contains("Digestion", StringComparison.Ordinal))
+        {
+            return "Diet & Combat";
+        }
+
+        if (name.Contains("Energy", StringComparison.Ordinal)
+            || name.Contains("Movement", StringComparison.Ordinal)
+            || name.Contains("Speed", StringComparison.Ordinal)
+            || name.Contains("Turn", StringComparison.Ordinal)
+            || name.Contains("BodyRadius", StringComparison.Ordinal)
+            || name.Contains("Basal", StringComparison.Ordinal))
+        {
+            return "Energy & Movement";
+        }
+
+        if (name.Contains("Mutation", StringComparison.Ordinal))
+        {
+            return "Mutation";
+        }
+
+        if (name.Contains("Species", StringComparison.Ordinal))
+        {
+            return "Species";
+        }
+
+        return "Advanced";
+    }
+
+    private static bool IsAdvancedScenarioField(string name)
+    {
+        return name.Contains("Multiplier", StringComparison.Ordinal)
+            || name.Contains("EnergyCost", StringComparison.Ordinal)
+            || name.Contains("LocalFertility", StringComparison.Ordinal)
+            || name.Contains("Species", StringComparison.Ordinal)
+            || name.Contains("Phase", StringComparison.Ordinal)
+            || name is "FixedDeltaSeconds" or "CloseSenseRefreshProximity";
+    }
+
+    private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement property)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var candidate in element.EnumerateObject())
+            {
+                if (string.Equals(candidate.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    property = candidate.Value;
+                    return true;
+                }
+            }
+        }
+
+        property = default;
+        return false;
     }
 
     [GeneratedRegex("[^a-z0-9]+", RegexOptions.IgnoreCase)]

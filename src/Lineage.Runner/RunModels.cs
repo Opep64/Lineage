@@ -1,15 +1,32 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace Lineage.Runner;
 
 public sealed record ScenarioOption(string Name, string Path);
 
+public sealed record ScenarioEditorDefinition(
+    string ScenarioPath,
+    JsonObject Scenario,
+    IReadOnlyList<ScenarioFieldDefinition> Fields);
+
+public sealed record ScenarioFieldDefinition(
+    string Name,
+    string JsonName,
+    string Label,
+    string Group,
+    string Type,
+    IReadOnlyList<string> EnumValues,
+    bool Advanced);
+
 public sealed record RunCreateRequest(
     string ScenarioPath,
     int Ticks,
     ulong? Seed,
     int? CheckpointIntervalTicks,
-    bool StopOnExtinction);
+    bool StopOnExtinction,
+    JsonElement? Scenario);
 
 public sealed record RunCommandRequest(string Command);
 
@@ -31,12 +48,43 @@ public sealed record RunDetails(
     IReadOnlyList<string> StdoutTail,
     IReadOnlyList<string> StderrTail);
 
+public sealed record RunScenarioSummary(
+    string Path,
+    bool IsResolvedSnapshot,
+    string? Name,
+    ulong? Seed,
+    string? PipelineKind,
+    string? BrainArchitectureKind,
+    string? InitialBrainKind,
+    int? BrainHiddenNodeCount,
+    bool? EnableSectorVision,
+    bool? EnableLegacyNearestFoodVisionInputs,
+    bool? EnableLegacyNearestCreatureVisionInputs,
+    double? WorldWidth,
+    double? WorldHeight,
+    int? InitialCreatureCount,
+    double? InitialResourcesPerMillionArea,
+    int? InitialResourceCount,
+    string? BiomeMapKind,
+    bool? EnableObstacles,
+    string? ObstacleMapKind,
+    double? ResourceVoidBorderWidth,
+    double? VisionAngleDegrees,
+    double? DeathMeatCaloriesPerBodyRadius,
+    double? DeathMeatEnergyFraction,
+    double? MeatDecayCaloriesPerSecond,
+    double? RottenMeatDamagePerRawKcal,
+    int SpeciesSeedCount);
+
 public sealed record RunSummary(
     string Id,
     string Name,
     string Status,
     string ScenarioPath,
     string ScenarioName,
+    string LaunchScenarioPath,
+    string ResolvedScenarioPath,
+    RunScenarioSummary? ScenarioSummary,
     ulong? Seed,
     int Ticks,
     DateTimeOffset CreatedAtUtc,
@@ -81,6 +129,10 @@ public sealed class RunManifest
     public string ScenarioPath { get; set; } = string.Empty;
 
     public string ScenarioName { get; set; } = string.Empty;
+
+    public string LaunchScenarioPath { get; set; } = string.Empty;
+
+    public string ResolvedScenarioPath { get; set; } = string.Empty;
 
     public ulong? Seed { get; set; }
 

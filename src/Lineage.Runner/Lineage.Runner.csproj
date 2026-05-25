@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Lineage.Core\Lineage.Core.csproj" />
     <ProjectReference Include="..\Lineage.Cli\Lineage.Cli.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 

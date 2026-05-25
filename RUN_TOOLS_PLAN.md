@@ -1,7 +1,7 @@
 # Lineage Run Tools Plan
 
 Created: 2026-05-23
-Updated: 2026-05-24
+Updated: 2026-05-25
 
 This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Start with `DOCS_INDEX.md` for the full documentation map. Keep current implemented mechanics in `IMPLEMENTED_STATE.md`, future mechanics in `ROADMAP.md`, and use this file only for workflow tooling around runs.
 
@@ -157,6 +157,7 @@ Each launched run should get its own folder, likely under `out/runs/<run-id>/`:
 ```text
 out/runs/<run-id>/
   run.manifest.json
+  resolved_scenario.json
   status.json
   events.jsonl
   control.json
@@ -169,6 +170,7 @@ out/runs/<run-id>/
 ```
 
 `run.manifest.json` should describe what was requested and where outputs live.
+`resolved_scenario.json` should capture the exact scenario after CLI overrides such as seed, density, or brain architecture have been applied.
 `status.json` should be periodically overwritten by the running CLI with current state.
 `events.jsonl` can hold append-only lifecycle and telemetry events.
 `control.json` can be written by the launcher to request actions such as stop, checkpoint now, or checkpoint and stop.
@@ -213,6 +215,12 @@ Scenario metadata should include:
 - Whether changing the value requires a restart.
 
 This same metadata should be used later to improve Godot's unwieldy one-long-list scenario editor into grouped, searchable sections with basic/advanced filtering.
+
+Current launcher slice:
+
+- The runner reflects `SimulationScenario` directly to discover field names, JSON names, scalar/enum/JSON types, and initial grouping.
+- This keeps new scalar scenario options visible in the launcher as soon as they are added to the core scenario type.
+- The next cleanup should move the grouping, ranges, units, descriptions, and basic/advanced markers into shared `Lineage.Core` metadata so Godot and the launcher use the exact same schema.
 
 Separate option categories:
 
@@ -295,6 +303,8 @@ The launcher should eventually:
 - The CLI can write stdout/stderr logs directly via launcher-supplied log paths, so a runner restart does not leave the simulation dependent on an old redirected pipe.
 - The dashboard supports basic run-library management: status/scenario/search filters, sorting, seed display, expandable details/log tails, renaming, single-run delete, and selected-run bulk delete.
 - Selected runs can be exported to a compact Markdown comparison packet with final/live metrics, command line, and artifact paths for Codex analysis.
+- New dashboard-launched runs save a resolved scenario JSON beside the run manifest and surface compact scenario identity: brain architecture, starter brain, vision mode, world size, resource density, terrain, and meat-pressure knobs.
+- The launcher has a first grouped scenario-options editor. It builds tabs from `SimulationScenario` fields, lets a run start from edited scenario JSON, writes the generated launch scenario under `out/runs/_launch_scenarios/`, and still saves the CLI-resolved scenario beside the run manifest.
 
 ## Phase 2: Run Library
 
@@ -303,7 +313,7 @@ The launcher should eventually:
 - Rename runs.
 - Delete selected completed/failed/lost runs in bulk.
 - Add sortable columns and compact run details/log views.
-- Parse final summary metrics from stats CSV/report outputs.
+- Parse final summary metrics and scenario identity from run artifacts.
 - Add tags and notes.
 - Import existing runs from `out/`.
 

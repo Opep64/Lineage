@@ -16,6 +16,11 @@ const exportText = document.querySelector("#exportText");
 const copyExportButton = document.querySelector("#copyExportButton");
 const downloadExportButton = document.querySelector("#downloadExportButton");
 const closeExportButton = document.querySelector("#closeExportButton");
+const scenarioOptionsToggle = document.querySelector("#scenarioOptionsToggle");
+const scenarioOptionsStatus = document.querySelector("#scenarioOptionsStatus");
+const scenarioOptionsPanel = document.querySelector("#scenarioOptionsPanel");
+const scenarioTabs = document.querySelector("#scenarioTabs");
+const scenarioFields = document.querySelector("#scenarioFields");
 
 let refreshTimer = null;
 let allRuns = [];
@@ -24,6 +29,8 @@ let expandedRunId = null;
 let runDetailsById = new Map();
 let sortKey = "createdAtUtc";
 let sortDirection = "desc";
+let scenarioEditor = null;
+let activeScenarioGroup = null;
 
 async function loadScenarios() {
   const response = await fetch("/api/scenarios");
@@ -35,6 +42,202 @@ async function loadScenarios() {
     option.textContent = `${scenario.name} (${scenario.path})`;
     scenarioSelect.append(option);
   }
+
+  await loadScenarioEditor();
+}
+
+async function loadScenarioEditor() {
+  scenarioEditor = null;
+  activeScenarioGroup = null;
+  scenarioTabs.innerHTML = "";
+  scenarioFields.innerHTML = "";
+  scenarioOptionsStatus.textContent = "Loading options...";
+
+  if (!scenarioSelect.value) {
+    scenarioOptionsStatus.textContent = "No scenario selected.";
+    return;
+  }
+
+  const response = await fetch(`/api/scenario-editor?path=${encodeURIComponent(scenarioSelect.value)}`);
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Scenario options unavailable." }));
+    scenarioOptionsStatus.textContent = problem.error || "Scenario options unavailable.";
+    return;
+  }
+
+  scenarioEditor = await response.json();
+  const groups = scenarioEditorGroups();
+  activeScenarioGroup = groups[0] || null;
+  renderScenarioEditor();
+}
+
+function renderScenarioEditor() {
+  scenarioTabs.innerHTML = "";
+  scenarioFields.innerHTML = "";
+
+  if (!scenarioEditor) {
+    return;
+  }
+
+  const groups = scenarioEditorGroups();
+  if (!activeScenarioGroup || !groups.includes(activeScenarioGroup)) {
+    activeScenarioGroup = groups[0] || null;
+  }
+
+  for (const group of groups) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `scenario-tab${group === activeScenarioGroup ? " is-active" : ""}`;
+    button.textContent = group;
+    button.dataset.group = group;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(group === activeScenarioGroup));
+    scenarioTabs.append(button);
+  }
+
+  const activeFields = scenarioEditor.fields.filter((field) => field.group === activeScenarioGroup);
+  for (const field of activeFields) {
+    scenarioFields.append(createScenarioField(field));
+  }
+
+  scenarioOptionsStatus.textContent = `${scenarioEditor.fields.length} options`;
+}
+
+function scenarioEditorGroups() {
+  if (!scenarioEditor) {
+    return [];
+  }
+
+  const preferredOrder = [
+    "Basics",
+    "Brain & Vision",
+    "World & Terrain",
+    "Plants",
+    "Seasons",
+    "Reproduction",
+    "Diet & Combat",
+    "Energy & Movement",
+    "Mutation",
+    "Species",
+    "Advanced"
+  ];
+  const groups = [...new Set(scenarioEditor.fields.map((field) => field.group))];
+  return groups.sort((left, right) => {
+    const leftIndex = preferredOrder.indexOf(left);
+    const rightIndex = preferredOrder.indexOf(right);
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex)
+        - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
+function createScenarioField(field) {
+  const wrapper = document.createElement("label");
+  wrapper.className = `scenario-field scenario-field-${field.type}`;
+
+  const label = document.createElement("span");
+  label.className = "scenario-field-label";
+  label.textContent = field.label;
+  wrapper.append(label);
+
+  wrapper.append(createScenarioControl(field));
+  return wrapper;
+}
+
+function createScenarioControl(field) {
+  const value = scenarioEditor.scenario?.[field.jsonName];
+  let control;
+
+  if (field.type === "boolean") {
+    control = document.createElement("input");
+    control.type = "checkbox";
+    control.checked = Boolean(value);
+  } else if (field.type === "enum") {
+    control = document.createElement("select");
+    for (const enumValue of field.enumValues) {
+      const option = document.createElement("option");
+      option.value = enumValue;
+      option.textContent = enumValue;
+      control.append(option);
+    }
+
+    control.value = value ?? "";
+  } else if (field.type === "json") {
+    control = document.createElement("textarea");
+    control.rows = 8;
+    control.spellcheck = false;
+    control.value = JSON.stringify(value ?? null, null, 2);
+  } else {
+    control = document.createElement("input");
+    control.type = field.type === "number" ? "number" : "text";
+    if (field.type === "number") {
+      control.step = "any";
+    }
+
+    control.value = value ?? "";
+  }
+
+  control.className = "scenario-control";
+  control.dataset.jsonName = field.jsonName;
+  control.dataset.type = field.type;
+  return control;
+}
+
+function collectScenarioOptions() {
+  if (!scenarioEditor) {
+    return null;
+  }
+
+  storeVisibleScenarioValues();
+  return JSON.parse(JSON.stringify(scenarioEditor.scenario));
+}
+
+function storeVisibleScenarioValues() {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  for (const control of scenarioFields.querySelectorAll(".scenario-control")) {
+    const field = scenarioEditor.fields.find((candidate) => candidate.jsonName === control.dataset.jsonName);
+    if (!field) {
+      continue;
+    }
+
+    scenarioEditor.scenario[field.jsonName] = readScenarioControlValue(control, field);
+  }
+}
+
+function readScenarioControlValue(control, field) {
+  if (field.type === "boolean") {
+    return control.checked;
+  }
+
+  if (field.type === "number") {
+    const raw = control.value.trim();
+    if (raw === "") {
+      throw new Error(`${field.label} needs a numeric value.`);
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`${field.label} needs a numeric value.`);
+    }
+
+    return parsed;
+  }
+
+  if (field.type === "json") {
+    try {
+      return JSON.parse(control.value);
+    } catch {
+      throw new Error(`${field.label} needs valid JSON.`);
+    }
+  }
+
+  return control.value;
 }
 
 async function loadRuns() {
@@ -95,6 +298,7 @@ function renderRuns() {
       <td>
         <div class="run-name">${escapeHtml(run.name)}</div>
         <div class="run-sub">${escapeHtml(run.scenarioPath)}</div>
+        ${run.scenarioSummary ? `<div class="run-sub">brain ${escapeHtml(formatScenarioInline(run.scenarioSummary))}</div>` : ""}
         <div class="run-sub">seed ${escapeHtml(formatSeed(run.seed))}</div>
         <div class="run-sub">${escapeHtml(run.id)}</div>
       </td>
@@ -174,8 +378,14 @@ function renderDetailsRow(run) {
           <div><span>Started</span><strong>${escapeHtml(formatDateTime(details.run.startedAtUtc))}</strong></div>
           <div><span>Ended</span><strong>${escapeHtml(formatDateTime(details.run.endedAtUtc))}</strong></div>
           <div><span>Seed</span><strong>${escapeHtml(formatSeed(details.run.seed))}</strong></div>
+          <div><span>Brain</span><strong>${escapeHtml(formatScenarioBrain(details.run.scenarioSummary))}</strong></div>
+          <div><span>Vision</span><strong>${escapeHtml(formatScenarioVision(details.run.scenarioSummary))}</strong></div>
+          <div><span>World</span><strong>${escapeHtml(formatScenarioWorld(details.run.scenarioSummary))}</strong></div>
+          <div><span>Resources</span><strong>${escapeHtml(formatScenarioResources(details.run.scenarioSummary))}</strong></div>
           <div><span>Stats</span><strong>${escapeHtml(details.run.statsPath)}</strong></div>
           <div><span>Snapshot</span><strong>${escapeHtml(details.run.snapshotPath)}</strong></div>
+          <div><span>Launch scenario</span><strong>${escapeHtml(details.run.launchScenarioPath || "")}</strong></div>
+          <div><span>Resolved scenario</span><strong>${escapeHtml(details.run.resolvedScenarioPath)}</strong></div>
         </div>
         ${details.error ? `<div class="detail-error">${escapeHtml(details.error)}</div>` : ""}
         <div class="command-line">${escapeHtml(details.commandLine || "")}</div>
@@ -218,6 +428,7 @@ function getVisibleRuns() {
       run.id,
       run.scenarioName,
       run.scenarioPath,
+      formatScenarioInline(run.scenarioSummary),
       run.status,
       run.seed,
       run.processId
@@ -300,9 +511,18 @@ function updateSortIndicators() {
 launchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   formMessage.textContent = "Starting run...";
+  let scenario = null;
+  try {
+    scenario = collectScenarioOptions();
+  } catch (error) {
+    formMessage.textContent = error.message;
+    return;
+  }
+
   const checkpointInterval = valueOrNull("#checkpointInterval");
   const payload = {
     scenarioPath: scenarioSelect.value,
+    scenario,
     ticks: Number(document.querySelector("#ticks").value),
     seed: valueOrNull("#seed"),
     checkpointIntervalTicks: checkpointInterval && checkpointInterval > 0 ? checkpointInterval : null,
@@ -486,6 +706,38 @@ for (const button of document.querySelectorAll("[data-sort]")) {
   });
 }
 
+scenarioSelect.addEventListener("change", loadScenarioEditor);
+
+scenarioOptionsToggle.addEventListener("click", () => {
+  scenarioOptionsPanel.hidden = !scenarioOptionsPanel.hidden;
+});
+
+scenarioTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-group]");
+  if (!button || button.dataset.group === activeScenarioGroup) {
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  activeScenarioGroup = button.dataset.group;
+  renderScenarioEditor();
+});
+
+scenarioFields.addEventListener("change", () => {
+  try {
+    storeVisibleScenarioValues();
+    scenarioOptionsStatus.textContent = `${scenarioEditor?.fields.length ?? 0} options`;
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+  }
+});
+
 runSearch.addEventListener("input", renderRuns);
 statusFilter.addEventListener("change", renderRuns);
 scenarioFilter.addEventListener("change", renderRuns);
@@ -562,6 +814,91 @@ function formatDateTime(value) {
 
 function formatDownloadTimestamp(value) {
   return value.toISOString().slice(0, 19).replaceAll(":", "").replace("T", "-");
+}
+
+function formatScenarioInline(summary) {
+  if (!summary) {
+    return "";
+  }
+
+  return [
+    formatScenarioBrain(summary),
+    formatScenarioWorld(summary),
+    formatScenarioResources(summary)
+  ].filter(Boolean).join(" | ");
+}
+
+function formatScenarioBrain(summary) {
+  if (!summary) {
+    return "";
+  }
+
+  const hidden = summary.brainHiddenNodeCount === null || summary.brainHiddenNodeCount === undefined
+    ? ""
+    : `, hidden ${formatNumber(summary.brainHiddenNodeCount)}`;
+  return [summary.brainArchitectureKind, summary.initialBrainKind].filter(Boolean).join(" / ") + hidden;
+}
+
+function formatScenarioVision(summary) {
+  if (!summary) {
+    return "";
+  }
+
+  const bits = [];
+  if (summary.enableSectorVision !== null && summary.enableSectorVision !== undefined) {
+    bits.push(`sector ${formatOnOff(summary.enableSectorVision)}`);
+  }
+
+  if (summary.enableLegacyNearestFoodVisionInputs !== null && summary.enableLegacyNearestFoodVisionInputs !== undefined) {
+    bits.push(`legacy food ${formatOnOff(summary.enableLegacyNearestFoodVisionInputs)}`);
+  }
+
+  if (summary.enableLegacyNearestCreatureVisionInputs !== null && summary.enableLegacyNearestCreatureVisionInputs !== undefined) {
+    bits.push(`legacy creature ${formatOnOff(summary.enableLegacyNearestCreatureVisionInputs)}`);
+  }
+
+  if (summary.visionAngleDegrees !== null && summary.visionAngleDegrees !== undefined) {
+    bits.push(`${formatDecimal(summary.visionAngleDegrees)} deg`);
+  }
+
+  return bits.join(", ");
+}
+
+function formatScenarioWorld(summary) {
+  if (!summary || summary.worldWidth === null || summary.worldWidth === undefined || summary.worldHeight === null || summary.worldHeight === undefined) {
+    return "";
+  }
+
+  return `${formatDecimal(summary.worldWidth)} x ${formatDecimal(summary.worldHeight)}`;
+}
+
+function formatScenarioResources(summary) {
+  if (!summary) {
+    return "";
+  }
+
+  const bits = [];
+  if (summary.initialResourcesPerMillionArea !== null && summary.initialResourcesPerMillionArea !== undefined) {
+    bits.push(`${formatDecimal(summary.initialResourcesPerMillionArea)}/M plants`);
+  }
+
+  if (summary.initialResourceCount !== null && summary.initialResourceCount !== undefined) {
+    bits.push(`${formatNumber(summary.initialResourceCount)} initial`);
+  }
+
+  if (summary.initialCreatureCount !== null && summary.initialCreatureCount !== undefined) {
+    bits.push(`${formatNumber(summary.initialCreatureCount)} creatures`);
+  }
+
+  return bits.join(", ");
+}
+
+function formatDecimal(value) {
+  return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
+function formatOnOff(value) {
+  return value ? "on" : "off";
 }
 
 function formatLog(lines) {
