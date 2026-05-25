@@ -75,6 +75,8 @@ var tests = new (string Name, Action Body)[]
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Sector forager starter follows sector plant cues", SectorForagerStarterFollowsSectorPlantCues),
+    ("Scavenger starter follows sector meat cues", ScavengerStarterFollowsSectorMeatCues),
+    ("Predator starter follows sector creature cues", PredatorStarterFollowsSectorCreatureCues),
     ("Opportunistic forager samples meat on contact", OpportunisticForagerSamplesMeatOnContact),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
@@ -3179,6 +3181,72 @@ static void SectorForagerStarterFollowsSectorPlantCues()
 
     creature = simulation.State.Creatures[0];
     AssertTrue(!creature.Actions.WantsEat, "Sector forager should not treat egg contact like plant contact");
+}
+
+static void ScavengerStarterFollowsSectorMeatCues()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 415,
+        systems: [new NeuralControllerSystem(enableLegacyNearestFoodVisionInputs: false)]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.3f,
+        CarrionAdaptation = 0.4f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateScavengerForager());
+
+    var rightSectors = default(VisionSectorSet);
+    rightSectors.AddMeat(8, 0.8f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        Hunger = 1f,
+        VisionSectors = rightSectors
+    };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertTrue(creature.Actions.Turn > 0.6f, "Scavenger starter should turn toward meat in right-side sectors");
+    AssertTrue(creature.Actions.MoveForward > 0.7f, "Scavenger starter should move toward sector meat cues");
+}
+
+static void PredatorStarterFollowsSectorCreatureCues()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 416,
+        systems: [new NeuralControllerSystem(enableLegacyNearestFoodVisionInputs: false)]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.25f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator());
+
+    var rightSectors = default(VisionSectorSet);
+    rightSectors.AddCreature(8, 0.9f, relativeBodySize: -0.5f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        Hunger = 1f,
+        VisionSectors = rightSectors
+    };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertTrue(creature.Actions.Turn > 0.6f, "Predator starter should turn toward smaller creatures in right-side sectors");
+    AssertTrue(creature.Actions.MoveForward > 0.6f, "Predator starter should move toward smaller creature sector cues");
+    AssertTrue(creature.Actions.WantsAttack, "Predator starter should attack smaller creatures in strong right-side sector cues");
 }
 
 static void OpportunisticForagerSamplesMeatOnContact()

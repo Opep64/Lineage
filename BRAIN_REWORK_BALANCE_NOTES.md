@@ -526,6 +526,49 @@ Implementation notes:
 - The selected-creature inspector now includes a compact left-to-right `Sector hits` summary using the same sector samples that feed the brain.
 - `V` toggles the sector overlay without affecting simulation behavior.
 
+## 2026-05-25 Starter Behavior Validation
+
+Ran a focused starter-brain comparison on sparse-world scenarios after adding the sector debug overlay.
+
+Initial validation files:
+
+- `out/brain_rework_starter_validation_20260525/starter_compare_15k.csv`
+- `out/brain_rework_starter_validation_20260525/starter_compare_15k.html`
+
+Findings:
+
+- `sectorForager` was the strongest pure survival starter in Balanced and Harsh and also performed well in Scavenger and Predation.
+- `scavengerForager` and `foragerPredator` still behaved like older nearest-cue starters and did not clearly outperform generic foragers in their themed scenarios.
+- This suggested the themed starters should inherit the sector-forager base rather than the older seed-forager base.
+
+Implementation notes:
+
+- `scavengerForager` and `freshnessAwareScavenger` now start from sector-forager weights, then add meat/scent behavior.
+- `foragerPredator` now starts from sector-forager weights, then adds sector creature pursuit/attack weights plus its older broad creature-cue behavior.
+- Added tests that verify scavenger sector-meat pursuit and predator sector-creature pursuit/attack with legacy nearest-food inputs disabled.
+
+Post-tune validation files:
+
+- `out/brain_rework_starter_validation_20260525/starter_compare_sector_tuned_15k.csv`
+- `out/brain_rework_starter_validation_20260525/starter_compare_sector_tuned_15k.html`
+- `out/brain_rework_starter_validation_20260525/themed_defaults_sector_tuned_30k.csv`
+- `out/brain_rework_starter_validation_20260525/themed_defaults_sector_tuned_30k.html`
+
+30k default-scenario comparison against the low-density baseline:
+
+| Scenario | Avg final creatures | Avg ticks/s | Avg births | Meat eaten share | Fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Scavenger Pressure | 25.0 -> 37.7 | 9266.7 -> 4220.6 | 152.3 -> 323.3 | 0.000 -> 0.082 | 0.000 -> 0.000 |
+| Carrion Pressure | 37.3 -> 30.7 | 6410.8 -> 4736.9 | 192.3 -> 329.3 | 0.000 -> 0.072 | 0.000 -> 0.000 |
+| Predation Pressure | 23.0 -> 27.3 | 6487.3 -> 4680.2 | 222.7 -> 345.3 | 0.014 -> 0.000 | 0.000 -> 0.000 |
+
+Interpretation:
+
+- The tuned themed starters now use the sector world better, and scavenger/carrion defaults show measurable meat use.
+- Predator defaults show persistent attack intent and some meat-derived energy, but fresh-kill predation is still not robust in 30k probes.
+- Throughput drops in the themed scenarios because the starters survive/reproduce more actively and spend more time with richer perception/action behavior.
+- The next predation-specific pass should probably add clearer attack near-miss diagnostics before further increasing bite pressure or predator starter aggression.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

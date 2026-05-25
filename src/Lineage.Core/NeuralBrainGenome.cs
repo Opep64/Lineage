@@ -205,7 +205,7 @@ public sealed class NeuralBrainGenome
     /// </summary>
     public static NeuralBrainGenome CreateScavengerForager(int hiddenNodeCount = 0)
     {
-        var weights = CreateSeedForagerWeights(hiddenNodeCount);
+        var weights = CreateSectorForagerWeights(hiddenNodeCount);
 
         SeedScavengerForagerWeights(weights);
 
@@ -217,7 +217,7 @@ public sealed class NeuralBrainGenome
     /// </summary>
     public static NeuralBrainGenome CreateFreshnessAwareScavenger(int hiddenNodeCount = 0)
     {
-        var weights = CreateSeedForagerWeights(hiddenNodeCount);
+        var weights = CreateSectorForagerWeights(hiddenNodeCount);
         SeedScavengerForagerWeights(weights);
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentDensityInput, -0.7f);
@@ -234,7 +234,9 @@ public sealed class NeuralBrainGenome
     /// </summary>
     public static NeuralBrainGenome CreateForagerPredator(int hiddenNodeCount = 0)
     {
-        var weights = CreateSeedForagerWeights(hiddenNodeCount);
+        var weights = CreateSectorForagerWeights(hiddenNodeCount);
+
+        SeedSectorCreatureHuntingWeights(weights);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 5.0f);
 
@@ -396,6 +398,42 @@ public sealed class NeuralBrainGenome
             Set(weights, NeuralBrainSchema.TurnOutput, meatProximityInput, side * 2.1f);
             Set(weights, NeuralBrainSchema.MoveForwardOutput, meatDensityInput, centerBias * 0.15f);
             Set(weights, NeuralBrainSchema.MoveForwardOutput, meatProximityInput, centerBias * 0.7f);
+        }
+    }
+
+    private static void SeedSectorCreatureHuntingWeights(float[] weights)
+    {
+        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
+        {
+            var side = (sectorIndex - VisionSectorSet.CenterSectorIndex) / (float)VisionSectorSet.CenterSectorIndex;
+            var centerBias = 1f - Math.Abs(side);
+            var smallerDensityInput = NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(sectorIndex);
+            var smallerProximityInput = NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(sectorIndex);
+            var similarDensityInput = NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(sectorIndex);
+            var similarProximityInput = NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(sectorIndex);
+            var largerDensityInput = NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(sectorIndex);
+            var largerProximityInput = NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(sectorIndex);
+            var approachInput = NeuralBrainSchema.VisionSectorCreatureApproachRateInput(sectorIndex);
+            var facingInput = NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(sectorIndex);
+
+            Set(weights, NeuralBrainSchema.TurnOutput, smallerDensityInput, side * 1.4f);
+            Set(weights, NeuralBrainSchema.TurnOutput, smallerProximityInput, side * 2.8f);
+            Set(weights, NeuralBrainSchema.TurnOutput, similarDensityInput, side * 0.8f);
+            Set(weights, NeuralBrainSchema.TurnOutput, similarProximityInput, side * 1.4f);
+            Set(weights, NeuralBrainSchema.TurnOutput, largerDensityInput, side * 0.4f);
+            Set(weights, NeuralBrainSchema.TurnOutput, largerProximityInput, side * 0.7f);
+
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, smallerDensityInput, centerBias * 0.2f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, smallerProximityInput, centerBias * 0.9f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, similarProximityInput, centerBias * 0.35f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, largerProximityInput, -centerBias * 0.45f);
+
+            Set(weights, NeuralBrainSchema.AttackOutput, smallerDensityInput, centerBias * 1.6f);
+            Set(weights, NeuralBrainSchema.AttackOutput, smallerProximityInput, centerBias * 4.2f);
+            Set(weights, NeuralBrainSchema.AttackOutput, similarProximityInput, centerBias * 1.2f);
+            Set(weights, NeuralBrainSchema.AttackOutput, largerProximityInput, -centerBias * 2.2f);
+            Set(weights, NeuralBrainSchema.AttackOutput, approachInput, -centerBias * 0.8f);
+            Set(weights, NeuralBrainSchema.AttackOutput, facingInput, -centerBias * 0.45f);
         }
     }
 
