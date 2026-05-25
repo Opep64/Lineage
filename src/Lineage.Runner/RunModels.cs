@@ -18,7 +18,12 @@ public sealed record ScenarioFieldDefinition(
     string Group,
     string Type,
     IReadOnlyList<string> EnumValues,
-    bool Advanced);
+    bool Advanced,
+    double? Minimum,
+    double? Maximum,
+    double? Step,
+    string? Units,
+    string? Description);
 
 public sealed record RunCreateRequest(
     string ScenarioPath,

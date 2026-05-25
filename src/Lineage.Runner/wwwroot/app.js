@@ -136,14 +136,21 @@ function scenarioEditorGroups() {
 
 function createScenarioField(field) {
   const wrapper = document.createElement("label");
-  wrapper.className = `scenario-field scenario-field-${field.type}`;
+  wrapper.className = `scenario-field scenario-field-${field.type}${field.advanced ? " is-advanced" : ""}`;
 
   const label = document.createElement("span");
   label.className = "scenario-field-label";
-  label.textContent = field.label;
+  label.textContent = field.units ? `${field.label} (${field.units})` : field.label;
   wrapper.append(label);
 
   wrapper.append(createScenarioControl(field));
+  if (field.description) {
+    const description = document.createElement("span");
+    description.className = "scenario-field-description";
+    description.textContent = field.description;
+    wrapper.append(description);
+  }
+
   return wrapper;
 }
 
@@ -174,7 +181,14 @@ function createScenarioControl(field) {
     control = document.createElement("input");
     control.type = field.type === "number" ? "number" : "text";
     if (field.type === "number") {
-      control.step = "any";
+      control.step = field.step ?? "any";
+      if (field.minimum !== null && field.minimum !== undefined) {
+        control.min = field.minimum;
+      }
+
+      if (field.maximum !== null && field.maximum !== undefined) {
+        control.max = field.maximum;
+      }
     }
 
     control.value = value ?? "";

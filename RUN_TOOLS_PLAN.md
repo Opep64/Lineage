@@ -218,9 +218,10 @@ This same metadata should be used later to improve Godot's unwieldy one-long-lis
 
 Current launcher slice:
 
-- The runner reflects `SimulationScenario` directly to discover field names, JSON names, scalar/enum/JSON types, and initial grouping.
+- `Lineage.Core` exposes shared scenario field metadata for field names, JSON names, scalar/enum/JSON types, initial grouping, basic/advanced flags, selected units, numeric hints, and short descriptions for high-signal fields.
 - This keeps new scalar scenario options visible in the launcher as soon as they are added to the core scenario type.
-- The next cleanup should move the grouping, ranges, units, descriptions, and basic/advanced markers into shared `Lineage.Core` metadata so Godot and the launcher use the exact same schema.
+- The runner consumes the shared metadata for its grouped scenario-options editor.
+- The next cleanup should make Godot consume the same metadata and expand the metadata over time with richer ranges, units, and help text.
 
 Separate option categories:
 

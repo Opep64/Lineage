@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Lineage.Core;
 
 var tests = new (string Name, Action Body)[]
@@ -160,6 +163,7 @@ var tests = new (string Name, Action Body)[]
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Simulation snapshot capture can sample stats history", SimulationSnapshotCaptureCanSampleStatsHistory),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
+    ("Scenario metadata describes editable JSON fields", ScenarioMetadataDescribesEditableJsonFields),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
     ("Scenario JSON round trips", ScenarioJsonRoundTrips)
 };
@@ -6988,6 +6992,49 @@ static void ScenarioJsonMigratesLegacyResourceCount()
     AssertClose(200f, scenario.InitialResourcesPerMillionArea, 0.0001, "Migrated resource density");
     AssertEqual(140, scenario.CalculateInitialResourceCount(), "Migrated resource count");
     AssertEqual(InitialBrainKind.RandomPerFounder, scenario.InitialBrainKind, "Migrated legacy random brain mode");
+}
+
+static void ScenarioMetadataDescribesEditableJsonFields()
+{
+    var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    var scenarioProperties = typeof(SimulationScenario)
+        .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+        .Where(property => property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+        .Where(property => property.GetMethod is not null)
+        .Select(property => property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
+            ?? jsonOptions.PropertyNamingPolicy!.ConvertName(property.Name))
+        .ToArray();
+
+    AssertEqual(scenarioProperties.Length, SimulationScenarioMetadata.Fields.Count, "Scenario metadata field count");
+    AssertEqual(
+        scenarioProperties.Length,
+        SimulationScenarioMetadata.Fields.Select(field => field.JsonName).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+        "Scenario metadata unique JSON names");
+
+    foreach (var jsonName in scenarioProperties)
+    {
+        AssertTrue(
+            SimulationScenarioMetadata.FindByJsonName(jsonName) is not null,
+            $"Scenario metadata contains {jsonName}");
+    }
+
+    var brain = SimulationScenarioMetadata.FindByJsonName("brainArchitectureKind")
+        ?? throw new InvalidOperationException("Missing brain architecture metadata.");
+    AssertEqual("Brain & Vision", brain.Group, "Brain architecture group");
+    AssertEqual("enum", brain.Type, "Brain architecture type");
+    AssertTrue(brain.EnumValues.Contains("hybridNeural"), "Brain architecture enum values");
+
+    var density = SimulationScenarioMetadata.FindByJsonName("initialResourcesPerMillionArea")
+        ?? throw new InvalidOperationException("Missing resource density metadata.");
+    AssertEqual("Plants", density.Group, "Resource density group");
+    AssertEqual("per 1M area", density.Units, "Resource density units");
+    AssertEqual(0d, density.Minimum, "Resource density minimum");
+
+    var species = SimulationScenarioMetadata.FindByJsonName("speciesSeeds")
+        ?? throw new InvalidOperationException("Missing species seed metadata.");
+    AssertEqual("json", species.Type, "Species seeds type");
+    AssertEqual("Species", species.Group, "Species seeds group");
+    AssertTrue(species.Advanced, "Species seeds should be advanced");
 }
 
 static void ScenarioJsonRoundTrips()

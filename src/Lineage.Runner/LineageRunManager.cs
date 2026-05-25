@@ -1,11 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Lineage.Core;
 
@@ -1397,181 +1395,21 @@ public sealed partial class LineageRunManager
 
     private static IReadOnlyList<ScenarioFieldDefinition> BuildScenarioFieldDefinitions()
     {
-        return typeof(SimulationScenario)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.GetCustomAttribute<JsonIgnoreAttribute>() is null)
-            .Where(property => property.GetMethod is not null)
-            .Select(property =>
-            {
-                var propertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                var type = ScenarioEditorType(propertyType);
-                var enumValues = propertyType.IsEnum
-                    ? Enum.GetNames(propertyType).Select(JsonOptions.PropertyNamingPolicy!.ConvertName).ToArray()
-                    : Array.Empty<string>();
-
-                return new ScenarioFieldDefinition(
-                    property.Name,
-                    JsonName(property),
-                    ToLabel(property.Name),
-                    ScenarioFieldGroup(property.Name),
-                    type,
-                    enumValues,
-                    IsAdvancedScenarioField(property.Name));
-            })
+        return SimulationScenarioMetadata.Fields
+            .Select(field => new ScenarioFieldDefinition(
+                field.Name,
+                field.JsonName,
+                field.Label,
+                field.Group,
+                field.Type,
+                field.EnumValues,
+                field.Advanced,
+                field.Minimum,
+                field.Maximum,
+                field.Step,
+                field.Units,
+                field.Description))
             .ToArray();
-    }
-
-    private static string ScenarioEditorType(Type type)
-    {
-        if (type == typeof(bool))
-        {
-            return "boolean";
-        }
-
-        if (type.IsEnum)
-        {
-            return "enum";
-        }
-
-        if (type == typeof(string))
-        {
-            return "text";
-        }
-
-        return IsNumberType(type) ? "number" : "json";
-    }
-
-    private static bool IsNumberType(Type type)
-    {
-        return type == typeof(byte)
-            || type == typeof(short)
-            || type == typeof(int)
-            || type == typeof(long)
-            || type == typeof(ushort)
-            || type == typeof(uint)
-            || type == typeof(ulong)
-            || type == typeof(float)
-            || type == typeof(double)
-            || type == typeof(decimal);
-    }
-
-    private static string JsonName(PropertyInfo property)
-    {
-        return property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
-            ?? JsonOptions.PropertyNamingPolicy!.ConvertName(property.Name);
-    }
-
-    private static string ToLabel(string name)
-    {
-        var builder = new StringBuilder(name.Length + 8);
-        for (var i = 0; i < name.Length; i++)
-        {
-            var current = name[i];
-            if (i > 0
-                && char.IsUpper(current)
-                && (char.IsLower(name[i - 1]) || (i + 1 < name.Length && char.IsLower(name[i + 1]))))
-            {
-                builder.Append(' ');
-            }
-
-            builder.Append(current);
-        }
-
-        return builder.ToString();
-    }
-
-    private static string ScenarioFieldGroup(string name)
-    {
-        if (name is "Name" or "Seed" or "PipelineKind" or "InitialCreatureCount" or "InitialCreatureSpawnRegion" or "StatsSnapshotIntervalTicks")
-        {
-            return "Basics";
-        }
-
-        if (name.Contains("Brain", StringComparison.Ordinal)
-            || name.Contains("Vision", StringComparison.Ordinal)
-            || name.Contains("Sense", StringComparison.Ordinal)
-            || name.Contains("Memory", StringComparison.Ordinal))
-        {
-            return "Brain & Vision";
-        }
-
-        if (name.Contains("World", StringComparison.Ordinal)
-            || name.Contains("Biome", StringComparison.Ordinal)
-            || name.Contains("Obstacle", StringComparison.Ordinal)
-            || name.Contains("Terrain", StringComparison.Ordinal)
-            || name.Contains("Spatial", StringComparison.Ordinal)
-            || name is "FixedDeltaSeconds")
-        {
-            return "World & Terrain";
-        }
-
-        if (name.Contains("Resource", StringComparison.Ordinal)
-            || name.Contains("Plant", StringComparison.Ordinal)
-            || name.Contains("Fertility", StringComparison.Ordinal))
-        {
-            return "Plants";
-        }
-
-        if (name.Contains("Season", StringComparison.Ordinal))
-        {
-            return "Seasons";
-        }
-
-        if (name.Contains("Reproduction", StringComparison.Ordinal)
-            || name.Contains("Reproductive", StringComparison.Ordinal)
-            || name.Contains("Offspring", StringComparison.Ordinal)
-            || name.Contains("Egg", StringComparison.Ordinal)
-            || name.Contains("Maturity", StringComparison.Ordinal)
-            || name.Contains("Senescent", StringComparison.Ordinal)
-            || name.Contains("Crowding", StringComparison.Ordinal)
-            || name.Contains("InitialCreatureEnergy", StringComparison.Ordinal))
-        {
-            return "Reproduction";
-        }
-
-        if (name.Contains("Diet", StringComparison.Ordinal)
-            || name.Contains("Carrion", StringComparison.Ordinal)
-            || name.Contains("Meat", StringComparison.Ordinal)
-            || name.Contains("Bite", StringComparison.Ordinal)
-            || name.Contains("Damage", StringComparison.Ordinal)
-            || name.Contains("Eat", StringComparison.Ordinal)
-            || name.Contains("Gut", StringComparison.Ordinal)
-            || name.Contains("Digestion", StringComparison.Ordinal))
-        {
-            return "Diet & Combat";
-        }
-
-        if (name.Contains("Energy", StringComparison.Ordinal)
-            || name.Contains("Movement", StringComparison.Ordinal)
-            || name.Contains("Speed", StringComparison.Ordinal)
-            || name.Contains("Turn", StringComparison.Ordinal)
-            || name.Contains("BodyRadius", StringComparison.Ordinal)
-            || name.Contains("Basal", StringComparison.Ordinal))
-        {
-            return "Energy & Movement";
-        }
-
-        if (name.Contains("Mutation", StringComparison.Ordinal))
-        {
-            return "Mutation";
-        }
-
-        if (name.Contains("Species", StringComparison.Ordinal))
-        {
-            return "Species";
-        }
-
-        return "Advanced";
-    }
-
-    private static bool IsAdvancedScenarioField(string name)
-    {
-        return name.Contains("Multiplier", StringComparison.Ordinal)
-            || name.Contains("EnergyCost", StringComparison.Ordinal)
-            || name.Contains("LocalFertility", StringComparison.Ordinal)
-            || name.Contains("Species", StringComparison.Ordinal)
-            || name.Contains("Phase", StringComparison.Ordinal)
-            || name is "FixedDeltaSeconds" or "CloseSenseRefreshProximity";
     }
 
     private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement property)

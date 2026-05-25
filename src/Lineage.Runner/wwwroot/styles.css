@@ -251,10 +251,23 @@ button.scenario-tab.is-active {
   min-width: 0;
 }
 
+.scenario-field.is-advanced .scenario-field-label::after {
+  content: " advanced";
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .scenario-field-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.scenario-field-description {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 .scenario-field-boolean {
