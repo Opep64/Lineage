@@ -89,7 +89,8 @@ public readonly record struct BrainInputFrame(
                 senses.EnergySurplusRatio,
                 senses.RecentFoodSuccess,
                 senses.RecentPlantRawYield,
-                senses.RecentPlantEnergyYield));
+                senses.RecentPlantEnergyYield,
+                senses.RecentFoodEnergyYield));
     }
 }
 
@@ -169,7 +170,8 @@ public readonly record struct InternalInputFrame(
     float EnergySurplusRatio,
     float RecentFoodSuccess,
     float RecentPlantRawYield,
-    float RecentPlantEnergyYield);
+    float RecentPlantEnergyYield,
+    float RecentFoodEnergyYield);
 
 /// <summary>
 /// Architecture-neutral action intents produced by a brain before later systems resolve them.

@@ -209,6 +209,11 @@ public struct CreatureSenseState
     public float RecentPlantEnergyYield { get; set; }
 
     /// <summary>
+    /// Recent usable energy released from any gut contents, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentFoodEnergyYield { get; set; }
+
+    /// <summary>
     /// Persistent memory vector projected onto the creature's forward direction.
     /// </summary>
     public float MemoryDirectionForward { get; set; }

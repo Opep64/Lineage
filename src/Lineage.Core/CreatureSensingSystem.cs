@@ -306,11 +306,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 var qualityWeight = qualityClarity >= MinimumPlantQualityClarity
                     ? qualityClarity * Math.Clamp(resource.Calories / Math.Max(1f, resource.MaxCalories), 0f, 1f)
                     : 0f;
+                var energyQuality = PlantResourceTraits.EnergyQualitySense(resource.PlantKind);
+                var biteEase = PlantResourceTraits.BiteEaseSense(resource.PlantKind);
                 if (qualityWeight > 0f)
                 {
                     visiblePlantQualityWeight += qualityWeight;
-                    visiblePlantEnergyQualityTotal += PlantResourceTraits.EnergyQualitySense(resource.PlantKind) * qualityWeight;
-                    visiblePlantBiteEaseTotal += PlantResourceTraits.BiteEaseSense(resource.PlantKind) * qualityWeight;
+                    visiblePlantEnergyQualityTotal += energyQuality * qualityWeight;
+                    visiblePlantBiteEaseTotal += biteEase * qualityWeight;
                 }
 
                 if (_enableSectorVision
@@ -322,7 +324,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                         effectiveVisionAngle,
                         out var sectorIndex))
                 {
-                    visionSectors.AddPlant(sectorIndex, proximity);
+                    visionSectors.AddPlant(sectorIndex, proximity, energyQuality, biteEase, qualityWeight);
                 }
 
                 var foodScore = proximity * CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
@@ -640,6 +642,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creature.LastPlantDigestedEnergy / expectedPlantDigestiveYield,
             0f,
             1f);
+        var recentFoodEnergyYield = Math.Clamp(
+            creature.LastCaloriesDigested / expectedPlantDigestiveYield,
+            0f,
+            1f);
         var isReadyToLay =
             eggReserveRatio >= 1f
             && creature.AgeSeconds >= genome.MaturityAgeSeconds
@@ -653,6 +659,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.RecentFoodSuccess = recentFoodSuccess;
         senses.RecentPlantRawYield = recentPlantRawYield;
         senses.RecentPlantEnergyYield = recentPlantEnergyYield;
+        senses.RecentFoodEnergyYield = recentFoodEnergyYield;
         senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
     }
 

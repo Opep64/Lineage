@@ -182,6 +182,7 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageEggReserveRatio,
     float AverageEnergySurplusRatio,
     float AverageRecentFoodSuccess,
+    float AverageRecentFoodEnergyYield,
     int ActiveMemoryCreatureCount,
     float AverageMemoryStrength,
     float MemoryUserFoodContactShare,

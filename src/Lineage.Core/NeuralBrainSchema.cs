@@ -13,7 +13,7 @@ public static class NeuralBrainSchema
 
     public const int VisionSectorInputStart = 46;
 
-    public const int VisionSectorChannelCount = 16;
+    public const int VisionSectorChannelCount = 18;
 
     public const int FoodContactInput = VisionSectorInputStart + VisionSectorSet.SectorCount * VisionSectorChannelCount;
 
@@ -39,7 +39,9 @@ public static class NeuralBrainSchema
 
     public const int RecentPlantEnergyYieldInput = RecentPlantRawYieldInput + 1;
 
-    public const int InputCount = RecentPlantEnergyYieldInput + 1;
+    public const int RecentFoodEnergyYieldInput = RecentPlantEnergyYieldInput + 1;
+
+    public const int InputCount = RecentFoodEnergyYieldInput + 1;
 
     public const int OutputCount = 7;
 
@@ -139,33 +141,37 @@ public static class NeuralBrainSchema
 
     public const int VisionSectorPlantProximityOffset = 1;
 
-    public const int VisionSectorMeatDensityOffset = 2;
+    public const int VisionSectorPlantEnergyQualityOffset = 2;
 
-    public const int VisionSectorMeatProximityOffset = 3;
+    public const int VisionSectorPlantBiteEaseOffset = 3;
 
-    public const int VisionSectorEggDensityOffset = 4;
+    public const int VisionSectorMeatDensityOffset = 4;
 
-    public const int VisionSectorEggProximityOffset = 5;
+    public const int VisionSectorMeatProximityOffset = 5;
 
-    public const int VisionSectorCreatureDensityOffset = 6;
+    public const int VisionSectorEggDensityOffset = 6;
 
-    public const int VisionSectorCreatureProximityOffset = 7;
+    public const int VisionSectorEggProximityOffset = 7;
 
-    public const int VisionSectorSmallerCreatureDensityOffset = 8;
+    public const int VisionSectorCreatureDensityOffset = 8;
 
-    public const int VisionSectorSmallerCreatureProximityOffset = 9;
+    public const int VisionSectorCreatureProximityOffset = 9;
 
-    public const int VisionSectorSimilarCreatureDensityOffset = 10;
+    public const int VisionSectorSmallerCreatureDensityOffset = 10;
 
-    public const int VisionSectorSimilarCreatureProximityOffset = 11;
+    public const int VisionSectorSmallerCreatureProximityOffset = 11;
 
-    public const int VisionSectorLargerCreatureDensityOffset = 12;
+    public const int VisionSectorSimilarCreatureDensityOffset = 12;
 
-    public const int VisionSectorLargerCreatureProximityOffset = 13;
+    public const int VisionSectorSimilarCreatureProximityOffset = 13;
 
-    public const int VisionSectorCreatureApproachRateOffset = 14;
+    public const int VisionSectorLargerCreatureDensityOffset = 14;
 
-    public const int VisionSectorCreatureFacingAlignmentOffset = 15;
+    public const int VisionSectorLargerCreatureProximityOffset = 15;
+
+    public const int VisionSectorCreatureApproachRateOffset = 16;
+
+    public const int VisionSectorCreatureFacingAlignmentOffset = 17;
 
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 
@@ -197,6 +203,16 @@ public static class NeuralBrainSchema
     public static int VisionSectorPlantProximityInput(int sectorIndex)
     {
         return GetVisionSectorInput(sectorIndex, VisionSectorPlantProximityOffset);
+    }
+
+    public static int VisionSectorPlantEnergyQualityInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorPlantEnergyQualityOffset);
+    }
+
+    public static int VisionSectorPlantBiteEaseInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorPlantBiteEaseOffset);
     }
 
     public static int VisionSectorMeatDensityInput(int sectorIndex)

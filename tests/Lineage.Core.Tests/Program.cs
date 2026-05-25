@@ -113,6 +113,8 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates creature sector motion inputs", NeuralBrainMigratesCreatureSectorMotionInputs),
     ("Neural brain migrates creature contact input", NeuralBrainMigratesCreatureContactInput),
     ("Neural brain migrates plant quality inputs", NeuralBrainMigratesPlantQualityInputs),
+    ("Neural brain migrates recent food energy yield input", NeuralBrainMigratesRecentFoodEnergyYieldInput),
+    ("Neural brain migrates sector plant quality inputs", NeuralBrainMigratesSectorPlantQualityInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2950,6 +2952,7 @@ static void CreatureSensingReportsReproductiveContext()
     AssertClose(0.4f, senses.HealthRatio, 0.000001, "Health ratio");
     AssertClose(0.75f, senses.EnergySurplusRatio, 0.000001, "Energy surplus ratio");
     AssertClose(0.75f, senses.RecentFoodSuccess, 0.000001, "Recent food success");
+    AssertClose(1f, senses.RecentFoodEnergyYield, 0.000001, "Recent food energy yield");
 }
 
 static void CreatureVisionConeHidesFoodBehindIt()
@@ -3084,6 +3087,16 @@ static void CreatureSectorVisionBucketsVisibleCategories()
 
     var sectors = simulation.State.Creatures[0].Senses.VisionSectors;
     AssertTrue(sectors.Get(4).PlantDensity > 0f, "Ahead plant should land in the center sector");
+    AssertClose(
+        PlantResourceTraits.EnergyQualitySense(PlantResourceKind.Generic),
+        sectors.Get(4).PlantEnergyQuality,
+        0.000001,
+        "Center sector plant energy quality");
+    AssertClose(
+        PlantResourceTraits.BiteEaseSense(PlantResourceKind.Generic),
+        sectors.Get(4).PlantBiteEase,
+        0.000001,
+        "Center sector plant bite ease");
     AssertTrue(sectors.Get(6).MeatDensity > 0f, "Ahead-right meat should land in a right-side sector");
     AssertTrue(sectors.Get(2).EggDensity > 0f, "Ahead-left egg should land in a left-side sector");
     AssertTrue(sectors.Get(4).CreatureDensity > 0f, "Ahead creature should land in the center sector");
@@ -3129,6 +3142,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         RecentFoodSuccess = 0.42f,
         RecentPlantRawYield = 0.36f,
         RecentPlantEnergyYield = 0.46f,
+        RecentFoodEnergyYield = 0.56f,
         CreatureProximity = 0.52f,
         CreatureDirectionForward = -0.62f,
         CreatureDirectionRight = 0.72f,
@@ -3163,7 +3177,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         MemoryStrength = 0.31f
     };
     var sectors = default(VisionSectorSet);
-    sectors.AddPlant(0, 0.5f);
+    sectors.AddPlant(0, 0.5f, energyQuality: 0.61f, biteEase: 0.71f, qualityWeight: 1f);
     sectors.AddMeat(4, 0.7f);
     sectors.AddEgg(6, 0.8f);
     sectors.AddCreature(8, 0.9f, relativeBodySize: -0.5f);
@@ -3200,10 +3214,13 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.75f, inputs[NeuralBrainSchema.CreatureContactInput], 0.000001, "Creature contact input");
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentPlantRawYieldInput], 0.000001, "Recent plant raw yield input");
     AssertClose(0.46f, inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput], 0.000001, "Recent plant energy yield input");
+    AssertClose(0.56f, inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput], 0.000001, "Recent food energy yield input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
     AssertClose(0.5f, inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(0)], 0.000001, "Sector plant proximity input");
+    AssertClose(0.61f, inputs[NeuralBrainSchema.VisionSectorPlantEnergyQualityInput(0)], 0.000001, "Sector plant energy quality input");
+    AssertClose(0.71f, inputs[NeuralBrainSchema.VisionSectorPlantBiteEaseInput(0)], 0.000001, "Sector plant bite ease input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorMeatDensityInput(4)], 0.000001, "Sector meat density input");
     AssertClose(0.7f, inputs[NeuralBrainSchema.VisionSectorMeatProximityInput(4)], 0.000001, "Sector meat proximity input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorEggDensityInput(6)], 0.000001, "Sector egg density input");
@@ -4362,7 +4379,7 @@ static void NeuralBrainMigratesCreatureContactInput()
     const int legacyInputCount = 195;
     const int legacyOutputCount = 7;
     const int hiddenNodeCount = 2;
-    var oldHealthRatioInput = NeuralBrainSchema.CreatureContactInput;
+    const int oldHealthRatioInput = 194;
     var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
     var legacyHiddenInputOffset = legacyDirectWeightCount;
     var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
@@ -4413,8 +4430,10 @@ static void NeuralBrainMigratesPlantQualityInputs()
     var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
     var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
 
-    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.HealthRatioInput] = -0.7f;
-    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.CreatureContactInput] = 1.2f;
+    const int oldCreatureContactInput = 194;
+    const int oldHealthRatioInput = 195;
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldHealthRatioInput] = -0.7f;
+    legacyWeights[legacyHiddenInputOffset + oldCreatureContactInput] = 1.2f;
     legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.EatOutput * hiddenNodeCount] = 2.4f;
 
     var brain = new NeuralBrainGenome(legacyWeights);
@@ -4451,6 +4470,103 @@ static void NeuralBrainMigratesPlantQualityInputs()
         brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RecentPlantEnergyYieldInput),
         0.000001,
         "New recent plant energy yield input starts neutral");
+}
+
+static void NeuralBrainMigratesRecentFoodEnergyYieldInput()
+{
+    const int legacyInputCount = 202;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int oldRecentPlantRawYieldInput = 200;
+    const int oldRecentPlantEnergyYieldInput = 201;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldRecentPlantEnergyYieldInput] = -1.2f;
+    legacyWeights[legacyHiddenInputOffset + oldRecentPlantRawYieldInput] = 0.8f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.ReproduceOutput * hiddenNodeCount] = 1.4f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Food energy yield migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Food energy yield migrated weight count");
+    AssertClose(
+        -1.2f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RecentPlantEnergyYieldInput),
+        0.000001,
+        "Existing recent plant energy yield direct input remains in place");
+    AssertClose(
+        0.8f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentPlantRawYieldInput),
+        0.000001,
+        "Existing recent plant raw hidden input remains in place");
+    AssertClose(
+        1.4f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.ReproduceOutput, 0),
+        0.000001,
+        "Existing hidden reproduce output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RecentFoodEnergyYieldInput),
+        0.000001,
+        "New recent food energy yield direct input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentFoodEnergyYieldInput),
+        0.000001,
+        "New recent food energy yield hidden input starts neutral");
+}
+
+static void NeuralBrainMigratesSectorPlantQualityInputs()
+{
+    const int legacyInputCount = 203;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int legacySectorChannelCount = 16;
+    const int oldCenterMeatProximityInput = 46
+        + VisionSectorSet.CenterSectorIndex * legacySectorChannelCount
+        + 3;
+    const int oldRecentFoodEnergyYieldInput = 202;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.TurnOutput * legacyInputCount + oldCenterMeatProximityInput] = 1.9f;
+    legacyWeights[legacyHiddenInputOffset + oldRecentFoodEnergyYieldInput] = 0.7f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.EatOutput * hiddenNodeCount] = 1.3f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Sector plant quality migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Sector plant quality migrated weight count");
+    AssertClose(
+        1.9f,
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.VisionSectorMeatProximityInput(VisionSectorSet.CenterSectorIndex)),
+        0.000001,
+        "Existing sector meat proximity input remains in place");
+    AssertClose(
+        0.7f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentFoodEnergyYieldInput),
+        0.000001,
+        "Existing recent food energy yield hidden input remains in place");
+    AssertClose(
+        1.3f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.EatOutput, 0),
+        0.000001,
+        "Existing hidden eat output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.VisionSectorPlantEnergyQualityInput(VisionSectorSet.CenterSectorIndex)),
+        0.000001,
+        "New sector plant energy quality direct input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.VisionSectorPlantBiteEaseInput(VisionSectorSet.CenterSectorIndex)),
+        0.000001,
+        "New sector plant bite ease hidden input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -5318,6 +5434,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
         EggReserveRatio = 0.5f,
         EnergySurplusRatio = 0.25f,
         RecentFoodSuccess = 0.75f,
+        RecentFoodEnergyYield = 0.6f,
         ReproductionReadiness = 1f,
         ForwardObstacle = 0.5f,
         LeftObstacle = 0.25f,
@@ -5367,6 +5484,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
         EggReserveRatio = 0.25f,
         EnergySurplusRatio = 0.05f,
         RecentFoodSuccess = 0.25f,
+        RecentFoodEnergyYield = 0.2f,
         ForwardObstacle = 0.25f,
         LeftObstacle = 0.5f,
         RightObstacle = 0.2f
@@ -5531,6 +5649,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.375f, snapshot.AverageEggReserveRatio, 0.000001, "Average egg reserve ratio");
     AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
     AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");
+    AssertClose(0.4f, snapshot.AverageRecentFoodEnergyYield, 0.000001, "Average recent food energy yield");
     AssertEqual(1, snapshot.ActiveMemoryCreatureCount, "Active memory creature count");
     AssertClose(0.1f, snapshot.AverageMemoryStrength, 0.000001, "Average memory strength");
     AssertClose(1f, snapshot.MemoryUserFoodContactShare, 0.000001, "Memory food contact share");

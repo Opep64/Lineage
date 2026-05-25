@@ -70,6 +70,7 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.RecentFoodSuccessInput] = frame.Internal.RecentFoodSuccess;
         inputs[NeuralBrainSchema.RecentPlantRawYieldInput] = frame.Internal.RecentPlantRawYield;
         inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput] = frame.Internal.RecentPlantEnergyYield;
+        inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput] = frame.Internal.RecentFoodEnergyYield;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;
@@ -99,6 +100,8 @@ public static class LegacyNeuralBrainAdapter
             var sector = frame.Vision.Sectors.Get(sectorIndex);
             inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(sectorIndex)] = sector.PlantDensity;
             inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(sectorIndex)] = sector.PlantProximity;
+            inputs[NeuralBrainSchema.VisionSectorPlantEnergyQualityInput(sectorIndex)] = sector.PlantEnergyQuality;
+            inputs[NeuralBrainSchema.VisionSectorPlantBiteEaseInput(sectorIndex)] = sector.PlantBiteEase;
             inputs[NeuralBrainSchema.VisionSectorMeatDensityInput(sectorIndex)] = sector.MeatDensity;
             inputs[NeuralBrainSchema.VisionSectorMeatProximityInput(sectorIndex)] = sector.MeatProximity;
             inputs[NeuralBrainSchema.VisionSectorEggDensityInput(sectorIndex)] = sector.EggDensity;

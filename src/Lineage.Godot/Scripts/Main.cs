@@ -965,7 +965,8 @@ public partial class Main : Node2D
             $"Damage resist {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Energy surplus {senses.EnergySurplusRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
-            $"Plant yield raw {senses.RecentPlantRawYield:0.00}  energy {senses.RecentPlantEnergyYield:0.00}\n" +
+            $"Food energy yield {senses.RecentFoodEnergyYield:0.00}  plant energy {senses.RecentPlantEnergyYield:0.00}\n" +
+            $"Plant yield raw {senses.RecentPlantRawYield:0.00}\n" +
             $"Memory {senses.MemoryStrength:0.00}  fwd {senses.MemoryDirectionForward:0.00}  right {senses.MemoryDirectionRight:0.00}\n" +
             $"Memory write fwd {creature.Actions.MemoryForward:0.00}  right {creature.Actions.MemoryRight:0.00}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +

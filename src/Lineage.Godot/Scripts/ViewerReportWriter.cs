@@ -158,6 +158,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
         WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
         WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
+        WriteMetric(writer, "Food energy yield", FormatPercent(snapshot.AverageRecentFoodEnergyYield));
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
         WriteMetric(writer, "Memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));

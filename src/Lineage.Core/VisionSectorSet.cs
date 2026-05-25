@@ -44,8 +44,13 @@ public struct VisionSectorSet
 
     public void AddPlant(int sectorIndex, float proximity)
     {
+        AddPlant(sectorIndex, proximity, energyQuality: 0f, biteEase: 0f, qualityWeight: 0f);
+    }
+
+    public void AddPlant(int sectorIndex, float proximity, float energyQuality, float biteEase, float qualityWeight)
+    {
         var sector = Get(sectorIndex);
-        sector.AddPlant(proximity);
+        sector.AddPlant(proximity, energyQuality, biteEase, qualityWeight);
         Set(sectorIndex, sector);
         HasAnySignal = true;
     }
@@ -192,6 +197,10 @@ public struct VisionSectorSample
 
     public float PlantProximity { get; private set; }
 
+    public float PlantEnergyQuality { get; private set; }
+
+    public float PlantBiteEase { get; private set; }
+
     public float MeatDensity { get; private set; }
 
     public float MeatProximity { get; private set; }
@@ -228,10 +237,28 @@ public struct VisionSectorSample
 
     private float CreatureMotionProximity { get; set; }
 
+    private float PlantQualityWeight { get; set; }
+
     public void AddPlant(float proximity)
+    {
+        AddPlant(proximity, energyQuality: 0f, biteEase: 0f, qualityWeight: 0f);
+    }
+
+    public void AddPlant(float proximity, float energyQuality, float biteEase, float qualityWeight)
     {
         PlantDensity = AddDensity(PlantDensity);
         PlantProximity = Math.Max(PlantProximity, ClampUnit(proximity));
+
+        var clampedWeight = Math.Max(0f, qualityWeight);
+        if (clampedWeight <= 0f)
+        {
+            return;
+        }
+
+        var nextWeight = PlantQualityWeight + clampedWeight;
+        PlantEnergyQuality = WeightedAverage(PlantEnergyQuality, PlantQualityWeight, ClampUnit(energyQuality), clampedWeight, nextWeight);
+        PlantBiteEase = WeightedAverage(PlantBiteEase, PlantQualityWeight, ClampUnit(biteEase), clampedWeight, nextWeight);
+        PlantQualityWeight = nextWeight;
     }
 
     public void AddMeat(float proximity)
@@ -283,6 +310,13 @@ public struct VisionSectorSample
     private static float AddDensity(float density)
     {
         return Math.Clamp(density + DensityIncrement, 0f, 1f);
+    }
+
+    private static float WeightedAverage(float current, float currentWeight, float value, float valueWeight, float nextWeight)
+    {
+        return nextWeight > 0f
+            ? (current * currentWeight + value * valueWeight) / nextWeight
+            : 0f;
     }
 
     private static float ClampUnit(float value)
