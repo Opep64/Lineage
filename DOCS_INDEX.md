@@ -30,6 +30,7 @@ This is the starting point for future Codex threads. Read this file first, then 
 
 ## Other Useful Files
 
+- `docs/simulation-project-overview.html`: visual HTML overview of the current simulation systems, options, brain structures, tools, and documentation links.
 - `RUN_TOOLS_PLAN.md`: design plan for the future local run launcher/library.
 - `EVOLUTION_SIMULATOR_TANGENT.md`: early idea capture; treat as inspiration, not current spec.
 - `species/README.md`: species profile format and usage notes.
