@@ -18,7 +18,8 @@ public static class GodotRunExportWriter
         string reportPath,
         string snapshotPath,
         SimulationScenario scenario,
-        Simulation simulation)
+        Simulation simulation,
+        IReadOnlyList<SpeciesInjectionResult> speciesInjections)
     {
         var paths = GodotRunExportPaths.From(statsPath, reportPath, snapshotPath);
         var state = simulation.State;
@@ -31,8 +32,9 @@ public static class GodotRunExportWriter
         GodotFounderSummaryCsvWriter.Write(paths.FounderSummaryPath, state.LineageRecords);
         GodotGenerationSummaryCsvWriter.Write(paths.GenerationSummaryPath, state.LineageRecords);
         GodotLineageTrendCsvWriter.Write(paths.LineageTrendPath, state.Stats.Snapshots, state.LineageRecords);
+        GodotRosterLineageSummaryCsvWriter.Write(paths.RosterSummaryPath, state.LineageRecords, speciesInjections);
         SimulationScenarioJson.Save(paths.ScenarioPath, scenario);
-        ViewerReportWriter.Write(paths.ReportPath, scenario, simulation);
+        ViewerReportWriter.Write(paths.ReportPath, scenario, simulation, speciesInjections);
         SimulationSnapshotJson.Save(paths.SnapshotPath, SimulationSnapshot.Capture(scenario, simulation));
 
         return new GodotRunExportResult(
@@ -44,6 +46,7 @@ public static class GodotRunExportWriter
             paths.FounderSummaryPath,
             paths.GenerationSummaryPath,
             paths.LineageTrendPath,
+            paths.RosterSummaryPath,
             paths.ScenarioPath,
             paths.ReportPath,
             paths.SnapshotPath);
@@ -59,11 +62,12 @@ public sealed record GodotRunExportResult(
     string FounderSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
+    string RosterSummaryPath,
     string ScenarioPath,
     string ReportPath,
     string SnapshotPath)
 {
-    public int FileCount => 11;
+    public int FileCount => 12;
 }
 
 internal sealed record GodotRunExportPaths(
@@ -75,6 +79,7 @@ internal sealed record GodotRunExportPaths(
     string FounderSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
+    string RosterSummaryPath,
     string ScenarioPath,
     string ReportPath,
     string SnapshotPath)
@@ -90,6 +95,7 @@ internal sealed record GodotRunExportPaths(
             AddSuffix(statsPath, "founders"),
             AddSuffix(statsPath, "generations"),
             AddSuffix(statsPath, "lineage_trends"),
+            AddSuffix(statsPath, "roster"),
             Path.ChangeExtension(AddSuffix(statsPath, "scenario"), ".json"),
             reportPath,
             snapshotPath);
@@ -652,6 +658,44 @@ internal readonly record struct GodotFounderSummary(
     int LivingCreatures,
     int DeadCreatures,
     int MaxGeneration);
+
+internal static class GodotRosterLineageSummaryCsvWriter
+{
+    public static void Write(
+        string path,
+        IReadOnlyList<CreatureLineageRecord> records,
+        IReadOnlyList<SpeciesInjectionResult> injections)
+    {
+        using var writer = GodotStatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,unknown_deaths,genome_ids,brain_ids");
+
+        foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections))
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                EscapeCsv(summary.ProfileName),
+                summary.FounderCount.ToString(CultureInfo.InvariantCulture),
+                summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.DescendantCount.ToString(CultureInfo.InvariantCulture),
+                summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.DeadCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                summary.StarvationDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.InjuryDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.RottenMeatDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.UnknownDeaths.ToString(CultureInfo.InvariantCulture),
+                EscapeCsv(string.Join("|", summary.GenomeIds)),
+                EscapeCsv(string.Join("|", summary.BrainIds))));
+        }
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
 
 internal static class GodotGenerationSummaryCsvWriter
 {

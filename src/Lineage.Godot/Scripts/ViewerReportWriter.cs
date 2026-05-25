@@ -16,8 +16,13 @@ namespace Lineage.Viewer;
 public static class ViewerReportWriter
 {
     private const int ReportTrendRowCount = 8;
+    private const int ReportTimelineSampleLimit = 1200;
 
-    public static void Write(string path, SimulationScenario scenario, Simulation simulation)
+    public static void Write(
+        string path,
+        SimulationScenario scenario,
+        Simulation simulation,
+        IReadOnlyList<SpeciesInjectionResult>? speciesInjections = null)
     {
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -28,6 +33,7 @@ public static class ViewerReportWriter
         using var writer = new StreamWriter(path);
         var state = simulation.State;
         var snapshots = state.Stats.Snapshots;
+        var reportSnapshots = SelectReportSnapshots(snapshots);
         var snapshot = snapshots.Count > 0 ? snapshots[^1] : default;
         var totalResourceCalories = 0f;
         var resourceCapacity = 0f;
@@ -56,12 +62,19 @@ public static class ViewerReportWriter
         var founderSummaries = allFounderSummaries
             .Take(10)
             .ToArray();
+        var rosterSummaries = RosterLineageAnalyzer.Analyze(
+                state.LineageRecords,
+                speciesInjections ?? Array.Empty<SpeciesInjectionResult>())
+            .OrderByDescending(summary => summary.LivingCreatures)
+            .ThenByDescending(summary => summary.TotalCreatures)
+            .ThenBy(summary => summary.ProfileName, StringComparer.Ordinal)
+            .ToArray();
         var behaviorSummary = BehaviorAssay.Analyze(state);
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
         var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
         var speciesBehaviorFingerprints = SpeciesClusterAnalyzer.AnalyzeBehaviorFingerprints(state, 10);
         var speciesBrainInputDiagnostics = SpeciesClusterAnalyzer.AnalyzeBrainInputDiagnostics(state, 10);
-        var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots, 10);
+        var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, reportSnapshots, 10);
         var speciesBehaviorChanges = SpeciesClusterAnalyzer.AnalyzeBehaviorChanges(state, speciesHistory, 10);
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
         var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
@@ -423,7 +436,7 @@ public static class ViewerReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
-        WriteChartsSection(writer, state.Stats.Snapshots);
+        WriteChartsSection(writer, reportSnapshots, snapshots.Count);
         WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
         WriteSpeciesBrainInputDiagnosticsSection(writer, speciesBrainInputDiagnostics);
@@ -472,6 +485,35 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("</section>");
+
+        if (rosterSummaries.Length > 0)
+        {
+            writer.WriteLine("<section>");
+            writer.WriteLine("<h2>Injected Profile Lineages</h2>");
+            writer.WriteLine("<div class=\"table-wrap\"><table>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<tbody>");
+            foreach (var summary in rosterSummaries)
+            {
+                writer.WriteLine(
+                    "<tr>" +
+                    $"<td>{Html(summary.ProfileName)}</td>" +
+                    $"<td>{Html(summary.FounderCount)}</td>" +
+                    $"<td>{Html(summary.TotalCreatures)}</td>" +
+                    $"<td>{Html(summary.DescendantCount)}</td>" +
+                    $"<td>{Html(summary.LivingCreatures)}</td>" +
+                    $"<td>{Html(summary.DeadCreatures)}</td>" +
+                    $"<td>{Html(summary.MaxGeneration)}</td>" +
+                    $"<td>{Html(summary.StarvationDeaths)}</td>" +
+                    $"<td>{Html(summary.InjuryDeaths)}</td>" +
+                    $"<td>{Html(summary.RottenMeatDeaths)}</td>" +
+                    $"<td>{Html(summary.UnknownDeaths)}</td>" +
+                    "</tr>");
+            }
+
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+        }
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Top Founder Lineages</h2>");
@@ -864,7 +906,10 @@ public static class ViewerReportWriter
         return $"{observed.Min(bin => bin.MinFertility):0.###}x-{observed.Max(bin => bin.MaxFertility):0.###}x";
     }
 
-    private static void WriteChartsSection(StreamWriter writer, IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    private static void WriteChartsSection(
+        StreamWriter writer,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        int sourceSnapshotCount)
     {
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Graphs</h2>");
@@ -873,6 +918,11 @@ public static class ViewerReportWriter
             writer.WriteLine("<p class=\"empty\">No stats snapshots were recorded, so no graphs are available.</p>");
             writer.WriteLine("</section>");
             return;
+        }
+
+        if (sourceSnapshotCount > snapshots.Count)
+        {
+            writer.WriteLine($"<p class=\"empty\">Graphs and timeline report sections are sampled to {snapshots.Count.ToString("N0", CultureInfo.InvariantCulture)} of {sourceSnapshotCount.ToString("N0", CultureInfo.InvariantCulture)} stats snapshots. CSV sidecars retain the full-resolution data.</p>");
         }
 
         writer.WriteLine("<div class=\"chart-grid\">");
@@ -1071,6 +1121,8 @@ public static class ViewerReportWriter
         IReadOnlyList<SimulationStatsSnapshot> snapshots,
         params ChartSeries[] series)
     {
+        series = DownsampleChartSeries(series, ReportTimelineSampleLimit);
+
         const float width = 720f;
         const float height = 240f;
         const float left = 46f;
@@ -1869,6 +1921,31 @@ public static class ViewerReportWriter
         return value.ToString("+0.###;-0.###;0", CultureInfo.InvariantCulture);
     }
 
+    private static IReadOnlyList<SimulationStatsSnapshot> SelectReportSnapshots(
+        IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    {
+        if (snapshots.Count <= ReportTimelineSampleLimit)
+        {
+            return snapshots;
+        }
+
+        var selected = new List<SimulationStatsSnapshot>(ReportTimelineSampleLimit);
+        var lastIndex = -1;
+        for (var i = 0; i < ReportTimelineSampleLimit; i++)
+        {
+            var index = (int)Math.Round(i * (snapshots.Count - 1) / (double)(ReportTimelineSampleLimit - 1));
+            if (index == lastIndex)
+            {
+                continue;
+            }
+
+            selected.Add(snapshots[index]);
+            lastIndex = index;
+        }
+
+        return selected;
+    }
+
     private static IReadOnlyList<long> SelectReportTicks(IReadOnlyList<long> ticks)
     {
         if (ticks.Count <= ReportTrendRowCount)
@@ -2007,5 +2084,55 @@ public static class ViewerReportWriter
             Count++;
             Average = _sum / Count;
         }
+    }
+
+    private static ChartSeries[] DownsampleChartSeries(IReadOnlyList<ChartSeries> series, int maxPoints)
+    {
+        if (maxPoints < 2)
+        {
+            return series.ToArray();
+        }
+
+        var result = new ChartSeries[series.Count];
+        for (var i = 0; i < series.Count; i++)
+        {
+            var chartSeries = series[i];
+            result[i] = chartSeries.Values.Length <= maxPoints
+                ? chartSeries
+                : chartSeries with { Values = DownsampleValues(chartSeries.Values, maxPoints) };
+        }
+
+        return result;
+    }
+
+    private static float[] DownsampleValues(float[] values, int maxPoints)
+    {
+        if (values.Length <= maxPoints)
+        {
+            return values;
+        }
+
+        var selected = new float[maxPoints];
+        var lastIndex = -1;
+        var selectedCount = 0;
+        for (var i = 0; i < maxPoints; i++)
+        {
+            var index = (int)Math.Round(i * (values.Length - 1) / (double)(maxPoints - 1));
+            if (index == lastIndex)
+            {
+                continue;
+            }
+
+            selected[selectedCount++] = values[index];
+            lastIndex = index;
+        }
+
+        if (selectedCount == selected.Length)
+        {
+            return selected;
+        }
+
+        Array.Resize(ref selected, selectedCount);
+        return selected;
     }
 }

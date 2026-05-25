@@ -13,6 +13,7 @@ namespace Lineage.Core;
 public static class SpeciesClusterAnalyzer
 {
     private const float BrainWeightLimit = 8f;
+    private const int BrainFeatureBucketCount = 64;
 
     private static readonly string[] NamePrefixes =
     [
@@ -1014,11 +1015,34 @@ public static class SpeciesClusterAnalyzer
 
     private static float[] CreateBrainFeatures(NeuralBrainGenome brain)
     {
-        var features = new float[brain.Weights.Length + 1];
+        var features = new float[1 + BrainFeatureBucketCount * 2];
         features[0] = brain.HiddenNodeCount / (float)NeuralBrainSchema.MaxHiddenNodeCount;
+        if (brain.Weights.Length == 0)
+        {
+            return features;
+        }
+
+        var counts = new int[BrainFeatureBucketCount];
         for (var i = 0; i < brain.Weights.Length; i++)
         {
-            features[i + 1] = Math.Clamp(brain.Weights[i] / BrainWeightLimit, -1f, 1f);
+            var bucket = Math.Min(BrainFeatureBucketCount - 1, (int)((long)i * BrainFeatureBucketCount / brain.Weights.Length));
+            var value = Math.Clamp(brain.Weights[i] / BrainWeightLimit, -1f, 1f);
+            var magnitude = MathF.Abs(value);
+            features[1 + bucket] += value;
+            features[1 + BrainFeatureBucketCount + bucket] = MathF.Max(
+                features[1 + BrainFeatureBucketCount + bucket],
+                magnitude);
+            counts[bucket]++;
+        }
+
+        for (var bucket = 0; bucket < BrainFeatureBucketCount; bucket++)
+        {
+            if (counts[bucket] == 0)
+            {
+                continue;
+            }
+
+            features[1 + bucket] /= counts[bucket];
         }
 
         return features;

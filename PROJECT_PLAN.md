@@ -290,16 +290,17 @@ Movement should eventually make actual speed matter, not only max-speed potentia
 - Add scenario config files. JSON load/save done.
 - Add reproducible seeds. Done.
 - Add CLI/headless runner. Done.
-- Add simple CSV or JSON stats export. Stats, lineage, traits, living species clusters, species cluster trends, founder, generation survival, and lineage trend CSVs done.
+- Add simple CSV or JSON stats export. Stats, lineage, traits, living species clusters, species cluster trends, founder, generation survival, lineage trend, and roster lineage CSVs done.
 - Add population graphs and death-cause summaries. Viewer graph done; CLI CSVs include death counters, founder summaries, generation survival, and lineage-over-time trends.
-- Add automated run report. HTML report with run summary, diagnostics, dominant lineage snapshots, trait summaries, founder lineages, and generation survival done.
+- Add automated run report. HTML report with run summary, diagnostics, dominant lineage snapshots, injected-profile lineage survival, trait summaries, founder lineages, and generation survival done.
 - Add inline report graphs. CLI and Godot viewer HTML reports now include SVG charts for population/eggs, plant/meat resource calories, foraging signals, and combat pressure. Done.
 - Add first standardized behavior assays. Reports now replay fixed sensory situations through living neural brains to summarize movement style, plant/meat response, visible-creature attack response, small/large-creature risk response, completed-egg laying tendency, and top-founder ecotype summaries. Done.
 - Add batch scenario comparison runner/report. Preset gentle/balanced/harsh comparison and custom repeated `--batch-scenario` inputs done; comparison reports now include injury deaths and final predation-pressure metrics. Done.
 - Add lightweight probe runner. `--probe` runs multi-scenario/multi-seed tuning sweeps without per-run reports, snapshots, or lineage CSV suites; it writes one compact CSV and one compact HTML summary, with optional extinction/runaway-population early stops. Done.
 - Add temporary probe variants. `--probe-variant <name:key=value,...>` runs the checked-in base scenario plus named in-memory JSON-property overrides, so tuning candidates can be compared without editing scenario files. Probe CSVs and HTML reports keep `scenario`, `variant`, and override text separate. Done.
 - Add species profile export/import. Species profiles live in `species/`, use the `.species.json` suffix, and store one representative genome plus neural brain that can be injected into another run. CLI and Godot can export selected/dominant species profiles, plus the closest living representative of a report species cluster, and load them later. Done.
-- Add scenario species rosters. `SimulationScenario.SpeciesSeeds` can define repeatable starting mixes from species profiles with count, spawn region, optional energy override, and enabled flag. CLI, probe runs, and Godot launch apply enabled roster entries at startup; scenarios with enabled species seeds skip generic starter creatures. Done.
+- Add scenario species rosters. `SimulationScenario.SpeciesSeeds` can define repeatable starting mixes from species profiles with count, spawn region, optional energy override, and enabled flag. CLI, probe runs, and Godot launch apply enabled roster entries at startup; scenarios with enabled species seeds skip generic starter creatures. CLI/Godot exports now write roster lineage summaries grouped by injected profile. Done.
+- Keep long-run HTML reports bounded. CLI/Godot reports now sample graph and timeline sections to 1,200 snapshots while leaving CSV sidecars full resolution. Species clustering uses compact brain feature buckets for report taxonomy so large exported runs do not spend minutes repeatedly comparing every neural weight. Done.
 
 ### Phase 6: Stronger Evolutionary Pressure
 
@@ -660,6 +661,7 @@ Useful CLI options:
 - `--founders-output <path>`
 - `--generations-output <path>`
 - `--lineage-trends-output <path>`
+- `--roster-output <path>`
 - `--report <path>`
 - `--save-snapshot <path>`
 - `--checkpoint-interval <n>`

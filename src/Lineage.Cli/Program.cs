@@ -75,6 +75,7 @@ static void PrintHelp()
           --founders-output <path>   Founder lineage summary CSV output path.
           --generations-output <path> Generation survival summary CSV output path.
           --lineage-trends-output <path> Founder lineage trend CSV output path.
+          --roster-output <path>     Starter profile lineage summary CSV output path.
           --report <path>            HTML run report output path.
           --profile                  Time each simulation system and print/write a profile.
           --profile-output <path>    Per-system profile CSV output path; writes a sensing sidecar.
@@ -150,7 +151,7 @@ static RunResult RunSingle(RunOptions options)
         SimulationSnapshotJson.Save(options.SaveSnapshotPath, SimulationSnapshot.Capture(scenario, simulation));
     }
 
-    WriteRunOutputs(options, scenario, simulation, stopwatch.Elapsed, outputPaths, checkpoints);
+    WriteRunOutputs(options, scenario, simulation, stopwatch.Elapsed, outputPaths, speciesInjections, checkpoints);
     runFiles.WriteStatus("completed", simulation, runResult.CompletedSteps, checkpoints, runResult.StopReason);
 
     SpeciesProfile? exportedSpecies = null;
@@ -540,6 +541,7 @@ static void WriteRunOutputs(
     Simulation simulation,
     TimeSpan elapsed,
     OutputPaths outputPaths,
+    IReadOnlyList<SpeciesInjectionResult> speciesInjections,
     IReadOnlyList<CheckpointArtifact> checkpoints)
 {
     if (outputPaths.StatsPath is not null)
@@ -552,6 +554,7 @@ static void WriteRunOutputs(
         FounderSummaryCsvWriter.Write(outputPaths.FounderSummaryPath!, simulation.State.LineageRecords);
         GenerationSummaryCsvWriter.Write(outputPaths.GenerationSummaryPath!, simulation.State.LineageRecords);
         LineageTrendCsvWriter.Write(outputPaths.LineageTrendPath!, simulation.State.Stats.Snapshots, simulation.State.LineageRecords);
+        RosterLineageSummaryCsvWriter.Write(outputPaths.RosterSummaryPath!, simulation.State.LineageRecords, speciesInjections);
     }
 
     if (outputPaths.ProfilePath is not null && simulation.Profile is not null)
@@ -566,7 +569,7 @@ static void WriteRunOutputs(
 
     if (outputPaths.ReportPath is not null)
     {
-        RunReportWriter.Write(outputPaths.ReportPath, options, scenario, simulation, elapsed, outputPaths, checkpoints);
+        RunReportWriter.Write(outputPaths.ReportPath, options, scenario, simulation, elapsed, outputPaths, speciesInjections, checkpoints);
     }
 }
 
@@ -639,6 +642,7 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Founders CSV: {Path.GetFullPath(outputPaths.FounderSummaryPath!)}");
         Console.WriteLine($"Generations CSV: {Path.GetFullPath(outputPaths.GenerationSummaryPath!)}");
         Console.WriteLine($"Lineage trends CSV: {Path.GetFullPath(outputPaths.LineageTrendPath!)}");
+        Console.WriteLine($"Roster lineages CSV: {Path.GetFullPath(outputPaths.RosterSummaryPath!)}");
     }
 
     if (result.Simulation.Profile is not null)
@@ -846,6 +850,8 @@ internal sealed record RunOptions
 
     public string? LineageTrendOutputPath { get; init; }
 
+    public string? RosterSummaryOutputPath { get; init; }
+
     public string? ReportPath { get; init; }
 
     public bool Profile { get; init; }
@@ -952,6 +958,7 @@ internal sealed record RunOptions
             FounderSummaryOutputPath = ExpandProcessIdToken(FounderSummaryOutputPath),
             GenerationSummaryOutputPath = ExpandProcessIdToken(GenerationSummaryOutputPath),
             LineageTrendOutputPath = ExpandProcessIdToken(LineageTrendOutputPath),
+            RosterSummaryOutputPath = ExpandProcessIdToken(RosterSummaryOutputPath),
             ReportPath = ExpandProcessIdToken(ReportPath),
             ProfileOutputPath = ExpandProcessIdToken(ProfileOutputPath),
             SaveSnapshotPath = ExpandProcessIdToken(SaveSnapshotPath),
@@ -1021,6 +1028,7 @@ internal sealed record RunOptions
                 null,
                 null,
                 null,
+                null,
                 ReportPath,
                 ProfileOutputPath,
                 disabledSensingProfilePath,
@@ -1042,6 +1050,7 @@ internal sealed record RunOptions
             FounderSummaryOutputPath ?? AddSuffix(statsPath, "founders"),
             GenerationSummaryOutputPath ?? AddSuffix(statsPath, "generations"),
             LineageTrendOutputPath ?? AddSuffix(statsPath, "lineage_trends"),
+            RosterSummaryOutputPath ?? AddSuffix(statsPath, "roster"),
             ReportPath,
             profilePath,
             sensingProfilePath,
@@ -1067,6 +1076,7 @@ internal sealed record RunOptions
             FounderSummaryOutputPath = null,
             GenerationSummaryOutputPath = null,
             LineageTrendOutputPath = null,
+            RosterSummaryOutputPath = null,
             ProfileOutputPath = ProfileEnabled ? Path.Combine(BatchOutputDirectory, $"{slug}_profile.csv") : null,
             ReportPath = DisableOutput ? null : Path.Combine(BatchOutputDirectory, $"{slug}_report.html"),
             SaveSnapshotPath = DisableOutput ? null : Path.Combine(BatchOutputDirectory, $"{slug}_snapshot.json"),
@@ -1150,6 +1160,9 @@ internal sealed record RunOptions
                     break;
                 case "--lineage-trends-output":
                     options = options with { LineageTrendOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
+                    break;
+                case "--roster-output":
+                    options = options with { RosterSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
                     break;
                 case "--report":
                     options = options with { ReportPath = ReadValue(args, ref i, arg) };
@@ -1516,6 +1529,7 @@ internal readonly record struct OutputPaths(
     string? FounderSummaryPath,
     string? GenerationSummaryPath,
     string? LineageTrendPath,
+    string? RosterSummaryPath,
     string? ReportPath,
     string? ProfilePath,
     string? SensingProfilePath,
@@ -3166,6 +3180,44 @@ internal readonly record struct FounderSummary(
     int DeadCreatures,
     int MaxGeneration);
 
+internal static class RosterLineageSummaryCsvWriter
+{
+    public static void Write(
+        string path,
+        IReadOnlyList<CreatureLineageRecord> records,
+        IReadOnlyList<SpeciesInjectionResult> injections)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,unknown_deaths,genome_ids,brain_ids");
+
+        foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections))
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                EscapeCsv(summary.ProfileName),
+                summary.FounderCount.ToString(CultureInfo.InvariantCulture),
+                summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.DescendantCount.ToString(CultureInfo.InvariantCulture),
+                summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.DeadCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                summary.StarvationDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.InjuryDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.RottenMeatDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.UnknownDeaths.ToString(CultureInfo.InvariantCulture),
+                EscapeCsv(string.Join("|", summary.GenomeIds)),
+                EscapeCsv(string.Join("|", summary.BrainIds))));
+        }
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
+
 internal static class GenerationSummaryCsvWriter
 {
     public static void Write(string path, IReadOnlyList<CreatureLineageRecord> records)
@@ -4264,6 +4316,7 @@ internal readonly record struct BatchRunSummary(
 internal static class RunReportWriter
 {
     private const int ReportTrendRowCount = 8;
+    private const int ReportTimelineSampleLimit = 1200;
 
     public static void Write(
         string path,
@@ -4272,12 +4325,30 @@ internal static class RunReportWriter
         Simulation simulation,
         TimeSpan elapsed,
         OutputPaths outputPaths,
+        IReadOnlyList<SpeciesInjectionResult> speciesInjections,
         IReadOnlyList<CheckpointArtifact> checkpoints)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
         var state = simulation.State;
         var snapshots = state.Stats.Snapshots;
+        var reportSnapshots = SelectReportSnapshots(snapshots);
         var finalSnapshot = snapshots.Count > 0 ? snapshots[^1] : default;
+        var timingEnabled = string.Equals(
+            Environment.GetEnvironmentVariable("LINEAGE_REPORT_TIMING"),
+            "1",
+            StringComparison.Ordinal);
+        var timingStopwatch = Stopwatch.StartNew();
+        void TraceTiming(string label)
+        {
+            if (!timingEnabled)
+            {
+                return;
+            }
+
+            Console.Error.WriteLine($"report_timing,{label},{timingStopwatch.Elapsed.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture)}");
+            timingStopwatch.Restart();
+        }
+
         var populationTrend = Trend.From(snapshots, snapshot => snapshot.CreatureCount, state.Creatures.Count);
         var eggTrend = Trend.From(snapshots, snapshot => snapshot.EggCount, state.Eggs.Count);
         var resourceTrend = Trend.From(
@@ -4336,28 +4407,51 @@ internal static class RunReportWriter
             snapshots,
             snapshot => snapshot.CaloriesEatenPerFoodVisionEvent,
             finalSnapshot.CaloriesEatenPerFoodVisionEvent);
+        TraceTiming("trends");
         var speciesSummaries = SpeciesClusterAnalyzer.Analyze(state, 10);
+        TraceTiming("species_summaries");
         var speciesBehaviorFingerprints = SpeciesClusterAnalyzer.AnalyzeBehaviorFingerprints(state, 10);
+        TraceTiming("species_behavior_fingerprints");
         var speciesBrainInputDiagnostics = SpeciesClusterAnalyzer.AnalyzeBrainInputDiagnostics(state, 10);
-        var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, snapshots, 10);
+        TraceTiming("species_brain_inputs");
+        var speciesHistory = SpeciesClusterAnalyzer.AnalyzeHistory(state, reportSnapshots, 10);
+        TraceTiming("species_history");
         var speciesBehaviorChanges = SpeciesClusterAnalyzer.AnalyzeBehaviorChanges(state, speciesHistory, 10);
+        TraceTiming("species_behavior_changes");
         var behaviorSummary = BehaviorAssay.Analyze(state);
+        TraceTiming("behavior_assay");
         var lineageBehaviorSummaries = BehaviorAssay.AnalyzeTopFounderLineages(state, 10);
+        TraceTiming("lineage_behavior_assay");
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
+        TraceTiming("brain_inputs");
         var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
+        TraceTiming("lineage_brain_inputs");
         var founderSummaries = FounderSummaryCsvWriter.Summarize(state.LineageRecords)
             .OrderByDescending(summary => summary.LivingCreatures)
             .ThenByDescending(summary => summary.TotalCreatures)
             .ThenBy(summary => summary.FounderId.Value)
             .ToArray();
+        TraceTiming("founder_summaries");
+        var rosterSummaries = RosterLineageAnalyzer.Analyze(state.LineageRecords, speciesInjections)
+            .OrderByDescending(summary => summary.LivingCreatures)
+            .ThenByDescending(summary => summary.TotalCreatures)
+            .ThenBy(summary => summary.ProfileName, StringComparer.Ordinal)
+            .ToArray();
+        TraceTiming("roster_summaries");
         var founderExplorationSummaries = SummarizeFounderExploration(state, 10);
+        TraceTiming("founder_exploration");
         var generationSummaries = GenerationSummaryCsvWriter.Summarize(state.LineageRecords);
-        var dominantLineageRows = LineageTrendCsvWriter.Summarize(snapshots, state.LineageRecords, maxRowsPerSnapshot: 1);
+        TraceTiming("generation_summaries");
+        var dominantLineageRows = LineageTrendCsvWriter.Summarize(reportSnapshots, state.LineageRecords, maxRowsPerSnapshot: 1);
+        TraceTiming("dominant_lineages");
         var traitSummary = state.Creatures.Count > 0
             ? TraitAccumulator.FromLivingCreatures(state)
             : default;
+        TraceTiming("trait_summary");
         var biomeSummaries = state.Biomes.SummarizeResources(state.Resources);
+        TraceTiming("biome_summaries");
         var seasonPressure = SeasonPressureAnalysis.Analyze(scenario, snapshots);
+        TraceTiming("season_pressure");
 
         WriteDocumentStart(writer, $"Lineage Run Report - {scenario.Name}");
 
@@ -4738,7 +4832,7 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
-        WriteChartsSection(writer, snapshots);
+        WriteChartsSection(writer, reportSnapshots, snapshots.Count);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Trends</h2>");
@@ -4812,6 +4906,35 @@ internal static class RunReportWriter
 
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
+
+        if (rosterSummaries.Length > 0)
+        {
+            writer.WriteLine("<section>");
+            writer.WriteLine("<h2>Injected Profile Lineages</h2>");
+            writer.WriteLine("<div class=\"table-wrap\"><table>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<tbody>");
+            foreach (var summary in rosterSummaries)
+            {
+                writer.WriteLine(
+                    "<tr>" +
+                    $"<td>{Html(summary.ProfileName)}</td>" +
+                    $"<td>{Html(summary.FounderCount)}</td>" +
+                    $"<td>{Html(summary.TotalCreatures)}</td>" +
+                    $"<td>{Html(summary.DescendantCount)}</td>" +
+                    $"<td>{Html(summary.LivingCreatures)}</td>" +
+                    $"<td>{Html(summary.DeadCreatures)}</td>" +
+                    $"<td>{Html(summary.MaxGeneration)}</td>" +
+                    $"<td>{Html(summary.StarvationDeaths)}</td>" +
+                    $"<td>{Html(summary.InjuryDeaths)}</td>" +
+                    $"<td>{Html(summary.RottenMeatDeaths)}</td>" +
+                    $"<td>{Html(summary.UnknownDeaths)}</td>" +
+                    "</tr>");
+            }
+
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+        }
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Top Founder Lineages</h2>");
@@ -4970,6 +5093,7 @@ internal static class RunReportWriter
         WriteOptionalPath(writer, "Founders CSV", outputPaths.FounderSummaryPath);
         WriteOptionalPath(writer, "Generations CSV", outputPaths.GenerationSummaryPath);
         WriteOptionalPath(writer, "Lineage trends CSV", outputPaths.LineageTrendPath);
+        WriteOptionalPath(writer, "Roster lineages CSV", outputPaths.RosterSummaryPath);
         WriteOptionalPath(writer, "Profile CSV", outputPaths.ProfilePath);
         WriteOptionalPath(writer, "Sensing profile CSV", outputPaths.SensingProfilePath);
         WriteOptionalPath(writer, "Snapshot JSON", options.SaveSnapshotPath);
@@ -5276,7 +5400,10 @@ internal static class RunReportWriter
         return $"{observed.Min(bin => bin.MinFertility):0.###}x-{observed.Max(bin => bin.MaxFertility):0.###}x";
     }
 
-    private static void WriteChartsSection(StreamWriter writer, IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    private static void WriteChartsSection(
+        StreamWriter writer,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        int sourceSnapshotCount)
     {
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Graphs</h2>");
@@ -5285,6 +5412,11 @@ internal static class RunReportWriter
             writer.WriteLine("<p class=\"empty\">No stats snapshots were recorded, so no graphs are available.</p>");
             writer.WriteLine("</section>");
             return;
+        }
+
+        if (sourceSnapshotCount > snapshots.Count)
+        {
+            writer.WriteLine($"<p class=\"empty\">Graphs and timeline report sections are sampled to {snapshots.Count.ToString("N0", CultureInfo.InvariantCulture)} of {sourceSnapshotCount.ToString("N0", CultureInfo.InvariantCulture)} stats snapshots. CSV sidecars retain the full-resolution data.</p>");
         }
 
         writer.WriteLine("<div class=\"chart-grid\">");
@@ -5530,6 +5662,8 @@ internal static class RunReportWriter
         IReadOnlyList<SimulationStatsSnapshot> snapshots,
         params ChartSeries[] series)
     {
+        series = DownsampleChartSeries(series, ReportTimelineSampleLimit);
+
         const float width = 720f;
         const float height = 240f;
         const float left = 46f;
@@ -6275,6 +6409,56 @@ internal static class RunReportWriter
         }
     }
 
+    private static ChartSeries[] DownsampleChartSeries(IReadOnlyList<ChartSeries> series, int maxPoints)
+    {
+        if (maxPoints < 2)
+        {
+            return series.ToArray();
+        }
+
+        var result = new ChartSeries[series.Count];
+        for (var i = 0; i < series.Count; i++)
+        {
+            var chartSeries = series[i];
+            result[i] = chartSeries.Values.Length <= maxPoints
+                ? chartSeries
+                : chartSeries with { Values = DownsampleValues(chartSeries.Values, maxPoints) };
+        }
+
+        return result;
+    }
+
+    private static float[] DownsampleValues(float[] values, int maxPoints)
+    {
+        if (values.Length <= maxPoints)
+        {
+            return values;
+        }
+
+        var selected = new float[maxPoints];
+        var lastIndex = -1;
+        var selectedCount = 0;
+        for (var i = 0; i < maxPoints; i++)
+        {
+            var index = (int)Math.Round(i * (values.Length - 1) / (double)(maxPoints - 1));
+            if (index == lastIndex)
+            {
+                continue;
+            }
+
+            selected[selectedCount++] = values[index];
+            lastIndex = index;
+        }
+
+        if (selectedCount == selected.Length)
+        {
+            return selected;
+        }
+
+        Array.Resize(ref selected, selectedCount);
+        return selected;
+    }
+
     private static string FileHref(string path)
     {
         return new Uri(Path.GetFullPath(path)).AbsoluteUri;
@@ -6303,6 +6487,31 @@ internal static class RunReportWriter
             }
 
             selected.Add(rows[index]);
+            lastIndex = index;
+        }
+
+        return selected;
+    }
+
+    private static IReadOnlyList<SimulationStatsSnapshot> SelectReportSnapshots(
+        IReadOnlyList<SimulationStatsSnapshot> snapshots)
+    {
+        if (snapshots.Count <= ReportTimelineSampleLimit)
+        {
+            return snapshots;
+        }
+
+        var selected = new List<SimulationStatsSnapshot>(ReportTimelineSampleLimit);
+        var lastIndex = -1;
+        for (var i = 0; i < ReportTimelineSampleLimit; i++)
+        {
+            var index = (int)Math.Round(i * (snapshots.Count - 1) / (double)(ReportTimelineSampleLimit - 1));
+            if (index == lastIndex)
+            {
+                continue;
+            }
+
+            selected.Add(snapshots[index]);
             lastIndex = index;
         }
 

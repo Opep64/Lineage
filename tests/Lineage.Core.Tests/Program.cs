@@ -150,6 +150,7 @@ var tests = new (string Name, Action Body)[]
     ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
     ("Species behavior change highlights notable shifts", SpeciesBehaviorChangeHighlightsNotableShifts),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
+    ("Roster lineage summaries group injected profile descendants", RosterLineageSummariesGroupInjectedProfileDescendants),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
@@ -6365,6 +6366,67 @@ static void ScenarioSpeciesRosterInjectsProfileFounders()
             Directory.Delete(tempRoot, recursive: true);
         }
     }
+}
+
+static void RosterLineageSummariesGroupInjectedProfileDescendants()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 804,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        InitialBrainKind = InitialBrainKind.ExplorerForager
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
+        sourceScenario,
+        source.State,
+        "Source profile");
+
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 500f,
+            WorldHeight = 500f
+        },
+        seed: 805);
+    var foragerInjection = SpeciesProfileInjector.Inject(
+        simulation.State,
+        profile with { Name = "Roster forager" },
+        new SpeciesInjectionOptions(2, EnergyOverride: 40f));
+    var scavengerInjection = SpeciesProfileInjector.Inject(
+        simulation.State,
+        profile with { Name = "Roster scavenger" },
+        new SpeciesInjectionOptions(1, EnergyOverride: 40f));
+
+    simulation.State.SpawnCreature(
+        foragerInjection.GenomeId,
+        new SimVector2(100f, 100f),
+        energy: 20f,
+        generation: 1,
+        parentId: foragerInjection.CreatureIds[0],
+        brainId: foragerInjection.BrainId);
+
+    var summaries = RosterLineageAnalyzer.Analyze(
+            simulation.State.LineageRecords,
+            [foragerInjection, scavengerInjection])
+        .ToDictionary(summary => summary.ProfileName);
+
+    AssertEqual(2, summaries.Count, "Roster summary count");
+
+    var foragerSummary = summaries["Roster forager"];
+    AssertEqual(2, foragerSummary.FounderCount, "Forager founder count");
+    AssertEqual(3, foragerSummary.TotalCreatures, "Forager total count");
+    AssertEqual(1, foragerSummary.DescendantCount, "Forager descendant count");
+    AssertEqual(3, foragerSummary.LivingCreatures, "Forager living count");
+    AssertEqual(1, foragerSummary.MaxGeneration, "Forager max generation");
+
+    var scavengerSummary = summaries["Roster scavenger"];
+    AssertEqual(1, scavengerSummary.FounderCount, "Scavenger founder count");
+    AssertEqual(1, scavengerSummary.TotalCreatures, "Scavenger total count");
+    AssertEqual(0, scavengerSummary.DescendantCount, "Scavenger descendant count");
+    AssertEqual(1, scavengerSummary.LivingCreatures, "Scavenger living count");
+    AssertEqual(0, scavengerSummary.MaxGeneration, "Scavenger max generation");
 }
 
 static void SimulationSnapshotsRestoreExactContinuation()

@@ -2800,6 +2800,7 @@ public partial class Main : Node2D
                 _selectedEggId = default;
             }
 
+            _scenarioSpeciesInjections = _scenarioSpeciesInjections.Concat(new[] { result }).ToArray();
             InvalidateCreatureRenderCache();
             ResetTelemetry();
             _scenarioEditor.SetStatus(
@@ -2828,6 +2829,7 @@ public partial class Main : Node2D
             var snapshotPath = ResolveWorkspacePath(request.SnapshotPath, workspaceRoot);
             var scenario = _scenario;
             var simulation = _simulation;
+            var speciesInjections = _scenarioSpeciesInjections;
             var previousPaused = _paused;
             var stopwatch = Stopwatch.StartNew();
 
@@ -2840,7 +2842,7 @@ public partial class Main : Node2D
             {
                 try
                 {
-                    var result = GodotRunExportWriter.Write(statsPath, reportPath, snapshotPath, scenario, simulation);
+                    var result = GodotRunExportWriter.Write(statsPath, reportPath, snapshotPath, scenario, simulation, speciesInjections);
                     stopwatch.Stop();
                     _mainThreadActions.Enqueue(() => CompleteCurrentRunExport(result, previousPaused, stopwatch.Elapsed));
                 }

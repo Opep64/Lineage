@@ -760,6 +760,38 @@ Interpretation:
 - Scavenger lines can capitalize on the scenario especially well, which may be useful pressure but may also need a separate cap/tuning pass later.
 - Next predation-specific work should focus on making predatory lineages better at converting kills into nutrition and reproduction, not simply increasing global bite damage.
 
+## Roster Lineage Reporting
+
+Added a core `RosterLineageAnalyzer` that groups lineage records by the injected starter species profile that seeded each founder. This removes the manual founder-ID-range inference used in the mixed predator/prey probe above.
+
+Output changes:
+
+- CLI runs now write a `_roster.csv` sidecar by default, or a custom path via `--roster-output`.
+- CLI HTML reports include an `Injected Profile Lineages` table with founder count, total/living/dead descendants, max generation, and death-cause counts per starter profile.
+- Godot current-run exports write the same roster CSV sidecar and include the same table in the viewer report.
+- Live species injections from Godot are tracked for later current-run export, not just scenario startup rosters.
+
+Smoke check:
+
+- `out/roster_lineage_reporting_20260525/seed44_stats_roster.csv`
+- `out/roster_lineage_reporting_20260525/seed44_report.html`
+
+## Large Report Export Performance
+
+A Godot-exported 750k-ish run surfaced very slow HTML report writing. Reproduced against `out/test1a/test1a_snapshot.json`:
+
+| Build | Stats snapshots | Report size | End-to-end load/report time |
+| --- | ---: | ---: | ---: |
+| Before report sampling/cluster feature compression | 78,225 | 106,968,292 bytes | 273.8s |
+| After report sampling only | 78,225 | 1,758,193 bytes | 248.0s |
+| After report sampling plus compact species brain features | 78,225 | 1,733,598 bytes | 8.9s timed, 8.1s final |
+
+Changes:
+
+- HTML reports sample graph and timeline sections to 1,200 stats snapshots. CSV sidecars still retain full-resolution data.
+- Species clustering now compares compact brain feature buckets instead of every neural weight, while preserving sparse high-weight signals with per-bucket max magnitude.
+- Hidden CLI timing hook: set `LINEAGE_REPORT_TIMING=1` to print report analysis section timings.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
