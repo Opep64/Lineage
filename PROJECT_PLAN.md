@@ -176,6 +176,46 @@ Performance/ecology update from 2026-05-22:
 - Current baseline numbers live in `PERFORMANCE_BASELINES.md`; after the plant dormancy pass, Balanced Foraging 20k with full profiling is about 16.756 seconds on the current machine.
 - This changed scenario outcomes intentionally, so future comparisons should use the plant-dormancy baseline rather than the pre-dormancy counts.
 
+Brain rework and sparse-balance branch update from 2026-05-25:
+
+- Active branch: `codex-brain-rework-balance-pass`.
+- Temporary detailed research log: `BRAIN_REWORK_BALANCE_NOTES.md`.
+- Branch goals:
+  - make perception more local and embodied, especially replacing perfect nearest-food style inputs with directional vision sectors
+  - introduce a brain factory so multiple brain architectures can coexist and be compared
+  - lower resource density so worlds feel larger, creatures must search more, and resource queries are less dominant
+  - rebalance starters and scenario energy costs around the sparser ecology
+- Completed core changes:
+  - added sector-based vision inputs for plants, meat, eggs, creatures, approach, and facing information
+  - added health ratio as an internal brain input
+  - added `BrainFactory` and `BrainArchitectureKind`
+  - kept the existing direct-plus-hidden architecture as `HybridNeural`
+  - added `HiddenLayerNeural`, where inputs must pass through a hidden layer before reaching outputs
+  - left scenario defaults on the hybrid architecture unless a scenario explicitly opts into hidden-layer brains
+  - changed the hidden-layer default size from 16 hidden nodes to 8 after 60k/90k comparison probes
+  - retained explicit `brainHiddenNodeCount` support so larger hidden layers remain easy to test
+  - constrained plant relocation to each plant's originating habitat biome so sparse worlds do not slowly move all plants into unrelated biomes
+  - streamed snapshot load/save and capped embedded Godot export stats history for long-run exports; full CSV sidecars remain the source of detailed history
+- Current sparse/habitat validation baseline:
+  - focused 60k and 90k probes across Balanced, Harsh, Omnivore, and Predation completed without extinctions
+  - Hidden8 remained viable in the same focused scenarios and largely removed the Harsh weakness seen with Hidden16
+  - Hidden8 is slower than the hybrid brain in simple foraging, but much closer than Hidden16; predation-heavy scenarios are closer because non-brain costs dominate
+- Merge-readiness validation:
+  - `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 157 tests
+  - `dotnet build Lineage.slnx -c Release -v:minimal` passed
+  - Godot headless launch passed with Godot .NET 4.6.2
+  - broad 20k probe across 11 scenarios and seeds 42-44 completed 33/33 runs with no extinctions and no population cap trips
+  - broad probe outputs: `out/merge_readiness_20260525/broad_20k.csv` and `out/merge_readiness_20260525/broad_20k.html`
+  - broad probe average final populations ranged from `26.7` in Harsh Foraging to `103.7` in Gentle Foraging
+- Current design decision:
+  - keep `HybridNeural` as the default until the new perception/balance work has had more long-run validation
+  - keep `HiddenLayerNeural` available for scenario comparison, with 8 hidden nodes as its default
+  - do not prewire memory; memory should be able to evolve, but not be handed to the starter as a solved behavior
+- Remaining before merging this branch back:
+  - verify Godot can launch, edit scenarios, and export current runs after the refactor
+  - decide whether to keep `BRAIN_REWORK_BALANCE_NOTES.md` as a committed research log or fold its important parts into this plan and remove it
+  - after merge, refresh any baseline numbers that future performance or balance comparisons will use
+
 ## Initial Scope
 
 The first real milestone should prove the core loop:

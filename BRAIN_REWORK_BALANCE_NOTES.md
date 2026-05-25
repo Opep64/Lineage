@@ -4,6 +4,8 @@ Temporary notes for branch `codex-brain-rework-balance-pass`.
 
 Base commit: `51f188d Add selected run Markdown export`.
 
+Current status: branch outcomes are now summarized in `PROJECT_PLAN.md`. Keep this file as the detailed experimental log unless we decide to fold it down before merge.
+
 ## Goals
 
 - Explore whether the current neural brain should be reworked.
@@ -22,7 +24,7 @@ Base commit: `51f188d Add selected run Markdown export`.
 
 ## Pre-Merge TODOs
 
-- Profile and optimize Godot live run export before merging this branch back into main. The current background export avoids freezing the UI thread, but we still need to measure where export time is spent, especially report/species-history analysis, snapshot JSON, and repeated report generation work.
+- Verify Godot live run export after the streaming/sampled snapshot fix on one long run. The previous UI-thread blocking and snapshot out-of-memory issues have been addressed, but large reports can still be slow and should remain a later optimization target.
 
 ## Current Hypotheses
 
@@ -1258,6 +1260,38 @@ Verification:
 - `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 157 tests.
 - `dotnet build Lineage.slnx -c Release -v:minimal` passed.
 - Godot headless smoke test passed.
+
+## 2026-05-25 Merge-Readiness Broad Probe
+
+Ran a broad 20k probe across the authored pressure scenarios to catch obvious branch regressions before merge cleanup.
+
+Output files:
+
+- `out/merge_readiness_20260525/broad_20k.csv`
+- `out/merge_readiness_20260525/broad_20k.html`
+
+Results:
+
+| Scenario | Final avg | Final range | Avg TPS | Status |
+| --- | ---: | --- | ---: | --- |
+| Balanced Foraging | 62.3 | 59-67 | 6917 | Completed |
+| Carrion Pressure | 61.3 | 60-63 | 4416 | Completed |
+| Gentle Foraging | 103.7 | 86-115 | 6312 | Completed |
+| Harsh Foraging | 26.7 | 25-28 | 9596 | Completed |
+| Migration Pressure | 48.3 | 43-53 | 3328 | Completed |
+| Obstacle Pressure | 83.7 | 76-98 | 6875 | Completed |
+| Omnivore Pressure | 32.0 | 24-41 | 9354 | Completed |
+| Predation Pressure | 27.3 | 19-37 | 6055 | Completed |
+| Predator Prey Pressure | 61.3 | 45-71 | 5181 | Completed |
+| Scavenger Pressure | 77.0 | 69-82 | 4928 | Completed |
+| Terrain Pressure | 35.0 | 26-42 | 8094 | Completed |
+
+Interpretation:
+
+- All 33 runs completed at 20k ticks.
+- No broad-probe scenario went extinct.
+- No run hit the 5000 population cap.
+- This is a smoke/regression probe, not a replacement for the focused 60k/90k baselines above.
 
 ## Open Questions
 
