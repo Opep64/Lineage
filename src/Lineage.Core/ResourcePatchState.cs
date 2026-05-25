@@ -16,6 +16,11 @@ public struct ResourcePatchState
 
     public SimVector2 Position { get; set; }
 
+    /// <summary>
+    /// Plant habitat captured at creation. Relocation keeps plants within this biome.
+    /// </summary>
+    public BiomeKind? HabitatBiomeKind { get; set; }
+
     public float Radius { get; set; }
 
     public float Calories { get; set; }

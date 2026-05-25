@@ -956,6 +956,174 @@ Interpretation:
 - Obstacle has the largest stable population but low food-seen share, which is a useful candidate when we later inspect search behavior and obstacle navigation.
 - Migration survived but still has no meaningful evidence of directional migration; that remains a mechanics/behavior challenge, not just a viability issue.
 
+## 2026-05-25 Sparse Starter Reproduction Tuning
+
+Tuned the foraging-family scenario presets toward sturdier young and less reproductive churn, without increasing plant density.
+
+Implementation notes:
+
+- `gentle-foraging`, `balanced-foraging`, and `harsh-foraging` now invest more energy per offspring, require more energy before reproducing, produce egg reserve more slowly, mature later, and wait longer between reproduction attempts.
+- `balanced-foraging` also has slightly lower basal and movement costs because it was the thinnest "normal" scenario after clean senses.
+- `omnivore-pressure` gets a smaller version of the reproduction shift plus a slightly softer global season amplitude. This gives the omnivore starter a little more room without changing its resource density.
+- I tested `explorerForager` as a sparse-food replacement starter; it was worse in the target scenarios, so the checked-in starter brains remain unchanged.
+- I tested larger starter speed/sense/energy reserves; that was not a clear win and would add sensing cost, so it was not checked in.
+
+Validation files:
+
+- `out/sparse_starter_tuning_20260525/foraging_variants_20k.csv`
+- `out/sparse_starter_tuning_20260525/foraging_survival_30k.csv`
+- `out/sparse_starter_tuning_20260525/offspring_strategy_30k.csv`
+- `out/sparse_starter_tuning_20260525/main_after_repro_tuning_30k.csv`
+- `out/sparse_starter_tuning_20260525/main_after_repro_tuning_30k.html`
+- `out/sparse_starter_tuning_20260525/harsh_sturdy_check_30k.csv`
+
+30k comparison against the clean-senses baseline:
+
+| Scenario | Final before | Final after | Tail before | Tail after | Deaths before | Deaths after | Births before | Births after | TPS before | TPS after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gentle Foraging | 26.0 | 55.0 | 37.7 | 69.7 | 400.3 | 227.7 | 426.3 | 282.7 | 4438 | 5744 |
+| Balanced Foraging | 19.3 | 33.3 | 28.5 | 41.6 | 249.3 | 186.3 | 268.7 | 219.7 | 7414 | 8492 |
+| Harsh Foraging | 19.0 | 20.3 | 22.5 | 20.3 | 174.0 | 141.3 | 193.0 | 161.7 | 10388 | 10456 |
+| Omnivore Pressure | 18.7 | 21.7 | 20.4 | 23.5 | 190.3 | 172.0 | 209.0 | 193.7 | 9561 | 10859 |
+| Scavenger Pressure | 32.7 | 32.7 | 35.4 | 35.4 | 277.3 | 277.3 | 310.0 | 310.0 | 5974 | 6265 |
+| Carrion Pressure | 45.3 | 45.3 | 43.3 | 43.3 | 308.3 | 308.3 | 353.7 | 353.7 | 5223 | 5503 |
+| Predation Pressure | 21.7 | 21.7 | 24.7 | 24.7 | 306.3 | 306.3 | 328.0 | 328.0 | 6564 | 7216 |
+| Predator Prey Pressure | 35.3 | 35.3 | 36.3 | 36.3 | 298.7 | 298.7 | 334.0 | 334.0 | 6220 | 6308 |
+| Migration Pressure | 42.3 | 42.3 | 44.9 | 44.9 | 323.3 | 323.3 | 365.7 | 365.7 | 3845 | 3931 |
+| Obstacle Pressure | 65.7 | 65.7 | 77.8 | 77.8 | 284.3 | 284.3 | 350.0 | 350.0 | 6648 | 6708 |
+| Terrain Pressure | 32.7 | 32.7 | 28.2 | 28.2 | 190.7 | 190.7 | 223.3 | 223.3 | 9851 | 9657 |
+
+Interpretation:
+
+- The patch improves the scenarios it touches without increasing plant count.
+- Gentle and Balanced now sustain more living creatures while producing fewer births and deaths, which is the direction we wanted for longer-lived sparse-world runs.
+- Harsh remains harsh but loses some birth/death churn.
+- Omnivore is only modestly improved; it probably needs role-specific pressure or starter tuning rather than generic reproduction changes.
+- Unchanged scenarios have identical ecological outcomes in the deterministic probe, which suggests the patch did not have hidden cross-scenario effects.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 154 tests.
+- `dotnet build Lineage.slnx -c Release -v:minimal` passed.
+
+## 2026-05-25 Long Stability Probe
+
+Ran 60k and 90k probes across the main authored scenarios using the current sparse reproduction tuning.
+
+Output files:
+
+- `out/long_stability_20260525/main_after_repro_tuning_60k.csv`
+- `out/long_stability_20260525/main_after_repro_tuning_60k.html`
+- `out/long_stability_20260525/main_after_repro_tuning_90k.csv`
+- `out/long_stability_20260525/main_after_repro_tuning_90k.html`
+- `out/long_stability_20260525/predation_seed42_90k_snapshot.json`
+- `out/long_stability_20260525/harsh_seed43_90k_snapshot.json`
+
+Summary:
+
+| Scenario | 30k final | 60k final | 90k final | 90k range | 90k tail | 90k starvation | 90k injury | 90k global reloc | 90k tail depleted fertility |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 33.3 | 38.3 | 34.3 | 29-37 | 37.1 | 390.3 | 0.0 | 508.3 | 95.9% |
+| Carrion Pressure | 45.3 | 39.3 | 39.7 | 38-43 | 50.2 | 679.7 | 0.0 | 633.0 | 99.8% |
+| Gentle Foraging | 55.0 | 67.7 | 48.7 | 32-60 | 59.6 | 587.0 | 0.0 | 680.7 | 94.3% |
+| Harsh Foraging | 17.3 | 20.0 | 20.0 | 11-25 | 21.9 | 271.0 | 0.0 | 508.7 | 95.4% |
+| Migration Pressure | 42.3 | 123.3 | 47.0 | 39-62 | 50.3 | 898.3 | 0.0 | 1168.3 | 96.7% |
+| Obstacle Pressure | 65.7 | 92.3 | 84.7 | 69-112 | 95.9 | 826.3 | 0.0 | 266.0 | 60.6% |
+| Omnivore Pressure | 21.7 | 21.7 | 23.3 | 20-25 | 29.1 | 313.0 | 0.0 | 403.3 | 95.3% |
+| Predation Pressure | 21.7 | 17.7 | 17.7 | 4-28 | 20.8 | 263.3 | 288.3 | 448.7 | 94.8% |
+| Predator Prey Pressure | 35.3 | 45.0 | 42.0 | 29-50 | 52.6 | 626.3 | 21.7 | 653.7 | 99.4% |
+| Scavenger Pressure | 32.7 | 43.7 | 47.0 | 33-59 | 53.9 | 651.0 | 0.0 | 712.0 | 99.1% |
+| Terrain Pressure | 32.7 | 78.7 | 60.7 | 52-76 | 69.3 | 653.0 | 0.0 | 326.3 | 77.4% |
+
+Interpretation:
+
+- No 60k or 90k probe run went extinct with seeds 42-44.
+- The long-run risk is still visible. Predation seed 42 ended at 4 creatures, and Harsh seed 43 ended at 11.
+- The user's plant-drift hypothesis is partly supported, but the stronger signal is broader local fertility exhaustion. In most 90k runs, the tail depleted local fertility cell share is above 94%.
+- Global plant relocations are frequent in long runs. Plants can still end up in barren cells because barren biome resource density is low but nonzero.
+- Snapshot inspection did not show most plants trapped in barren cells:
+  - Predation seed 42 at 90k: 37 barren plants, 62 sparse plants, 202 grassland plants, 83 rich plants; 34 of 64 local fertility cells below 0.5.
+  - Harsh seed 43 at 90k: 21 barren plants, 49 sparse plants, 156 grassland plants, 94 rich plants; 50 of 64 local fertility cells below 0.5.
+- Eggs are not the dominant collapse signal in these two snapshots. Predation seed 42 had no final eggs; Harsh seed 43 had two final eggs in non-barren cells. Earlier egg deaths occurred, but late-run population thinning was mostly starvation plus predation injury where combat exists.
+
+Likely next tuning/mechanics step:
+
+- Add a plant relocation option that rejects barren cells and/or weights global relocation by current local fertility, not just static biome density.
+- Consider increasing local fertility recovery or reducing neighbor depletion in sparse scenarios. The current long-run ecology appears to burn down the usable fertility field faster than it recovers.
+- Keep local dispersal high enough that food patches remain spatially meaningful, but avoid letting global relocation slowly populate unhelpful low-fertility regions.
+
+## 2026-05-25 Habitat-Constrained Plant Relocation
+
+Implemented plant habitat memory so a plant can relocate for fertility pressure without changing its biome identity.
+
+Behavior:
+
+- Plant resources now store `HabitatBiomeKind`, inferred from the biome where they originally spawn or from older snapshots if the field is missing.
+- Depleted plants can still use local dispersal, cluster relocation, or global relocation, but candidate positions must be in the plant's habitat biome.
+- If no compatible habitat/fertility placement is available, the plant remains dormant and retries later instead of jumping into another biome.
+- Meat resources do not carry habitat.
+- This is meant to preserve the future distinction between plant types and biome homes, for example mushrooms staying forest-native instead of drifting into grassland.
+
+Targeted 60k validation:
+
+- Output CSV: `out/habitat_relocation_20260525/targeted_60k.csv`
+- Output HTML: `out/habitat_relocation_20260525/targeted_60k.html`
+- Scenarios: Balanced, Harsh, Omnivore, Predation
+- Seeds: `42,43,44`
+- Result: all 12 runs completed; no extinctions.
+
+Comparison against `out/long_stability_20260525/main_after_repro_tuning_60k.csv`:
+
+| Scenario | Final before | Final after | Deaths before | Deaths after | Global reloc before | Global reloc after | Dormancy before | Dormancy after | TPS before | TPS after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 38.3 | 31.7 | 275.7 | 246.7 | 358.3 | 524.7 | 688.3 | 585.0 | 8958 | 9495 |
+| Harsh Foraging | 20.0 | 20.7 | 207.7 | 208.3 | 370.0 | 679.3 | 785.0 | 808.7 | 11731 | 10934 |
+| Omnivore Pressure | 21.7 | 24.0 | 234.3 | 246.7 | 277.0 | 565.0 | 705.3 | 720.7 | 12447 | 10697 |
+| Predation Pressure | 17.7 | 25.3 | 442.0 | 436.3 | 336.7 | 694.7 | 896.7 | 949.7 | 8626 | 7324 |
+
+Interpretation:
+
+- The habitat rule did not destabilize the focused scenarios in this 60k pass.
+- Higher global relocation counts are expected because successful global relocation now still counts when the plant samples another position within its own habitat biome.
+- This changes ecological outcomes enough that later baseline comparisons should use the habitat-relocation outputs as the new reference.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 156 tests.
+- `dotnet build Lineage.slnx -c Release -v:minimal` passed.
+- Godot headless smoke test passed with `Godot_v4.6.2-stable_mono_win64_console.exe --headless --path src\Lineage.Godot --quit-after 1`.
+
+## 2026-05-25 Long Godot Export Snapshot OOM
+
+Observed failure:
+
+- A 2.5M tick Godot export to `out/test3` wrote most sidecars and the HTML report, then failed with "Insufficient memory to continue the execution of the program."
+- Partial artifacts showed the report was not the failing stage:
+  - `test3_stats.csv`: 288 MB, 252,753 lines
+  - `test3_stats_lineage_trends.csv`: 29 MB, 475,323 lines
+  - `test3_stats_species_trends.csv`: 16 MB, 252,754 lines
+  - `test3_report.html`: 1.4 MB
+- No `test3_snapshot.json` was produced.
+
+Cause:
+
+- Godot export wrote CSV/report artifacts first, then called `SimulationSnapshotJson.Save`.
+- Snapshot saving previously serialized the complete snapshot to one giant string before writing it to disk.
+- The snapshot also carried the full stats history, duplicating the large CSV history inside JSON.
+
+Fix:
+
+- `SimulationSnapshotJson.Save` now streams JSON directly to the file instead of materializing one giant JSON string.
+- `SimulationSnapshotJson.Load` now streams from file as well.
+- `SimulationSnapshot.Capture` gained an optional `maxStatsSnapshots` argument. Default behavior is unchanged and still captures exact full history.
+- Godot "Export Current" now writes a reloadable snapshot with a sampled stats history capped at 4096 snapshots. The full stats history remains in the CSV sidecars.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 157 tests.
+- `dotnet build Lineage.slnx -c Release -v:minimal` passed.
+- Godot headless smoke test passed.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

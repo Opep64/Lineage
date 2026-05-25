@@ -116,6 +116,17 @@ public sealed class WorldState
             : BrainArchitectureKind.HybridNeural;
     }
 
+    public void SetBiomes(BiomeMap biomes)
+    {
+        if (biomes.Bounds.Width != Bounds.Width || biomes.Bounds.Height != Bounds.Height)
+        {
+            throw new ArgumentException("Biome map bounds must match the world bounds.", nameof(biomes));
+        }
+
+        Biomes = biomes;
+        MarkResourcesDirty();
+    }
+
     public void SetObstacles(ObstacleMap obstacles)
     {
         if (obstacles.Bounds.Width != Bounds.Width || obstacles.Bounds.Height != Bounds.Height)
@@ -371,6 +382,15 @@ public sealed class WorldState
         patch.Id = id;
         patch.Position = Bounds.Clamp(patch.Position);
         patch.Calories = Math.Min(patch.Calories, patch.MaxCalories);
+        if (patch.Kind == ResourceKind.Plant)
+        {
+            patch.HabitatBiomeKind ??= Biomes.GetKindAt(patch.Position);
+        }
+        else
+        {
+            patch.HabitatBiomeKind = null;
+        }
+
         if (patch.Kind == ResourceKind.Plant
             && patch.RespawnSecondsRemaining > 0f
             && patch.RespawnSecondsTotal <= 0f)

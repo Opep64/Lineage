@@ -5,6 +5,8 @@ namespace Lineage.Core;
 /// </summary>
 public sealed class ResourceRegrowthSystem : ISimulationSystem
 {
+    private const float DormantPlacementRetrySeconds = 1f;
+
     private readonly bool _relocateDepletedResources;
     private readonly float _resourceClusterStrength;
     private readonly float _resourceClusterRadius;
@@ -157,6 +159,14 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
 
             if (resource.RespawnSecondsTotal > 0f)
             {
+                if (!TryPrepareDormantPlantRespawn(state, ref resource))
+                {
+                    resource.Calories = 0f;
+                    resource.RespawnSecondsRemaining = DormantPlacementRetrySeconds;
+                    resourcesDirty = true;
+                    return resourcesDirty;
+                }
+
                 state.Stats.RecordPlantDormancyCompleted(resource.RespawnSecondsTotal);
             }
 
@@ -173,7 +183,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             resource.Calories = 0f;
             if (_relocateDepletedResources)
             {
-                RelocateDepletedPlant(state, ref resource);
+                TryRelocatePlant(state, ref resource);
             }
 
             resource.RespawnSecondsRemaining = SamplePlantRespawnDelay(state);
@@ -193,7 +203,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         {
             state.Stats.RecordPlantDepletion();
             state.LocalFertility.ApplyPlantDepletion(resource.Position);
-            RelocateDepletedPlant(state, ref resource);
+            _ = TryRelocatePlant(state, ref resource);
             resourcesDirty = true;
         }
 
@@ -209,18 +219,44 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         return resourcesDirty;
     }
 
-    private void RelocateDepletedPlant(WorldState state, ref ResourcePatchState resource)
+    private bool TryPrepareDormantPlantRespawn(WorldState state, ref ResourcePatchState resource)
+    {
+        var habitatBiome = ResolvePlantHabitatBiome(state, resource);
+        resource.HabitatBiomeKind = habitatBiome;
+        return ResourcePlacement.CanPlacePlantAt(state, resource.Position, habitatBiome)
+            || TryRelocatePlant(state, ref resource, habitatBiome);
+    }
+
+    private bool TryRelocatePlant(
+        WorldState state,
+        ref ResourcePatchState resource,
+        BiomeKind? resolvedHabitatBiome = null)
     {
         var depletedPosition = resource.Position;
-        resource.Position = ResourcePlacement.SamplePlantPosition(
+        var habitatBiome = resolvedHabitatBiome ?? ResolvePlantHabitatBiome(state, resource);
+        resource.HabitatBiomeKind = habitatBiome;
+        if (!ResourcePlacement.TrySamplePlantPosition(
             state,
             _resourceClusterStrength,
             _resourceClusterRadius,
+            out var position,
             out var placementMode,
             depletedPosition,
             _plantLocalDispersalChance,
-            _plantLocalDispersalRadius);
+            _plantLocalDispersalRadius,
+            habitatBiome))
+        {
+            return false;
+        }
+
+        resource.Position = position;
         state.Stats.RecordPlantRelocation(placementMode);
+        return true;
+    }
+
+    private static BiomeKind ResolvePlantHabitatBiome(WorldState state, ResourcePatchState resource)
+    {
+        return resource.HabitatBiomeKind ?? state.Biomes.GetKindAt(resource.Position);
     }
 
     private float CalculatePlantFertilityMultiplier(WorldState state, SimVector2 position)

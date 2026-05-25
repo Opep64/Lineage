@@ -94,7 +94,10 @@ public sealed record SimulationSnapshot
 
     public LocalFertilitySnapshot LocalFertility { get; init; } = new();
 
-    public static SimulationSnapshot Capture(SimulationScenario scenario, Simulation simulation)
+    public static SimulationSnapshot Capture(
+        SimulationScenario scenario,
+        Simulation simulation,
+        int? maxStatsSnapshots = null)
     {
         var state = simulation.State;
         return new SimulationSnapshot
@@ -113,7 +116,7 @@ public sealed record SimulationSnapshot
                 .Select((_, brainId) => state.GetBrainArchitectureKind(brainId))
                 .ToArray(),
             LineageRecords = state.LineageRecords.ToArray(),
-            StatsSnapshots = state.Stats.Snapshots.ToArray(),
+            StatsSnapshots = SelectStatsSnapshots(state.Stats.Snapshots, maxStatsSnapshots),
             CreatureBirthCount = state.Stats.CreatureBirthCount,
             FounderCreatureCount = state.Stats.FounderCreatureCount,
             CreatureDeathCount = state.Stats.CreatureDeathCount,
@@ -142,6 +145,35 @@ public sealed record SimulationSnapshot
             Obstacles = ObstacleSnapshot.Capture(state.Obstacles),
             LocalFertility = LocalFertilitySnapshot.Capture(state.LocalFertility)
         };
+    }
+
+    private static SimulationStatsSnapshot[] SelectStatsSnapshots(
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        int? maxStatsSnapshots)
+    {
+        if (maxStatsSnapshots is null || snapshots.Count <= maxStatsSnapshots.Value)
+        {
+            return snapshots.ToArray();
+        }
+
+        if (maxStatsSnapshots.Value <= 0 || snapshots.Count == 0)
+        {
+            return [];
+        }
+
+        if (maxStatsSnapshots.Value == 1)
+        {
+            return [snapshots[^1]];
+        }
+
+        var selected = new SimulationStatsSnapshot[maxStatsSnapshots.Value];
+        for (var i = 0; i < selected.Length; i++)
+        {
+            var index = (int)Math.Round(i * (snapshots.Count - 1) / (double)(selected.Length - 1));
+            selected[i] = snapshots[index];
+        }
+
+        return selected;
     }
 }
 

@@ -299,6 +299,65 @@ public sealed class BiomeMap
             random.NextSingle(bounds.Y, bounds.Y + bounds.Height));
     }
 
+    public bool TrySampleResourcePosition(
+        DeterministicRandom random,
+        BiomeKind requiredKind,
+        out SimVector2 position)
+    {
+        var totalWeight = 0f;
+        for (var y = 0; y < CellCountY; y++)
+        {
+            for (var x = 0; x < CellCountX; x++)
+            {
+                if (GetKind(x, y) != requiredKind)
+                {
+                    continue;
+                }
+
+                var bounds = GetResourceSpawnBounds(GetCellBounds(x, y));
+                totalWeight += bounds.Area * GetResourceDensityMultiplier(requiredKind);
+            }
+        }
+
+        if (totalWeight <= 0f)
+        {
+            position = default;
+            return false;
+        }
+
+        var roll = random.NextSingle(0f, totalWeight);
+        var cumulative = 0f;
+        for (var y = 0; y < CellCountY; y++)
+        {
+            for (var x = 0; x < CellCountX; x++)
+            {
+                if (GetKind(x, y) != requiredKind)
+                {
+                    continue;
+                }
+
+                var bounds = GetResourceSpawnBounds(GetCellBounds(x, y));
+                var weight = bounds.Area * GetResourceDensityMultiplier(requiredKind);
+                if (weight <= 0f)
+                {
+                    continue;
+                }
+
+                cumulative += weight;
+                if (roll <= cumulative)
+                {
+                    position = new SimVector2(
+                        random.NextSingle(bounds.X, bounds.X + bounds.Width),
+                        random.NextSingle(bounds.Y, bounds.Y + bounds.Height));
+                    return true;
+                }
+            }
+        }
+
+        position = default;
+        return false;
+    }
+
     public float GetResourceDensityMultiplierAt(SimVector2 position)
     {
         if (IsInResourceVoid(position))

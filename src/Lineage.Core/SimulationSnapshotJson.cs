@@ -30,12 +30,16 @@ public static class SimulationSnapshotJson
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(path, ToJson(snapshot));
+        using var stream = File.Create(path);
+        JsonSerializer.Serialize(stream, Validate(snapshot), JsonOptions);
     }
 
     public static SimulationSnapshot Load(string path)
     {
-        return FromJson(File.ReadAllText(path));
+        using var stream = File.OpenRead(path);
+        var snapshot = JsonSerializer.Deserialize<SimulationSnapshot>(stream, JsonOptions)
+            ?? throw new InvalidOperationException("Snapshot JSON did not contain a snapshot object.");
+        return Validate(snapshot);
     }
 
     public static RestoredSimulation LoadSimulation(string path)
@@ -90,7 +94,7 @@ public static class SimulationSnapshotJson
 
         state.Creatures.AddRange(snapshot.Creatures.Select(NormalizeCreature));
         state.Eggs.AddRange(snapshot.Eggs.Select(NormalizeEgg));
-        state.Resources.AddRange(snapshot.Resources.Select(NormalizeResource));
+        state.Resources.AddRange(snapshot.Resources.Select(resource => NormalizeResource(resource, state.Biomes)));
         state.MarkEggsDirty();
         state.MarkResourcesDirty();
         state.RestoreLineageRecords(snapshot.LineageRecords);
@@ -273,11 +277,12 @@ public static class SimulationSnapshotJson
         return egg;
     }
 
-    private static ResourcePatchState NormalizeResource(ResourcePatchState resource)
+    private static ResourcePatchState NormalizeResource(ResourcePatchState resource, BiomeMap? biomes = null)
     {
         if (resource.Kind != ResourceKind.Meat)
         {
             resource.MeatAgeSeconds = 0f;
+            resource.HabitatBiomeKind ??= biomes?.GetKindAt(resource.Position);
             if (!float.IsFinite(resource.RespawnSecondsRemaining) || resource.RespawnSecondsRemaining < 0f)
             {
                 resource.RespawnSecondsRemaining = 0f;
@@ -304,6 +309,7 @@ public static class SimulationSnapshotJson
 
         resource.RespawnSecondsRemaining = 0f;
         resource.RespawnSecondsTotal = 0f;
+        resource.HabitatBiomeKind = null;
         if (!float.IsFinite(resource.MeatAgeSeconds) || resource.MeatAgeSeconds < 0f)
         {
             resource.MeatAgeSeconds = 0f;

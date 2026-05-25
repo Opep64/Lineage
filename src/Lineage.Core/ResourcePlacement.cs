@@ -43,6 +43,34 @@ public static class ResourcePlacement
         float localDispersalChance = 0f,
         float localDispersalRadius = 0f)
     {
+        if (TrySamplePlantPosition(
+            state,
+            clusterStrength,
+            clusterRadius,
+            out var position,
+            out placementMode,
+            localDispersalOrigin,
+            localDispersalChance,
+            localDispersalRadius))
+        {
+            return position;
+        }
+
+        placementMode = PlantPlacementMode.Global;
+        return state.Biomes.SampleResourcePosition(state.Random);
+    }
+
+    public static bool TrySamplePlantPosition(
+        WorldState state,
+        float clusterStrength,
+        float clusterRadius,
+        out SimVector2 position,
+        out PlantPlacementMode placementMode,
+        SimVector2? localDispersalOrigin = null,
+        float localDispersalChance = 0f,
+        float localDispersalRadius = 0f,
+        BiomeKind? habitatBiomeKind = null)
+    {
         if (localDispersalOrigin is { } origin
             && localDispersalChance > 0f
             && localDispersalRadius > 0f
@@ -54,10 +82,11 @@ public static class ResourcePlacement
                 var radius = localDispersalRadius * MathF.Sqrt(state.Random.NextSingle());
                 var candidate = state.Bounds.Clamp(origin + SimVector2.FromAngle(angle) * radius);
 
-                if (CanPlacePlant(state, candidate))
+                if (CanPlacePlantAt(state, candidate, habitatBiomeKind))
                 {
                     placementMode = PlantPlacementMode.LocalDispersal;
-                    return candidate;
+                    position = candidate;
+                    return true;
                 }
             }
         }
@@ -78,16 +107,17 @@ public static class ResourcePlacement
                 var radius = clusterRadius * MathF.Sqrt(state.Random.NextSingle());
                 var candidate = state.Bounds.Clamp(anchor.Position + SimVector2.FromAngle(angle) * radius);
 
-                if (CanPlacePlant(state, candidate))
+                if (CanPlacePlantAt(state, candidate, habitatBiomeKind))
                 {
                     placementMode = PlantPlacementMode.Cluster;
-                    return candidate;
+                    position = candidate;
+                    return true;
                 }
             }
         }
 
         placementMode = PlantPlacementMode.Global;
-        return SampleOpenBiomeResourcePosition(state);
+        return TrySampleOpenBiomeResourcePosition(state, habitatBiomeKind, out position);
     }
 
     private static bool TryGetRandomLivePlantAnchor(WorldState state, out ResourcePatchState anchor)
@@ -108,7 +138,10 @@ public static class ResourcePlacement
         return false;
     }
 
-    private static bool CanPlacePlant(WorldState state, SimVector2 position)
+    internal static bool CanPlacePlantAt(
+        WorldState state,
+        SimVector2 position,
+        BiomeKind? habitatBiomeKind = null)
     {
         if (state.Biomes.IsInResourceVoid(position)
             || state.Biomes.GetResourceDensityMultiplierAt(position) <= 0f
@@ -117,21 +150,44 @@ public static class ResourcePlacement
             return false;
         }
 
+        if (habitatBiomeKind is { } habitat
+            && state.Biomes.GetKindAt(position) != habitat)
+        {
+            return false;
+        }
+
         var localFertility = state.LocalFertility.GetMultiplierAt(position);
         return localFertility >= 0.999f || state.Random.NextSingle() <= localFertility;
     }
 
-    private static SimVector2 SampleOpenBiomeResourcePosition(WorldState state)
+    private static bool TrySampleOpenBiomeResourcePosition(
+        WorldState state,
+        BiomeKind? habitatBiomeKind,
+        out SimVector2 position)
     {
         for (var attempt = 0; attempt < 64; attempt++)
         {
-            var candidate = state.Biomes.SampleResourcePosition(state.Random);
-            if (CanPlacePlant(state, candidate))
+            SimVector2 sampled;
+            if (habitatBiomeKind is { } habitat)
             {
-                return candidate;
+                if (!state.Biomes.TrySampleResourcePosition(state.Random, habitat, out sampled))
+                {
+                    break;
+                }
+            }
+            else
+            {
+                sampled = state.Biomes.SampleResourcePosition(state.Random);
+            }
+
+            if (CanPlacePlantAt(state, sampled, habitatBiomeKind))
+            {
+                position = sampled;
+                return true;
             }
         }
 
-        return state.Biomes.SampleResourcePosition(state.Random);
+        position = default;
+        return false;
     }
 }

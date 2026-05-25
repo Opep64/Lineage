@@ -25,6 +25,8 @@ var tests = new (string Name, Action Body)[]
     ("Local fertility slows plant dormancy", LocalFertilitySlowsPlantDormancy),
     ("Depleted resources can relocate before regrowing", DepletedResourcesCanRelocateBeforeRegrowing),
     ("Depleted plants can disperse locally", DepletedPlantsCanDisperseLocally),
+    ("Depleted plants keep habitat biome when relocating", DepletedPlantsKeepHabitatBiomeWhenRelocating),
+    ("Dormant plants hold when habitat placement unavailable", DormantPlantsHoldWhenHabitatPlacementUnavailable),
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
     ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
@@ -153,6 +155,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
     ("Roster lineage summaries group injected profile descendants", RosterLineageSummariesGroupInjectedProfileDescendants),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
+    ("Simulation snapshot capture can sample stats history", SimulationSnapshotCaptureCanSampleStatsHistory),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
     ("Scenario JSON round trips", ScenarioJsonRoundTrips)
@@ -922,6 +925,109 @@ static void DepletedPlantsCanDisperseLocally()
     AssertEqual(1, simulation.State.Stats.PlantLocalDispersalCount, "Local dispersal relocation count");
     AssertEqual(0, simulation.State.Stats.PlantClusterRelocationCount, "Local dispersal cluster fallback count");
     AssertEqual(0, simulation.State.Stats.PlantGlobalRelocationCount, "Local dispersal global fallback count");
+}
+
+static void DepletedPlantsKeepHabitatBiomeWhenRelocating()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 200f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 211,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                relocateDepletedResources: true,
+                resourceClusterStrength: 0f,
+                plantLocalDispersalChance: 0f)
+        ]);
+    simulation.State.SetBiomes(BiomeMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 100f,
+        cellCountX: 2,
+        cellCountY: 1,
+        [BiomeKind.Grassland, BiomeKind.Rich]));
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(150f, 50f),
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 5f
+    });
+
+    simulation.Step();
+
+    var resource = simulation.State.Resources[0];
+    AssertEqual(BiomeKind.Rich, resource.HabitatBiomeKind, "Plant habitat biome should be captured at spawn");
+    AssertEqual(BiomeKind.Rich, simulation.State.Biomes.GetKindAt(resource.Position), "Relocated plant should remain in its habitat biome");
+    AssertClose(5f, resource.Calories, 0.000001, "Habitat-constrained relocation calories after regrowth");
+}
+
+static void DormantPlantsHoldWhenHabitatPlacementUnavailable()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 200f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 212,
+        systems:
+        [
+            new ResourceRegrowthSystem(
+                relocateDepletedResources: true,
+                resourceClusterStrength: 0f,
+                plantLocalDispersalChance: 0f,
+                plantRespawnDelaySecondsMin: 2f,
+                plantRespawnDelaySecondsMax: 2f,
+                plantRespawnCaloriesMin: 4f,
+                plantRespawnCaloriesMax: 4f)
+        ]);
+    simulation.State.SetBiomes(BiomeMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 100f,
+        cellCountX: 2,
+        cellCountY: 1,
+        [BiomeKind.Rich, BiomeKind.Grassland]));
+    simulation.State.SetObstacles(ObstacleMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 100f,
+        cellCountX: 2,
+        cellCountY: 1,
+        [true, false]));
+
+    var initialPosition = new SimVector2(50f, 50f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = initialPosition,
+        Radius = 2f,
+        Calories = 0f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 5f
+    });
+
+    simulation.Step();
+    AssertClose(0f, simulation.State.Resources[0].Calories, 0.000001, "Unavailable habitat plant should enter dormancy");
+    AssertClose(2f, simulation.State.Resources[0].RespawnSecondsRemaining, 0.000001, "Unavailable habitat dormant timer");
+    AssertEqual(0, simulation.State.Stats.PlantGlobalRelocationCount, "Unavailable habitat should not count as global relocation");
+
+    simulation.Step();
+    simulation.Step();
+
+    var resource = simulation.State.Resources[0];
+    AssertTrue(resource.Position == initialPosition, "Unavailable habitat plant should hold its last compatible position");
+    AssertClose(0f, resource.Calories, 0.000001, "Unavailable habitat plant should remain dormant");
+    AssertClose(1f, resource.RespawnSecondsRemaining, 0.000001, "Unavailable habitat plant should retry later");
+    AssertClose(2f, resource.RespawnSecondsTotal, 0.000001, "Unavailable habitat plant should keep original dormancy duration");
+    AssertEqual(0, simulation.State.Stats.PlantDormancyCompletedCount, "Unavailable habitat should not complete dormancy");
 }
 
 static void DepletedPlantsEnterDormancyBeforeRespawning()
@@ -6603,6 +6709,41 @@ static void SimulationSnapshotsRestoreExactContinuation()
         AssertEqual(expected.FreshKillPreyId, actual.FreshKillPreyId, $"Resource {i} fresh-kill prey");
         AssertClose(expected.FreshKillSecondsRemaining, actual.FreshKillSecondsRemaining, 0.000001, $"Resource {i} fresh-kill timer");
     }
+}
+
+static void SimulationSnapshotCaptureCanSampleStatsHistory()
+{
+    var scenario = new SimulationScenario
+    {
+        StatsSnapshotIntervalTicks = 1
+    };
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 34,
+        systems: [new StatsRecordingSystem()]);
+
+    simulation.RunSteps(10);
+
+    var full = SimulationSnapshot.Capture(scenario, simulation);
+    AssertEqual(10, full.StatsSnapshots.Length, "Full snapshot history count");
+    AssertEqual(0L, full.StatsSnapshots[0].Tick, "Full snapshot first tick");
+    AssertEqual(9L, full.StatsSnapshots[^1].Tick, "Full snapshot final tick");
+
+    var sampled = SimulationSnapshot.Capture(scenario, simulation, maxStatsSnapshots: 4);
+    AssertEqual(4, sampled.StatsSnapshots.Length, "Sampled snapshot history count");
+    AssertEqual(0L, sampled.StatsSnapshots[0].Tick, "Sampled snapshot first tick");
+    AssertEqual(9L, sampled.StatsSnapshots[^1].Tick, "Sampled snapshot final tick");
+    AssertTrue(
+        sampled.StatsSnapshots[1].Tick > sampled.StatsSnapshots[0].Tick
+        && sampled.StatsSnapshots[2].Tick > sampled.StatsSnapshots[1].Tick,
+        "Sampled snapshots should preserve chronological order");
+
+    var finalOnly = SimulationSnapshot.Capture(scenario, simulation, maxStatsSnapshots: 1);
+    AssertEqual(1, finalOnly.StatsSnapshots.Length, "Final-only snapshot history count");
+    AssertEqual(9L, finalOnly.StatsSnapshots[0].Tick, "Final-only snapshot tick");
+
+    var none = SimulationSnapshot.Capture(scenario, simulation, maxStatsSnapshots: 0);
+    AssertEqual(0, none.StatsSnapshots.Length, "Empty snapshot history count");
 }
 
 static void ScenarioPressureKnobsSeedStartingGenome()

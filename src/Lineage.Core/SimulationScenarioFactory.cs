@@ -157,6 +157,7 @@ public static class SimulationScenarioFactory
             state.SpawnResourcePatch(new ResourcePatchState
             {
                 Position = position,
+                HabitatBiomeKind = state.Biomes.GetKindAt(position),
                 Radius = RandomRange(state, scenario.ResourceRadiusMin, scenario.ResourceRadiusMax),
                 Calories = RandomRange(state, scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax),
                 MaxCalories = scenario.ResourceMaxCalories,

@@ -13,6 +13,8 @@ namespace Lineage.Viewer;
 /// </remarks>
 public static class GodotRunExportWriter
 {
+    private const int ExportSnapshotStatsSampleLimit = 4096;
+
     public static GodotRunExportResult Write(
         string statsPath,
         string reportPath,
@@ -35,7 +37,9 @@ public static class GodotRunExportWriter
         GodotRosterLineageSummaryCsvWriter.Write(paths.RosterSummaryPath, state.LineageRecords, speciesInjections);
         SimulationScenarioJson.Save(paths.ScenarioPath, scenario);
         ViewerReportWriter.Write(paths.ReportPath, scenario, simulation, speciesInjections);
-        SimulationSnapshotJson.Save(paths.SnapshotPath, SimulationSnapshot.Capture(scenario, simulation));
+        SimulationSnapshotJson.Save(
+            paths.SnapshotPath,
+            SimulationSnapshot.Capture(scenario, simulation, maxStatsSnapshots: ExportSnapshotStatsSampleLimit));
 
         return new GodotRunExportResult(
             paths.StatsPath,
