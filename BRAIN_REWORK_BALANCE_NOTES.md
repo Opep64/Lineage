@@ -416,6 +416,16 @@ Implementation notes:
 - These cues use the same semantics as the existing nearest-creature approach/facing inputs, but are attached to sector vision.
 - Neural sector channels widened from 14 to 16. Older 14-channel sector brains migrate with existing weights preserved and the new motion channels neutral.
 
+## 2026-05-24 Creature Sector Motion Diagnostics
+
+Extended the sensory brain wiring diagnostics to include the new sector motion/orientation channels.
+
+Implementation notes:
+
+- Reports now include direct and hidden wiring magnitudes for approach-sector and facing-sector inputs.
+- Reports also include signed attack readouts for approach and facing sectors, which should help identify emerging predator/prey or defensive responses.
+- This is report-only telemetry and does not alter simulation behavior.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

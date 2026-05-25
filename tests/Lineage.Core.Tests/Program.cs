@@ -3282,11 +3282,15 @@ static void BrainInputDiagnosticsSummarizeFreshnessWiring()
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = 3f;
     weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 1.8f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = -2.4f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 2.7f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -1.5f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 0.5f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.RottenMeatScentDensityInput] = -0.75f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.9f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.6f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = -1.2f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 0.8f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -0.4f;
     var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
 
     var founderId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
@@ -3295,6 +3299,8 @@ static void BrainInputDiagnosticsSummarizeFreshnessWiring()
     var lineages = BrainInputDiagnostics.AnalyzeTopFounderLineages(simulation.State, 10);
     const int CreatureSizeSectorInputCount = VisionSectorSet.SectorCount * 2;
     const int DirectCreatureSizeSectorDivisor = NeuralBrainSchema.OutputCount * CreatureSizeSectorInputCount;
+    const int CreatureMotionSectorInputCount = VisionSectorSet.SectorCount;
+    const int DirectCreatureMotionSectorDivisor = NeuralBrainSchema.OutputCount * CreatureMotionSectorInputCount;
 
     AssertEqual(1, summary.EvaluatedCreatureCount, "Brain diagnostic evaluated count");
     AssertClose(3f / NeuralBrainSchema.OutputCount, summary.DirectFreshnessWeightMagnitude, 0.000001, "Direct freshness magnitude");
@@ -3302,22 +3308,29 @@ static void BrainInputDiagnosticsSummarizeFreshnessWiring()
     AssertClose(3f / DirectCreatureSizeSectorDivisor, summary.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Direct smaller creature sector magnitude");
     AssertClose(1.8f / DirectCreatureSizeSectorDivisor, summary.DirectSimilarCreatureSectorWeightMagnitude, 0.000001, "Direct similar creature sector magnitude");
     AssertClose(2.4f / DirectCreatureSizeSectorDivisor, summary.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Direct larger creature sector magnitude");
+    AssertClose(2.7f / DirectCreatureMotionSectorDivisor, summary.DirectCreatureApproachSectorWeightMagnitude, 0.000001, "Direct creature approach sector magnitude");
+    AssertClose(1.5f / DirectCreatureMotionSectorDivisor, summary.DirectCreatureFacingSectorWeightMagnitude, 0.000001, "Direct creature facing sector magnitude");
     AssertClose(0.5f, summary.HiddenFreshnessWeightMagnitude, 0.000001, "Hidden freshness magnitude");
     AssertClose(0.25f, summary.HiddenRotScentWeightMagnitude, 0.000001, "Hidden rot magnitude");
     AssertClose(0.9f / CreatureSizeSectorInputCount, summary.HiddenSmallerCreatureSectorWeightMagnitude, 0.000001, "Hidden smaller creature sector magnitude");
     AssertClose(0.6f / CreatureSizeSectorInputCount, summary.HiddenSimilarCreatureSectorWeightMagnitude, 0.000001, "Hidden similar creature sector magnitude");
     AssertClose(1.2f / CreatureSizeSectorInputCount, summary.HiddenLargerCreatureSectorWeightMagnitude, 0.000001, "Hidden larger creature sector magnitude");
+    AssertClose(0.8f / CreatureMotionSectorInputCount, summary.HiddenCreatureApproachSectorWeightMagnitude, 0.000001, "Hidden creature approach sector magnitude");
+    AssertClose(0.4f / CreatureMotionSectorInputCount, summary.HiddenCreatureFacingSectorWeightMagnitude, 0.000001, "Hidden creature facing sector magnitude");
     AssertClose(2f, summary.MoveFreshnessWeight, 0.000001, "Move freshness weight");
     AssertClose(-1f, summary.EatFreshnessWeight, 0.000001, "Eat freshness weight");
     AssertClose(-4f, summary.MoveRotScentForwardWeight, 0.000001, "Move rot forward weight");
     AssertClose(-3f, summary.TurnRotScentRightWeight, 0.000001, "Turn rot right weight");
     AssertClose(3f / CreatureSizeSectorInputCount, summary.AttackSmallerCreatureSectorWeight, 0.000001, "Attack smaller creature sector weight");
     AssertClose(-2.4f / CreatureSizeSectorInputCount, summary.AttackLargerCreatureSectorWeight, 0.000001, "Attack larger creature sector weight");
+    AssertClose(2.7f / CreatureMotionSectorInputCount, summary.AttackCreatureApproachSectorWeight, 0.000001, "Attack creature approach sector weight");
+    AssertClose(-1.5f / CreatureMotionSectorInputCount, summary.AttackCreatureFacingSectorWeight, 0.000001, "Attack creature facing sector weight");
 
     AssertEqual(1, lineages.Count, "Lineage diagnostic count");
     AssertEqual(founderId, lineages[0].FounderId, "Lineage diagnostic founder");
     AssertClose(summary.DirectRotScentWeightMagnitude, lineages[0].Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Lineage rot magnitude");
     AssertClose(summary.DirectLargerCreatureSectorWeightMagnitude, lineages[0].Diagnostics.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Lineage larger creature sector magnitude");
+    AssertClose(summary.DirectCreatureApproachSectorWeightMagnitude, lineages[0].Diagnostics.DirectCreatureApproachSectorWeightMagnitude, 0.000001, "Lineage approach sector magnitude");
 }
 
 static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
@@ -3342,11 +3355,15 @@ static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
     wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = 3f;
     wiredWeights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 1.8f;
     wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = -2.4f;
+    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 2.7f;
+    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -1.5f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 0.5f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.RottenMeatScentDensityInput] = -0.75f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.9f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.6f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = -1.2f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 0.8f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -0.4f;
     var wiredBrainId = simulation.State.AddBrain(new NeuralBrainGenome(wiredWeights));
     var quietBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero(hiddenNodeCount: 1));
 
@@ -3359,6 +3376,8 @@ static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
     var summaries = SpeciesClusterAnalyzer.AnalyzeBrainInputDiagnostics(simulation.State, 10);
     const int CreatureSizeSectorInputCount = VisionSectorSet.SectorCount * 2;
     const int DirectCreatureSizeSectorDivisor = NeuralBrainSchema.OutputCount * CreatureSizeSectorInputCount;
+    const int CreatureMotionSectorInputCount = VisionSectorSet.SectorCount;
+    const int DirectCreatureMotionSectorDivisor = NeuralBrainSchema.OutputCount * CreatureMotionSectorInputCount;
 
     AssertEqual(2, summaries.Count, "Species diagnostic cluster count");
     AssertTrue(summaries.All(summary => summary.Diagnostics.EvaluatedCreatureCount == summary.LivingCreatures), "Species diagnostics should evaluate all living neural creatures in each cluster");
@@ -3370,19 +3389,26 @@ static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
     AssertClose(3f / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Species direct smaller creature sector magnitude");
     AssertClose(1.8f / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectSimilarCreatureSectorWeightMagnitude, 0.000001, "Species direct similar creature sector magnitude");
     AssertClose(2.4f / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Species direct larger creature sector magnitude");
+    AssertClose(2.7f / DirectCreatureMotionSectorDivisor, wired.Diagnostics.DirectCreatureApproachSectorWeightMagnitude, 0.000001, "Species direct creature approach sector magnitude");
+    AssertClose(1.5f / DirectCreatureMotionSectorDivisor, wired.Diagnostics.DirectCreatureFacingSectorWeightMagnitude, 0.000001, "Species direct creature facing sector magnitude");
     AssertClose(0.5f, wired.Diagnostics.HiddenFreshnessWeightMagnitude, 0.000001, "Species hidden freshness magnitude");
     AssertClose(0.25f, wired.Diagnostics.HiddenRotScentWeightMagnitude, 0.000001, "Species hidden rot magnitude");
     AssertClose(0.9f / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenSmallerCreatureSectorWeightMagnitude, 0.000001, "Species hidden smaller creature sector magnitude");
     AssertClose(0.6f / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenSimilarCreatureSectorWeightMagnitude, 0.000001, "Species hidden similar creature sector magnitude");
     AssertClose(1.2f / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenLargerCreatureSectorWeightMagnitude, 0.000001, "Species hidden larger creature sector magnitude");
+    AssertClose(0.8f / CreatureMotionSectorInputCount, wired.Diagnostics.HiddenCreatureApproachSectorWeightMagnitude, 0.000001, "Species hidden creature approach sector magnitude");
+    AssertClose(0.4f / CreatureMotionSectorInputCount, wired.Diagnostics.HiddenCreatureFacingSectorWeightMagnitude, 0.000001, "Species hidden creature facing sector magnitude");
     AssertClose(-4f, wired.Diagnostics.MoveRotScentForwardWeight, 0.000001, "Species move rot forward weight");
     AssertClose(3f / CreatureSizeSectorInputCount, wired.Diagnostics.AttackSmallerCreatureSectorWeight, 0.000001, "Species attack smaller creature sector weight");
     AssertClose(-2.4f / CreatureSizeSectorInputCount, wired.Diagnostics.AttackLargerCreatureSectorWeight, 0.000001, "Species attack larger creature sector weight");
+    AssertClose(2.7f / CreatureMotionSectorInputCount, wired.Diagnostics.AttackCreatureApproachSectorWeight, 0.000001, "Species attack creature approach sector weight");
+    AssertClose(-1.5f / CreatureMotionSectorInputCount, wired.Diagnostics.AttackCreatureFacingSectorWeight, 0.000001, "Species attack creature facing sector weight");
 
     var quiet = summaries.Single(summary => summary.Diagnostics.DirectFreshnessWeightMagnitude == 0f);
     AssertEqual(3, quiet.LivingCreatures, "Quiet species diagnostic living count");
     AssertClose(0f, quiet.Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Quiet species rot magnitude");
     AssertClose(0f, quiet.Diagnostics.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Quiet species smaller creature sector magnitude");
+    AssertClose(0f, quiet.Diagnostics.DirectCreatureApproachSectorWeightMagnitude, 0.000001, "Quiet species creature approach sector magnitude");
 }
 
 static void ExplorerForagerKeepsSearchingWithoutFoodCues()

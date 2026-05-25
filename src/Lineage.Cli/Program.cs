@@ -5951,17 +5951,23 @@ internal static class RunReportWriter
         WriteMetric(writer, "Direct small-creature sectors", FormatBrainWeight(summary.DirectSmallerCreatureSectorWeightMagnitude));
         WriteMetric(writer, "Direct similar-creature sectors", FormatBrainWeight(summary.DirectSimilarCreatureSectorWeightMagnitude));
         WriteMetric(writer, "Direct large-creature sectors", FormatBrainWeight(summary.DirectLargerCreatureSectorWeightMagnitude));
+        WriteMetric(writer, "Direct approach sectors", FormatBrainWeight(summary.DirectCreatureApproachSectorWeightMagnitude));
+        WriteMetric(writer, "Direct facing sectors", FormatBrainWeight(summary.DirectCreatureFacingSectorWeightMagnitude));
         WriteMetric(writer, "Hidden freshness magnitude", FormatBrainWeight(summary.HiddenFreshnessWeightMagnitude));
         WriteMetric(writer, "Hidden rot-scent magnitude", FormatBrainWeight(summary.HiddenRotScentWeightMagnitude));
         WriteMetric(writer, "Hidden small-creature sectors", FormatBrainWeight(summary.HiddenSmallerCreatureSectorWeightMagnitude));
         WriteMetric(writer, "Hidden similar-creature sectors", FormatBrainWeight(summary.HiddenSimilarCreatureSectorWeightMagnitude));
         WriteMetric(writer, "Hidden large-creature sectors", FormatBrainWeight(summary.HiddenLargerCreatureSectorWeightMagnitude));
+        WriteMetric(writer, "Hidden approach sectors", FormatBrainWeight(summary.HiddenCreatureApproachSectorWeightMagnitude));
+        WriteMetric(writer, "Hidden facing sectors", FormatBrainWeight(summary.HiddenCreatureFacingSectorWeightMagnitude));
         WriteMetric(writer, "Move from freshness", FormatSignedBrainWeight(summary.MoveFreshnessWeight));
         WriteMetric(writer, "Eat from freshness", FormatSignedBrainWeight(summary.EatFreshnessWeight));
         WriteMetric(writer, "Move from rot ahead", FormatSignedBrainWeight(summary.MoveRotScentForwardWeight));
         WriteMetric(writer, "Turn from rot right", FormatSignedBrainWeight(summary.TurnRotScentRightWeight));
         WriteMetric(writer, "Attack small-creature sectors", FormatSignedBrainWeight(summary.AttackSmallerCreatureSectorWeight));
         WriteMetric(writer, "Attack large-creature sectors", FormatSignedBrainWeight(summary.AttackLargerCreatureSectorWeight));
+        WriteMetric(writer, "Attack approach sectors", FormatSignedBrainWeight(summary.AttackCreatureApproachSectorWeight));
+        WriteMetric(writer, "Attack facing sectors", FormatSignedBrainWeight(summary.AttackCreatureFacingSectorWeight));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
     }
@@ -5980,7 +5986,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Fresh Direct</th><th>Rot Direct</th><th>Small Direct</th><th>Similar Direct</th><th>Large Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Small Hidden</th><th>Similar Hidden</th><th>Large Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Ahead</th><th>Turn Rot Right</th><th>Attack Small</th><th>Attack Large</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Fresh Direct</th><th>Rot Direct</th><th>Small Direct</th><th>Similar Direct</th><th>Large Direct</th><th>Approach Direct</th><th>Facing Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Small Hidden</th><th>Similar Hidden</th><th>Large Hidden</th><th>Approach Hidden</th><th>Facing Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Ahead</th><th>Turn Rot Right</th><th>Attack Small</th><th>Attack Large</th><th>Attack Approach</th><th>Attack Facing</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -5995,17 +6001,23 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectSmallerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectSimilarCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectLargerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectCreatureApproachSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectCreatureFacingSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenFreshnessWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSmallerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSimilarCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenLargerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenCreatureApproachSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenCreatureFacingSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentForwardWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackSmallerCreatureSectorWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackLargerCreatureSectorWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackCreatureApproachSectorWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackCreatureFacingSectorWeight))}</td>" +
                 "</tr>");
         }
 
@@ -6027,7 +6039,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Fresh Direct</th><th>Rot Direct</th><th>Small Direct</th><th>Similar Direct</th><th>Large Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Small Hidden</th><th>Similar Hidden</th><th>Large Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Density</th><th>Turn Rot Density</th><th>Move Rot Ahead</th><th>Turn Rot Right</th><th>Attack Small</th><th>Attack Large</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Fresh Direct</th><th>Rot Direct</th><th>Small Direct</th><th>Similar Direct</th><th>Large Direct</th><th>Approach Direct</th><th>Facing Direct</th><th>Fresh Hidden</th><th>Rot Hidden</th><th>Small Hidden</th><th>Similar Hidden</th><th>Large Hidden</th><th>Approach Hidden</th><th>Facing Hidden</th><th>Move Fresh</th><th>Eat Fresh</th><th>Move Rot Density</th><th>Turn Rot Density</th><th>Move Rot Ahead</th><th>Turn Rot Right</th><th>Attack Small</th><th>Attack Large</th><th>Attack Approach</th><th>Attack Facing</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -6043,11 +6055,15 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectSmallerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectSimilarCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.DirectLargerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectCreatureApproachSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.DirectCreatureFacingSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenFreshnessWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenRotScentWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSmallerCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenSimilarCreatureSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatBrainWeight(diagnostics.HiddenLargerCreatureSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenCreatureApproachSectorWeightMagnitude))}</td>" +
+                $"<td>{Html(FormatBrainWeight(diagnostics.HiddenCreatureFacingSectorWeightMagnitude))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.EatFreshnessWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.MoveRotScentDensityWeight))}</td>" +
@@ -6056,6 +6072,8 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.TurnRotScentRightWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackSmallerCreatureSectorWeight))}</td>" +
                 $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackLargerCreatureSectorWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackCreatureApproachSectorWeight))}</td>" +
+                $"<td>{Html(FormatSignedBrainWeight(diagnostics.AttackCreatureFacingSectorWeight))}</td>" +
                 "</tr>");
         }
 

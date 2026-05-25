@@ -31,6 +31,12 @@ public static class BrainInputDiagnostics
         NeuralBrainSchema.VisionSectorLargerCreatureDensityOffset,
         NeuralBrainSchema.VisionSectorLargerCreatureProximityOffset);
 
+    private static readonly int[] CreatureApproachSectorInputs = CreateVisionSectorInputs(
+        NeuralBrainSchema.VisionSectorCreatureApproachRateOffset);
+
+    private static readonly int[] CreatureFacingSectorInputs = CreateVisionSectorInputs(
+        NeuralBrainSchema.VisionSectorCreatureFacingAlignmentOffset);
+
     public static BrainInputDiagnosticSummary Analyze(WorldState state)
     {
         return Analyze(state, state.Creatures);
@@ -227,11 +233,15 @@ public static class BrainInputDiagnostics
         private float _directSmallerCreatureSectorMagnitude;
         private float _directSimilarCreatureSectorMagnitude;
         private float _directLargerCreatureSectorMagnitude;
+        private float _directCreatureApproachSectorMagnitude;
+        private float _directCreatureFacingSectorMagnitude;
         private float _hiddenFreshnessMagnitude;
         private float _hiddenRotScentMagnitude;
         private float _hiddenSmallerCreatureSectorMagnitude;
         private float _hiddenSimilarCreatureSectorMagnitude;
         private float _hiddenLargerCreatureSectorMagnitude;
+        private float _hiddenCreatureApproachSectorMagnitude;
+        private float _hiddenCreatureFacingSectorMagnitude;
         private float _moveFreshnessWeight;
         private float _eatFreshnessWeight;
         private float _moveRotScentDensityWeight;
@@ -240,6 +250,8 @@ public static class BrainInputDiagnostics
         private float _turnRotScentRightWeight;
         private float _attackSmallerCreatureSectorWeight;
         private float _attackLargerCreatureSectorWeight;
+        private float _attackCreatureApproachSectorWeight;
+        private float _attackCreatureFacingSectorWeight;
 
         public void Add(NeuralBrainGenome brain)
         {
@@ -249,11 +261,15 @@ public static class BrainInputDiagnostics
             _directSmallerCreatureSectorMagnitude += MeanAbsoluteDirectInputWeights(brain, SmallerCreatureSectorInputs);
             _directSimilarCreatureSectorMagnitude += MeanAbsoluteDirectInputWeights(brain, SimilarCreatureSectorInputs);
             _directLargerCreatureSectorMagnitude += MeanAbsoluteDirectInputWeights(brain, LargerCreatureSectorInputs);
+            _directCreatureApproachSectorMagnitude += MeanAbsoluteDirectInputWeights(brain, CreatureApproachSectorInputs);
+            _directCreatureFacingSectorMagnitude += MeanAbsoluteDirectInputWeights(brain, CreatureFacingSectorInputs);
             _hiddenFreshnessMagnitude += MeanAbsoluteHiddenInputWeights(brain, NeuralBrainSchema.VisibleMeatFreshnessInput);
             _hiddenRotScentMagnitude += MeanAbsoluteHiddenInputWeights(brain, RotScentInputs);
             _hiddenSmallerCreatureSectorMagnitude += MeanAbsoluteHiddenInputWeights(brain, SmallerCreatureSectorInputs);
             _hiddenSimilarCreatureSectorMagnitude += MeanAbsoluteHiddenInputWeights(brain, SimilarCreatureSectorInputs);
             _hiddenLargerCreatureSectorMagnitude += MeanAbsoluteHiddenInputWeights(brain, LargerCreatureSectorInputs);
+            _hiddenCreatureApproachSectorMagnitude += MeanAbsoluteHiddenInputWeights(brain, CreatureApproachSectorInputs);
+            _hiddenCreatureFacingSectorMagnitude += MeanAbsoluteHiddenInputWeights(brain, CreatureFacingSectorInputs);
             _moveFreshnessWeight += brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisibleMeatFreshnessInput);
             _eatFreshnessWeight += brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.VisibleMeatFreshnessInput);
             _moveRotScentDensityWeight += brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentDensityInput);
@@ -268,6 +284,14 @@ public static class BrainInputDiagnostics
                 brain,
                 NeuralBrainSchema.AttackOutput,
                 LargerCreatureSectorInputs);
+            _attackCreatureApproachSectorWeight += MeanDirectOutputInputWeights(
+                brain,
+                NeuralBrainSchema.AttackOutput,
+                CreatureApproachSectorInputs);
+            _attackCreatureFacingSectorWeight += MeanDirectOutputInputWeights(
+                brain,
+                NeuralBrainSchema.AttackOutput,
+                CreatureFacingSectorInputs);
         }
 
         public BrainInputDiagnosticSummary ToSummary()
@@ -284,11 +308,15 @@ public static class BrainInputDiagnostics
                 _directSmallerCreatureSectorMagnitude / Count,
                 _directSimilarCreatureSectorMagnitude / Count,
                 _directLargerCreatureSectorMagnitude / Count,
+                _directCreatureApproachSectorMagnitude / Count,
+                _directCreatureFacingSectorMagnitude / Count,
                 _hiddenFreshnessMagnitude / Count,
                 _hiddenRotScentMagnitude / Count,
                 _hiddenSmallerCreatureSectorMagnitude / Count,
                 _hiddenSimilarCreatureSectorMagnitude / Count,
                 _hiddenLargerCreatureSectorMagnitude / Count,
+                _hiddenCreatureApproachSectorMagnitude / Count,
+                _hiddenCreatureFacingSectorMagnitude / Count,
                 _moveFreshnessWeight / Count,
                 _eatFreshnessWeight / Count,
                 _moveRotScentDensityWeight / Count,
@@ -296,7 +324,9 @@ public static class BrainInputDiagnostics
                 _moveRotScentForwardWeight / Count,
                 _turnRotScentRightWeight / Count,
                 _attackSmallerCreatureSectorWeight / Count,
-                _attackLargerCreatureSectorWeight / Count);
+                _attackLargerCreatureSectorWeight / Count,
+                _attackCreatureApproachSectorWeight / Count,
+                _attackCreatureFacingSectorWeight / Count);
         }
     }
 }
@@ -308,11 +338,15 @@ public readonly record struct BrainInputDiagnosticSummary(
     float DirectSmallerCreatureSectorWeightMagnitude,
     float DirectSimilarCreatureSectorWeightMagnitude,
     float DirectLargerCreatureSectorWeightMagnitude,
+    float DirectCreatureApproachSectorWeightMagnitude,
+    float DirectCreatureFacingSectorWeightMagnitude,
     float HiddenFreshnessWeightMagnitude,
     float HiddenRotScentWeightMagnitude,
     float HiddenSmallerCreatureSectorWeightMagnitude,
     float HiddenSimilarCreatureSectorWeightMagnitude,
     float HiddenLargerCreatureSectorWeightMagnitude,
+    float HiddenCreatureApproachSectorWeightMagnitude,
+    float HiddenCreatureFacingSectorWeightMagnitude,
     float MoveFreshnessWeight,
     float EatFreshnessWeight,
     float MoveRotScentDensityWeight,
@@ -320,7 +354,9 @@ public readonly record struct BrainInputDiagnosticSummary(
     float MoveRotScentForwardWeight,
     float TurnRotScentRightWeight,
     float AttackSmallerCreatureSectorWeight,
-    float AttackLargerCreatureSectorWeight);
+    float AttackLargerCreatureSectorWeight,
+    float AttackCreatureApproachSectorWeight,
+    float AttackCreatureFacingSectorWeight);
 
 public readonly record struct LineageBrainInputDiagnosticSummary(
     EntityId FounderId,
