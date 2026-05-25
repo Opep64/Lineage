@@ -34,6 +34,9 @@ public static class BehaviorAssay
         var meatRight = new BehaviorAssayAccumulator();
         var rottenMeatAhead = new BehaviorAssayAccumulator();
         var rottenMeatRight = new BehaviorAssayAccumulator();
+        var plantContact = new BehaviorAssayAccumulator();
+        var meatContact = new BehaviorAssayAccumulator();
+        var eggContact = new BehaviorAssayAccumulator();
         var meatScentAhead = new BehaviorAssayAccumulator();
         var meatScentRight = new BehaviorAssayAccumulator();
         var rottenMeatScentAhead = new BehaviorAssayAccumulator();
@@ -72,6 +75,9 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateMeatRightSenses(), inputs, outputs, ref meatRight);
             Accumulate(brain, genome, CreateRottenMeatAheadSenses(), inputs, outputs, ref rottenMeatAhead);
             Accumulate(brain, genome, CreateRottenMeatRightSenses(), inputs, outputs, ref rottenMeatRight);
+            Accumulate(brain, genome, CreatePlantContactSenses(), inputs, outputs, ref plantContact);
+            Accumulate(brain, genome, CreateMeatContactSenses(), inputs, outputs, ref meatContact);
+            Accumulate(brain, genome, CreateEggContactSenses(), inputs, outputs, ref eggContact);
             Accumulate(brain, genome, CreateMeatScentAheadSenses(), inputs, outputs, ref meatScentAhead);
             Accumulate(brain, genome, CreateMeatScentRightSenses(), inputs, outputs, ref meatScentRight);
             Accumulate(brain, genome, CreateRottenMeatScentAheadSenses(), inputs, outputs, ref rottenMeatScentAhead);
@@ -97,12 +103,15 @@ public static class BehaviorAssay
             baseline.ToResult("No cue"),
             hungryNoCue.ToResult("Hungry no cue"),
             fedNoCue.ToResult("Fed no cue"),
-            plantAhead.ToResult("Plant ahead"),
-            plantRight.ToResult("Plant right"),
-            meatAhead.ToResult("Meat ahead"),
-            meatRight.ToResult("Meat right"),
-            rottenMeatAhead.ToResult("Rotten meat ahead"),
-            rottenMeatRight.ToResult("Rotten meat right"),
+            plantAhead.ToResult("Plant sector ahead"),
+            plantRight.ToResult("Plant sector right"),
+            meatAhead.ToResult("Fresh meat sector ahead"),
+            meatRight.ToResult("Fresh meat sector right"),
+            rottenMeatAhead.ToResult("Rotten meat sector ahead"),
+            rottenMeatRight.ToResult("Rotten meat sector right"),
+            plantContact.ToResult("Plant contact"),
+            meatContact.ToResult("Meat contact"),
+            eggContact.ToResult("Egg contact"),
             meatScentAhead.ToResult("Meat scent ahead"),
             meatScentRight.ToResult("Meat scent right"),
             rottenMeatScentAhead.ToResult("Rotten meat scent ahead"),
@@ -202,6 +211,7 @@ public static class BehaviorAssay
             inputFrame,
             legacyMemoryInputs,
             inputs,
+            enableLegacyNearestFoodVisionInputs: false,
             enableLegacyNearestCreatureVisionInputs: false);
         outputs.Clear();
         brain.Evaluate(inputs, outputs);
@@ -247,101 +257,148 @@ public static class BehaviorAssay
 
     private static CreatureSenseState CreatePlantAheadSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            FoodDetected = true,
-            FoodProximity = 0.82f,
-            FoodDirectionForward = 1f,
-            VisibleFoodDensity = 0.35f,
-            PlantDetected = true,
-            PlantProximity = 0.82f,
-            PlantDirectionForward = 1f,
-            VisiblePlantDensity = 0.35f
-        };
+        return WithPlantSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.82f,
+                FoodDirectionForward = 1f,
+                VisibleFoodDensity = 0.35f,
+                PlantDetected = true,
+                PlantProximity = 0.82f,
+                PlantDirectionForward = 1f,
+                VisiblePlantDensity = 0.35f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.82f);
     }
 
     private static CreatureSenseState CreatePlantRightSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            FoodDetected = true,
-            FoodProximity = 0.65f,
-            FoodDirectionRight = 1f,
-            VisibleFoodDensity = 0.28f,
-            PlantDetected = true,
-            PlantProximity = 0.65f,
-            PlantDirectionRight = 1f,
-            VisiblePlantDensity = 0.28f
-        };
+        return WithPlantSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.65f,
+                FoodDirectionRight = 1f,
+                VisibleFoodDensity = 0.28f,
+                PlantDetected = true,
+                PlantProximity = 0.65f,
+                PlantDirectionRight = 1f,
+                VisiblePlantDensity = 0.28f
+            },
+            sectorIndex: 8,
+            proximity: 0.65f);
     }
 
     private static CreatureSenseState CreateMeatAheadSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            FoodDetected = true,
-            FoodProximity = 0.82f,
-            FoodDirectionForward = 1f,
-            VisibleFoodDensity = 0.25f,
-            MeatDetected = true,
-            MeatProximity = 0.82f,
-            MeatDirectionForward = 1f,
-            VisibleMeatDensity = 0.25f,
-            VisibleMeatFreshness = 1f
-        };
+        return WithMeatSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.82f,
+                FoodDirectionForward = 1f,
+                VisibleFoodDensity = 0.25f,
+                MeatDetected = true,
+                MeatProximity = 0.82f,
+                MeatDirectionForward = 1f,
+                VisibleMeatDensity = 0.25f,
+                VisibleMeatFreshness = 1f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.82f);
     }
 
     private static CreatureSenseState CreateMeatRightSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            FoodDetected = true,
-            FoodProximity = 0.65f,
-            FoodDirectionRight = 1f,
-            VisibleFoodDensity = 0.2f,
-            MeatDetected = true,
-            MeatProximity = 0.65f,
-            MeatDirectionRight = 1f,
-            VisibleMeatDensity = 0.2f,
-            VisibleMeatFreshness = 1f
-        };
+        return WithMeatSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.65f,
+                FoodDirectionRight = 1f,
+                VisibleFoodDensity = 0.2f,
+                MeatDetected = true,
+                MeatProximity = 0.65f,
+                MeatDirectionRight = 1f,
+                VisibleMeatDensity = 0.2f,
+                VisibleMeatFreshness = 1f
+            },
+            sectorIndex: 8,
+            proximity: 0.65f);
     }
 
     private static CreatureSenseState CreateRottenMeatAheadSenses()
     {
-        return CreateBaselineSenses() with
-        {
-            FoodDetected = true,
-            FoodProximity = 0.82f,
-            FoodDirectionForward = 1f,
-            VisibleFoodDensity = 0.25f,
-            MeatDetected = true,
-            MeatProximity = 0.82f,
-            MeatDirectionForward = 1f,
-            VisibleMeatDensity = 0.25f,
-            VisibleMeatFreshness = MeatQuality.MinimumFreshness,
-            RottenMeatScentDetected = true,
-            RottenMeatScentDensity = 0.55f,
-            RottenMeatScentDirectionForward = 0.55f
-        };
+        return WithMeatSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.82f,
+                FoodDirectionForward = 1f,
+                VisibleFoodDensity = 0.25f,
+                MeatDetected = true,
+                MeatProximity = 0.82f,
+                MeatDirectionForward = 1f,
+                VisibleMeatDensity = 0.25f,
+                VisibleMeatFreshness = MeatQuality.MinimumFreshness,
+                RottenMeatScentDetected = true,
+                RottenMeatScentDensity = 0.55f,
+                RottenMeatScentDirectionForward = 0.55f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.82f);
     }
 
     private static CreatureSenseState CreateRottenMeatRightSenses()
     {
+        return WithMeatSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.65f,
+                FoodDirectionRight = 1f,
+                VisibleFoodDensity = 0.2f,
+                MeatDetected = true,
+                MeatProximity = 0.65f,
+                MeatDirectionRight = 1f,
+                VisibleMeatDensity = 0.2f,
+                VisibleMeatFreshness = MeatQuality.MinimumFreshness,
+                RottenMeatScentDetected = true,
+                RottenMeatScentDensity = 0.45f,
+                RottenMeatScentDirectionRight = 0.45f
+            },
+            sectorIndex: 8,
+            proximity: 0.65f);
+    }
+
+    private static CreatureSenseState CreatePlantContactSenses()
+    {
         return CreateBaselineSenses() with
         {
-            FoodDetected = true,
-            FoodProximity = 0.65f,
-            FoodDirectionRight = 1f,
-            VisibleFoodDensity = 0.2f,
-            MeatDetected = true,
-            MeatProximity = 0.65f,
-            MeatDirectionRight = 1f,
-            VisibleMeatDensity = 0.2f,
-            VisibleMeatFreshness = MeatQuality.MinimumFreshness,
-            RottenMeatScentDetected = true,
-            RottenMeatScentDensity = 0.45f,
-            RottenMeatScentDirectionRight = 0.45f
+            FoodContact = 1f,
+            PlantFoodContact = 1f
+        };
+    }
+
+    private static CreatureSenseState CreateMeatContactSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            FoodContact = 1f,
+            MeatFoodContact = 1f,
+            VisibleMeatFreshness = 1f
+        };
+    }
+
+    private static CreatureSenseState CreateEggContactSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            FoodContact = 1f,
+            EggFoodContact = 1f,
+            VisibleMeatFreshness = 1f
         };
     }
 
@@ -378,6 +435,36 @@ public static class BehaviorAssay
         senses.VisionSectors = sectors;
         senses.CreatureDetected = true;
         senses.VisibleCreatureDensity = MathF.Max(senses.VisibleCreatureDensity, 0.125f);
+        return senses;
+    }
+
+    private static CreatureSenseState WithPlantSector(
+        CreatureSenseState senses,
+        int sectorIndex,
+        float proximity)
+    {
+        var sectors = senses.VisionSectors;
+        sectors.AddPlant(sectorIndex, proximity);
+        senses.VisionSectors = sectors;
+        senses.FoodDetected = true;
+        senses.PlantDetected = true;
+        senses.VisibleFoodDensity = MathF.Max(senses.VisibleFoodDensity, 0.125f);
+        senses.VisiblePlantDensity = MathF.Max(senses.VisiblePlantDensity, 0.125f);
+        return senses;
+    }
+
+    private static CreatureSenseState WithMeatSector(
+        CreatureSenseState senses,
+        int sectorIndex,
+        float proximity)
+    {
+        var sectors = senses.VisionSectors;
+        sectors.AddMeat(sectorIndex, proximity);
+        senses.VisionSectors = sectors;
+        senses.FoodDetected = true;
+        senses.MeatDetected = true;
+        senses.VisibleFoodDensity = MathF.Max(senses.VisibleFoodDensity, 0.125f);
+        senses.VisibleMeatDensity = MathF.Max(senses.VisibleMeatDensity, 0.125f);
         return senses;
     }
 
@@ -654,10 +741,19 @@ public static class BehaviorAssay
 
     private static string ClassifyForagingBias(BehaviorAssaySummary summary)
     {
-        var plantScore = CueScore(summary.PlantAhead, summary.PlantRight);
+        var plantScore = FoodCueScore(summary.PlantAhead, summary.PlantRight, summary.PlantContact);
         var meatScore = MathF.Max(
-            CueScore(summary.MeatAhead, summary.MeatRight),
+            FoodCueScore(summary.MeatAhead, summary.MeatRight, summary.MeatContact),
             CueScore(summary.MeatScentAhead, summary.MeatScentRight));
+        var followsMeatCue = summary.MeatAhead.MoveForward > summary.Baseline.MoveForward + 0.15f
+            || summary.MeatScentAhead.MoveForward > summary.Baseline.MoveForward + 0.2f
+            || summary.MeatRight.Turn > 0.2f
+            || summary.MeatScentRight.Turn > 0.2f;
+        if (summary.MeatContact.EatShare > 0.5f && followsMeatCue)
+        {
+            return "meat/egg-biased";
+        }
+
         if (plantScore > meatScore + 0.25f)
         {
             return "plant-biased";
@@ -778,25 +874,28 @@ public static class BehaviorAssay
             return "not evaluated";
         }
 
-        var plantScore = CueScore(summary.PlantAhead, summary.PlantRight);
+        var plantScore = FoodCueScore(summary.PlantAhead, summary.PlantRight, summary.PlantContact);
         var meatScore = MathF.Max(
-            CueScore(summary.MeatAhead, summary.MeatRight),
+            FoodCueScore(summary.MeatAhead, summary.MeatRight, summary.MeatContact),
             CueScore(summary.MeatScentAhead, summary.MeatScentRight));
         var creatureAttack = MathF.Max(
             summary.SmallCreatureAhead.AttackShare,
             MathF.Max(summary.CreatureAhead.AttackShare, summary.CreatureRight.AttackShare));
 
-        if (creatureAttack > 0.65f && meatScore >= plantScore - 0.2f)
+        if (creatureAttack > 0.65f)
         {
             return "small-prey predator";
         }
 
-        if (creatureAttack > 0.2f && meatScore > plantScore + 0.1f)
+        if (creatureAttack > 0.2f && meatScore >= plantScore - 0.5f)
         {
             return "opportunistic predator";
         }
 
-        if (meatScore > plantScore + 0.25f)
+        var followsMeatScent = summary.MeatScentAhead.MoveForward > summary.Baseline.MoveForward + 0.2f
+            || summary.MeatScentRight.Turn > 0.2f;
+        if (summary.MeatContact.EatShare > 0.5f
+            && (meatScore >= plantScore - 0.1f || followsMeatScent))
         {
             return "scavenger-leaning";
         }
@@ -875,6 +974,15 @@ public static class BehaviorAssay
         return Math.Clamp(ahead.MoveForward, 0f, 1f)
             + Math.Clamp(right.Turn, 0f, 1f)
             + ahead.EatShare * 0.5f;
+    }
+
+    private static float FoodCueScore(
+        BehaviorAssayResult ahead,
+        BehaviorAssayResult right,
+        BehaviorAssayResult contact)
+    {
+        return CueScore(ahead, right)
+            + contact.EatShare * 0.5f;
     }
 
     private static LineageBehaviorAccumulator GetLineageBehaviorGroup(
@@ -977,6 +1085,9 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult MeatRight,
     BehaviorAssayResult RottenMeatAhead,
     BehaviorAssayResult RottenMeatRight,
+    BehaviorAssayResult PlantContact,
+    BehaviorAssayResult MeatContact,
+    BehaviorAssayResult EggContact,
     BehaviorAssayResult MeatScentAhead,
     BehaviorAssayResult MeatScentRight,
     BehaviorAssayResult RottenMeatScentAhead,
@@ -1029,6 +1140,9 @@ public readonly record struct BehaviorAssaySummary(
         MeatRight,
         RottenMeatAhead,
         RottenMeatRight,
+        PlantContact,
+        MeatContact,
+        EggContact,
         MeatScentAhead,
         MeatScentRight,
         RottenMeatScentAhead,

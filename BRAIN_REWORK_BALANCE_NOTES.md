@@ -898,6 +898,25 @@ Verification:
 - `dotnet build Lineage.slnx -v:minimal` passed.
 - Godot headless project load passed.
 
+## 2026-05-25 Food Assay Sector/Contact Cleanup
+
+Behavior assays now suppress the old nearest-food brain inputs, matching the checked-in scenario path where `enableLegacyNearestFoodVisionInputs` is `false`.
+
+Implementation notes:
+
+- Visible plant/meat probes now use sector plant/meat cues instead of depending on nearest-food direction channels.
+- Eating is now tested with explicit contact probes: `Plant contact`, `Meat contact`, and `Egg contact`.
+- Report labels now distinguish sight from touch: `Plant sector ahead`, `Fresh meat sector ahead`, `Rotten meat sector ahead`, and the contact rows.
+- Foraging-bias and ecotype labels now consider meat contact plus visible/scent meat response, so scavenger starters remain labeled as meat/egg-biased or scavenger-leaning even when old nearest-food cues are withheld.
+- Smoke report: `out/food_sector_assay_smoke_20260525/scavenger_report.html`.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 154 tests.
+- `dotnet build Lineage.slnx -v:minimal` passed.
+- `dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj -- --scenario scenarios\scavenger-pressure.json --ticks 1000 --output out\food_sector_assay_smoke_20260525\scavenger_stats.csv --report out\food_sector_assay_smoke_20260525\scavenger_report.html --save-snapshot out\food_sector_assay_smoke_20260525\scavenger_snapshot.json` passed.
+- Godot headless project load passed.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

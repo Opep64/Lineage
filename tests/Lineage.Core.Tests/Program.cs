@@ -3390,9 +3390,10 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(27, summary.Results.Count, "Assay result count");
+    AssertEqual(30, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
+    AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
     AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
@@ -3608,7 +3609,7 @@ static void ExplorerForagerKeepsSearchingWithoutFoodCues()
     AssertTrue(Math.Abs(explorerSummary.HungryNoCue.Turn) < 0.2f, "Explorer forager no-cue search should not be a tight circle");
     AssertTrue(explorerSummary.FedNoCue.MoveForward < explorerSummary.HungryNoCue.MoveForward - 0.25f, "Explorer forager search should remain hunger-sensitive");
     AssertTrue(explorerSummary.PlantRight.Turn > 0.5f, "Explorer forager should still turn toward visible plant cues");
-    AssertTrue(explorerSummary.PlantAhead.EatShare > 0.9f, "Explorer forager should still eat reachable plants");
+    AssertTrue(explorerSummary.PlantContact.EatShare > 0.9f, "Explorer forager should still eat reachable plants on contact");
     AssertTrue(explorerSummary.CreatureAhead.AttackShare < 0.1f, "Explorer forager should not arrive with built-in attack behavior");
     AssertEqual("hunger-driven cruising", explorerSummary.SearchTendency, "Explorer forager search tendency");
 }
@@ -4273,8 +4274,9 @@ static void ScavengerForagerStarterBrainFollowsCarrionCues()
 
     var summary = BehaviorAssay.Analyze(simulation.State);
 
-    AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Scavenger forager should still eat close plants");
-    AssertTrue(summary.MeatAhead.MoveForward > summary.PlantAhead.MoveForward + 0.25f, "Scavenger forager should push harder toward visible meat than plants");
+    AssertTrue(summary.PlantContact.EatShare > 0.9f, "Scavenger forager should still eat close plants on contact");
+    AssertTrue(summary.MeatContact.EatShare > 0.9f, "Scavenger forager should eat meat on contact");
+    AssertTrue(summary.MeatAhead.MoveForward > summary.Baseline.MoveForward + 0.2f, "Scavenger forager should pursue visible meat sectors");
     AssertTrue(summary.MeatRight.Turn > 0.8f, "Scavenger forager should turn toward visible meat");
     AssertTrue(summary.MeatScentAhead.MoveForward > summary.Baseline.MoveForward + 0.3f, "Scavenger forager should move toward meat scent");
     AssertTrue(summary.MeatScentRight.Turn > 0.6f, "Scavenger forager should turn toward meat scent");
@@ -4298,8 +4300,9 @@ static void FreshnessAwareScavengerStarterBrainAvoidsRotCues()
 
     var summary = BehaviorAssay.Analyze(simulation.State);
 
-    AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Freshness-aware scavenger should still eat close plants");
-    AssertTrue(summary.MeatAhead.MoveForward > summary.PlantAhead.MoveForward + 0.25f, "Freshness-aware scavenger should still pursue visible fresh meat");
+    AssertTrue(summary.PlantContact.EatShare > 0.9f, "Freshness-aware scavenger should still eat close plants on contact");
+    AssertTrue(summary.MeatContact.EatShare > 0.9f, "Freshness-aware scavenger should eat meat on contact");
+    AssertTrue(summary.MeatAhead.MoveForward > summary.Baseline.MoveForward + 0.2f, "Freshness-aware scavenger should still pursue visible fresh meat sectors");
     AssertTrue(summary.MeatScentAhead.MoveForward > summary.Baseline.MoveForward + 0.3f, "Freshness-aware scavenger should still follow clean meat scent");
     AssertTrue(summary.RottenMeatAhead.MoveForward < summary.MeatAhead.MoveForward - 0.5f, "Freshness-aware scavenger should suppress movement toward stale meat");
     AssertTrue(summary.RottenMeatScentAhead.MoveForward < summary.MeatScentAhead.MoveForward - 0.45f, "Freshness-aware scavenger should avoid rot scent ahead");
@@ -4323,7 +4326,8 @@ static void ForagerPredatorStarterBrainHuntsCreatureCues()
 
     var summary = BehaviorAssay.Analyze(simulation.State);
 
-    AssertTrue(summary.PlantAhead.EatShare > 0.9f, "Forager predator should still eat close plants");
+    AssertTrue(summary.PlantContact.EatShare > 0.9f, "Forager predator should still eat close plants on contact");
+    AssertTrue(summary.MeatContact.EatShare > 0.9f, "Forager predator should eat meat on contact");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.2f, "Forager predator should not treat a same-size creature sector as automatic prey");
     AssertTrue(summary.CreatureRight.Turn > 0.8f, "Forager predator should turn toward visible creatures on the right");
     AssertTrue(summary.SmallCreatureAhead.AttackShare > 0.9f, "Forager predator should attack smaller visible creatures");
