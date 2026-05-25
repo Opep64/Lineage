@@ -70,6 +70,14 @@ public sealed record SimulationScenario
 
     public InitialCreatureSpawnRegion InitialCreatureSpawnRegion { get; init; } = InitialCreatureSpawnRegion.Uniform;
 
+    public float InitialBodyRadius { get; init; } = CreatureGenome.Baseline.BodyRadius;
+
+    public float InitialMaxSpeed { get; init; } = CreatureGenome.Baseline.MaxSpeed;
+
+    public float InitialMaxTurnRadiansPerSecond { get; init; } = CreatureGenome.Baseline.MaxTurnRadiansPerSecond;
+
+    public float InitialSenseRadius { get; init; } = CreatureGenome.Baseline.SenseRadius;
+
     public SpeciesScenarioSeed[] SpeciesSeeds { get; init; } = [];
 
     public float InitialResourcesPerMillionArea { get; init; } = 28.75f;
@@ -284,6 +292,10 @@ public sealed record SimulationScenario
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsureNonNegative(InitialCreatureCount, nameof(InitialCreatureCount));
         EnsureEnumDefined(InitialCreatureSpawnRegion, nameof(InitialCreatureSpawnRegion));
+        EnsurePositive(InitialBodyRadius, nameof(InitialBodyRadius));
+        EnsurePositive(InitialMaxSpeed, nameof(InitialMaxSpeed));
+        EnsurePositive(InitialMaxTurnRadiansPerSecond, nameof(InitialMaxTurnRadiansPerSecond));
+        EnsurePositive(InitialSenseRadius, nameof(InitialSenseRadius));
         var speciesSeeds = (SpeciesSeeds ?? []).Select(seed =>
         {
             if (seed is null)

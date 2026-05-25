@@ -454,6 +454,66 @@ Interpretation:
 - Base and sector-on final populations matched exactly for the sampled seeds in all three scenarios.
 - Performance stayed close enough to continue with the vision branch. Predation and scavenger sector-on were slightly slower; Balanced sector-on was slightly faster in this sample.
 
+## 2026-05-25 Low-Density Scenario Balance Pass
+
+Started the branch balance pass that supports larger worlds and less dense food fields.
+
+Implementation notes:
+
+- Lowered plant density across checked-in scenarios and slowed plant respawn/regrowth so food is less like a dense continuous carpet.
+- Increased plant cluster/dispersal radii so resources are spread over wider patches.
+- Reduced movement and basal costs in many scenarios enough to let creatures search longer between meals.
+- Raised reproduction thresholds and offspring investment modestly so lower resource density does not immediately rebound into dense populations.
+- Added scenario-level founder trait knobs: `initialBodyRadius`, `initialMaxSpeed`, `initialMaxTurnRadiansPerSecond`, and `initialSenseRadius`.
+- Applied larger founder speed/sense only where the sparse-food probes needed it: harsh, predation, scavenger, carrion, migration, and a smaller terrain nudge.
+
+Final output files:
+
+- `out/brain_rework_low_density_20260525/baseline_20k.csv`
+- `out/brain_rework_low_density_20260525/baseline_20k.html`
+- `out/brain_rework_low_density_20260525/low_density_pass4_20k.csv`
+- `out/brain_rework_low_density_20260525/low_density_pass4_20k.html`
+- `out/brain_rework_low_density_20260525/low_density_pass4_30k.csv`
+- `out/brain_rework_low_density_20260525/low_density_pass4_30k.html`
+
+20k comparison against the branch state before this pass:
+
+| Scenario | Initial plants | Avg final creatures | Avg ticks/s | TPS change |
+| --- | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 460 -> 312 | 136.7 -> 54.7 | 2454.1 -> 4867.1 | +98.3% |
+| Carrion Pressure | 448 -> 384 | 47.7 -> 44.7 | 7811.9 -> 6772.5 | -13.3% |
+| Gentle Foraging | 600 -> 352 | 337.0 -> 83.7 | 1184.8 -> 3186.8 | +169.0% |
+| Harsh Foraging | 380 -> 320 | 55.0 -> 25.3 | 5722.9 -> 6862.3 | +19.9% |
+| Migration Pressure | 1280 -> 1024 | 124.0 -> 51.3 | 2230.7 -> 2523.5 | +13.1% |
+| Obstacle Pressure | 950 -> 740 | 111.7 -> 75.3 | 4302.6 -> 5256.6 | +22.2% |
+| Omnivore Pressure | 360 -> 320 | 70.0 -> 35.0 | 5439.7 -> 6598.2 | +21.3% |
+| Predation Pressure | 500 -> 384 | 66.3 -> 25.7 | 4818.2 -> 6038.1 | +25.3% |
+| Scavenger Pressure | 448 -> 368 | 30.7 -> 31.3 | 9867.6 -> 9268.1 | -6.1% |
+| Terrain Pressure | 720 -> 624 | 52.7 -> 36.0 | 5438.2 -> 6074.2 | +11.7% |
+
+30k stability check after tuning:
+
+| Scenario | Avg final creatures | Range | Avg ticks/s | Status |
+| --- | ---: | --- | ---: | --- |
+| Balanced Foraging | 23.0 | 19-29 | 5515.9 | Completed |
+| Carrion Pressure | 37.3 | 25-48 | 6410.8 | Completed |
+| Gentle Foraging | 29.3 | 21-38 | 3563.1 | Completed |
+| Harsh Foraging | 14.0 | 11-17 | 7943.8 | Completed |
+| Migration Pressure | 45.7 | 39-50 | 2837.5 | Completed |
+| Obstacle Pressure | 65.7 | 51-75 | 4866.8 | Completed |
+| Omnivore Pressure | 22.0 | 18-29 | 7353.0 | Completed |
+| Predation Pressure | 23.0 | 11-32 | 6487.3 | Completed |
+| Scavenger Pressure | 25.0 | 19-36 | 9266.7 | Completed |
+| Terrain Pressure | 36.7 | 21-56 | 6317.8 | Completed |
+
+Interpretation:
+
+- The pass produces much lower populations while keeping all sampled scenarios alive through 30k ticks.
+- Most scenarios are faster because there are fewer plants and creatures to process.
+- Carrion and scavenger trade some throughput for stronger founder senses, which improved sparse-food viability.
+- Harsh is intentionally near the low end; if future mechanics increase mortality further, it should be the first scenario to soften.
+- This is a new baseline for the branch. Future behavior/performance checks should compare against the `low_density_pass4_*` reports rather than the older dense-resource probes.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

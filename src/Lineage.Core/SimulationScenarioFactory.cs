@@ -174,6 +174,10 @@ public static class SimulationScenarioFactory
 
         var genomeId = state.AddGenome(CreatureGenome.Baseline with
         {
+            BodyRadius = scenario.InitialBodyRadius,
+            MaxSpeed = scenario.InitialMaxSpeed,
+            MaxTurnRadiansPerSecond = scenario.InitialMaxTurnRadiansPerSecond,
+            SenseRadius = scenario.InitialSenseRadius,
             BasalEnergyPerSecond = scenario.BasalEnergyPerSecond,
             MovementEnergyPerSecond = scenario.MovementEnergyPerSecond,
             EatCaloriesPerSecond = scenario.EatCaloriesPerSecond,
