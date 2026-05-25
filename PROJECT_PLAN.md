@@ -694,12 +694,14 @@ Starter scenarios:
 - `scenarios/carrion-pressure.json`
 - `scenarios/omnivore-pressure.json`
 - `scenarios/predation-pressure.json`
+- `scenarios/predator-prey-pressure.json`
 - `scenarios/terrain-pressure.json`
 - `scenarios/mixed-starter-roster.json`
 
 Starter species profiles:
 
 - `species/starter-seed-forager.species.json`
+- `species/starter-sector-forager.species.json`
 - `species/starter-explorer-forager.species.json`
 - `species/starter-scavenger-forager.species.json`
 - `species/starter-forager-predator.species.json`

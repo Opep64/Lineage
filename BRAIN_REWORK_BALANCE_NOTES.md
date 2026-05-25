@@ -703,6 +703,63 @@ Interpretation:
 - The likely design issue is that `predation-pressure` starts every creature as a forager-predator, so the whole population immediately acts as both predator and prey.
 - Next predation work should probably use a mixed predator/prey roster and refresh starter species profiles from the current BrainFactory before more damage tuning. That would let predation emerge as an ecological pressure on foragers instead of turning the entire founding population into mutual predators.
 
+## 2026-05-25 Mixed Predator/Prey Roster
+
+Refreshed starter species profiles from current BrainFactory exports so scenario rosters no longer rely on old 335-weight migrated brains. Current starter profiles now have 2184 weights:
+
+- `species/starter-seed-forager.species.json`
+- `species/starter-sector-forager.species.json`
+- `species/starter-explorer-forager.species.json`
+- `species/starter-scavenger-forager.species.json`
+- `species/starter-forager-predator.species.json`
+
+Added `scenarios/predator-prey-pressure.json`, using the same broad environment as `predation-pressure` but with a mixed startup roster:
+
+- 76 sector foragers
+- 24 explorer foragers
+- 10 scavenger foragers
+- 10 forager predators
+
+Validation files:
+
+- `out/predator_prey_roster_20260525/predator_prey_compare_30k.csv`
+- `out/predator_prey_roster_20260525/predator_prey_compare_30k.html`
+- `out/predator_prey_roster_20260525/predator_prey_10pred_30k.csv`
+- `out/predator_prey_roster_20260525/predator_prey_10pred_30k.html`
+- `out/predator_prey_roster_20260525/predator_prey_10pred_60k.csv`
+- `out/predator_prey_roster_20260525/predator_prey_10pred_60k.html`
+- `out/predator_prey_roster_20260525/seed44_60k_report.html`
+
+30k comparison, seeds 42/43/44:
+
+| Scenario | Avg final creatures | Range | Avg births | Avg deaths | Avg starvation deaths | Avg injury deaths | Avg tail creatures | Avg fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| All-predator `predation-pressure` | 19.7 | 17-22 | 303.3 | 283.7 | 108.7 | 167.7 | 21.7 | 22.2% |
+| Mixed roster, 4 predators | 34.3 | 25-48 | 332.0 | 297.7 | 291.7 | 4.7 | 36.8 | 0.0% |
+| Mixed roster, 10 predators | 35.0 | 28-47 | 329.0 | 294.0 | 271.3 | 21.3 | 34.5 | 0.0% |
+
+60k mixed-roster probe with 10 predators, seeds 42/43/44:
+
+| Avg final creatures | Range | Avg births | Avg deaths | Avg starvation deaths | Avg injury deaths | Avg tail creatures | Avg tail attack intent |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 48.3 | 45-53 | 519.7 | 471.3 | 429.7 | 38.3 | 49.2 | 0.36% |
+
+Detailed 60k seed 44 founder-line survival:
+
+| Founder profile | Founder count | Total descendants + founders | Living creatures | Max generation |
+| --- | ---: | ---: | ---: | ---: |
+| Sector forager | 76 | 240 | 2 | 6 |
+| Explorer forager | 24 | 38 | 0 | 2 |
+| Scavenger forager | 10 | 205 | 42 | 6 |
+| Forager predator | 10 | 51 | 1 | 6 |
+
+Interpretation:
+
+- The mixed roster is much more stable than the all-predator setup and supports longer runs without drifting toward extinction.
+- Predation pressure is now light and episodic rather than dominant. That is probably a better baseline, but it is not yet a strong sustained predator/prey loop.
+- Scavenger lines can capitalize on the scenario especially well, which may be useful pressure but may also need a separate cap/tuning pass later.
+- Next predation-specific work should focus on making predatory lineages better at converting kills into nutrition and reproduction, not simply increasing global bite damage.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
