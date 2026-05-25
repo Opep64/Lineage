@@ -16,10 +16,28 @@ public static class CreatureDigestion
     public const float FullCarrionFreshMeatPenalty = 0.25f;
     public const float FullCarrionStaleMeatRecovery = 0.85f;
     public const float FullCarrionRottenMeatProtection = 0.9f;
+    private const float TenderPlantAdaptationBonus = 0.25f;
+    private const float RichPlantAdaptationBonus = 0.35f;
+    private const float ToughPlantAdaptationBonus = 0.65f;
 
     public static float PlantEfficiency(CreatureGenome genome)
     {
         return Efficiency(1f - genome.DietaryAdaptation);
+    }
+
+    public static float PlantTypeEnergyEfficiency(CreatureGenome genome, PlantResourceKind plantKind)
+    {
+        return PlantEfficiency(genome)
+            * PlantResourceTraits.DigestionEnergyMultiplier(plantKind)
+            * PlantTypeAdaptationMultiplier(genome, plantKind);
+    }
+
+    public static float PlantSpecializationUpkeepFactor(CreatureGenome genome)
+    {
+        var tender = Math.Clamp(genome.TenderPlantAdaptation, 0f, 1f);
+        var rich = Math.Clamp(genome.RichPlantAdaptation, 0f, 1f);
+        var tough = Math.Clamp(genome.ToughPlantAdaptation, 0f, 1f);
+        return tender * tender + rich * rich + tough * tough;
     }
 
     public static float MeatEfficiency(CreatureGenome genome)
@@ -74,5 +92,16 @@ public static class CreatureDigestion
     {
         return MinimumEfficiency
             + (MaximumEfficiency - MinimumEfficiency) * Math.Clamp(specialization, 0f, 1f);
+    }
+
+    private static float PlantTypeAdaptationMultiplier(CreatureGenome genome, PlantResourceKind plantKind)
+    {
+        return plantKind switch
+        {
+            PlantResourceKind.Tender => 1f + Math.Clamp(genome.TenderPlantAdaptation, 0f, 1f) * TenderPlantAdaptationBonus,
+            PlantResourceKind.Rich => 1f + Math.Clamp(genome.RichPlantAdaptation, 0f, 1f) * RichPlantAdaptationBonus,
+            PlantResourceKind.Tough => 1f + Math.Clamp(genome.ToughPlantAdaptation, 0f, 1f) * ToughPlantAdaptationBonus,
+            _ => 1f
+        };
     }
 }

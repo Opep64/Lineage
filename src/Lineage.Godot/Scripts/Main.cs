@@ -954,6 +954,8 @@ public partial class Main : Node2D
             $"Diet meat bias {genome.DietaryAdaptation:0.00}\n" +
             $"Carrion bias {genome.CarrionAdaptation:0.00}\n" +
             $"Digest plant {CreatureDigestion.PlantEfficiency(genome):P0}  meat {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
+            $"Plant adapt T {genome.TenderPlantAdaptation:0.00}  R {genome.RichPlantAdaptation:0.00}  Tough {genome.ToughPlantAdaptation:0.00}\n" +
+            $"Plant yield T {CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tender):P0}  R {CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Rich):P0}  Tough {CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tough):P0}\n" +
             $"Meat digest fresh {CreatureDigestion.FreshMeatEnergyEfficiency(genome):P0}  stale {CreatureDigestion.StaleMeatEnergyEfficiency(genome):P0}\n" +
             $"Digest rate {CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome):0.0}/{genome.DigestionCaloriesPerSecond:0.0}\n" +
             $"Gut cap {gutCapacity:0.0}/{genome.GutCapacityCalories:0.0}\n" +

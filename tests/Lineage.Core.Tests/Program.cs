@@ -42,6 +42,7 @@ var tests = new (string Name, Action Body)[]
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
     ("Plant type controls eating transfer rate", PlantTypeControlsEatingTransferRate),
     ("Plant type controls digestion payoff", PlantTypeControlsDigestionPayoff),
+    ("Plant adaptation controls digestion payoff", PlantAdaptationControlsDigestionPayoff),
     ("Eating requires body contact with a resource", EatingRequiresBodyContact),
     ("Dietary adaptation controls digested calories", DietaryAdaptationControlsDigestedCalories),
     ("Carrion adaptation trades fresh and stale meat digestion", CarrionAdaptationTradesFreshAndStaleMeatDigestion),
@@ -51,6 +52,7 @@ var tests = new (string Name, Action Body)[]
     ("Dead creatures leave meat resources", DeadCreaturesLeaveMeatResources),
     ("Metabolism can charge body-size upkeep", MetabolismChargesBodySizeUpkeep),
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
+    ("Metabolism charges plant specialization upkeep", MetabolismChargesPlantSpecializationUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
     ("Reproduction fertility declines with age", ReproductionFertilityDeclinesWithAge),
@@ -1521,7 +1523,30 @@ static void PlantTypeControlsDigestionPayoff()
     AssertClose(7.8f, RunPlantTypeDigestionProbe(PlantResourceKind.Tough), 0.000001, "Tough plant digestion");
 }
 
-static float RunPlantTypeDigestionProbe(PlantResourceKind plantKind)
+static void PlantAdaptationControlsDigestionPayoff()
+{
+    AssertClose(
+        12.5f,
+        RunPlantTypeDigestionProbe(PlantResourceKind.Tender, tenderPlantAdaptation: 1f),
+        0.000001,
+        "Tender adaptation improves tender plant digestion");
+    AssertClose(
+        14.175f,
+        RunPlantTypeDigestionProbe(PlantResourceKind.Rich, richPlantAdaptation: 1f),
+        0.000001,
+        "Rich adaptation improves rich plant digestion");
+    AssertClose(
+        12.87f,
+        RunPlantTypeDigestionProbe(PlantResourceKind.Tough, toughPlantAdaptation: 1f),
+        0.000001,
+        "Tough adaptation improves tough plant digestion");
+}
+
+static float RunPlantTypeDigestionProbe(
+    PlantResourceKind plantKind,
+    float tenderPlantAdaptation = 0f,
+    float richPlantAdaptation = 0f,
+    float toughPlantAdaptation = 0f)
 {
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 1f },
@@ -1536,6 +1561,9 @@ static float RunPlantTypeDigestionProbe(PlantResourceKind plantKind)
         DigestionCaloriesPerSecond = 10f,
         GutCapacityCalories = 30f,
         DietaryAdaptation = 0f,
+        TenderPlantAdaptation = tenderPlantAdaptation,
+        RichPlantAdaptation = richPlantAdaptation,
+        ToughPlantAdaptation = toughPlantAdaptation,
         MaturityAgeSeconds = 0f
     });
 
@@ -1904,6 +1932,32 @@ static void MetabolismChargesTraitUpkeep()
     simulation.Step();
 
     AssertClose(8.525f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after trait upkeep");
+}
+
+static void MetabolismChargesPlantSpecializationUpkeep()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 133,
+        systems:
+        [
+            new MetabolismSystem(plantSpecializationEnergyCostPerSecond: 1f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 1f,
+        TenderPlantAdaptation = 0.5f,
+        RichPlantAdaptation = 0.25f,
+        ToughPlantAdaptation = 1f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+
+    simulation.Step();
+
+    AssertClose(7.6875f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after plant specialization upkeep");
 }
 
 static void MetabolismBasalCostFollowsBiomeMultiplier()
@@ -5455,6 +5509,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
     AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AverageDietaryAdaptation, 0.000001, "Average dietary adaptation");
     AssertClose(CreatureGenome.Baseline.CarrionAdaptation, snapshot.AverageCarrionAdaptation, 0.000001, "Average carrion adaptation");
+    AssertClose(CreatureGenome.Baseline.TenderPlantAdaptation, snapshot.AverageTenderPlantAdaptation, 0.000001, "Average tender plant adaptation");
+    AssertClose(CreatureGenome.Baseline.RichPlantAdaptation, snapshot.AverageRichPlantAdaptation, 0.000001, "Average rich plant adaptation");
+    AssertClose(CreatureGenome.Baseline.ToughPlantAdaptation, snapshot.AverageToughPlantAdaptation, 0.000001, "Average tough plant adaptation");
     AssertClose(CreatureGenome.Baseline.BiteStrength, snapshot.AverageBiteStrength, 0.000001, "Average bite strength");
     AssertClose(CreatureGenome.Baseline.DamageResistance, snapshot.AverageDamageResistance, 0.000001, "Average damage resistance");
     AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AttackerAverageDietaryAdaptation, 0.000001, "Attacker dietary adaptation");
@@ -7058,6 +7115,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         DigestionRateEnergyCostPerSecond = 0.008f,
         BiteStrengthEnergyCostPerSecond = 0.05f,
         DamageResistanceEnergyCostPerSecond = 0.02f,
+        PlantSpecializationEnergyCostPerSecond = 0f,
         EggEnergyCostPerSecond = 0.02f,
         EggEnvironmentalDamagePerSecond = 0.04f,
         MovementEnergyPerSecond = 1.25f,
@@ -7069,6 +7127,9 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         MaturityAgeSeconds = 0f,
         DietaryAdaptation = 0.25f,
         CarrionAdaptation = 0.35f,
+        TenderPlantAdaptation = 0.2f,
+        RichPlantAdaptation = 0.3f,
+        ToughPlantAdaptation = 0.4f,
         BiteStrength = 0.75f,
         DamageResistance = 1.25f,
         DeathMeatCaloriesPerBodyRadius = 5f,
@@ -7101,6 +7162,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(0.008f, scenario.DigestionRateEnergyCostPerSecond, 0.000001, "Scenario digestion-rate energy");
     AssertClose(0.05f, scenario.BiteStrengthEnergyCostPerSecond, 0.000001, "Scenario bite-strength energy");
     AssertClose(0.02f, scenario.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
+    AssertClose(0f, scenario.PlantSpecializationEnergyCostPerSecond, 0.000001, "Scenario plant specialization energy");
     AssertClose(0.02f, scenario.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(0.04f, scenario.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(1.25f, genome.MovementEnergyPerSecond, 0.000001, "Seeded movement energy");
@@ -7113,6 +7175,9 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(0f, genome.MaturityAgeSeconds, 0.000001, "Seeded maturity age");
     AssertClose(0.25f, genome.DietaryAdaptation, 0.000001, "Seeded dietary adaptation");
     AssertClose(0.35f, genome.CarrionAdaptation, 0.000001, "Seeded carrion adaptation");
+    AssertClose(0.2f, genome.TenderPlantAdaptation, 0.000001, "Seeded tender plant adaptation");
+    AssertClose(0.3f, genome.RichPlantAdaptation, 0.000001, "Seeded rich plant adaptation");
+    AssertClose(0.4f, genome.ToughPlantAdaptation, 0.000001, "Seeded tough plant adaptation");
     AssertClose(0.75f, genome.BiteStrength, 0.000001, "Seeded bite strength");
     AssertClose(1.25f, genome.DamageResistance, 0.000001, "Seeded damage resistance");
     AssertClose(5f, scenario.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
@@ -7289,6 +7354,7 @@ static void ScenarioJsonRoundTrips()
         DigestionRateEnergyCostPerSecond = 0.0065f,
         BiteStrengthEnergyCostPerSecond = 0.041f,
         DamageResistanceEnergyCostPerSecond = 0.032f,
+        PlantSpecializationEnergyCostPerSecond = 0.019f,
         MemoryEnergyCostPerSecond = 0.021f,
         MemoryDecayPerSecond = 0.09f,
         MemoryWriteRatePerSecond = 1.75f,
@@ -7309,6 +7375,9 @@ static void ScenarioJsonRoundTrips()
         CrowdingFertilityPenalty = 0.55f,
         DietaryAdaptation = 0.42f,
         CarrionAdaptation = 0.37f,
+        TenderPlantAdaptation = 0.11f,
+        RichPlantAdaptation = 0.22f,
+        ToughPlantAdaptation = 0.33f,
         BiteStrength = 0.7f,
         DamageResistance = 1.4f,
         DeathMeatCaloriesPerBodyRadius = 3.5f,
@@ -7358,6 +7427,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
+    AssertTrue(json.Contains("\"plantSpecializationEnergyCostPerSecond\""), "JSON should serialize plant specialization cost");
+    AssertTrue(json.Contains("\"tenderPlantAdaptation\""), "JSON should serialize tender plant adaptation");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
@@ -7435,6 +7506,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.DigestionRateEnergyCostPerSecond, roundTripped.DigestionRateEnergyCostPerSecond, 0.000001, "Scenario digestion-rate energy");
     AssertClose(scenario.BiteStrengthEnergyCostPerSecond, roundTripped.BiteStrengthEnergyCostPerSecond, 0.000001, "Scenario bite-strength energy");
     AssertClose(scenario.DamageResistanceEnergyCostPerSecond, roundTripped.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
+    AssertClose(scenario.PlantSpecializationEnergyCostPerSecond, roundTripped.PlantSpecializationEnergyCostPerSecond, 0.000001, "Scenario plant specialization energy");
     AssertClose(scenario.MemoryEnergyCostPerSecond, roundTripped.MemoryEnergyCostPerSecond, 0.000001, "Scenario memory energy");
     AssertClose(scenario.MemoryDecayPerSecond, roundTripped.MemoryDecayPerSecond, 0.000001, "Scenario memory decay");
     AssertClose(scenario.MemoryWriteRatePerSecond, roundTripped.MemoryWriteRatePerSecond, 0.000001, "Scenario memory write rate");
@@ -7455,6 +7527,9 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.CrowdingFertilityPenalty, roundTripped.CrowdingFertilityPenalty, 0.000001, "Scenario crowding fertility");
     AssertClose(scenario.DietaryAdaptation, roundTripped.DietaryAdaptation, 0.000001, "Scenario dietary adaptation");
     AssertClose(scenario.CarrionAdaptation, roundTripped.CarrionAdaptation, 0.000001, "Scenario carrion adaptation");
+    AssertClose(scenario.TenderPlantAdaptation, roundTripped.TenderPlantAdaptation, 0.000001, "Scenario tender plant adaptation");
+    AssertClose(scenario.RichPlantAdaptation, roundTripped.RichPlantAdaptation, 0.000001, "Scenario rich plant adaptation");
+    AssertClose(scenario.ToughPlantAdaptation, roundTripped.ToughPlantAdaptation, 0.000001, "Scenario tough plant adaptation");
     AssertClose(scenario.BiteStrength, roundTripped.BiteStrength, 0.000001, "Scenario bite strength");
     AssertClose(scenario.DamageResistance, roundTripped.DamageResistance, 0.000001, "Scenario damage resistance");
     AssertClose(scenario.DeathMeatCaloriesPerBodyRadius, roundTripped.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");

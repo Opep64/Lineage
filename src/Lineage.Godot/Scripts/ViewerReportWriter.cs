@@ -296,6 +296,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Meat energy share", FormatPercent(snapshot.MeatDigestedEnergyShare));
         WriteMetric(writer, "Average diet", snapshot.AverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average carrion", snapshot.AverageCarrionAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Average plant adaptation", $"T {snapshot.AverageTenderPlantAdaptation:0.###}, R {snapshot.AverageRichPlantAdaptation:0.###}, Tough {snapshot.AverageToughPlantAdaptation:0.###}");
         WriteMetric(writer, "Average bite", snapshot.AverageBiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average resistance", snapshot.AverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Attacker diet", snapshot.AttackerAverageDietaryAdaptation.ToString("0.###", CultureInfo.InvariantCulture));
@@ -310,7 +311,10 @@ public static class ViewerReportWriter
         var startingGenome = CreatureGenome.Baseline with
         {
             DietaryAdaptation = scenario.DietaryAdaptation,
-            CarrionAdaptation = scenario.CarrionAdaptation
+            CarrionAdaptation = scenario.CarrionAdaptation,
+            TenderPlantAdaptation = scenario.TenderPlantAdaptation,
+            RichPlantAdaptation = scenario.RichPlantAdaptation,
+            ToughPlantAdaptation = scenario.ToughPlantAdaptation
         };
 
         writer.WriteLine("<section>");
@@ -360,6 +364,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Digestion rate upkeep", $"{scenario.DigestionRateEnergyCostPerSecond:0.######} energy/rate/s");
         WriteMetric(writer, "Bite strength upkeep", $"{scenario.BiteStrengthEnergyCostPerSecond:0.######} energy/strength/s");
         WriteMetric(writer, "Damage resistance upkeep", $"{scenario.DamageResistanceEnergyCostPerSecond:0.######} energy/resistance/s");
+        WriteMetric(writer, "Plant specialization upkeep", $"{scenario.PlantSpecializationEnergyCostPerSecond:0.######} energy/unit/s");
         WriteMetric(writer, "Active memory upkeep", $"{scenario.MemoryEnergyCostPerSecond:0.######} energy/full-memory/s");
         WriteMetric(writer, "Memory decay", $"{scenario.MemoryDecayPerSecond:0.######}/s");
         WriteMetric(writer, "Memory write rate", $"{scenario.MemoryWriteRatePerSecond:0.######}/s");
@@ -379,9 +384,13 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Crowding fertility penalty", FormatPercent(scenario.CrowdingFertilityPenalty));
         WriteMetric(writer, "Starting diet", $"{scenario.DietaryAdaptation:0.###} meat bias");
         WriteMetric(writer, "Starting carrion", $"{scenario.CarrionAdaptation:0.###} stale-meat bias");
+        WriteMetric(writer, "Starting plant adaptation", $"T {scenario.TenderPlantAdaptation:0.###}, R {scenario.RichPlantAdaptation:0.###}, Tough {scenario.ToughPlantAdaptation:0.###}");
         WriteMetric(writer, "Starting bite strength", scenario.BiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting damage resistance", scenario.DamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(startingGenome)));
+        WriteMetric(writer, "Starting tender digestion", FormatPercent(CreatureDigestion.PlantTypeEnergyEfficiency(startingGenome, PlantResourceKind.Tender)));
+        WriteMetric(writer, "Starting rich digestion", FormatPercent(CreatureDigestion.PlantTypeEnergyEfficiency(startingGenome, PlantResourceKind.Rich)));
+        WriteMetric(writer, "Starting tough digestion", FormatPercent(CreatureDigestion.PlantTypeEnergyEfficiency(startingGenome, PlantResourceKind.Tough)));
         WriteMetric(writer, "Starting meat digestion", FormatPercent(CreatureDigestion.MeatEfficiency(startingGenome)));
         WriteMetric(writer, "Starting fresh meat digestion", FormatPercent(CreatureDigestion.FreshMeatEnergyEfficiency(startingGenome)));
         WriteMetric(writer, "Starting stale meat digestion", FormatPercent(CreatureDigestion.StaleMeatEnergyEfficiency(startingGenome)));
@@ -475,6 +484,9 @@ public static class ViewerReportWriter
             WriteTraitRow(writer, "Maturity age seconds", traitSummary.MaturityAgeSeconds);
             WriteTraitRow(writer, "Dietary adaptation meat bias", traitSummary.DietaryAdaptation);
             WriteTraitRow(writer, "Carrion adaptation stale bias", traitSummary.CarrionAdaptation);
+            WriteTraitRow(writer, "Tender plant adaptation", traitSummary.TenderPlantAdaptation);
+            WriteTraitRow(writer, "Rich plant adaptation", traitSummary.RichPlantAdaptation);
+            WriteTraitRow(writer, "Tough plant adaptation", traitSummary.ToughPlantAdaptation);
             WriteTraitRow(writer, "Plant digestion efficiency", traitSummary.PlantDigestion);
             WriteTraitRow(writer, "Meat digestion efficiency", traitSummary.MeatDigestion);
             WriteTraitRow(writer, "Fresh meat digestion efficiency", traitSummary.FreshMeatDigestion);
@@ -572,6 +584,9 @@ public static class ViewerReportWriter
             summary.MaturityAgeSeconds.Add(genome.MaturityAgeSeconds);
             summary.DietaryAdaptation.Add(genome.DietaryAdaptation);
             summary.CarrionAdaptation.Add(genome.CarrionAdaptation);
+            summary.TenderPlantAdaptation.Add(genome.TenderPlantAdaptation);
+            summary.RichPlantAdaptation.Add(genome.RichPlantAdaptation);
+            summary.ToughPlantAdaptation.Add(genome.ToughPlantAdaptation);
             summary.PlantDigestion.Add(CreatureDigestion.PlantEfficiency(genome));
             summary.MeatDigestion.Add(CreatureDigestion.MeatEfficiency(genome));
             summary.FreshMeatDigestion.Add(CreatureDigestion.FreshMeatEnergyEfficiency(genome));
@@ -1297,7 +1312,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Adapt</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -1316,6 +1331,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(summary.RegionLabel)}</td>" +
                 $"<td>{Html(summary.AverageGenomeDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.AverageBrainDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPlantAdaptation(summary))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AveragePlantDigestion))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AverageMeatDigestion))}</td>" +
                 $"<td>{Html(FormatPercent(summary.AttackShare))}</td>" +
@@ -2010,6 +2026,11 @@ public static class ViewerReportWriter
             : $"{min}-{max} avg {average:0.##}";
     }
 
+    private static string FormatPlantAdaptation(SpeciesClusterSummary summary)
+    {
+        return $"T {summary.AverageTenderPlantAdaptation:0.##} / R {summary.AverageRichPlantAdaptation:0.##} / Tough {summary.AverageToughPlantAdaptation:0.##}";
+    }
+
     private static string FormatPlantRelocations(SimulationStats stats)
     {
         return $"local {stats.PlantLocalDispersalCount}, cluster {stats.PlantClusterRelocationCount}, global {stats.PlantGlobalRelocationCount}";
@@ -2146,6 +2167,9 @@ public static class ViewerReportWriter
         public FloatAccumulator MaturityAgeSeconds;
         public FloatAccumulator DietaryAdaptation;
         public FloatAccumulator CarrionAdaptation;
+        public FloatAccumulator TenderPlantAdaptation;
+        public FloatAccumulator RichPlantAdaptation;
+        public FloatAccumulator ToughPlantAdaptation;
         public FloatAccumulator PlantDigestion;
         public FloatAccumulator MeatDigestion;
         public FloatAccumulator FreshMeatDigestion;

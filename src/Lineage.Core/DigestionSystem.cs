@@ -214,17 +214,14 @@ public sealed class DigestionSystem : ISimulationSystem
         creature.GutRichPlantCalories = Math.Max(0f, creature.GutRichPlantCalories - richDigested);
         creature.GutToughPlantCalories = Math.Max(0f, creature.GutToughPlantCalories - toughDigested);
 
-        var plantEfficiency = CreatureDigestion.PlantEfficiency(genome);
-        var genericEnergy = genericDigested * plantEfficiency;
+        var genericEnergy = genericDigested
+            * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Generic);
         var tenderEnergy = tenderDigested
-            * plantEfficiency
-            * PlantResourceTraits.DigestionEnergyMultiplier(PlantResourceKind.Tender);
+            * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tender);
         var richEnergy = richDigested
-            * plantEfficiency
-            * PlantResourceTraits.DigestionEnergyMultiplier(PlantResourceKind.Rich);
+            * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Rich);
         var toughEnergy = toughDigested
-            * plantEfficiency
-            * PlantResourceTraits.DigestionEnergyMultiplier(PlantResourceKind.Tough);
+            * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tough);
 
         return new PlantDigestionResult(
             genericEnergy + tenderEnergy + richEnergy + toughEnergy,

@@ -729,6 +729,9 @@ public static class SpeciesClusterAnalyzer
         var totalSenseRadius = 0f;
         var totalDietaryAdaptation = 0f;
         var totalCarrionAdaptation = 0f;
+        var totalTenderPlantAdaptation = 0f;
+        var totalRichPlantAdaptation = 0f;
+        var totalToughPlantAdaptation = 0f;
         var totalBiteStrength = 0f;
         var totalDamageResistance = 0f;
         var totalPlantDigestion = 0f;
@@ -765,6 +768,9 @@ public static class SpeciesClusterAnalyzer
             totalSenseRadius += genome.SenseRadius;
             totalDietaryAdaptation += genome.DietaryAdaptation;
             totalCarrionAdaptation += genome.CarrionAdaptation;
+            totalTenderPlantAdaptation += genome.TenderPlantAdaptation;
+            totalRichPlantAdaptation += genome.RichPlantAdaptation;
+            totalToughPlantAdaptation += genome.ToughPlantAdaptation;
             totalBiteStrength += genome.BiteStrength;
             totalDamageResistance += genome.DamageResistance;
             totalPlantDigestion += CreatureDigestion.PlantEfficiency(genome);
@@ -788,6 +794,9 @@ public static class SpeciesClusterAnalyzer
             .FirstOrDefault();
         var averageDietaryAdaptation = totalDietaryAdaptation / count;
         var averageCarrionAdaptation = totalCarrionAdaptation / count;
+        var averageTenderPlantAdaptation = totalTenderPlantAdaptation / count;
+        var averageRichPlantAdaptation = totalRichPlantAdaptation / count;
+        var averageToughPlantAdaptation = totalToughPlantAdaptation / count;
         var averageBiteStrength = totalBiteStrength / count;
         var eatingShare = eatingCount / (float)count;
         var attackShare = attackingCount / (float)count;
@@ -817,6 +826,9 @@ public static class SpeciesClusterAnalyzer
             AverageSenseRadius: totalSenseRadius / count,
             AverageDietaryAdaptation: averageDietaryAdaptation,
             AverageCarrionAdaptation: averageCarrionAdaptation,
+            AverageTenderPlantAdaptation: averageTenderPlantAdaptation,
+            AverageRichPlantAdaptation: averageRichPlantAdaptation,
+            AverageToughPlantAdaptation: averageToughPlantAdaptation,
             AveragePlantDigestion: totalPlantDigestion / count,
             AverageMeatDigestion: totalMeatDigestion / count,
             AverageFreshMeatDigestion: totalFreshMeatDigestion / count,
@@ -1003,6 +1015,9 @@ public static class SpeciesClusterAnalyzer
             LogFeature(MathF.Max(1f, genome.ReproductionCooldownSeconds), 1f, 60f),
             Math.Clamp(genome.DietaryAdaptation, 0f, 1f),
             Math.Clamp(genome.CarrionAdaptation, 0f, 1f),
+            Math.Clamp(genome.TenderPlantAdaptation, 0f, 1f),
+            Math.Clamp(genome.RichPlantAdaptation, 0f, 1f),
+            Math.Clamp(genome.ToughPlantAdaptation, 0f, 1f),
             LogFeature(genome.GutCapacityCalories, 5f, 250f),
             LogFeature(genome.DigestionCaloriesPerSecond, 1f, 60f),
             LogFeature(genome.BiteStrength, 0.05f, 4f),
@@ -1745,6 +1760,9 @@ public readonly record struct SpeciesClusterSummary(
     float AverageSenseRadius,
     float AverageDietaryAdaptation,
     float AverageCarrionAdaptation,
+    float AverageTenderPlantAdaptation,
+    float AverageRichPlantAdaptation,
+    float AverageToughPlantAdaptation,
     float AveragePlantDigestion,
     float AverageMeatDigestion,
     float AverageFreshMeatDigestion,

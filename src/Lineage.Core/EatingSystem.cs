@@ -118,8 +118,7 @@ public sealed class EatingSystem(
 
             var efficiency = resource.Kind == ResourceKind.Meat
                 ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
-                : CreatureDigestion.PlantEfficiency(genome)
-                    * PlantResourceTraits.DigestionEnergyMultiplier(resource.PlantKind);
+                : CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
 
             var distanceSquared = centerDistance * centerDistance;
             if (IsBetterFoodContact(efficiency, edgeDistance, distanceSquared, bestEfficiency, bestEdgeDistance, bestDistanceSquared))

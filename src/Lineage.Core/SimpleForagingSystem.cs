@@ -109,7 +109,7 @@ public sealed class SimpleForagingSystem(
             var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
             var efficiency = resource.Kind == ResourceKind.Meat
                 ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
-                : CreatureDigestion.PlantEfficiency(genome);
+                : CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
             var score = proximity * efficiency;
             var distanceSquared = centerDistance * centerDistance;
             if (score > bestScore

@@ -89,7 +89,8 @@ public static class SimulationScenarioMetadata
 
         if (name.Contains("Chance", StringComparison.Ordinal)
             || name.Contains("MutationRate", StringComparison.Ordinal)
-            || name is "DietaryAdaptation" or "CarrionAdaptation" or "DeathMeatEnergyFraction"
+            || name.Contains("Adaptation", StringComparison.Ordinal)
+            || name is "DeathMeatEnergyFraction"
                 or "CloseSenseRefreshProximity" or "LocalFertilityNeighborDepletionShare")
         {
             return (0d, 1d, step, units, description);

@@ -14,6 +14,7 @@ public sealed class MetabolismSystem(
     float digestionRateEnergyCostPerSecond = 0f,
     float biteStrengthEnergyCostPerSecond = 0f,
     float damageResistanceEnergyCostPerSecond = 0f,
+    float plantSpecializationEnergyCostPerSecond = 0f,
     float memoryEnergyCostPerSecond = 0f,
     BiomePressureProfile? biomeBasalCostProfile = null) : ISimulationSystem
 {
@@ -39,6 +40,8 @@ public sealed class MetabolismSystem(
         ValidateCost(biteStrengthEnergyCostPerSecond, nameof(biteStrengthEnergyCostPerSecond));
     private readonly float _damageResistanceEnergyCostPerSecond =
         ValidateCost(damageResistanceEnergyCostPerSecond, nameof(damageResistanceEnergyCostPerSecond));
+    private readonly float _plantSpecializationEnergyCostPerSecond =
+        ValidateCost(plantSpecializationEnergyCostPerSecond, nameof(plantSpecializationEnergyCostPerSecond));
     private readonly float _memoryEnergyCostPerSecond =
         ValidateCost(memoryEnergyCostPerSecond, nameof(memoryEnergyCostPerSecond));
 
@@ -65,6 +68,7 @@ public sealed class MetabolismSystem(
                 + CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond
                 + CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond
                 + CreatureGrowth.EffectiveDamageResistance(creature, genome) * _damageResistanceEnergyCostPerSecond
+                + CreatureDigestion.PlantSpecializationUpkeepFactor(genome) * _plantSpecializationEnergyCostPerSecond
                 + Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond;
             var biomeBasalCostMultiplier = _biomeBasalCostProfile.For(state.Biomes.GetKindAt(creature.Position));
             creature.Energy -= (genome.BasalEnergyPerSecond * biomeBasalCostMultiplier + traitUpkeep) * deltaSeconds;

@@ -100,6 +100,9 @@ public sealed class StatsRecordingSystem(
         var totalVisionAngle = 0f;
         var totalDietaryAdaptation = 0f;
         var totalCarrionAdaptation = 0f;
+        var totalTenderPlantAdaptation = 0f;
+        var totalRichPlantAdaptation = 0f;
+        var totalToughPlantAdaptation = 0f;
         var totalBiteStrength = 0f;
         var totalDamageResistance = 0f;
         var totalBiomeMovementCostMultiplier = 0f;
@@ -272,6 +275,9 @@ public sealed class StatsRecordingSystem(
             totalVisionAngle += CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
             totalDietaryAdaptation += genome.DietaryAdaptation;
             totalCarrionAdaptation += genome.CarrionAdaptation;
+            totalTenderPlantAdaptation += genome.TenderPlantAdaptation;
+            totalRichPlantAdaptation += genome.RichPlantAdaptation;
+            totalToughPlantAdaptation += genome.ToughPlantAdaptation;
             totalBiteStrength += genome.BiteStrength;
             totalDamageResistance += genome.DamageResistance;
             var biome = state.Biomes.GetKindAt(creature.Position);
@@ -888,6 +894,9 @@ public sealed class StatsRecordingSystem(
             meatDigestedEnergyShare,
             totalDietaryAdaptation / divisor,
             totalCarrionAdaptation / divisor,
+            totalTenderPlantAdaptation / divisor,
+            totalRichPlantAdaptation / divisor,
+            totalToughPlantAdaptation / divisor,
             totalBiteStrength / divisor,
             totalDamageResistance / divisor,
             attackerTotalDietaryAdaptation / attackerDivisor,

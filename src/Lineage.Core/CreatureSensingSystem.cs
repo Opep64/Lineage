@@ -118,7 +118,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var visionCosThreshold = hasLimitedVision
                 ? MathF.Cos(effectiveVisionAngle * 0.5f)
                 : -1f;
-            var plantFoodEfficiency = CreatureDigestion.PlantEfficiency(genome);
             var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
             var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
             sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
@@ -326,7 +325,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     visionSectors.AddPlant(sectorIndex, proximity);
                 }
 
-                var foodScore = proximity * plantFoodEfficiency;
+                var foodScore = proximity * CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
                 if (foodScore > bestVisibleFoodScore
                     || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
                         && distanceSquared < bestVisibleFoodDistanceSquared))

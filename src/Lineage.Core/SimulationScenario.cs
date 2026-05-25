@@ -202,6 +202,8 @@ public sealed record SimulationScenario
 
     public float DamageResistanceEnergyCostPerSecond { get; init; } = 0.03f;
 
+    public float PlantSpecializationEnergyCostPerSecond { get; init; } = 0.025f;
+
     public float MemoryEnergyCostPerSecond { get; init; } = 0.01f;
 
     public float MemoryDecayPerSecond { get; init; } = NeuralControllerSystem.DefaultMemoryDecayPerSecond;
@@ -247,6 +249,12 @@ public sealed record SimulationScenario
     public float DietaryAdaptation { get; init; } = 0.1f;
 
     public float CarrionAdaptation { get; init; } = 0f;
+
+    public float TenderPlantAdaptation { get; init; } = 0f;
+
+    public float RichPlantAdaptation { get; init; } = 0f;
+
+    public float ToughPlantAdaptation { get; init; } = 0f;
 
     public float BiteStrength { get; init; } = 0.55f;
 
@@ -371,6 +379,7 @@ public sealed record SimulationScenario
         EnsureNonNegative(DigestionRateEnergyCostPerSecond, nameof(DigestionRateEnergyCostPerSecond));
         EnsureNonNegative(BiteStrengthEnergyCostPerSecond, nameof(BiteStrengthEnergyCostPerSecond));
         EnsureNonNegative(DamageResistanceEnergyCostPerSecond, nameof(DamageResistanceEnergyCostPerSecond));
+        EnsureNonNegative(PlantSpecializationEnergyCostPerSecond, nameof(PlantSpecializationEnergyCostPerSecond));
         EnsureNonNegative(MemoryEnergyCostPerSecond, nameof(MemoryEnergyCostPerSecond));
         EnsureNonNegative(MemoryDecayPerSecond, nameof(MemoryDecayPerSecond));
         EnsureNonNegative(MemoryWriteRatePerSecond, nameof(MemoryWriteRatePerSecond));
@@ -393,6 +402,9 @@ public sealed record SimulationScenario
         EnsureRange(CrowdingFertilityPenalty, 0f, 1f, nameof(CrowdingFertilityPenalty));
         EnsureProbability(DietaryAdaptation, nameof(DietaryAdaptation));
         EnsureProbability(CarrionAdaptation, nameof(CarrionAdaptation));
+        EnsureProbability(TenderPlantAdaptation, nameof(TenderPlantAdaptation));
+        EnsureProbability(RichPlantAdaptation, nameof(RichPlantAdaptation));
+        EnsureProbability(ToughPlantAdaptation, nameof(ToughPlantAdaptation));
         EnsurePositive(BiteStrength, nameof(BiteStrength));
         EnsurePositive(DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(DeathMeatCaloriesPerBodyRadius, nameof(DeathMeatCaloriesPerBodyRadius));
