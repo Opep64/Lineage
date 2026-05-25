@@ -792,6 +792,43 @@ Changes:
 - Species clustering now compares compact brain feature buckets instead of every neural weight, while preserving sparse high-weight signals with per-bucket max magnitude.
 - Hidden CLI timing hook: set `LINEAGE_REPORT_TIMING=1` to print report analysis section timings.
 
+## 2026-05-25 Brain Architecture Long Validation
+
+Ran a 60k-tick, three-seed probe comparing the current hybrid neural brain against `hiddenLayerNeural` with 8 hidden nodes.
+
+Validation files:
+
+- `out/validation_20260525/brain_balance_probe_60k.csv`
+- `out/validation_20260525/brain_balance_probe_60k.html`
+
+Probe shape:
+
+- Scenarios: Balanced Foraging, Terrain Pressure, Migration Pressure, Predator Prey Pressure.
+- Seeds: 42, 43, 44.
+- Variant: `hidden8:brainArchitectureKind=hiddenLayerNeural,brainHiddenNodeCount=8`.
+- Stop conditions: stop on extinction, stop above 5,000 creatures.
+
+Results:
+
+| Scenario | Variant | Avg final pop | Range | Tail pop | Avg births | Avg deaths | Max gen | Right creatures | Avg ticks/s |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | Hybrid base | 28.7 | 16-38 | 24.1 | 339.3 | 310.7 | 6.3 | 6.7 | 1689.7 |
+| Balanced Foraging | Hidden8 | 23.0 | 16-33 | 30.5 | 358.3 | 335.3 | 5.7 | 4.0 | 1296.2 |
+| Migration Pressure | Hybrid base | 105.0 | 94-125 | 119.6 | 720.3 | 615.3 | 6.0 | 85.3 | 614.0 |
+| Migration Pressure | Hidden8 | 89.0 | 75-98 | 134.4 | 869.7 | 780.7 | 6.3 | 77.3 | 466.3 |
+| Predator Prey Pressure | Hybrid base | 48.3 | 45-53 | 49.3 | 519.7 | 471.3 | 6.0 | 12.3 | 1142.0 |
+| Predator Prey Pressure | Hidden8 | 48.3 | 45-53 | 49.3 | 519.7 | 471.3 | 6.0 | 12.3 | 1057.3 |
+| Terrain Pressure | Hybrid base | 89.7 | 74-117 | 66.4 | 413.3 | 323.7 | 5.7 | 47.3 | 1227.0 |
+| Terrain Pressure | Hidden8 | 96.3 | 44-123 | 70.6 | 378.3 | 282.0 | 6.0 | 49.0 | 1203.2 |
+
+Interpretation:
+
+- Both architectures stayed viable through 60k ticks in the checked scenarios.
+- Hidden8 is not a clear improvement yet. It was slightly weaker in Balanced and Migration, slightly stronger but high-variance in Terrain, and unchanged in Predator Prey.
+- Hidden8 is slower in the pure scenario-start cases: about 23% slower in Balanced, 24% slower in Migration, and 2% slower in Terrain.
+- Predator Prey uses injected species profiles, so the architecture override does not transform those saved starter brains. Its base and Hidden8 population results match exactly for that reason; only minor runner overhead differs.
+- Keep the hybrid architecture as the default for now. Hidden-layer brains are viable enough to keep, but the fair comparison should wait until the remaining senses are fully wired and until roster scenarios can inject hidden-layer starter species profiles or explicitly transform profile brains at load time.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
