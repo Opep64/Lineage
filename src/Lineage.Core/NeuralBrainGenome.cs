@@ -35,6 +35,10 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutFoodContactKinds = 119;
     private const int LegacyInputCountWithoutHealthRatio = 122;
     private const int LegacyInputCountWithoutCreatureSectorSize = 123;
+    private const int LegacyCreatureSectorSizeChannelCount = 14;
+    private const int LegacyCreatureSectorMotionFoodContactInput =
+        NeuralBrainSchema.VisionSectorInputStart + VisionSectorSet.SectorCount * LegacyCreatureSectorSizeChannelCount;
+    private const int LegacyInputCountWithoutCreatureSectorMotion = LegacyCreatureSectorMotionFoodContactInput + 5;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
 
@@ -826,6 +830,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutCreatureSectorMotion,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutCreatureSectorMotion,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutCreatureSectorSize,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -1151,6 +1170,43 @@ public sealed class NeuralBrainGenome
         if (input == oldReproductionReadinessInput)
         {
             return NeuralBrainSchema.ReproductionReadinessInput;
+        }
+
+        if (legacyInputCount >= LegacyInputCountWithoutCreatureSectorMotion)
+        {
+            if (input >= NeuralBrainSchema.VisionSectorInputStart
+                && input < LegacyCreatureSectorMotionFoodContactInput)
+            {
+                var sectorOffset = input - NeuralBrainSchema.VisionSectorInputStart;
+                var sectorIndex = sectorOffset / LegacyCreatureSectorSizeChannelCount;
+                var channelOffset = sectorOffset % LegacyCreatureSectorSizeChannelCount;
+                return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, channelOffset);
+            }
+
+            if (input == LegacyCreatureSectorMotionFoodContactInput)
+            {
+                return NeuralBrainSchema.FoodContactInput;
+            }
+
+            if (input == LegacyCreatureSectorMotionFoodContactInput + 1)
+            {
+                return NeuralBrainSchema.PlantFoodContactInput;
+            }
+
+            if (input == LegacyCreatureSectorMotionFoodContactInput + 2)
+            {
+                return NeuralBrainSchema.MeatFoodContactInput;
+            }
+
+            if (input == LegacyCreatureSectorMotionFoodContactInput + 3)
+            {
+                return NeuralBrainSchema.EggFoodContactInput;
+            }
+
+            if (input == LegacyCreatureSectorMotionFoodContactInput + 4)
+            {
+                return NeuralBrainSchema.HealthRatioInput;
+            }
         }
 
         if (legacyInputCount >= LegacyInputCountWithoutFoodContact

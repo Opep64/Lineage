@@ -803,6 +803,7 @@ public sealed class UniformSpatialIndex
         float visionCosThreshold,
         float visionAngleRadians,
         float[] bodyRadii,
+        float[] maxSpeeds,
         bool collectVisionSectors,
         ref VisionSectorSet visionSectors)
     {
@@ -822,6 +823,9 @@ public sealed class UniformSpatialIndex
         }
 
         var creatures = CollectionsMarshal.AsSpan(state.Creatures);
+        var selfCreature = creatures[selfIndex];
+        var selfVelocityX = selfCreature.Velocity.X;
+        var selfVelocityY = selfCreature.Velocity.Y;
         var queryRadiusSquared = queryRadius * queryRadius;
         var forwardX = forward.X;
         var forwardY = forward.Y;
@@ -829,15 +833,25 @@ public sealed class UniformSpatialIndex
         var rightY = forwardX;
         var squaredVisionCosThreshold = visionCosThreshold * visionCosThreshold;
         var selfRadius = 0f;
+        var selfMaxSpeed = 0f;
         if (collectVisionSectors)
         {
             selfRadius = bodyRadii[selfIndex];
             if (selfRadius < 0f)
             {
                 selfRadius = CreatureGrowth.EffectiveBodyRadius(
-                    creatures[selfIndex],
-                    state.GetGenome(creatures[selfIndex].GenomeId));
+                    selfCreature,
+                    state.GetGenome(selfCreature.GenomeId));
                 bodyRadii[selfIndex] = selfRadius;
+            }
+
+            selfMaxSpeed = maxSpeeds[selfIndex];
+            if (selfMaxSpeed < 0f)
+            {
+                selfMaxSpeed = CreatureGrowth.EffectiveMaxSpeed(
+                    selfCreature,
+                    state.GetGenome(selfCreature.GenomeId));
+                maxSpeeds[selfIndex] = selfMaxSpeed;
             }
         }
 
@@ -944,7 +958,40 @@ public sealed class UniformSpatialIndex
                         var proximity = 1f - Math.Clamp(edgeDistance / senseRadius, 0f, 1f);
                         var radiusScale = MathF.Max(0.001f, MathF.Max(selfRadius, otherRadius));
                         var relativeBodySize = Math.Clamp((otherRadius - selfRadius) / radiusScale, -1f, 1f);
-                        visionSectors.AddCreature(sectorIndex, proximity, relativeBodySize);
+
+                        var otherMaxSpeed = maxSpeeds[otherCreatureIndex];
+                        if (otherMaxSpeed < 0f)
+                        {
+                            otherMaxSpeed = CreatureGrowth.EffectiveMaxSpeed(
+                                otherCreature,
+                                state.GetGenome(otherCreature.GenomeId));
+                            maxSpeeds[otherCreatureIndex] = otherMaxSpeed;
+                        }
+
+                        var directionToOtherX = centerDistance > 0.0001f
+                            ? toOtherX / centerDistance
+                            : forwardX;
+                        var directionToOtherY = centerDistance > 0.0001f
+                            ? toOtherY / centerDistance
+                            : forwardY;
+                        var relativeVelocityX = otherCreature.Velocity.X - selfVelocityX;
+                        var relativeVelocityY = otherCreature.Velocity.Y - selfVelocityY;
+                        var approachScale = MathF.Max(1f, MathF.Max(selfMaxSpeed, otherMaxSpeed));
+                        var approachRate = Math.Clamp(
+                            -((relativeVelocityX * directionToOtherX) + (relativeVelocityY * directionToOtherY)) / approachScale,
+                            -1f,
+                            1f);
+                        var otherForward = SimVector2.FromAngle(otherCreature.HeadingRadians);
+                        var facingAlignment = Math.Clamp(
+                            -((otherForward.X * directionToOtherX) + (otherForward.Y * directionToOtherY)),
+                            -1f,
+                            1f);
+                        visionSectors.AddCreature(
+                            sectorIndex,
+                            proximity,
+                            relativeBodySize,
+                            approachRate,
+                            facingAlignment);
                     }
 
                     if (distanceSquared < nearestDistanceSquared)

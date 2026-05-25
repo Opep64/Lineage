@@ -96,6 +96,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates sector vision inputs", NeuralBrainMigratesSectorVisionInputs),
     ("Neural brain migrates food contact input", NeuralBrainMigratesFoodContactInput),
     ("Neural brain migrates health ratio input", NeuralBrainMigratesHealthRatioInput),
+    ("Neural brain migrates creature sector motion inputs", NeuralBrainMigratesCreatureSectorMotionInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2672,9 +2673,14 @@ static void CreatureSectorVisionBucketsVisibleCategories()
     simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 25f);
     var creature = simulation.State.Creatures[0];
     creature.HeadingRadians = 0f;
+    creature.Velocity = SimVector2.Zero;
     simulation.State.Creatures[0] = creature;
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(85f, 50f), energy: 25f);
+    var visibleCreature = simulation.State.Creatures[1];
+    visibleCreature.HeadingRadians = MathF.PI;
+    visibleCreature.Velocity = new SimVector2(-10f, 0f);
+    simulation.State.Creatures[1] = visibleCreature;
     simulation.State.SpawnCreature(smallGenomeId, new SimVector2(85f, 42f), energy: 25f);
     simulation.State.SpawnCreature(largeGenomeId, new SimVector2(85f, 62f), energy: 25f);
     var parentId = simulation.State.Creatures[0].Id;
@@ -2717,6 +2723,8 @@ static void CreatureSectorVisionBucketsVisibleCategories()
     AssertTrue(sectors.Get(2).EggDensity > 0f, "Ahead-left egg should land in a left-side sector");
     AssertTrue(sectors.Get(4).CreatureDensity > 0f, "Ahead creature should land in the center sector");
     AssertTrue(sectors.Get(4).SimilarCreatureDensity > 0f, "Same-size creature should land in similar-size sector detail");
+    AssertTrue(sectors.Get(4).CreatureApproachRate > 0.3f, "Center creature should report a closing sector cue");
+    AssertTrue(sectors.Get(4).CreatureFacingAlignment > 0.99f, "Center creature should report a facing sector cue");
     AssertTrue(
         Enumerable.Range(0, VisionSectorSet.SectorCount).Any(index => sectors.Get(index).SmallerCreatureDensity > 0f),
         "Smaller creature should appear in smaller-size sector detail");
@@ -2788,7 +2796,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     sectors.AddEgg(6, 0.8f);
     sectors.AddCreature(8, 0.9f, relativeBodySize: -0.5f);
     sectors.AddCreature(5, 0.4f, relativeBodySize: 0f);
-    sectors.AddCreature(2, 0.6f, relativeBodySize: 0.5f);
+    sectors.AddCreature(2, 0.6f, relativeBodySize: 0.5f, approachRate: 0.7f, facingAlignment: -0.35f);
     senses.VisionSectors = sectors;
 
     var frame = BrainInputFrame.FromSenses(senses, genome);
@@ -2829,6 +2837,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.4f, inputs[NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(5)], 0.000001, "Sector similar creature proximity input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(2)], 0.000001, "Sector larger creature density input");
     AssertClose(0.6f, inputs[NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(2)], 0.000001, "Sector larger creature proximity input");
+    AssertClose(0.7f, inputs[NeuralBrainSchema.VisionSectorCreatureApproachRateInput(2)], 0.000001, "Sector creature approach rate input");
+    AssertClose(-0.35f, inputs[NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(2)], 0.000001, "Sector creature facing alignment input");
 
     Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
     outputs[NeuralBrainSchema.MoveForwardOutput] = 2f;
@@ -3711,6 +3721,69 @@ static void NeuralBrainMigratesHealthRatioInput()
         healthBrain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(0)),
         0.000001,
         "New creature size sector input starts neutral");
+}
+
+static void NeuralBrainMigratesCreatureSectorMotionInputs()
+{
+    const int legacyInputCount = 177;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int legacySectorChannelCount = 14;
+    const int oldFoodContactInput = 172;
+    const int oldHealthRatioInput = 176;
+    var oldCenterLargeCreatureProximityInput = 46
+        + VisionSectorSet.CenterSectorIndex * legacySectorChannelCount
+        + 13;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldCenterLargeCreatureProximityInput] = 2.2f;
+    legacyWeights[NeuralBrainSchema.EatOutput * legacyInputCount + oldFoodContactInput] = 3.3f;
+    legacyWeights[legacyHiddenInputOffset + oldHealthRatioInput] = -1.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.AttackOutput * hiddenNodeCount] = 1.1f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Creature sector motion migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Creature sector motion migrated weight count");
+    AssertClose(
+        2.2f,
+        brain.GetWeight(
+            NeuralBrainSchema.MoveForwardOutput,
+            NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)),
+        0.000001,
+        "Existing larger-creature sector input remains in place");
+    AssertClose(
+        3.3f,
+        brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.FoodContactInput),
+        0.000001,
+        "Existing food contact input remains in place");
+    AssertClose(
+        -1.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.HealthRatioInput),
+        0.000001,
+        "Existing hidden health input remains in place");
+    AssertClose(
+        1.1f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.AttackOutput, 0),
+        0.000001,
+        "Existing hidden attack output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(
+            NeuralBrainSchema.MoveForwardOutput,
+            NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)),
+        0.000001,
+        "New sector creature approach input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(
+            0,
+            NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)),
+        0.000001,
+        "New hidden sector creature facing input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()

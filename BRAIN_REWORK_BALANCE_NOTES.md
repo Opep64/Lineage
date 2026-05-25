@@ -405,6 +405,17 @@ Implementation notes:
 - The diagnostics also report signed attack readouts for smaller and larger creature sector channels, which gives a quick signal for emerging predation or large-creature avoidance wiring.
 - This is report-only telemetry and does not alter simulation behavior.
 
+## 2026-05-24 Creature Sector Motion Vision
+
+Added per-sector creature motion/orientation cues so brains can react to more than the nearest visible creature.
+
+Implementation notes:
+
+- Each vision sector now exposes creature approach rate and creature facing alignment for the closest creature represented in that sector.
+- Approach is positive when the distance is closing; facing alignment is positive when the seen creature is pointed toward the observer.
+- These cues use the same semantics as the existing nearest-creature approach/facing inputs, but are attached to sector vision.
+- Neural sector channels widened from 14 to 16. Older 14-channel sector brains migrate with existing weights preserved and the new motion channels neutral.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

@@ -214,6 +214,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 visionCosThreshold,
                 effectiveVisionAngle,
                 _cachedBodyRadii,
+                _cachedMaxSpeeds,
                 _enableSectorVision,
                 ref visionSectors);
             sensingProfile?.RecordCreatureQuery(

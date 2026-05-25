@@ -13,7 +13,7 @@ public static class NeuralBrainSchema
 
     public const int VisionSectorInputStart = 46;
 
-    public const int VisionSectorChannelCount = 14;
+    public const int VisionSectorChannelCount = 16;
 
     public const int FoodContactInput = VisionSectorInputStart + VisionSectorSet.SectorCount * VisionSectorChannelCount;
 
@@ -149,6 +149,10 @@ public static class NeuralBrainSchema
 
     public const int VisionSectorLargerCreatureProximityOffset = 13;
 
+    public const int VisionSectorCreatureApproachRateOffset = 14;
+
+    public const int VisionSectorCreatureFacingAlignmentOffset = 15;
+
     public const int VisiblePreyDensityInput = VisibleCreatureDensityInput;
 
     public const int PreyProximityInput = CreatureProximityInput;
@@ -239,6 +243,16 @@ public static class NeuralBrainSchema
     public static int VisionSectorLargerCreatureProximityInput(int sectorIndex)
     {
         return GetVisionSectorInput(sectorIndex, VisionSectorLargerCreatureProximityOffset);
+    }
+
+    public static int VisionSectorCreatureApproachRateInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorCreatureApproachRateOffset);
+    }
+
+    public static int VisionSectorCreatureFacingAlignmentInput(int sectorIndex)
+    {
+        return GetVisionSectorInput(sectorIndex, VisionSectorCreatureFacingAlignmentOffset);
     }
 
     public static int GetVisionSectorInput(int sectorIndex, int channelOffset)

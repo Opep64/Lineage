@@ -73,8 +73,18 @@ public struct VisionSectorSet
 
     public void AddCreature(int sectorIndex, float proximity, float relativeBodySize)
     {
+        AddCreature(sectorIndex, proximity, relativeBodySize, approachRate: 0f, facingAlignment: 0f);
+    }
+
+    public void AddCreature(
+        int sectorIndex,
+        float proximity,
+        float relativeBodySize,
+        float approachRate,
+        float facingAlignment)
+    {
         var sector = Get(sectorIndex);
-        sector.AddCreature(proximity, relativeBodySize);
+        sector.AddCreature(proximity, relativeBodySize, approachRate, facingAlignment);
         Set(sectorIndex, sector);
         HasAnySignal = true;
     }
@@ -206,6 +216,18 @@ public struct VisionSectorSample
 
     public float LargerCreatureProximity { get; private set; }
 
+    /// <summary>
+    /// Closing rate of the nearest creature represented by this sector. Positive means the gap is shrinking.
+    /// </summary>
+    public float CreatureApproachRate { get; private set; }
+
+    /// <summary>
+    /// Facing alignment of the nearest creature represented by this sector. Positive means it faces this creature.
+    /// </summary>
+    public float CreatureFacingAlignment { get; private set; }
+
+    private float CreatureMotionProximity { get; set; }
+
     public void AddPlant(float proximity)
     {
         PlantDensity = AddDensity(PlantDensity);
@@ -226,9 +248,21 @@ public struct VisionSectorSample
 
     public void AddCreature(float proximity, float relativeBodySize)
     {
+        AddCreature(proximity, relativeBodySize, approachRate: 0f, facingAlignment: 0f);
+    }
+
+    public void AddCreature(float proximity, float relativeBodySize, float approachRate, float facingAlignment)
+    {
         CreatureDensity = AddDensity(CreatureDensity);
         var clampedProximity = ClampUnit(proximity);
         CreatureProximity = Math.Max(CreatureProximity, clampedProximity);
+        if (clampedProximity >= CreatureMotionProximity)
+        {
+            CreatureMotionProximity = clampedProximity;
+            CreatureApproachRate = ClampSigned(approachRate);
+            CreatureFacingAlignment = ClampSigned(facingAlignment);
+        }
+
         if (relativeBodySize < -0.2f)
         {
             SmallerCreatureDensity = AddDensity(SmallerCreatureDensity);
@@ -254,5 +288,10 @@ public struct VisionSectorSample
     private static float ClampUnit(float value)
     {
         return Math.Clamp(value, 0f, 1f);
+    }
+
+    private static float ClampSigned(float value)
+    {
+        return Math.Clamp(value, -1f, 1f);
     }
 }

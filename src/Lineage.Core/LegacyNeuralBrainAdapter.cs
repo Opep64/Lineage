@@ -100,6 +100,8 @@ public static class LegacyNeuralBrainAdapter
             inputs[NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(sectorIndex)] = sector.SimilarCreatureProximity;
             inputs[NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(sectorIndex)] = sector.LargerCreatureDensity;
             inputs[NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(sectorIndex)] = sector.LargerCreatureProximity;
+            inputs[NeuralBrainSchema.VisionSectorCreatureApproachRateInput(sectorIndex)] = sector.CreatureApproachRate;
+            inputs[NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(sectorIndex)] = sector.CreatureFacingAlignment;
         }
     }
 
