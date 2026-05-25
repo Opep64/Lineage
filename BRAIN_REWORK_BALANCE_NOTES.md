@@ -917,6 +917,45 @@ Verification:
 - `dotnet run --project src\Lineage.Cli\Lineage.Cli.csproj -- --scenario scenarios\scavenger-pressure.json --ticks 1000 --output out\food_sector_assay_smoke_20260525\scavenger_stats.csv --report out\food_sector_assay_smoke_20260525\scavenger_report.html --save-snapshot out\food_sector_assay_smoke_20260525\scavenger_snapshot.json` passed.
 - Godot headless project load passed.
 
+## 2026-05-25 Clean Senses Main Scenario Probe
+
+Ran a medium clean-perception probe across the main authored scenarios with the checked-in defaults: legacy nearest-food and nearest-creature brain inputs disabled, sector/contact cues active.
+
+Command:
+
+```powershell
+dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --probe --ticks 30000 --probe-seeds 42,43,44 --probe-scenario .\scenarios\gentle-foraging.json --probe-scenario .\scenarios\balanced-foraging.json --probe-scenario .\scenarios\harsh-foraging.json --probe-scenario .\scenarios\scavenger-pressure.json --probe-scenario .\scenarios\carrion-pressure.json --probe-scenario .\scenarios\omnivore-pressure.json --probe-scenario .\scenarios\predation-pressure.json --probe-scenario .\scenarios\predator-prey-pressure.json --probe-scenario .\scenarios\migration-pressure.json --probe-scenario .\scenarios\obstacle-pressure.json --probe-scenario .\scenarios\terrain-pressure.json --probe-stop-on-extinction --probe-max-population 5000 --probe-output out\clean_senses_validation_20260525\clean_senses_main_30k.csv --probe-report out\clean_senses_validation_20260525\clean_senses_main_30k.html
+```
+
+Output files:
+
+- `out/clean_senses_validation_20260525/clean_senses_main_30k.csv`
+- `out/clean_senses_validation_20260525/clean_senses_main_30k.html`
+
+Summary:
+
+| Scenario | Avg final pop | Range | Tail pop | Starvation | Injury | Meat eaten | Tail meat | Food seen | Avg ticks/s |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced Foraging | 19.3 | 13-25 | 28.5 | 249.3 | 0.0 | 0.0% | 0.0% | 44.7% | 7414 |
+| Carrion Pressure | 45.3 | 41-51 | 43.3 | 308.0 | 0.0 | 0.0% | 12.8% | 36.0% | 5223 |
+| Gentle Foraging | 26.0 | 22-34 | 37.7 | 400.3 | 0.0 | 0.0% | 0.0% | 43.6% | 4438 |
+| Harsh Foraging | 19.0 | 14-26 | 22.5 | 174.0 | 0.0 | 0.0% | 0.0% | 39.6% | 10388 |
+| Migration Pressure | 42.3 | 39-44 | 44.9 | 323.3 | 0.0 | 0.0% | 0.0% | 47.1% | 3845 |
+| Obstacle Pressure | 65.7 | 57-71 | 77.8 | 284.3 | 0.0 | 0.0% | 0.0% | 21.4% | 6648 |
+| Omnivore Pressure | 18.7 | 16-23 | 20.4 | 190.3 | 0.0 | 0.0% | 6.7% | 25.8% | 9561 |
+| Predation Pressure | 21.7 | 12-29 | 24.7 | 148.3 | 154.7 | 32.1% | 20.1% | 49.2% | 6564 |
+| Predator Prey Pressure | 35.3 | 25-43 | 36.3 | 278.0 | 18.7 | 0.0% | 11.2% | 37.6% | 6220 |
+| Scavenger Pressure | 32.7 | 31-35 | 35.4 | 277.3 | 0.0 | 11.6% | 9.4% | 44.7% | 5974 |
+| Terrain Pressure | 32.7 | 31-36 | 28.2 | 190.7 | 0.0 | 0.0% | 0.0% | 34.8% | 9851 |
+
+Interpretation:
+
+- The clean perception path is viable across all main authored scenarios at 30k ticks; no extinctions occurred.
+- Populations are deliberately low now, but pure foraging scenarios look thinner than ideal. That points toward sparse-food/starter tuning rather than a broken sector/contact input path.
+- Predation and Scavenger are the only scenarios with strong run-average meat use. Carrion, Omnivore, and Predator Prey show tail meat use but low total meat share, so their meat/carrion pressure may need sharper setup if we want those roles to dominate.
+- Obstacle has the largest stable population but low food-seen share, which is a useful candidate when we later inspect search behavior and obstacle navigation.
+- Migration survived but still has no meaningful evidence of directional migration; that remains a mechanics/behavior challenge, not just a viability issue.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
