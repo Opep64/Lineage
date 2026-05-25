@@ -211,6 +211,7 @@ public sealed partial class LineageRunManager
             Run: summary,
             CommandLine: manifest.CommandLine,
             Error: manifest.Error ?? summary.FailureReason,
+            Artifacts: ListRunArtifacts(manifest),
             StdoutTail: ReadTail(manifest.StdoutPath, maxLines),
             StderrTail: ReadTail(manifest.StderrPath, maxLines));
     }
@@ -297,7 +298,7 @@ public sealed partial class LineageRunManager
         }
 
         var manifest = run.Manifest;
-        var snapshotPath = ResolveContinuationSnapshotPath(manifest);
+        var snapshotPath = ResolveContinuationSnapshotPath(manifest, request.SnapshotPath);
         manifest.LoadSnapshotPath = snapshotPath;
         manifest.Ticks = request.Ticks;
         manifest.Status = "starting";
@@ -1220,8 +1221,115 @@ public sealed partial class LineageRunManager
         return resolvedPath;
     }
 
-    private string ResolveContinuationSnapshotPath(RunManifest manifest)
+    private IReadOnlyList<RunArtifact> ListRunArtifacts(RunManifest manifest)
     {
+        var status = ReadStatus(manifest.StatusPath);
+        var latestCheckpointPath = string.IsNullOrWhiteSpace(status?.LatestCheckpointPath)
+            ? string.Empty
+            : ResolveArtifactPath(status.LatestCheckpointPath);
+        var artifacts = new List<RunArtifact>();
+        var seenPaths = new HashSet<string>(PathComparer());
+
+        AddArtifact("snapshot", "Final snapshot", manifest.SnapshotPath, tick: null, isContinuationSource: true);
+
+        if (!string.IsNullOrWhiteSpace(manifest.CheckpointDirectory))
+        {
+            var checkpointDirectory = ResolveArtifactPath(manifest.CheckpointDirectory);
+            if (Directory.Exists(checkpointDirectory))
+            {
+                foreach (var checkpointPath in Directory
+                    .EnumerateFiles(checkpointDirectory, "*.json", SearchOption.TopDirectoryOnly)
+                    .Select(path => new
+                    {
+                        Path = path,
+                        Tick = TryParseCheckpointTick(path),
+                        ModifiedAtUtc = File.GetLastWriteTimeUtc(path)
+                    })
+                    .OrderByDescending(item => item.Tick ?? long.MinValue)
+                    .ThenByDescending(item => item.ModifiedAtUtc))
+                {
+                    var isLatest = !string.IsNullOrWhiteSpace(latestCheckpointPath)
+                        && PathsEqual(checkpointPath.Path, latestCheckpointPath);
+                    AddArtifact(
+                        "checkpoint",
+                        isLatest ? "Checkpoint (latest)" : "Checkpoint",
+                        checkpointPath.Path,
+                        checkpointPath.Tick,
+                        isContinuationSource: true,
+                        isLatestCheckpoint: isLatest);
+                }
+            }
+        }
+
+        AddArtifact("report", "HTML report", manifest.ReportPath);
+        AddArtifact("stats", "Stats CSV", manifest.StatsPath);
+        AddArtifact("scenario", "Resolved scenario", EffectiveResolvedScenarioPath(manifest));
+        AddArtifact("scenario", "Launch scenario", manifest.LaunchScenarioPath);
+        AddArtifact("manifest", "Run manifest", Path.Combine(manifest.RunDirectory, "run.manifest.json"));
+        AddArtifact("log", "stdout.log", manifest.StdoutPath);
+        AddArtifact("log", "stderr.log", manifest.StderrPath);
+
+        return artifacts;
+
+        void AddArtifact(
+            string type,
+            string label,
+            string path,
+            long? tick = null,
+            bool isContinuationSource = false,
+            bool isLatestCheckpoint = false)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            var resolvedPath = ResolveArtifactPath(path);
+            if (string.IsNullOrWhiteSpace(resolvedPath))
+            {
+                return;
+            }
+
+            resolvedPath = Path.GetFullPath(resolvedPath);
+            if (!seenPaths.Add(resolvedPath))
+            {
+                return;
+            }
+
+            var file = new FileInfo(resolvedPath);
+            artifacts.Add(new RunArtifact(
+                Type: type,
+                Label: label,
+                Path: resolvedPath,
+                Exists: file.Exists,
+                SizeBytes: file.Exists ? file.Length : null,
+                ModifiedAtUtc: file.Exists
+                    ? new DateTimeOffset(DateTime.SpecifyKind(file.LastWriteTimeUtc, DateTimeKind.Utc))
+                    : null,
+                Tick: tick,
+                IsContinuationSource: isContinuationSource,
+                IsLatestCheckpoint: isLatestCheckpoint));
+        }
+    }
+
+    private string ResolveContinuationSnapshotPath(RunManifest manifest, string? selectedSnapshotPath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(selectedSnapshotPath))
+        {
+            var resolvedSelectedPath = ResolveArtifactPath(selectedSnapshotPath);
+            if (!File.Exists(resolvedSelectedPath))
+            {
+                throw new FileNotFoundException("Selected snapshot file was not found.", selectedSnapshotPath);
+            }
+
+            if (!IsContinuationSourcePath(manifest, resolvedSelectedPath))
+            {
+                throw new InvalidOperationException("Selected snapshot is not a final snapshot or checkpoint for this run.");
+            }
+
+            return resolvedSelectedPath;
+        }
+
         var status = ReadStatus(manifest.StatusPath);
         var candidates = new List<string>();
         if (!string.IsNullOrWhiteSpace(status?.LatestCheckpointPath))
@@ -1255,6 +1363,62 @@ public sealed partial class LineageRunManager
         }
 
         throw new FileNotFoundException("No checkpoint or final snapshot was found for this run.", manifest.Id);
+    }
+
+    private bool IsContinuationSourcePath(RunManifest manifest, string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (!string.IsNullOrWhiteSpace(manifest.SnapshotPath)
+            && PathsEqual(fullPath, ResolveArtifactPath(manifest.SnapshotPath)))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(manifest.CheckpointDirectory)
+            || !string.Equals(Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var checkpointDirectory = ResolveArtifactPath(manifest.CheckpointDirectory);
+        return !string.IsNullOrWhiteSpace(checkpointDirectory)
+            && IsPathUnderDirectory(fullPath, checkpointDirectory);
+    }
+
+    private static bool IsPathUnderDirectory(string path, string directory)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var fullDirectory = Path.GetFullPath(directory);
+        var relativePath = Path.GetRelativePath(fullDirectory, fullPath);
+        return !relativePath.StartsWith("..", StringComparison.Ordinal)
+            && !Path.IsPathRooted(relativePath);
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), PathComparison());
+    }
+
+    private static StringComparer PathComparer()
+    {
+        return OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+    }
+
+    private static StringComparison PathComparison()
+    {
+        return OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+    }
+
+    private static long? TryParseCheckpointTick(string path)
+    {
+        var match = CheckpointTickRegex().Match(Path.GetFileName(path));
+        return match.Success && long.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var tick)
+            ? tick
+            : null;
     }
 
     private string ResolveScenarioPath(string scenarioPath)
@@ -1961,6 +2125,9 @@ public sealed partial class LineageRunManager
 
     [GeneratedRegex("[^a-z0-9]+", RegexOptions.IgnoreCase)]
     private static partial Regex SlugRegex();
+
+    [GeneratedRegex("(?:^|_)tick_(\\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex CheckpointTickRegex();
 
     private sealed class ManagedRun(RunManifest manifest, Process? process)
     {

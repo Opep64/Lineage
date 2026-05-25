@@ -309,7 +309,8 @@ The launcher should eventually:
 - The launcher has a first grouped scenario-options editor. It builds tabs from `SimulationScenario` fields, lets a run start from edited scenario JSON, writes the generated launch scenario under `out/runs/_launch_scenarios/`, and still saves the CLI-resolved scenario beside the run manifest.
 - Run rows can clone settings back into the launch form. The clone path prefers the run's `resolved_scenario.json`, falls back to the generated launch scenario, then falls back to the original scenario file so users can duplicate an experiment and make small changes.
 - Non-running rows can be rerun after a confirmation prompt. The replacement run uses the prior resolved/launch settings, starts with a fresh process-id-based run id, and then removes the old run artifacts if the replacement starts.
-- Non-running rows can continue in place from the latest checkpoint or final snapshot, reusing the same run record and output folder.
+- Non-running rows can continue in place from the latest checkpoint, final snapshot, or a selected checkpoint in the run details artifact picker, reusing the same run record and output folder.
+- Run details include an artifact/checkpoint table with paths, file metadata, copy-path actions, report open actions, and per-snapshot Continue actions.
 - The scenario-options editor supports search, basic/all filtering, changed-field highlighting, and reset actions for the current group or all loaded scenario options.
 - Edited launcher settings can be saved as managed user scenarios under `scenarios/user/`.
 - Scenarios directly under `scenarios/` are protected development presets. The dashboard can archive launcher-created user scenarios to `out/scenario-trash/`, but it does not delete protected project scenarios or manually dropped-in user files.
@@ -335,7 +336,7 @@ The launcher should eventually:
 ## Phase 4: Godot Handoff
 
 - Make final snapshots and checkpoints easy to launch or load in Godot.
-- Add a checkpoint picker tied to run records.
+- Build on the runner's checkpoint/artifact picker for a Godot handoff action.
 - Consider adding a lightweight Godot startup argument or shared handoff file if needed.
 - Track authored world IDs/revisions in run records once map painting exists.
 

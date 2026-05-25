@@ -718,6 +718,7 @@ function renderDetailsRow(run) {
           <div><span>Resolved scenario</span><strong>${escapeHtml(details.run.resolvedScenarioPath)}</strong></div>
         </div>
         ${details.error ? `<div class="detail-error">${escapeHtml(details.error)}</div>` : ""}
+        ${renderArtifactsPanel(details)}
         <div class="command-line">${escapeHtml(details.commandLine || "")}</div>
         <div class="log-grid">
           <div>
@@ -733,6 +734,63 @@ function renderDetailsRow(run) {
     </td>
   `;
   return row;
+}
+
+function renderArtifactsPanel(details) {
+  const artifacts = Array.isArray(details.artifacts) ? details.artifacts : [];
+  if (artifacts.length === 0) {
+    return `
+      <div class="artifacts-panel">
+        <div class="log-title">Artifacts</div>
+        <div class="run-sub">No artifacts have been recorded for this run yet.</div>
+      </div>
+    `;
+  }
+
+  const rows = artifacts.map((artifact) => {
+    const canContinue = artifact.exists && artifact.isContinuationSource && !details.run.isRunning;
+    const canOpenReport = artifact.exists && artifact.type === "report";
+    return `
+      <tr>
+        <td>
+          <div class="artifact-label">${escapeHtml(artifact.label)}</div>
+          <div class="run-sub">${escapeHtml(artifact.type)}${artifact.isLatestCheckpoint ? " · latest" : ""}</div>
+        </td>
+        <td>${artifact.tick === null || artifact.tick === undefined ? "" : formatNumber(artifact.tick)}</td>
+        <td>${escapeHtml(formatFileSize(artifact.sizeBytes))}</td>
+        <td>${escapeHtml(formatDateTime(artifact.modifiedAtUtc))}</td>
+        <td class="artifact-path">${escapeHtml(artifact.path)}</td>
+        <td>
+          <div class="artifact-actions">
+            <button class="secondary" data-action="copy-path" data-path="${escapeHtml(artifact.path)}" ${artifact.path ? "" : "disabled"}>Copy Path</button>
+            ${canOpenReport ? `<button class="secondary" data-action="report" data-id="${escapeHtml(details.run.id)}">Open</button>` : ""}
+            ${canContinue ? `<button class="secondary" data-action="continue-artifact" data-id="${escapeHtml(details.run.id)}" data-path="${escapeHtml(artifact.path)}">Continue</button>` : ""}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <div class="artifacts-panel">
+      <div class="log-title">Artifacts / checkpoints</div>
+      <div class="artifacts-scroll">
+        <table class="artifacts-table">
+          <thead>
+            <tr>
+              <th>Artifact</th>
+              <th>Tick</th>
+              <th>Size</th>
+              <th>Modified</th>
+              <th>Path</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
 function getVisibleRuns() {
@@ -917,6 +975,16 @@ runsBody.addEventListener("click", async (event) => {
 
   if (action === "rerun") {
     await rerunRun(id);
+    return;
+  }
+
+  if (action === "copy-path") {
+    await copyText(button.dataset.path || "");
+    return;
+  }
+
+  if (action === "continue-artifact") {
+    await continueRun(id, button.dataset.path || null);
     return;
   }
 
@@ -1201,7 +1269,7 @@ async function rerunRun(id) {
     : `Rerun started: ${result.run.name}; original artifacts were kept`;
 }
 
-async function continueRun(id) {
+async function continueRun(id, snapshotPath = null) {
   const run = allRuns.find((candidate) => candidate.id === id);
   const name = run?.name || id;
   const remainingTicks = Number(run?.ticks || 0) - Number(run?.completedSteps || 0);
@@ -1209,11 +1277,18 @@ async function continueRun(id) {
     ? Math.ceil(remainingTicks)
     : Math.max(1, Number(run?.ticks || document.querySelector("#ticks").value || 20000));
 
-  refreshStatus.textContent = `Continuing ${name} for ${formatNumber(ticks)} tick(s)`;
+  refreshStatus.textContent = snapshotPath
+    ? `Continuing ${name} from selected snapshot for ${formatNumber(ticks)} tick(s)`
+    : `Continuing ${name} for ${formatNumber(ticks)} tick(s)`;
+  const payload = { ticks };
+  if (snapshotPath) {
+    payload.snapshotPath = snapshotPath;
+  }
+
   const response = await fetch(`/api/runs/${encodeURIComponent(id)}/continue`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticks })
+    body: JSON.stringify(payload)
   });
   if (!response.ok) {
     const problem = await response.json().catch(() => ({ error: "Continue failed." }));
@@ -1224,6 +1299,28 @@ async function continueRun(id) {
   const result = await response.json();
   await loadRuns();
   refreshStatus.textContent = `Continued from ${result.snapshotPath}: ${result.run.name}`;
+}
+
+async function copyText(text) {
+  if (!text) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.append(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  }
+
+  refreshStatus.textContent = "Path copied.";
 }
 
 function ensureScenarioOption(path, name) {
@@ -1292,6 +1389,27 @@ function formatSeed(value) {
 
 function formatDateTime(value) {
   return value ? new Date(value).toLocaleString() : "";
+}
+
+function formatFileSize(value) {
+  const bytes = Number(value || 0);
+  if (!bytes) {
+    return "";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const units = ["KB", "MB", "GB"];
+  let scaled = bytes / 1024;
+  let unitIndex = 0;
+  while (scaled >= 1024 && unitIndex < units.length - 1) {
+    scaled /= 1024;
+    unitIndex++;
+  }
+
+  return `${scaled.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[unitIndex]}`;
 }
 
 function formatDownloadTimestamp(value) {

@@ -603,6 +603,64 @@ tr.is-expanded td {
   font-size: 12px;
 }
 
+.artifacts-panel {
+  margin-bottom: 10px;
+}
+
+.artifacts-scroll {
+  max-height: 260px;
+  margin-top: 4px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.artifacts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.artifacts-table th,
+.artifacts-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+
+.artifacts-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f7f9;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.artifacts-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.artifact-label {
+  font-weight: 700;
+}
+
+.artifact-path {
+  min-width: 260px;
+  max-width: 640px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.artifact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 160px;
+}
+
 .log-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -67,7 +67,9 @@ public sealed record RunRerunResult(
     RunSummary Run,
     bool DeletedOriginal);
 
-public sealed record RunContinueRequest(int Ticks);
+public sealed record RunContinueRequest(
+    int Ticks,
+    string? SnapshotPath = null);
 
 public sealed record RunContinueResult(
     RunSummary Run,
@@ -77,8 +79,20 @@ public sealed record RunDetails(
     RunSummary Run,
     string CommandLine,
     string? Error,
+    IReadOnlyList<RunArtifact> Artifacts,
     IReadOnlyList<string> StdoutTail,
     IReadOnlyList<string> StderrTail);
+
+public sealed record RunArtifact(
+    string Type,
+    string Label,
+    string Path,
+    bool Exists,
+    long? SizeBytes,
+    DateTimeOffset? ModifiedAtUtc,
+    long? Tick,
+    bool IsContinuationSource,
+    bool IsLatestCheckpoint);
 
 public sealed record RunCloneSettings(
     string SourceRunId,
