@@ -33,6 +33,16 @@ public struct CreatureSenseState
 
     public float VisiblePlantDensity { get; set; }
 
+    /// <summary>
+    /// Close-range visual estimate of plant energy quality. Far plants remain generic plant mass.
+    /// </summary>
+    public float VisiblePlantEnergyQuality { get; set; }
+
+    /// <summary>
+    /// Close-range visual estimate of how easy visible plants are to bite and swallow.
+    /// </summary>
+    public float VisiblePlantBiteEase { get; set; }
+
     public bool MeatDetected { get; set; }
 
     public float MeatProximity { get; set; }
@@ -141,6 +151,16 @@ public struct CreatureSenseState
 
     public float PlantFoodContact { get; set; }
 
+    /// <summary>
+    /// Taste/contact cue for the contacted plant's likely digestion payoff.
+    /// </summary>
+    public float PlantFoodContactEnergyQuality { get; set; }
+
+    /// <summary>
+    /// Taste/contact cue for the contacted plant's bite difficulty.
+    /// </summary>
+    public float PlantFoodContactBiteEase { get; set; }
+
     public float MeatFoodContact { get; set; }
 
     public float EggFoodContact { get; set; }
@@ -177,6 +197,16 @@ public struct CreatureSenseState
     public float ReproductionReadiness { get; set; }
 
     public float RecentFoodSuccess { get; set; }
+
+    /// <summary>
+    /// Recent raw plant calories transferred into the gut, normalized to expected bite capacity.
+    /// </summary>
+    public float RecentPlantRawYield { get; set; }
+
+    /// <summary>
+    /// Recent plant energy released by digestion, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentPlantEnergyYield { get; set; }
 
     /// <summary>
     /// Persistent memory vector projected onto the creature's forward direction.

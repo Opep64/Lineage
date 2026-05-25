@@ -40,6 +40,7 @@ public sealed class EatingSystem(
             creature.IsTouchingFood = false;
             creature.FoodContactKind = FoodContactKind.None;
             creature.FoodContactResourceKind = default;
+            creature.FoodContactPlantKind = default;
             creature.FoodContactResourceId = default;
             creature.FoodContactEdgeDistance = 0f;
             creature.FoodContactCalories = 0f;
@@ -65,6 +66,7 @@ public sealed class EatingSystem(
             creature.IsTouchingFood = true;
             creature.FoodContactKind = target.Kind;
             creature.FoodContactResourceKind = target.ResourceKind;
+            creature.FoodContactPlantKind = target.PlantKind;
             creature.FoodContactResourceId = target.Id;
             creature.FoodContactEdgeDistance = target.EdgeDistance;
             creature.FoodContactCalories = target.Calories;
@@ -125,6 +127,7 @@ public sealed class EatingSystem(
                 best = new FoodContact(
                     FoodContactKind.Resource,
                     resource.Kind,
+                    resource.PlantKind,
                     resourceIndex,
                     resource.Id,
                     edgeDistance,
@@ -156,6 +159,7 @@ public sealed class EatingSystem(
             {
                 best = new FoodContact(
                     FoodContactKind.Egg,
+                    default,
                     default,
                     eggIndex,
                     egg.Id,
@@ -337,11 +341,12 @@ public sealed class EatingSystem(
     private readonly record struct FoodContact(
         FoodContactKind Kind,
         ResourceKind ResourceKind,
+        PlantResourceKind PlantKind,
         int Index,
         EntityId Id,
         float EdgeDistance,
         float Calories)
     {
-        public static FoodContact None { get; } = new(FoodContactKind.None, default, -1, default, 0f, 0f);
+        public static FoodContact None { get; } = new(FoodContactKind.None, default, default, -1, default, 0f, 0f);
     }
 }

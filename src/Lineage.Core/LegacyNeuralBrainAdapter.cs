@@ -30,6 +30,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.HungerInput] = frame.Internal.Hunger;
         inputs[NeuralBrainSchema.VisibleFoodDensityInput] = frame.Vision.Food.Density;
         inputs[NeuralBrainSchema.VisiblePlantDensityInput] = frame.Vision.Plant.Density;
+        inputs[NeuralBrainSchema.VisiblePlantEnergyQualityInput] = frame.Vision.PlantEnergyQuality;
+        inputs[NeuralBrainSchema.VisiblePlantBiteEaseInput] = frame.Vision.PlantBiteEase;
         inputs[NeuralBrainSchema.VisibleMeatDensityInput] = frame.Vision.Meat.Density;
         if (enableLegacyNearestFoodVisionInputs)
         {
@@ -66,6 +68,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.RightTerrainDragInput] = frame.Body.RightTerrainDrag;
         inputs[NeuralBrainSchema.EnergySurplusInput] = frame.Internal.EnergySurplusRatio;
         inputs[NeuralBrainSchema.RecentFoodSuccessInput] = frame.Internal.RecentFoodSuccess;
+        inputs[NeuralBrainSchema.RecentPlantRawYieldInput] = frame.Internal.RecentPlantRawYield;
+        inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput] = frame.Internal.RecentPlantEnergyYield;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;
@@ -79,6 +83,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.MovementBlockedInput] = frame.Body.MovementBlocked;
         inputs[NeuralBrainSchema.FoodContactInput] = frame.Body.FoodContact;
         inputs[NeuralBrainSchema.PlantFoodContactInput] = frame.Body.PlantFoodContact;
+        inputs[NeuralBrainSchema.PlantFoodContactEnergyQualityInput] = frame.Body.PlantFoodContactEnergyQuality;
+        inputs[NeuralBrainSchema.PlantFoodContactBiteEaseInput] = frame.Body.PlantFoodContactBiteEase;
         inputs[NeuralBrainSchema.MeatFoodContactInput] = frame.Body.MeatFoodContact;
         inputs[NeuralBrainSchema.EggFoodContactInput] = frame.Body.EggFoodContact;
         inputs[NeuralBrainSchema.CreatureContactInput] = frame.Body.CreatureContact;

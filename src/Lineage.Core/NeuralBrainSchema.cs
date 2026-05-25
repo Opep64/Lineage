@@ -27,7 +27,19 @@ public static class NeuralBrainSchema
 
     public const int HealthRatioInput = CreatureContactInput + 1;
 
-    public const int InputCount = HealthRatioInput + 1;
+    public const int VisiblePlantEnergyQualityInput = HealthRatioInput + 1;
+
+    public const int VisiblePlantBiteEaseInput = VisiblePlantEnergyQualityInput + 1;
+
+    public const int PlantFoodContactEnergyQualityInput = VisiblePlantBiteEaseInput + 1;
+
+    public const int PlantFoodContactBiteEaseInput = PlantFoodContactEnergyQualityInput + 1;
+
+    public const int RecentPlantRawYieldInput = PlantFoodContactBiteEaseInput + 1;
+
+    public const int RecentPlantEnergyYieldInput = RecentPlantRawYieldInput + 1;
+
+    public const int InputCount = RecentPlantEnergyYieldInput + 1;
 
     public const int OutputCount = 7;
 

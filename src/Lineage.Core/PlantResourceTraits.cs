@@ -16,6 +16,11 @@ public readonly record struct PlantResourceTraitProfile(
 /// </summary>
 public static class PlantResourceTraits
 {
+    private const float MinimumDigestionQualityMultiplier = 0.75f;
+    private const float MaximumDigestionQualityMultiplier = 1.1f;
+    private const float MinimumBiteEaseMultiplier = 0.55f;
+    private const float MaximumBiteEaseMultiplier = 1.3f;
+
     public static PlantResourceTraitProfile For(PlantResourceKind kind)
     {
         return kind switch
@@ -59,5 +64,33 @@ public static class PlantResourceTraits
     public static float DigestionEnergyMultiplier(PlantResourceKind kind)
     {
         return For(kind).DigestionEnergyMultiplier;
+    }
+
+    /// <summary>
+    /// Normalized cue for how much useful energy this plant type tends to release after digestion.
+    /// This is a sensory/taste signal, not a direct calorie conversion.
+    /// </summary>
+    public static float EnergyQualitySense(PlantResourceKind kind)
+    {
+        return NormalizeSense(
+            DigestionEnergyMultiplier(kind),
+            MinimumDigestionQualityMultiplier,
+            MaximumDigestionQualityMultiplier);
+    }
+
+    /// <summary>
+    /// Normalized cue for how easy this plant type is to bite and transfer into the gut.
+    /// </summary>
+    public static float BiteEaseSense(PlantResourceKind kind)
+    {
+        return NormalizeSense(
+            EatingRateMultiplier(kind),
+            MinimumBiteEaseMultiplier,
+            MaximumBiteEaseMultiplier);
+    }
+
+    private static float NormalizeSense(float value, float minimum, float maximum)
+    {
+        return Math.Clamp((value - minimum) / (maximum - minimum), 0f, 1f);
     }
 }

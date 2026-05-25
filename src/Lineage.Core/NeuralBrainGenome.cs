@@ -40,6 +40,7 @@ public sealed class NeuralBrainGenome
         NeuralBrainSchema.VisionSectorInputStart + VisionSectorSet.SectorCount * LegacyCreatureSectorSizeChannelCount;
     private const int LegacyInputCountWithoutCreatureSectorMotion = LegacyCreatureSectorMotionFoodContactInput + 5;
     private const int LegacyInputCountWithoutCreatureContact = NeuralBrainSchema.HealthRatioInput;
+    private const int LegacyInputCountWithoutPlantQuality = NeuralBrainSchema.HealthRatioInput + 1;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
 
@@ -872,6 +873,21 @@ public sealed class NeuralBrainGenome
         if (TryInferCurrentWeightLayout(weights.Length, out var hiddenNodeCount))
         {
             return (weights, hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
+            LegacyInputCountWithoutPlantQuality,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutPlantQuality,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
         }
 
         if (TryInferLegacyWeightLayout(

@@ -64,6 +64,7 @@ var tests = new (string Name, Action Body)[]
     ("Minimal life loop is repeatable", MinimalLifeLoopIsRepeatable),
     ("Creature sensing reports local food direction", CreatureSensingReportsFoodDirection),
     ("Creature sensing splits plant and meat cues", CreatureSensingSplitsPlantAndMeatCues),
+    ("Creature sensing reports plant quality cues", CreatureSensingReportsPlantQualityCues),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
@@ -109,6 +110,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates health ratio input", NeuralBrainMigratesHealthRatioInput),
     ("Neural brain migrates creature sector motion inputs", NeuralBrainMigratesCreatureSectorMotionInputs),
     ("Neural brain migrates creature contact input", NeuralBrainMigratesCreatureContactInput),
+    ("Neural brain migrates plant quality inputs", NeuralBrainMigratesPlantQualityInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2438,6 +2440,102 @@ static void CreatureSensingSplitsPlantAndMeatCues()
     AssertTrue(senses.FoodDirectionRight > 0.99f, "Meat specialist should prefer meat right");
 }
 
+static void CreatureSensingReportsPlantQualityCues()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 240f,
+            WorldHeight = 160f,
+            FixedDeltaSeconds = 0.1f
+        },
+        seed: 1305,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1),
+            new EatingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 50f,
+        VisionAngleRadians = MathF.Tau,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(120f, 20f), energy: 25f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 120f), energy: 25f);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Tender,
+        Position = new SimVector2(21f, 20f),
+        Radius = 2f,
+        Calories = 20f,
+        MaxCalories = 20f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Tough,
+        Position = new SimVector2(121f, 20f),
+        Radius = 2f,
+        Calories = 20f,
+        MaxCalories = 20f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Tender,
+        Position = new SimVector2(69f, 120f),
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f
+    });
+
+    simulation.Step();
+    simulation.Step();
+
+    var tenderSenses = simulation.State.Creatures[0].Senses;
+    var toughSenses = simulation.State.Creatures[1].Senses;
+    var farSenses = simulation.State.Creatures[2].Senses;
+
+    AssertTrue(tenderSenses.PlantDetected, "Tender plant should be visible");
+    AssertTrue(toughSenses.PlantDetected, "Tough plant should be visible");
+    AssertClose(
+        PlantResourceTraits.BiteEaseSense(PlantResourceKind.Tender),
+        tenderSenses.VisiblePlantBiteEase,
+        0.000001,
+        "Tender plant visual bite ease");
+    AssertClose(
+        PlantResourceTraits.EnergyQualitySense(PlantResourceKind.Tough),
+        toughSenses.VisiblePlantEnergyQuality,
+        0.000001,
+        "Tough plant visual energy quality");
+    AssertTrue(
+        tenderSenses.VisiblePlantBiteEase > toughSenses.VisiblePlantBiteEase,
+        "Tender plants should look easier to bite than tough plants at close range");
+    AssertClose(
+        PlantResourceTraits.EnergyQualitySense(PlantResourceKind.Tender),
+        tenderSenses.PlantFoodContactEnergyQuality,
+        0.000001,
+        "Tender plant contact energy quality");
+    AssertClose(
+        PlantResourceTraits.BiteEaseSense(PlantResourceKind.Tough),
+        toughSenses.PlantFoodContactBiteEase,
+        0.000001,
+        "Tough plant contact bite ease");
+    AssertTrue(tenderSenses.RecentPlantRawYield > toughSenses.RecentPlantRawYield, "Tender plant should transfer raw calories faster");
+    AssertTrue(farSenses.PlantDetected, "Far plant should still be visible as plant mass");
+    AssertTrue(farSenses.VisiblePlantDensity > 0f, "Far plant should contribute visible plant density");
+    AssertClose(0f, farSenses.VisiblePlantEnergyQuality, 0.000001, "Far plant should not reveal close quality");
+    AssertClose(0f, farSenses.VisiblePlantBiteEase, 0.000001, "Far plant should not reveal close bite ease");
+}
+
 static void CreatureSensingReportsVisibleCreatureCues()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -2963,6 +3061,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         PlantDirectionForward = 0.25f,
         PlantDirectionRight = 0.75f,
         VisiblePlantDensity = 0.45f,
+        VisiblePlantEnergyQuality = 0.57f,
+        VisiblePlantBiteEase = 0.67f,
         MeatProximity = 0.65f,
         MeatDirectionForward = -0.2f,
         MeatDirectionRight = 0.9f,
@@ -2972,6 +3072,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         ReproductionReadiness = 0.22f,
         EnergySurplusRatio = 0.32f,
         RecentFoodSuccess = 0.42f,
+        RecentPlantRawYield = 0.36f,
+        RecentPlantEnergyYield = 0.46f,
         CreatureProximity = 0.52f,
         CreatureDirectionForward = -0.62f,
         CreatureDirectionRight = 0.72f,
@@ -2996,6 +3098,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         MovementBlocked = 1f,
         FoodContact = 0.93f,
         PlantFoodContact = 1f,
+        PlantFoodContactEnergyQuality = 0.73f,
+        PlantFoodContactBiteEase = 0.83f,
         MeatFoodContact = 0.25f,
         EggFoodContact = 0.5f,
         CreatureContact = 0.75f,
@@ -3024,6 +3128,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.35f, inputs[NeuralBrainSchema.DietaryMeatBiasInput], 0.000001, "Diet input");
     AssertClose(0.7f, inputs[NeuralBrainSchema.FoodProximityInput], 0.000001, "Food proximity input");
     AssertClose(0.75f, inputs[NeuralBrainSchema.PlantRightInput], 0.000001, "Plant right input");
+    AssertClose(0.57f, inputs[NeuralBrainSchema.VisiblePlantEnergyQualityInput], 0.000001, "Plant energy quality input");
+    AssertClose(0.67f, inputs[NeuralBrainSchema.VisiblePlantBiteEaseInput], 0.000001, "Plant bite ease input");
     AssertClose(0.55f, inputs[NeuralBrainSchema.VisibleMeatFreshnessInput], 0.000001, "Meat freshness input");
     AssertClose(0.82f, inputs[NeuralBrainSchema.VisibleCreatureDensityInput], 0.000001, "Creature density input");
     AssertClose(0.68f, inputs[NeuralBrainSchema.MeatScentForwardInput], 0.000001, "Meat scent forward input");
@@ -3032,9 +3138,13 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.84f, inputs[NeuralBrainSchema.ForwardObstacleInput], 0.000001, "Obstacle input");
     AssertClose(0.93f, inputs[NeuralBrainSchema.FoodContactInput], 0.000001, "Food contact input");
     AssertClose(1f, inputs[NeuralBrainSchema.PlantFoodContactInput], 0.000001, "Plant food contact input");
+    AssertClose(0.73f, inputs[NeuralBrainSchema.PlantFoodContactEnergyQualityInput], 0.000001, "Plant contact energy quality input");
+    AssertClose(0.83f, inputs[NeuralBrainSchema.PlantFoodContactBiteEaseInput], 0.000001, "Plant contact bite ease input");
     AssertClose(0.25f, inputs[NeuralBrainSchema.MeatFoodContactInput], 0.000001, "Meat food contact input");
     AssertClose(0.5f, inputs[NeuralBrainSchema.EggFoodContactInput], 0.000001, "Egg food contact input");
     AssertClose(0.75f, inputs[NeuralBrainSchema.CreatureContactInput], 0.000001, "Creature contact input");
+    AssertClose(0.36f, inputs[NeuralBrainSchema.RecentPlantRawYieldInput], 0.000001, "Recent plant raw yield input");
+    AssertClose(0.46f, inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput], 0.000001, "Recent plant energy yield input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
@@ -4236,6 +4346,56 @@ static void NeuralBrainMigratesCreatureContactInput()
         brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactInput),
         0.000001,
         "New creature contact hidden input starts neutral");
+}
+
+static void NeuralBrainMigratesPlantQualityInputs()
+{
+    const int legacyInputCount = 196;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 3;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.HealthRatioInput] = -0.7f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.CreatureContactInput] = 1.2f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.EatOutput * hiddenNodeCount] = 2.4f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Plant quality migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Plant quality migrated weight count");
+    AssertClose(
+        -0.7f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HealthRatioInput),
+        0.000001,
+        "Existing health direct input remains in place");
+    AssertClose(
+        1.2f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactInput),
+        0.000001,
+        "Existing creature contact hidden input remains in place");
+    AssertClose(
+        2.4f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.EatOutput, 0),
+        0.000001,
+        "Existing hidden eat output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.VisiblePlantEnergyQualityInput),
+        0.000001,
+        "New visible plant energy quality input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.PlantFoodContactBiteEaseInput),
+        0.000001,
+        "New contact plant bite ease hidden input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RecentPlantEnergyYieldInput),
+        0.000001,
+        "New recent plant energy yield input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()

@@ -32,6 +32,8 @@ public readonly record struct BrainInputFrame(
                     senses.PlantDirectionForward,
                     senses.PlantDirectionRight,
                     senses.VisiblePlantDensity),
+                senses.VisiblePlantEnergyQuality,
+                senses.VisiblePlantBiteEase,
                 new DirectionalObjectSignal(
                     senses.MeatDetected,
                     senses.MeatProximity,
@@ -72,6 +74,8 @@ public readonly record struct BrainInputFrame(
                 senses.MovementBlocked,
                 senses.FoodContact,
                 senses.PlantFoodContact,
+                senses.PlantFoodContactEnergyQuality,
+                senses.PlantFoodContactBiteEase,
                 senses.MeatFoodContact,
                 senses.EggFoodContact,
                 senses.CreatureContact),
@@ -83,7 +87,9 @@ public readonly record struct BrainInputFrame(
                 senses.EggReserveRatio,
                 senses.ReproductionReadiness,
                 senses.EnergySurplusRatio,
-                senses.RecentFoodSuccess));
+                senses.RecentFoodSuccess,
+                senses.RecentPlantRawYield,
+                senses.RecentPlantEnergyYield));
     }
 }
 
@@ -112,6 +118,8 @@ public readonly record struct DirectionalGradientSignal(
 public readonly record struct VisionInputFrame(
     DirectionalObjectSignal Food,
     DirectionalObjectSignal Plant,
+    float PlantEnergyQuality,
+    float PlantBiteEase,
     DirectionalObjectSignal Meat,
     float MeatFreshness,
     VisionSectorSet Sectors,
@@ -142,6 +150,8 @@ public readonly record struct BodyInputFrame(
     float MovementBlocked,
     float FoodContact,
     float PlantFoodContact,
+    float PlantFoodContactEnergyQuality,
+    float PlantFoodContactBiteEase,
     float MeatFoodContact,
     float EggFoodContact,
     float CreatureContact);
@@ -157,7 +167,9 @@ public readonly record struct InternalInputFrame(
     float EggReserveRatio,
     float ReproductionReadiness,
     float EnergySurplusRatio,
-    float RecentFoodSuccess);
+    float RecentFoodSuccess,
+    float RecentPlantRawYield,
+    float RecentPlantEnergyYield);
 
 /// <summary>
 /// Architecture-neutral action intents produced by a brain before later systems resolve them.

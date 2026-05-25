@@ -49,6 +49,9 @@ public partial class Main : Node2D
     private readonly Color _worldColor = new(0.11f, 0.13f, 0.11f);
     private readonly Color _panelColor = new(0.055f, 0.06f, 0.058f);
     private readonly Color _resourceColor = new(0.24f, 0.74f, 0.36f);
+    private readonly Color _tenderPlantColor = new(0.56f, 0.94f, 0.47f);
+    private readonly Color _richPlantColor = new(0.90f, 0.78f, 0.26f);
+    private readonly Color _toughPlantColor = new(0.30f, 0.52f, 0.22f);
     private readonly Color _meatResourceColor = new(0.72f, 0.22f, 0.20f);
     private readonly Color _eggColor = new(0.86f, 0.88f, 0.72f);
     private readonly Color _creatureColor = new(0.82f, 0.73f, 0.48f);
@@ -816,6 +819,7 @@ public partial class Main : Node2D
             $"Search {snapshot.TotalDistanceTraveledPerSecond:0}u/s  meal dist {snapshot.AverageDistanceSinceLastMeal:0}u  kcal/u {snapshot.CaloriesEatenPerDistance:0.00}\n" +
             $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}  Map {(_renderMap ? "on" : "off")}\n" +
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
+            $"Plant colors generic/tender/rich/tough\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
             $"Obstacles {FormatObstacleMapKind(_scenario.ObstacleMapKind)} cells {_simulation.State.Obstacles.BlockedCellCount}\n" +
@@ -959,12 +963,14 @@ public partial class Main : Node2D
             $"Damage resist {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Energy surplus {senses.EnergySurplusRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
+            $"Plant yield raw {senses.RecentPlantRawYield:0.00}  energy {senses.RecentPlantEnergyYield:0.00}\n" +
             $"Memory {senses.MemoryStrength:0.00}  fwd {senses.MemoryDirectionForward:0.00}  right {senses.MemoryDirectionRight:0.00}\n" +
             $"Memory write fwd {creature.Actions.MemoryForward:0.00}  right {creature.Actions.MemoryRight:0.00}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +
             $"Lay ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}\n" +
             $"Egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
             $"Food contact {(creature.IsTouchingFood ? "yes" : "no")}\n" +
+            $"Plant taste energy {senses.PlantFoodContactEnergyQuality:0.00}  bite {senses.PlantFoodContactBiteEase:0.00}\n" +
             BuildFoodContactText(creature, genome) +
             $"Last meal {BuildLastMealSourceText(creature)}\n" +
             $"Swallowed this tick {creature.LastCaloriesEaten:0.00} raw ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
@@ -989,6 +995,7 @@ public partial class Main : Node2D
             $"Right {senses.FoodDirectionRight:0.00}\n" +
             $"Plants {(senses.PlantDetected ? "yes" : "no")}  density {senses.VisiblePlantDensity:0.00}\n" +
             $"Plant prox {senses.PlantProximity:0.00}  fwd {senses.PlantDirectionForward:0.00}  right {senses.PlantDirectionRight:0.00}\n" +
+            $"Plant quality energy {senses.VisiblePlantEnergyQuality:0.00}  bite {senses.VisiblePlantBiteEase:0.00}\n" +
             $"Meat {(senses.MeatDetected ? "yes" : "no")}  density {senses.VisibleMeatDensity:0.00}\n" +
             $"Meat prox {senses.MeatProximity:0.00}  fwd {senses.MeatDirectionForward:0.00}  right {senses.MeatDirectionRight:0.00}\n" +
             $"Meat fresh {senses.VisibleMeatFreshness:P0}\n" +
@@ -1107,13 +1114,18 @@ public partial class Main : Node2D
 
                 var digestionEfficiency = resource.Kind == ResourceKind.Meat
                     ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
-                    : CreatureDigestion.PlantEfficiency(genome);
+                    : CreatureDigestion.PlantEfficiency(genome)
+                        * PlantResourceTraits.DigestionEnergyMultiplier(resource.PlantKind);
+                var plantTypeText = resource.Kind == ResourceKind.Plant
+                    ? $"Plant type {resource.PlantKind.ToString().ToLowerInvariant()}\n"
+                    : string.Empty;
                 var freshnessText = resource.Kind == ResourceKind.Meat
                     ? $"Food fresh {MeatQuality.Freshness(resource):P0}\n"
                     : string.Empty;
 
                 return
                     $"Food type {FormatResourceKind(resource.Kind)}\n" +
+                    plantTypeText +
                     freshnessText +
                     $"Digest eff {digestionEfficiency:P0}\n" +
                     $"Food edge {creature.FoodContactEdgeDistance:0.0}/{CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}\n" +
@@ -1239,10 +1251,11 @@ public partial class Main : Node2D
                 var fullness = resource.MaxCalories > 0f
                     ? Mathf.Clamp(resource.Calories / resource.MaxCalories, 0f, 1f)
                     : 0f;
-                var color = ColorForResource(resource.Kind, fullness);
+                var color = ColorForResource(resource, fullness);
                 var screenPosition = ToScreen(resource.Position);
                 var radius = MathF.Max(2f, resource.Radius * _worldScale);
                 DrawCircle(screenPosition, radius, color);
+                DrawPlantTypeMarker(resource, screenPosition, radius, fullness);
                 _drawnResourceCount++;
             }
         }
@@ -1309,7 +1322,7 @@ public partial class Main : Node2D
                 var meatShare = summary.TotalCalories > 0f
                     ? Mathf.Clamp(summary.MeatCalories / summary.TotalCalories, 0f, 1f)
                     : 0f;
-                var color = new Color(0.17f + fullness * 0.08f, 0.72f, 0.30f, alpha)
+                var color = PlantAggregateColor(summary, fullness, alpha)
                     .Lerp(new Color(0.72f, 0.22f, 0.18f, alpha), meatShare);
                 DrawRect(clippedScreenRect, color, filled: true);
                 _drawnResourceAggregateCount++;
@@ -1863,13 +1876,86 @@ public partial class Main : Node2D
         return $"{brainId} ({FormatBrainArchitectureKind(architecture)}, {brain.HiddenNodeCount} hidden)";
     }
 
-    private Color ColorForResource(ResourceKind kind, float fullness)
+    private Color ColorForResource(ResourcePatchState resource, float fullness)
     {
-        return kind switch
+        return resource.Kind switch
         {
             ResourceKind.Meat => _meatResourceColor.Lerp(new Color(0.20f, 0.10f, 0.09f), 1f - fullness),
-            _ => _resourceColor.Lerp(new Color(0.14f, 0.26f, 0.16f), 1f - fullness)
+            _ => ColorForPlantKind(resource.PlantKind).Lerp(new Color(0.14f, 0.26f, 0.16f), 1f - fullness)
         };
+    }
+
+    private Color ColorForPlantKind(PlantResourceKind plantKind)
+    {
+        return plantKind switch
+        {
+            PlantResourceKind.Tender => _tenderPlantColor,
+            PlantResourceKind.Rich => _richPlantColor,
+            PlantResourceKind.Tough => _toughPlantColor,
+            _ => _resourceColor
+        };
+    }
+
+    private Color PlantAggregateColor(ResourceAggregateSummary summary, float fullness, float alpha)
+    {
+        var plantCalories = summary.GenericPlantCalories
+            + summary.TenderPlantCalories
+            + summary.RichPlantCalories
+            + summary.ToughPlantCalories;
+        if (plantCalories <= 0f)
+        {
+            return new Color(0.17f + fullness * 0.08f, 0.72f, 0.30f, alpha);
+        }
+
+        var color =
+            ColorForPlantKind(PlantResourceKind.Generic) * (summary.GenericPlantCalories / plantCalories)
+            + ColorForPlantKind(PlantResourceKind.Tender) * (summary.TenderPlantCalories / plantCalories)
+            + ColorForPlantKind(PlantResourceKind.Rich) * (summary.RichPlantCalories / plantCalories)
+            + ColorForPlantKind(PlantResourceKind.Tough) * (summary.ToughPlantCalories / plantCalories);
+
+        return new Color(
+            Mathf.Clamp(color.R + fullness * 0.04f, 0f, 1f),
+            Mathf.Clamp(color.G + fullness * 0.04f, 0f, 1f),
+            Mathf.Clamp(color.B + fullness * 0.04f, 0f, 1f),
+            alpha);
+    }
+
+    private void DrawPlantTypeMarker(ResourcePatchState resource, Vector2 screenPosition, float radius, float fullness)
+    {
+        if (resource.Kind != ResourceKind.Plant || resource.PlantKind == PlantResourceKind.Generic || radius < 3.25f)
+        {
+            return;
+        }
+
+        var markerAlpha = Mathf.Clamp(0.45f + fullness * 0.45f, 0f, 0.95f);
+        var markerColor = resource.PlantKind switch
+        {
+            PlantResourceKind.Rich => new Color(1.0f, 0.95f, 0.45f, markerAlpha),
+            PlantResourceKind.Tough => new Color(0.08f, 0.16f, 0.08f, markerAlpha),
+            _ => new Color(0.84f, 1.0f, 0.72f, markerAlpha)
+        };
+
+        switch (resource.PlantKind)
+        {
+            case PlantResourceKind.Rich:
+                DrawArc(screenPosition, radius + 1f, 0f, MathF.Tau, 20, markerColor, width: 1f);
+                break;
+            case PlantResourceKind.Tough:
+                var diameter = radius * 1.35f;
+                DrawRect(
+                    new Rect2(screenPosition - new Vector2(diameter * 0.5f, diameter * 0.5f), new Vector2(diameter, diameter)),
+                    markerColor,
+                    filled: false,
+                    width: 1f);
+                break;
+            case PlantResourceKind.Tender:
+                DrawLine(
+                    screenPosition + new Vector2(-radius * 0.45f, radius * 0.25f),
+                    screenPosition + new Vector2(radius * 0.45f, -radius * 0.25f),
+                    markerColor,
+                    width: 1f);
+                break;
+        }
     }
 
     private static float EggHealthRatio(EggState egg)
@@ -3218,6 +3304,24 @@ public partial class Main : Node2D
                 {
                     chunk.MeatCalories += resource.Calories;
                 }
+                else
+                {
+                    switch (resource.PlantKind)
+                    {
+                        case PlantResourceKind.Tender:
+                            chunk.TenderPlantCalories += resource.Calories;
+                            break;
+                        case PlantResourceKind.Rich:
+                            chunk.RichPlantCalories += resource.Calories;
+                            break;
+                        case PlantResourceKind.Tough:
+                            chunk.ToughPlantCalories += resource.Calories;
+                            break;
+                        default:
+                            chunk.GenericPlantCalories += resource.Calories;
+                            break;
+                    }
+                }
             }
         }
 
@@ -3288,6 +3392,10 @@ public partial class Main : Node2D
                     summary.TotalCalories += chunk.TotalCalories;
                     summary.TotalMaxCalories += chunk.TotalMaxCalories;
                     summary.MeatCalories += chunk.MeatCalories;
+                    summary.GenericPlantCalories += chunk.GenericPlantCalories;
+                    summary.TenderPlantCalories += chunk.TenderPlantCalories;
+                    summary.RichPlantCalories += chunk.RichPlantCalories;
+                    summary.ToughPlantCalories += chunk.ToughPlantCalories;
                 }
             }
 
@@ -3330,6 +3438,14 @@ public partial class Main : Node2D
         public float TotalMaxCalories;
 
         public float MeatCalories;
+
+        public float GenericPlantCalories;
+
+        public float TenderPlantCalories;
+
+        public float RichPlantCalories;
+
+        public float ToughPlantCalories;
     }
 
     private readonly record struct ResourceChunkRange(int MinX, int MinY, int MaxX, int MaxY);
@@ -3343,6 +3459,14 @@ public partial class Main : Node2D
         public float TotalMaxCalories;
 
         public float MeatCalories;
+
+        public float GenericPlantCalories;
+
+        public float TenderPlantCalories;
+
+        public float RichPlantCalories;
+
+        public float ToughPlantCalories;
     }
 
     private sealed class CreatureRenderCache

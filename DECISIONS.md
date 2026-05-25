@@ -40,12 +40,13 @@ Decision:
 
 - Plant diversity starts with coarse scenario-weighted plant types rather than full plant species. The initial types are generic, tender, rich, and tough.
 - Plant type affects plant-side ecology and nutrition: seeded calories/capacity, regrowth, eating transfer speed, and digestion payoff.
-- Creatures do not currently receive separate plant-type vision inputs. They still see plant density/proximity broadly, preserving the current embodied-foraging design until close-range or fuzzy category sensing is deliberately added.
+- Creatures do not receive perfect plant-type labels. They still see plant density/proximity broadly, plus close-range plant quality/ease cues, contact taste/ease cues, and recent plant raw/digested yield feedback.
 
 Rationale:
 
 - This adds resource tradeoffs without multiplying brain inputs or making every plant type a separate perfect visual category.
 - It gives scenarios a way to vary foraging pressure while keeping old scenarios compatible through the default generic-only mix.
+- The close/taste/yield cues let preference evolve through experience while far-away plants remain mostly generic plant mass.
 
 Status: active.
 

@@ -14,6 +14,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MaximumTerrainProbeDistance = 160f;
     private const int ObstacleProbeSteps = 4;
     private const float MinimumExpectedFoodTransfer = 0.001f;
+    private const float MinimumExpectedPlantDigestiveYield = 0.001f;
+    private const float MinimumPlantQualityClarity = 0.04f;
     public const int DefaultWorldSenseIntervalTicks = 4;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const bool DefaultEnableSectorVision = false;
@@ -140,6 +142,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 && creature.FoodContactResourceKind == ResourceKind.Plant
                     ? 1f
                     : 0f;
+            senses.PlantFoodContactEnergyQuality = senses.PlantFoodContact > 0f
+                ? PlantResourceTraits.EnergyQualitySense(creature.FoodContactPlantKind)
+                : 0f;
+            senses.PlantFoodContactBiteEase = senses.PlantFoodContact > 0f
+                ? PlantResourceTraits.BiteEaseSense(creature.FoodContactPlantKind)
+                : 0f;
             senses.MeatFoodContact = creature.IsTouchingFood
                 && creature.FoodContactKind == FoodContactKind.Resource
                 && creature.FoodContactResourceKind == ResourceKind.Meat
@@ -256,6 +264,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
             var nearestVisibleMeatFreshness = 0f;
             var nearestVisibleCreatureIndex = creatureVisibility.NearestIndex;
+            var visiblePlantQualityWeight = 0f;
+            var visiblePlantEnergyQualityTotal = 0f;
+            var visiblePlantBiteEaseTotal = 0f;
 
             var resourceScanStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
@@ -292,6 +303,17 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 }
 
                 var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                var qualityClarity = PlantQualityClarity(proximity);
+                var qualityWeight = qualityClarity >= MinimumPlantQualityClarity
+                    ? qualityClarity * Math.Clamp(resource.Calories / Math.Max(1f, resource.MaxCalories), 0f, 1f)
+                    : 0f;
+                if (qualityWeight > 0f)
+                {
+                    visiblePlantQualityWeight += qualityWeight;
+                    visiblePlantEnergyQualityTotal += PlantResourceTraits.EnergyQualitySense(resource.PlantKind) * qualityWeight;
+                    visiblePlantBiteEaseTotal += PlantResourceTraits.BiteEaseSense(resource.PlantKind) * qualityWeight;
+                }
+
                 if (_enableSectorVision
                     && VisionSectorSet.TryGetSectorIndex(
                         toResource,
@@ -463,6 +485,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 : 0L;
             senses.VisibleFoodDensity = Math.Clamp(visibleFoodCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisiblePlantDensity = Math.Clamp(visiblePlantCount / DensitySaturationFoodCount, 0f, 1f);
+            senses.VisiblePlantEnergyQuality = visiblePlantQualityWeight > 0f
+                ? visiblePlantEnergyQualityTotal / visiblePlantQualityWeight
+                : 0f;
+            senses.VisiblePlantBiteEase = visiblePlantQualityWeight > 0f
+                ? visiblePlantBiteEaseTotal / visiblePlantQualityWeight
+                : 0f;
             senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
             senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
@@ -602,6 +630,17 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             (creature.LastCaloriesEaten + creature.LastCaloriesDigested) / expectedFoodTransfer,
             0f,
             1f);
+        var expectedPlantDigestiveYield = Math.Max(
+            MinimumExpectedPlantDigestiveYield,
+            CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * Math.Max(0f, deltaSeconds));
+        var recentPlantRawYield = Math.Clamp(
+            creature.LastPlantCaloriesEaten / expectedFoodTransfer,
+            0f,
+            1f);
+        var recentPlantEnergyYield = Math.Clamp(
+            creature.LastPlantDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
         var isReadyToLay =
             eggReserveRatio >= 1f
             && creature.AgeSeconds >= genome.MaturityAgeSeconds
@@ -613,6 +652,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.EggReserveRatio = eggReserveRatio;
         senses.EnergySurplusRatio = energySurplusRatio;
         senses.RecentFoodSuccess = recentFoodSuccess;
+        senses.RecentPlantRawYield = recentPlantRawYield;
+        senses.RecentPlantEnergyYield = recentPlantEnergyYield;
         senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
     }
 
@@ -1027,6 +1068,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     {
         var maxCenterDistance = targetRadius + senseRadius;
         return distanceSquared <= maxCenterDistance * maxCenterDistance;
+    }
+
+    private static float PlantQualityClarity(float proximity)
+    {
+        var clamped = Math.Clamp(proximity, 0f, 1f);
+        return clamped * clamped;
     }
 
     private void BeginTraitCache(WorldState state)
