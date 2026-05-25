@@ -7,7 +7,7 @@ public static class NeuralBrainSchema
 {
     public const int DefaultHiddenNodeCount = 4;
 
-    public const int DefaultHiddenLayerNodeCount = 16;
+    public const int DefaultHiddenLayerNodeCount = 8;
 
     public const int MaxHiddenNodeCount = 64;
 

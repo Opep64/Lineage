@@ -1205,6 +1205,60 @@ Interpretation:
 - This is enough to keep the hidden-layer architecture in play, but not enough to make it the default yet.
 - Next useful step is likely starter/tuning support for hidden-layer brains, especially Harsh survivability, before adding more brain architectures.
 
+## 2026-05-25 Hidden-Layer Node Count Tuning
+
+Tested whether the initial hidden-layer brain should keep the 16-node default or use a smaller default closer to the starter's current relay structure.
+
+Output files:
+
+- `out/brain_arch_tuning_20260525/hidden_nodes_60k.csv`
+- `out/brain_arch_tuning_20260525/hidden_nodes_60k.html`
+- `out/brain_arch_tuning_20260525/hidden8_90k.csv`
+- `out/brain_arch_tuning_20260525/hidden8_90k.html`
+
+60k comparison:
+
+| Scenario | Variant | Final avg | Final range | Avg TPS |
+| --- | --- | ---: | --- | ---: |
+| Balanced Foraging | Hybrid | 31.7 | 26-35 | 9724 |
+| Balanced Foraging | Hidden16 | 35.3 | 27-41 | 5609 |
+| Balanced Foraging | Hidden8 | 28.7 | 23-33 | 7892 |
+| Harsh Foraging | Hybrid | 20.7 | 15-28 | 11874 |
+| Harsh Foraging | Hidden16 | 20.3 | 18-22 | 8810 |
+| Harsh Foraging | Hidden8 | 21.7 | 16-30 | 11079 |
+| Omnivore Pressure | Hybrid | 24.0 | 18-28 | 11012 |
+| Omnivore Pressure | Hidden16 | 27.7 | 21-34 | 6883 |
+| Omnivore Pressure | Hidden8 | 26.7 | 23-32 | 9206 |
+| Predation Pressure | Hybrid | 25.3 | 20-32 | 7162 |
+| Predation Pressure | Hidden16 | 15.3 | 9-22 | 6536 |
+| Predation Pressure | Hidden8 | 21.0 | 14-34 | 8680 |
+
+90k Hidden8 follow-up:
+
+| Scenario | Variant | Final avg | Final range | Avg TPS |
+| --- | --- | ---: | --- | ---: |
+| Balanced Foraging | Hybrid | 27.7 | 11-50 | 9601 |
+| Balanced Foraging | Hidden8 | 36.3 | 19-48 | 8337 |
+| Harsh Foraging | Hybrid | 21.3 | 17-27 | 11712 |
+| Harsh Foraging | Hidden8 | 23.0 | 22-24 | 11572 |
+| Omnivore Pressure | Hybrid | 25.3 | 17-31 | 11787 |
+| Omnivore Pressure | Hidden8 | 27.7 | 17-36 | 11297 |
+| Predation Pressure | Hybrid | 18.3 | 10-26 | 8336 |
+| Predation Pressure | Hidden8 | 17.3 | 11-26 | 10706 |
+
+Decision:
+
+- Changed `NeuralBrainSchema.DefaultHiddenLayerNodeCount` from 16 to 8.
+- The starter currently uses seven hidden relay nodes, one per output, so 8 leaves one spare node without paying for a large inert layer.
+- Hidden16 remains available by explicitly setting `brainHiddenNodeCount=16`.
+- Hidden8 improves speed substantially and removes the Harsh weakness seen in the 90k Hidden16 comparison.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 157 tests.
+- `dotnet build Lineage.slnx -c Release -v:minimal` passed.
+- Godot headless smoke test passed.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
