@@ -154,17 +154,28 @@ public static class SimulationScenarioFactory
                 state,
                 scenario.ResourceClusterStrength,
                 scenario.ResourceClusterRadius);
+            var plantKind = scenario.SamplePlantResourceKind(state.Random);
+            var plantTraits = PlantResourceTraits.For(plantKind);
+            var radius = RandomRange(state, scenario.ResourceRadiusMin, scenario.ResourceRadiusMax)
+                * plantTraits.RadiusMultiplier;
+            var maxCalories = scenario.ResourceMaxCalories * plantTraits.MaxCaloriesMultiplier;
+            var calories = Math.Min(
+                maxCalories,
+                RandomRange(state, scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax)
+                * plantTraits.InitialCaloriesMultiplier);
             state.SpawnResourcePatch(new ResourcePatchState
             {
                 Position = position,
+                PlantKind = plantKind,
                 HabitatBiomeKind = state.Biomes.GetKindAt(position),
-                Radius = RandomRange(state, scenario.ResourceRadiusMin, scenario.ResourceRadiusMax),
-                Calories = RandomRange(state, scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax),
-                MaxCalories = scenario.ResourceMaxCalories,
+                Radius = Math.Max(0.1f, radius),
+                Calories = calories,
+                MaxCalories = maxCalories,
                 RegrowthCaloriesPerSecond = RandomRange(
                     state,
                     scenario.ResourceRegrowthMin,
                     scenario.ResourceRegrowthMax)
+                    * plantTraits.RegrowthMultiplier
                     * state.Biomes.GetResourceRegrowthMultiplierAt(position)
             });
         }

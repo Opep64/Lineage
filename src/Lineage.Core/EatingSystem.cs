@@ -45,6 +45,9 @@ public sealed class EatingSystem(
             creature.FoodContactCalories = 0f;
             creature.LastCaloriesEaten = 0f;
             creature.LastPlantCaloriesEaten = 0f;
+            creature.LastTenderPlantCaloriesEaten = 0f;
+            creature.LastRichPlantCaloriesEaten = 0f;
+            creature.LastToughPlantCaloriesEaten = 0f;
             creature.LastCarcassCaloriesEaten = 0f;
             creature.LastEggCaloriesEaten = 0f;
             creature.LastLivePreyCaloriesEaten = 0f;
@@ -113,7 +116,8 @@ public sealed class EatingSystem(
 
             var efficiency = resource.Kind == ResourceKind.Meat
                 ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
-                : CreatureDigestion.PlantEfficiency(genome);
+                : CreatureDigestion.PlantEfficiency(genome)
+                    * PlantResourceTraits.DigestionEnergyMultiplier(resource.PlantKind);
 
             var distanceSquared = centerDistance * centerDistance;
             if (IsBetterFoodContact(efficiency, edgeDistance, distanceSquared, bestEfficiency, bestEdgeDistance, bestDistanceSquared))
@@ -189,10 +193,13 @@ public sealed class EatingSystem(
         float deltaSeconds)
     {
         var resource = state.Resources[resourceIndex];
+        var eatRateMultiplier = resource.Kind == ResourceKind.Plant
+            ? PlantResourceTraits.EatingRateMultiplier(resource.PlantKind)
+            : 1f;
         var amount = Math.Min(
             resource.Calories,
             Math.Min(
-                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds,
+                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * eatRateMultiplier * deltaSeconds,
                 AvailableGutCapacity(creature, genome)));
 
         if (amount <= 0f)
@@ -204,7 +211,7 @@ public sealed class EatingSystem(
         var meatFreshness = resource.Kind == ResourceKind.Meat
             ? MeatQuality.Freshness(resource)
             : 1f;
-        AddToGut(ref creature, resource.Kind, amount, meatFreshness);
+        AddToGut(ref creature, resource.Kind, resource.PlantKind, amount, meatFreshness);
         creature.LastCaloriesEaten = amount;
         if (resource.Kind == ResourceKind.Meat)
         {
@@ -229,6 +236,18 @@ public sealed class EatingSystem(
         else
         {
             creature.LastPlantCaloriesEaten = amount;
+            switch (resource.PlantKind)
+            {
+                case PlantResourceKind.Tender:
+                    creature.LastTenderPlantCaloriesEaten = amount;
+                    break;
+                case PlantResourceKind.Rich:
+                    creature.LastRichPlantCaloriesEaten = amount;
+                    break;
+                case PlantResourceKind.Tough:
+                    creature.LastToughPlantCaloriesEaten = amount;
+                    break;
+            }
         }
 
         creature.SecondsSinceLastMeal = 0f;
@@ -285,7 +304,12 @@ public sealed class EatingSystem(
         return Math.Max(0f, capacity - creature.GutPlantCalories - creature.GutMeatCalories);
     }
 
-    private static void AddToGut(ref CreatureState creature, ResourceKind kind, float amount, float meatFreshness)
+    private static void AddToGut(
+        ref CreatureState creature,
+        ResourceKind kind,
+        PlantResourceKind plantKind,
+        float amount,
+        float meatFreshness)
     {
         if (kind == ResourceKind.Meat)
         {
@@ -295,6 +319,18 @@ public sealed class EatingSystem(
         else
         {
             creature.GutPlantCalories += amount;
+            switch (plantKind)
+            {
+                case PlantResourceKind.Tender:
+                    creature.GutTenderPlantCalories += amount;
+                    break;
+                case PlantResourceKind.Rich:
+                    creature.GutRichPlantCalories += amount;
+                    break;
+                case PlantResourceKind.Tough:
+                    creature.GutToughPlantCalories += amount;
+                    break;
+            }
         }
     }
 

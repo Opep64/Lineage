@@ -55,6 +55,9 @@ public sealed class StatsRecordingSystem(
         var totalVisibleCreatureDensity = 0f;
         var totalCaloriesEaten = 0f;
         var totalPlantCaloriesEaten = 0f;
+        var totalTenderPlantCaloriesEaten = 0f;
+        var totalRichPlantCaloriesEaten = 0f;
+        var totalToughPlantCaloriesEaten = 0f;
         var totalCarcassCaloriesEaten = 0f;
         var totalEggCaloriesEaten = 0f;
         var totalLivePreyCaloriesEaten = 0f;
@@ -62,6 +65,9 @@ public sealed class StatsRecordingSystem(
         var totalStaleMeatCaloriesEaten = 0f;
         var totalCaloriesDigested = 0f;
         var totalPlantDigestedEnergy = 0f;
+        var totalTenderPlantDigestedEnergy = 0f;
+        var totalRichPlantDigestedEnergy = 0f;
+        var totalToughPlantDigestedEnergy = 0f;
         var totalMeatDigestedEnergy = 0f;
         var totalRottenMeatDamage = 0f;
         var totalGutFillRatio = 0f;
@@ -179,6 +185,9 @@ public sealed class StatsRecordingSystem(
             totalVisibleCreatureDensity += creature.Senses.VisibleCreatureDensity;
             totalCaloriesEaten += creature.LastCaloriesEaten;
             totalPlantCaloriesEaten += creature.LastPlantCaloriesEaten;
+            totalTenderPlantCaloriesEaten += creature.LastTenderPlantCaloriesEaten;
+            totalRichPlantCaloriesEaten += creature.LastRichPlantCaloriesEaten;
+            totalToughPlantCaloriesEaten += creature.LastToughPlantCaloriesEaten;
             totalCarcassCaloriesEaten += creature.LastCarcassCaloriesEaten;
             totalEggCaloriesEaten += creature.LastEggCaloriesEaten;
             totalLivePreyCaloriesEaten += creature.LastLivePreyCaloriesEaten;
@@ -186,6 +195,9 @@ public sealed class StatsRecordingSystem(
             totalStaleMeatCaloriesEaten += creature.LastStaleMeatCaloriesEaten;
             totalCaloriesDigested += creature.LastCaloriesDigested;
             totalPlantDigestedEnergy += creature.LastPlantDigestedEnergy;
+            totalTenderPlantDigestedEnergy += creature.LastTenderPlantDigestedEnergy;
+            totalRichPlantDigestedEnergy += creature.LastRichPlantDigestedEnergy;
+            totalToughPlantDigestedEnergy += creature.LastToughPlantDigestedEnergy;
             totalMeatDigestedEnergy += creature.LastMeatDigestedEnergy;
             totalRottenMeatDamage += creature.LastRottenMeatDamage;
             if (creature.LastRottenMeatDamage > 0f)
@@ -454,6 +466,9 @@ public sealed class StatsRecordingSystem(
         var totalMeatFreshnessWeightedCalories = 0f;
         var activeResourceCount = 0;
         var plantResourceCount = 0;
+        var tenderPlantTypeResourceCount = 0;
+        var richPlantTypeResourceCount = 0;
+        var toughPlantTypeResourceCount = 0;
         var meatResourceCount = 0;
         var dormantPlantResourceCount = 0;
         var totalDormantPlantSecondsRemaining = 0f;
@@ -467,6 +482,9 @@ public sealed class StatsRecordingSystem(
         var sparsePlantCalories = 0f;
         var grasslandPlantCalories = 0f;
         var richPlantCalories = 0f;
+        var tenderPlantTypeCalories = 0f;
+        var richPlantTypeCalories = 0f;
+        var toughPlantTypeCalories = 0f;
         var barrenMeatCalories = 0f;
         var sparseMeatCalories = 0f;
         var grasslandMeatCalories = 0f;
@@ -508,6 +526,22 @@ public sealed class StatsRecordingSystem(
             {
                 plantResourceCount++;
                 totalPlantCalories += resource.Calories;
+                switch (resource.PlantKind)
+                {
+                    case PlantResourceKind.Tender:
+                        tenderPlantTypeResourceCount++;
+                        tenderPlantTypeCalories += resource.Calories;
+                        break;
+                    case PlantResourceKind.Rich:
+                        richPlantTypeResourceCount++;
+                        richPlantTypeCalories += resource.Calories;
+                        break;
+                    case PlantResourceKind.Tough:
+                        toughPlantTypeResourceCount++;
+                        toughPlantTypeCalories += resource.Calories;
+                        break;
+                }
+
                 AddPlantPatchCell(plantCaloriesByPatchCell, state.Bounds, resource.Position, resource.Calories);
                 AddRegionValue(region, resource.Calories, ref leftRegionPlantCalories, ref middleRegionPlantCalories, ref rightRegionPlantCalories);
                 AddBiomeValue(
@@ -560,6 +594,15 @@ public sealed class StatsRecordingSystem(
         var plantCaloriesEatenPerSecond = deltaSeconds > 0f
             ? totalPlantCaloriesEaten / deltaSeconds
             : 0f;
+        var tenderPlantCaloriesEatenPerSecond = deltaSeconds > 0f
+            ? totalTenderPlantCaloriesEaten / deltaSeconds
+            : 0f;
+        var richPlantCaloriesEatenPerSecond = deltaSeconds > 0f
+            ? totalRichPlantCaloriesEaten / deltaSeconds
+            : 0f;
+        var toughPlantCaloriesEatenPerSecond = deltaSeconds > 0f
+            ? totalToughPlantCaloriesEaten / deltaSeconds
+            : 0f;
         var carcassCaloriesEatenPerSecond = deltaSeconds > 0f
             ? totalCarcassCaloriesEaten / deltaSeconds
             : 0f;
@@ -580,6 +623,15 @@ public sealed class StatsRecordingSystem(
             : 0f;
         var plantDigestedEnergyPerSecond = deltaSeconds > 0f
             ? totalPlantDigestedEnergy / deltaSeconds
+            : 0f;
+        var tenderPlantDigestedEnergyPerSecond = deltaSeconds > 0f
+            ? totalTenderPlantDigestedEnergy / deltaSeconds
+            : 0f;
+        var richPlantDigestedEnergyPerSecond = deltaSeconds > 0f
+            ? totalRichPlantDigestedEnergy / deltaSeconds
+            : 0f;
+        var toughPlantDigestedEnergyPerSecond = deltaSeconds > 0f
+            ? totalToughPlantDigestedEnergy / deltaSeconds
             : 0f;
         var meatDigestedEnergyPerSecond = deltaSeconds > 0f
             ? totalMeatDigestedEnergy / deltaSeconds
@@ -715,6 +767,12 @@ public sealed class StatsRecordingSystem(
             totalEggHealth,
             totalResourceCalories,
             totalPlantCalories,
+            tenderPlantTypeResourceCount,
+            richPlantTypeResourceCount,
+            toughPlantTypeResourceCount,
+            tenderPlantTypeCalories,
+            richPlantTypeCalories,
+            toughPlantTypeCalories,
             totalMeatCalories,
             barrenCreatureCount,
             sparseCreatureCount,
@@ -770,11 +828,17 @@ public sealed class StatsRecordingSystem(
             totalVisibleCreatureDensity / divisor,
             caloriesEatenPerSecond,
             plantCaloriesEatenPerSecond,
+            tenderPlantCaloriesEatenPerSecond,
+            richPlantCaloriesEatenPerSecond,
+            toughPlantCaloriesEatenPerSecond,
             carcassCaloriesEatenPerSecond,
             eggCaloriesEatenPerSecond,
             livePreyCaloriesEatenPerSecond,
             caloriesDigestedPerSecond,
             plantDigestedEnergyPerSecond,
+            tenderPlantDigestedEnergyPerSecond,
+            richPlantDigestedEnergyPerSecond,
+            toughPlantDigestedEnergyPerSecond,
             meatDigestedEnergyPerSecond,
             totalGutFillRatio / divisor,
             totalGutPlantShare / divisor,

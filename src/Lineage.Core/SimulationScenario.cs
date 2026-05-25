@@ -102,6 +102,14 @@ public sealed record SimulationScenario
 
     public float ResourceRegrowthMax { get; init; } = 1.8f;
 
+    public float GenericPlantWeight { get; init; } = 1f;
+
+    public float TenderPlantWeight { get; init; }
+
+    public float RichPlantWeight { get; init; }
+
+    public float ToughPlantWeight { get; init; }
+
     public bool RelocateDepletedResources { get; init; } = true;
 
     public float PlantRespawnDelaySecondsMin { get; init; } = 0f;
@@ -314,6 +322,15 @@ public sealed record SimulationScenario
         EnsureRange(ResourceCaloriesMin, ResourceCaloriesMax, nameof(ResourceCaloriesMin), nameof(ResourceCaloriesMax));
         EnsurePositive(ResourceMaxCalories, nameof(ResourceMaxCalories));
         EnsureRange(ResourceRegrowthMin, ResourceRegrowthMax, nameof(ResourceRegrowthMin), nameof(ResourceRegrowthMax));
+        EnsureNonNegative(GenericPlantWeight, nameof(GenericPlantWeight));
+        EnsureNonNegative(TenderPlantWeight, nameof(TenderPlantWeight));
+        EnsureNonNegative(RichPlantWeight, nameof(RichPlantWeight));
+        EnsureNonNegative(ToughPlantWeight, nameof(ToughPlantWeight));
+        if (GenericPlantWeight + TenderPlantWeight + RichPlantWeight + ToughPlantWeight <= 0f)
+        {
+            throw new InvalidOperationException("At least one plant type weight must be positive.");
+        }
+
         EnsureNonNegativeRange(PlantRespawnDelaySecondsMin, PlantRespawnDelaySecondsMax, nameof(PlantRespawnDelaySecondsMin), nameof(PlantRespawnDelaySecondsMax));
         EnsureProbability(ResourceClusterStrength, nameof(ResourceClusterStrength));
         EnsurePositive(ResourceClusterRadius, nameof(ResourceClusterRadius));
@@ -458,6 +475,35 @@ public sealed record SimulationScenario
     public int CalculateInitialResourceCount()
     {
         return CalculateResourceCount(WorldWidth, WorldHeight, InitialResourcesPerMillionArea);
+    }
+
+    public PlantResourceKind SamplePlantResourceKind(DeterministicRandom random)
+    {
+        var totalWeight = GenericPlantWeight + TenderPlantWeight + RichPlantWeight + ToughPlantWeight;
+        if (totalWeight <= 0f)
+        {
+            return PlantResourceKind.Generic;
+        }
+
+        var roll = random.NextSingle(0f, totalWeight);
+        if (roll < GenericPlantWeight)
+        {
+            return PlantResourceKind.Generic;
+        }
+
+        roll -= GenericPlantWeight;
+        if (roll < TenderPlantWeight)
+        {
+            return PlantResourceKind.Tender;
+        }
+
+        roll -= TenderPlantWeight;
+        if (roll < RichPlantWeight)
+        {
+            return PlantResourceKind.Rich;
+        }
+
+        return PlantResourceKind.Tough;
     }
 
     public bool HasEnabledSpeciesSeeds()

@@ -30,8 +30,12 @@ public sealed class DigestionSystem : ISimulationSystem
 
             creature.LastCaloriesDigested = 0f;
             creature.LastPlantDigestedEnergy = 0f;
+            creature.LastTenderPlantDigestedEnergy = 0f;
+            creature.LastRichPlantDigestedEnergy = 0f;
+            creature.LastToughPlantDigestedEnergy = 0f;
             creature.LastMeatDigestedEnergy = 0f;
             creature.LastRottenMeatDamage = 0f;
+            NormalizePlantSubtypes(ref creature);
             NormalizeMeatQuality(ref creature);
             ClampGutToCapacity(ref creature, genome);
 
@@ -70,11 +74,11 @@ public sealed class DigestionSystem : ISimulationSystem
                 ? Math.Clamp(creature.GutMeatQualityCalories / creature.GutMeatCalories, MeatQuality.MinimumFreshness, 1f)
                 : 1f;
 
-            creature.GutPlantCalories -= plantDigested;
+            var plantDigestion = DigestPlantCalories(ref creature, genome, plantDigested);
             creature.GutMeatCalories -= meatDigested;
             creature.GutMeatQualityCalories = Math.Max(0f, creature.GutMeatQualityCalories - meatDigested * meatQuality);
 
-            var plantReleasedEnergy = plantDigested * CreatureDigestion.PlantEfficiency(genome);
+            var plantReleasedEnergy = plantDigestion.TotalEnergy;
             var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEnergyEfficiency(genome, meatQuality);
             var releasedEnergy = plantReleasedEnergy + meatReleasedEnergy;
             var rottenMeatDamage = CalculateRottenMeatDamage(genome, meatQuality, meatDigested);
@@ -82,6 +86,9 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.Health = Math.Max(0f, creature.Health - rottenMeatDamage);
             creature.LastCaloriesDigested = releasedEnergy;
             creature.LastPlantDigestedEnergy = plantReleasedEnergy;
+            creature.LastTenderPlantDigestedEnergy = plantDigestion.TenderEnergy;
+            creature.LastRichPlantDigestedEnergy = plantDigestion.RichEnergy;
+            creature.LastToughPlantDigestedEnergy = plantDigestion.ToughEnergy;
             creature.LastMeatDigestedEnergy = meatReleasedEnergy;
             creature.LastRottenMeatDamage = rottenMeatDamage;
 
@@ -121,6 +128,118 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.GutMeatCalories);
     }
 
+    private static void NormalizePlantSubtypes(ref CreatureState creature)
+    {
+        if (creature.GutPlantCalories <= 0f)
+        {
+            creature.GutPlantCalories = 0f;
+            creature.GutTenderPlantCalories = 0f;
+            creature.GutRichPlantCalories = 0f;
+            creature.GutToughPlantCalories = 0f;
+            return;
+        }
+
+        creature.GutTenderPlantCalories = Math.Clamp(creature.GutTenderPlantCalories, 0f, creature.GutPlantCalories);
+        creature.GutRichPlantCalories = Math.Clamp(creature.GutRichPlantCalories, 0f, creature.GutPlantCalories);
+        creature.GutToughPlantCalories = Math.Clamp(creature.GutToughPlantCalories, 0f, creature.GutPlantCalories);
+
+        var subtypeTotal = creature.GutTenderPlantCalories
+            + creature.GutRichPlantCalories
+            + creature.GutToughPlantCalories;
+        if (subtypeTotal <= creature.GutPlantCalories || subtypeTotal <= 0f)
+        {
+            return;
+        }
+
+        var scale = creature.GutPlantCalories / subtypeTotal;
+        creature.GutTenderPlantCalories *= scale;
+        creature.GutRichPlantCalories *= scale;
+        creature.GutToughPlantCalories *= scale;
+    }
+
+    private static PlantDigestionResult DigestPlantCalories(
+        ref CreatureState creature,
+        CreatureGenome genome,
+        float plantDigested)
+    {
+        if (plantDigested <= 0f || creature.GutPlantCalories <= 0f)
+        {
+            return default;
+        }
+
+        NormalizePlantSubtypes(ref creature);
+
+        var totalPlant = creature.GutPlantCalories;
+        var tender = creature.GutTenderPlantCalories;
+        var rich = creature.GutRichPlantCalories;
+        var tough = creature.GutToughPlantCalories;
+        var generic = Math.Max(0f, totalPlant - tender - rich - tough);
+        var digestAmount = Math.Min(plantDigested, totalPlant);
+
+        var genericDigested = ConsumeShare(generic, totalPlant, digestAmount);
+        var tenderDigested = ConsumeShare(tender, totalPlant, digestAmount);
+        var richDigested = ConsumeShare(rich, totalPlant, digestAmount);
+        var toughDigested = ConsumeShare(tough, totalPlant, digestAmount);
+        var consumed = genericDigested + tenderDigested + richDigested + toughDigested;
+        var roundingLeft = digestAmount - consumed;
+        if (roundingLeft > 0f)
+        {
+            var extraGeneric = Math.Min(generic - genericDigested, roundingLeft);
+            genericDigested += extraGeneric;
+            roundingLeft -= extraGeneric;
+        }
+
+        if (roundingLeft > 0f)
+        {
+            var extraTender = Math.Min(tender - tenderDigested, roundingLeft);
+            tenderDigested += extraTender;
+            roundingLeft -= extraTender;
+        }
+
+        if (roundingLeft > 0f)
+        {
+            var extraRich = Math.Min(rich - richDigested, roundingLeft);
+            richDigested += extraRich;
+            roundingLeft -= extraRich;
+        }
+
+        if (roundingLeft > 0f)
+        {
+            toughDigested += Math.Min(tough - toughDigested, roundingLeft);
+        }
+
+        var finalConsumed = genericDigested + tenderDigested + richDigested + toughDigested;
+        creature.GutPlantCalories = Math.Max(0f, creature.GutPlantCalories - finalConsumed);
+        creature.GutTenderPlantCalories = Math.Max(0f, creature.GutTenderPlantCalories - tenderDigested);
+        creature.GutRichPlantCalories = Math.Max(0f, creature.GutRichPlantCalories - richDigested);
+        creature.GutToughPlantCalories = Math.Max(0f, creature.GutToughPlantCalories - toughDigested);
+
+        var plantEfficiency = CreatureDigestion.PlantEfficiency(genome);
+        var genericEnergy = genericDigested * plantEfficiency;
+        var tenderEnergy = tenderDigested
+            * plantEfficiency
+            * PlantResourceTraits.DigestionEnergyMultiplier(PlantResourceKind.Tender);
+        var richEnergy = richDigested
+            * plantEfficiency
+            * PlantResourceTraits.DigestionEnergyMultiplier(PlantResourceKind.Rich);
+        var toughEnergy = toughDigested
+            * plantEfficiency
+            * PlantResourceTraits.DigestionEnergyMultiplier(PlantResourceKind.Tough);
+
+        return new PlantDigestionResult(
+            genericEnergy + tenderEnergy + richEnergy + toughEnergy,
+            tenderEnergy,
+            richEnergy,
+            toughEnergy);
+    }
+
+    private static float ConsumeShare(float sourceAmount, float totalAmount, float digestAmount)
+    {
+        return sourceAmount > 0f && totalAmount > 0f
+            ? Math.Min(sourceAmount, digestAmount * sourceAmount / totalAmount)
+            : 0f;
+    }
+
     private static void ClampGutToCapacity(ref CreatureState creature, CreatureGenome genome)
     {
         var capacity = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome);
@@ -132,6 +251,9 @@ public sealed class DigestionSystem : ISimulationSystem
 
         var scale = Math.Max(0f, capacity) / totalGutCalories;
         creature.GutPlantCalories *= scale;
+        creature.GutTenderPlantCalories *= scale;
+        creature.GutRichPlantCalories *= scale;
+        creature.GutToughPlantCalories *= scale;
         creature.GutMeatCalories *= scale;
         creature.GutMeatQualityCalories *= scale;
     }
@@ -142,4 +264,10 @@ public sealed class DigestionSystem : ISimulationSystem
             ? value
             : throw new ArgumentOutOfRangeException(name, "Rotten meat damage must be finite and non-negative.");
     }
+
+    private readonly record struct PlantDigestionResult(
+        float TotalEnergy,
+        float TenderEnergy,
+        float RichEnergy,
+        float ToughEnergy);
 }

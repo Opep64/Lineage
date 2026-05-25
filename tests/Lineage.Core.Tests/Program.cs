@@ -37,6 +37,8 @@ var tests = new (string Name, Action Body)[]
     ("Eating transfers resource calories into creature energy", EatingTransfersCalories),
     ("Eating fills gut before digestion", EatingFillsGutBeforeDigestion),
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
+    ("Plant type controls eating transfer rate", PlantTypeControlsEatingTransferRate),
+    ("Plant type controls digestion payoff", PlantTypeControlsDigestionPayoff),
     ("Eating requires body contact with a resource", EatingRequiresBodyContact),
     ("Dietary adaptation controls digested calories", DietaryAdaptationControlsDigestedCalories),
     ("Carrion adaptation trades fresh and stale meat digestion", CarrionAdaptationTradesFreshAndStaleMeatDigestion),
@@ -125,6 +127,7 @@ var tests = new (string Name, Action Body)[]
     ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
+    ("Scenario factory seeds requested plant type mix", ScenarioFactorySeedsRequestedPlantTypeMix),
     ("Scenario factory honors initial spawn region", ScenarioFactoryHonorsInitialSpawnRegion),
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
@@ -1458,6 +1461,99 @@ static void GutCapacityLimitsAdditionalEating()
     AssertClose(2f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Plant gut calories are capacity-limited");
     AssertClose(8f, simulation.State.Creatures[0].GutMeatCalories, 0.000001, "Existing meat gut calories remain");
     AssertClose(28f, simulation.State.Resources[0].Calories, 0.000001, "Resource loses only capacity-limited calories");
+}
+
+static void PlantTypeControlsEatingTransferRate()
+{
+    AssertClose(12.5f, RunPlantTypeEatingProbe(PlantResourceKind.Tender), 0.000001, "Tender plant eating transfer");
+    AssertClose(10f, RunPlantTypeEatingProbe(PlantResourceKind.Generic), 0.000001, "Generic plant eating transfer");
+    AssertClose(6f, RunPlantTypeEatingProbe(PlantResourceKind.Tough), 0.000001, "Tough plant eating transfer");
+}
+
+static float RunPlantTypeEatingProbe(PlantResourceKind plantKind)
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 231,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 10f,
+        GutCapacityCalories = 30f,
+        DietaryAdaptation = 0f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        PlantKind = plantKind,
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    return simulation.State.Creatures[0].LastPlantCaloriesEaten;
+}
+
+static void PlantTypeControlsDigestionPayoff()
+{
+    AssertClose(10f, RunPlantTypeDigestionProbe(PlantResourceKind.Generic), 0.000001, "Generic plant digestion");
+    AssertClose(10f, RunPlantTypeDigestionProbe(PlantResourceKind.Tender), 0.000001, "Tender plant digestion");
+    AssertClose(10.5f, RunPlantTypeDigestionProbe(PlantResourceKind.Rich), 0.000001, "Rich plant digestion");
+    AssertClose(7.8f, RunPlantTypeDigestionProbe(PlantResourceKind.Tough), 0.000001, "Tough plant digestion");
+}
+
+static float RunPlantTypeDigestionProbe(PlantResourceKind plantKind)
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 232,
+        systems:
+        [
+            new DigestionSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DigestionCaloriesPerSecond = 10f,
+        GutCapacityCalories = 30f,
+        DietaryAdaptation = 0f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    var creature = simulation.State.Creatures[0];
+    creature.GutPlantCalories = 10f;
+    switch (plantKind)
+    {
+        case PlantResourceKind.Tender:
+            creature.GutTenderPlantCalories = 10f;
+            break;
+        case PlantResourceKind.Rich:
+            creature.GutRichPlantCalories = 10f;
+            break;
+        case PlantResourceKind.Tough:
+            creature.GutToughPlantCalories = 10f;
+            break;
+    }
+
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    return simulation.State.Creatures[0].LastPlantDigestedEnergy;
 }
 
 static void EatingRequiresBodyContact()
@@ -5396,6 +5492,34 @@ static void ScenarioFactorySeedsRequestedWorld()
     }
 }
 
+static void ScenarioFactorySeedsRequestedPlantTypeMix()
+{
+    var scenario = new SimulationScenario
+    {
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 12f,
+        WorldWidth = 1_000f,
+        WorldHeight = 1_000f,
+        ResourceVoidBorderWidth = 0f,
+        GenericPlantWeight = 0f,
+        TenderPlantWeight = 1f,
+        RichPlantWeight = 0f,
+        ToughPlantWeight = 0f,
+        EnableBiomes = false
+    }.Validated();
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+
+    AssertEqual(12, simulation.State.Resources.Count, "Seeded plant count");
+    for (var i = 0; i < simulation.State.Resources.Count; i++)
+    {
+        var resource = simulation.State.Resources[i];
+        AssertEqual(PlantResourceKind.Tender, resource.PlantKind, $"Seeded plant type {i}");
+        AssertTrue(resource.MaxCalories <= scenario.ResourceMaxCalories * 0.8001f, $"Tender max calories {i}");
+        AssertTrue(resource.RegrowthCaloriesPerSecond >= scenario.ResourceRegrowthMin * 1.44f, $"Tender regrowth lower bound {i}");
+    }
+}
+
 static void ScenarioFactoryHonorsInitialSpawnRegion()
 {
     var scenario = new SimulationScenario
@@ -6909,6 +7033,10 @@ static void ScenarioJsonRoundTrips()
             }
         ],
         InitialResourcesPerMillionArea = 37.5f,
+        GenericPlantWeight = 0.25f,
+        TenderPlantWeight = 0.2f,
+        RichPlantWeight = 0.35f,
+        ToughPlantWeight = 0.2f,
         PlantRespawnDelaySecondsMin = 12f,
         PlantRespawnDelaySecondsMax = 34f,
         PlantLocalDispersalChance = 0.27f,
@@ -7051,6 +7179,10 @@ static void ScenarioJsonRoundTrips()
     AssertClose(42f, roundTripped.SpeciesSeeds[0].EnergyOverride ?? 0f, 0.000001, "Scenario species seed energy override");
     AssertTrue(!roundTripped.SpeciesSeeds[1].Enabled, "Scenario disabled species seed");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
+    AssertClose(scenario.GenericPlantWeight, roundTripped.GenericPlantWeight, 0.000001, "Scenario generic plant weight");
+    AssertClose(scenario.TenderPlantWeight, roundTripped.TenderPlantWeight, 0.000001, "Scenario tender plant weight");
+    AssertClose(scenario.RichPlantWeight, roundTripped.RichPlantWeight, 0.000001, "Scenario rich plant weight");
+    AssertClose(scenario.ToughPlantWeight, roundTripped.ToughPlantWeight, 0.000001, "Scenario tough plant weight");
     AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
     AssertClose(scenario.PlantLocalDispersalChance, roundTripped.PlantLocalDispersalChance, 0.000001, "Scenario plant local dispersal chance");

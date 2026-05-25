@@ -65,10 +65,12 @@ Status: active design direction
 
 ## Ecology And Resources
 
-Status: broad future work
+Status: first plant diversity slice implemented, broader ecology future
 
-- Add multiple plant/resource types.
-- Add food traits such as toughness, toxicity, water content, fruit/leaf/root distinction, or digestible payoff.
+- Coarse plant types exist now: generic, tender, rich, and tough.
+- Add richer plant/resource types beyond the first coarse food categories.
+- Add food traits such as toxicity, water content, fruit/leaf/root distinction, seasonal availability, or richer digestible payoff.
+- Decide whether future plant type recognition should stay broad and compressed or expose close-range categories only.
 - Add seed dispersal and delayed germination rather than instant plant relocation/respawn.
 - Consider plant populations or field/patch summaries for very large worlds instead of one entity per plant everywhere.
 - Add persistent habitat features such as trees, large bushes, shade, or plant-obstacles.

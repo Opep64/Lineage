@@ -14,6 +14,11 @@ public struct ResourcePatchState
 
     public ResourceKind Kind { get; set; }
 
+    /// <summary>
+    /// Plant subtype tuning for plant resources. Meat ignores this value.
+    /// </summary>
+    public PlantResourceKind PlantKind { get; set; }
+
     public SimVector2 Position { get; set; }
 
     /// <summary>

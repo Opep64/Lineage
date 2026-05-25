@@ -27,6 +27,7 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Creatures have position, velocity, heading, energy, health, age, generation, parent/founder lineage, genome ID, brain ID, gut contents, senses, action outputs, reproduction cooldown, egg reserve, and a legacy spatial memory vector.
 - Eggs are first-class entities with parent, generation, genome, brain, energy, health, max health, investment ratio, age, incubation time, and pending death reason.
 - Resources are plant or meat patches.
+- Plant patches have a coarse plant type: generic, tender, rich, or tough. Plant type affects seeded calories/capacity, regrowth rate, eating transfer rate, and digestion payoff, but creatures do not currently get separate visual channels for each type.
 - Plants can regrow, deplete, enter dormancy, disperse locally, relocate within habitat constraints, and re-enter the spatial index only when active.
 - Meat comes from dead creatures, decays, can become stale/rotten, does not regrow, and can disappear when depleted or decayed.
 
@@ -58,6 +59,7 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Creature genomes include dietary adaptation, carrion adaptation, gut capacity, digestion rate, bite strength, and damage resistance.
 - Eating fills the gut first; digestion converts gut contents into usable energy over time.
 - Plant and meat digestion efficiency depends on diet genes.
+- Plant subtype digestion can further adjust plant energy payoff. Tough plants digest less efficiently; rich plants digest slightly better.
 - Meat freshness affects nutrition, and rotten/stale meat can cause health damage.
 - Carrion adaptation improves stale/rotten meat handling.
 - Eggs can be eaten as meat-like nutrition.
@@ -181,6 +183,7 @@ Godot supports:
 Reports include:
 
 - Population/resources/eggs charts.
+- Plant type calories, intake, and digestion charts.
 - Death and reproduction summaries.
 - Trait summaries.
 - Lineage/founder/generation summaries.

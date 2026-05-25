@@ -89,6 +89,12 @@ public struct CreatureState
 
     public float LastPlantCaloriesEaten { get; set; }
 
+    public float LastTenderPlantCaloriesEaten { get; set; }
+
+    public float LastRichPlantCaloriesEaten { get; set; }
+
+    public float LastToughPlantCaloriesEaten { get; set; }
+
     public float LastCarcassCaloriesEaten { get; set; }
 
     public float LastEggCaloriesEaten { get; set; }
@@ -121,11 +127,23 @@ public struct CreatureState
 
     public float LastPlantDigestedEnergy { get; set; }
 
+    public float LastTenderPlantDigestedEnergy { get; set; }
+
+    public float LastRichPlantDigestedEnergy { get; set; }
+
+    public float LastToughPlantDigestedEnergy { get; set; }
+
     public float LastMeatDigestedEnergy { get; set; }
 
     public float LastRottenMeatDamage { get; set; }
 
     public float GutPlantCalories { get; set; }
+
+    public float GutTenderPlantCalories { get; set; }
+
+    public float GutRichPlantCalories { get; set; }
+
+    public float GutToughPlantCalories { get; set; }
 
     public float GutMeatCalories { get; set; }
 
