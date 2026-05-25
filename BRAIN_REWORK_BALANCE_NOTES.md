@@ -514,6 +514,18 @@ Interpretation:
 - Harsh is intentionally near the low end; if future mechanics increase mortality further, it should be the first scenario to soften.
 - This is a new baseline for the branch. Future behavior/performance checks should compare against the `low_density_pass4_*` reports rather than the older dense-resource probes.
 
+## 2026-05-25 Godot Sector Vision Debug Overlay
+
+Added a Godot-only selected-creature debug overlay for the sector vision work.
+
+Implementation notes:
+
+- Selected creatures now show sector boundary rays inside the existing vision cone.
+- Sector signals are drawn as category-colored rays and markers: green plants, red meat, yellow eggs, and cyan creatures.
+- Creature-sector markers get an extra ring when the closest represented creature is approaching or moving away.
+- The selected-creature inspector now includes a compact left-to-right `Sector hits` summary using the same sector samples that feed the brain.
+- `V` toggles the sector overlay without affecting simulation behavior.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

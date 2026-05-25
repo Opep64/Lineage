@@ -55,6 +55,10 @@ public partial class Main : Node2D
     private readonly Color _selectedColor = new(1.0f, 0.94f, 0.42f);
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
     private readonly Color _memoryColor = new(0.55f, 0.8f, 1.0f, 0.78f);
+    private readonly Color _visionSectorPlantColor = new(0.32f, 0.92f, 0.45f, 0.92f);
+    private readonly Color _visionSectorMeatColor = new(0.94f, 0.28f, 0.22f, 0.9f);
+    private readonly Color _visionSectorEggColor = new(0.94f, 0.86f, 0.42f, 0.9f);
+    private readonly Color _visionSectorCreatureColor = new(0.38f, 0.82f, 1.0f, 0.9f);
     private readonly Color _obstacleColor = new(0.035f, 0.04f, 0.038f, 0.82f);
     private readonly Color _graphPopulationColor = new(0.96f, 0.78f, 0.34f);
     private readonly Color _graphResourceColor = new(0.31f, 0.82f, 0.48f);
@@ -95,6 +99,7 @@ public partial class Main : Node2D
     private bool _followSelected;
     private bool _showBiomeOverlay = true;
     private bool _renderMap = true;
+    private bool _showVisionSectorDebug = true;
     private Vector2 _lastPanPosition;
     private ResourceRenderCache _resourceRenderCache = new();
     private ulong _resourceCacheLastRefreshMilliseconds;
@@ -259,6 +264,9 @@ public partial class Main : Node2D
                     break;
                 case Key.C:
                     CycleColorMode();
+                    break;
+                case Key.V:
+                    _showVisionSectorDebug = !_showVisionSectorDebug;
                     break;
                 case Key.Equal:
                 case Key.Plus:
@@ -817,6 +825,7 @@ public partial class Main : Node2D
             $"Arrows pan  G follows\n" +
             $"B toggles biomes\n" +
             $"C changes color mode\n" +
+            $"V sectors {(_showVisionSectorDebug ? "shown" : "hidden")}\n" +
             $"M toggles map\n" +
             $"{launcherHint}";
 
@@ -931,6 +940,7 @@ public partial class Main : Node2D
             $"Turn {CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome):0.0}/{genome.MaxTurnRadiansPerSecond:0.0}\n" +
             $"Vision range {CreatureGrowth.EffectiveSenseRadius(creature, genome):0.0}/{genome.SenseRadius:0.0}\n" +
             $"Vision angle {ToDegrees(CreatureGrowth.EffectiveVisionAngleRadians(creature, genome)):0}deg/{ToDegrees(genome.VisionAngleRadians):0}deg\n" +
+            $"Sector hits {BuildVisionSectorHitSummary(senses.VisionSectors)}\n" +
             $"Body {CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}/{genome.BodyRadius:0.0}\n" +
             $"Terrain drag now {senses.CurrentTerrainDrag:0.00}  ahead {senses.ForwardTerrainDrag:0.00}  L {senses.LeftTerrainDrag:0.00}  R {senses.RightTerrainDrag:0.00}\n" +
             $"Obstacle fwd {senses.ForwardObstacle:0.00}  L {senses.LeftObstacle:0.00}  R {senses.RightObstacle:0.00}  blocked {senses.MovementBlocked:0.00}\n" +
@@ -993,6 +1003,48 @@ public partial class Main : Node2D
             $"Eat intent {creature.Actions.WantsEat}\n" +
             $"Attack intent {creature.Actions.WantsAttack}\n" +
             $"Reproduce {creature.Actions.WantsReproduce}";
+    }
+
+    private static string BuildVisionSectorHitSummary(VisionSectorSet sectors)
+    {
+        if (!sectors.HasAnySignal)
+        {
+            return "none";
+        }
+
+        var parts = new List<string>();
+        for (var i = 0; i < VisionSectorSet.SectorCount; i++)
+        {
+            var sample = sectors.Get(i);
+            var labels = new List<string>();
+            AddVisionSectorLabel(labels, "P", sample.PlantDensity, sample.PlantProximity);
+            AddVisionSectorLabel(labels, "M", sample.MeatDensity, sample.MeatProximity);
+            AddVisionSectorLabel(labels, "E", sample.EggDensity, sample.EggProximity);
+            AddVisionSectorLabel(labels, "C", sample.CreatureDensity, sample.CreatureProximity);
+            if (labels.Count > 0)
+            {
+                parts.Add($"{i}:{string.Join('/', labels)}");
+            }
+        }
+
+        if (parts.Count == 0)
+        {
+            return "none";
+        }
+
+        const int maxParts = 6;
+        var summary = string.Join(' ', parts.Take(maxParts));
+        return parts.Count > maxParts
+            ? $"{summary} +{parts.Count - maxParts}"
+            : summary;
+    }
+
+    private static void AddVisionSectorLabel(List<string> labels, string prefix, float density, float proximity)
+    {
+        if (VisionSignal(density, proximity) > 0.001f)
+        {
+            labels.Add($"{prefix}{proximity:0.0}");
+        }
     }
 
     private string BuildEggInspectorText(EggState egg)
@@ -1495,6 +1547,7 @@ public partial class Main : Node2D
         float radius)
     {
         DrawVisionCone(creature, genome, screenPosition);
+        DrawVisionSectorDebug(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
         DrawSelectedMemoryVector(creature, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
@@ -1576,6 +1629,139 @@ public partial class Main : Node2D
             points[^1],
             new Color(_senseColor.R, _senseColor.G, _senseColor.B, 0.42f),
             width: 1.2f);
+    }
+
+    private void DrawVisionSectorDebug(CreatureState creature, CreatureGenome genome, Vector2 screenPosition)
+    {
+        if (!_showVisionSectorDebug)
+        {
+            return;
+        }
+
+        var visionRange = CreatureGrowth.EffectiveSenseRadius(creature, genome);
+        var visionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
+        var halfAngle = visionAngle * 0.5f;
+        var sectorAngle = visionAngle / VisionSectorSet.SectorCount;
+        var start = creature.HeadingRadians - halfAngle;
+        var boundaryColor = new Color(0.82f, 0.9f, 1f, 0.16f);
+
+        for (var i = 0; i <= VisionSectorSet.SectorCount; i++)
+        {
+            var angle = start + sectorAngle * i;
+            DrawLine(
+                screenPosition,
+                ToScreen(creature.Position + SimVector2.FromAngle(angle) * visionRange),
+                boundaryColor,
+                width: i == VisionSectorSet.CenterSectorIndex ? 1.2f : 0.8f);
+        }
+
+        var sectors = creature.Senses.VisionSectors;
+        for (var i = 0; i < VisionSectorSet.SectorCount; i++)
+        {
+            DrawVisionSectorSample(
+                creature.Position,
+                screenPosition,
+                start + sectorAngle * (i + 0.5f),
+                visionRange,
+                sectors.Get(i));
+        }
+    }
+
+    private void DrawVisionSectorSample(
+        SimVector2 creaturePosition,
+        Vector2 screenPosition,
+        float angle,
+        float visionRange,
+        VisionSectorSample sample)
+    {
+        var plantSignal = VisionSignal(sample.PlantDensity, sample.PlantProximity);
+        var meatSignal = VisionSignal(sample.MeatDensity, sample.MeatProximity);
+        var eggSignal = VisionSignal(sample.EggDensity, sample.EggProximity);
+        var creatureSignal = VisionSignal(sample.CreatureDensity, sample.CreatureProximity);
+        var strongestSignal = MathF.Max(MathF.Max(plantSignal, meatSignal), MathF.Max(eggSignal, creatureSignal));
+        if (strongestSignal <= 0.001f)
+        {
+            return;
+        }
+
+        var direction = SimVector2.FromAngle(angle);
+        var dominantColor = DominantVisionSectorColor(plantSignal, meatSignal, eggSignal, creatureSignal);
+        DrawLine(
+            screenPosition,
+            ToScreen(creaturePosition + direction * visionRange),
+            WithAlpha(dominantColor, 0.16f + strongestSignal * 0.3f),
+            width: 1f + strongestSignal * 2.2f);
+
+        var screenDirection = ToGodot(direction).Normalized();
+        var markerOffset = new Vector2(-screenDirection.Y, screenDirection.X);
+        DrawVisionSignalMarker(creaturePosition, direction, markerOffset, visionRange, sample.PlantDensity, sample.PlantProximity, _visionSectorPlantColor, -9f);
+        DrawVisionSignalMarker(creaturePosition, direction, markerOffset, visionRange, sample.MeatDensity, sample.MeatProximity, _visionSectorMeatColor, 0f);
+        DrawVisionSignalMarker(creaturePosition, direction, markerOffset, visionRange, sample.EggDensity, sample.EggProximity, _visionSectorEggColor, 9f);
+        DrawVisionSignalMarker(creaturePosition, direction, markerOffset, visionRange, sample.CreatureDensity, sample.CreatureProximity, _visionSectorCreatureColor, 18f);
+
+        if (sample.CreatureDensity > 0f && MathF.Abs(sample.CreatureApproachRate) > 0.05f)
+        {
+            var proximity = Math.Clamp(sample.CreatureProximity, 0f, 1f);
+            var distance = Math.Clamp(visionRange * (1f - proximity), 0f, visionRange);
+            var marker = ToScreen(creaturePosition + direction * distance) + markerOffset * 18f;
+            var approachColor = sample.CreatureApproachRate > 0f
+                ? new Color(1f, 0.52f, 0.18f, 0.86f)
+                : new Color(0.25f, 0.52f, 1f, 0.72f);
+            DrawArc(marker, 8f + 5f * MathF.Abs(sample.CreatureApproachRate), 0f, MathF.Tau, 28, approachColor, width: 1.4f);
+        }
+    }
+
+    private void DrawVisionSignalMarker(
+        SimVector2 creaturePosition,
+        SimVector2 direction,
+        Vector2 markerOffset,
+        float visionRange,
+        float density,
+        float proximity,
+        Color color,
+        float offsetPixels)
+    {
+        var signal = VisionSignal(density, proximity);
+        if (signal <= 0.001f)
+        {
+            return;
+        }
+
+        var distance = Math.Clamp(visionRange * (1f - Math.Clamp(proximity, 0f, 1f)), 0f, visionRange);
+        var marker = ToScreen(creaturePosition + direction * distance) + markerOffset * offsetPixels;
+        var radius = 2.5f + density * 6f + proximity * 3f;
+        DrawCircle(marker, radius, WithAlpha(color, 0.35f + signal * 0.45f));
+        DrawArc(marker, radius + 1.5f, 0f, MathF.Tau, 20, WithAlpha(color, 0.75f), width: 1f);
+    }
+
+    private Color DominantVisionSectorColor(float plantSignal, float meatSignal, float eggSignal, float creatureSignal)
+    {
+        if (creatureSignal >= plantSignal && creatureSignal >= meatSignal && creatureSignal >= eggSignal)
+        {
+            return _visionSectorCreatureColor;
+        }
+
+        if (meatSignal >= plantSignal && meatSignal >= eggSignal)
+        {
+            return _visionSectorMeatColor;
+        }
+
+        if (eggSignal >= plantSignal)
+        {
+            return _visionSectorEggColor;
+        }
+
+        return _visionSectorPlantColor;
+    }
+
+    private static float VisionSignal(float density, float proximity)
+    {
+        return MathF.Max(Math.Clamp(density, 0f, 1f), Math.Clamp(proximity, 0f, 1f));
+    }
+
+    private static Color WithAlpha(Color color, float alpha)
+    {
+        return new Color(color.R, color.G, color.B, Math.Clamp(alpha, 0f, 1f));
     }
 
     private void DrawSelectedFoodContact(CreatureState creature, Vector2 creatureScreenPosition)
