@@ -156,7 +156,8 @@ public static class SimulationScenarioFactory
                 state,
                 scenario.ResourceClusterStrength,
                 scenario.ResourceClusterRadius);
-            var plantKind = scenario.SamplePlantResourceKind(state.Random);
+            var biomeKind = state.Biomes.GetKindAt(position);
+            var plantKind = scenario.SamplePlantResourceKind(state.Random, biomeKind);
             var plantTraits = PlantResourceTraits.For(plantKind);
             var radius = RandomRange(state, scenario.ResourceRadiusMin, scenario.ResourceRadiusMax)
                 * plantTraits.RadiusMultiplier;
@@ -169,7 +170,7 @@ public static class SimulationScenarioFactory
             {
                 Position = position,
                 PlantKind = plantKind,
-                HabitatBiomeKind = state.Biomes.GetKindAt(position),
+                HabitatBiomeKind = biomeKind,
                 Radius = Math.Max(0.1f, radius),
                 Calories = calories,
                 MaxCalories = maxCalories,

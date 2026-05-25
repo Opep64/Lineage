@@ -1116,8 +1116,7 @@ public partial class Main : Node2D
 
                 var digestionEfficiency = resource.Kind == ResourceKind.Meat
                     ? CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource))
-                    : CreatureDigestion.PlantEfficiency(genome)
-                        * PlantResourceTraits.DigestionEnergyMultiplier(resource.PlantKind);
+                    : CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
                 var plantTypeText = resource.Kind == ResourceKind.Plant
                     ? $"Plant type {resource.PlantKind.ToString().ToLowerInvariant()}\n"
                     : string.Empty;

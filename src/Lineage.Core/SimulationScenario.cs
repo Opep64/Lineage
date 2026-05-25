@@ -110,6 +110,8 @@ public sealed record SimulationScenario
 
     public float ToughPlantWeight { get; init; }
 
+    public bool EnablePlantTypeHabitatAffinity { get; init; }
+
     public bool RelocateDepletedResources { get; init; } = true;
 
     public float PlantRespawnDelaySecondsMin { get; init; } = 0f;
@@ -489,28 +491,40 @@ public sealed record SimulationScenario
         return CalculateResourceCount(WorldWidth, WorldHeight, InitialResourcesPerMillionArea);
     }
 
-    public PlantResourceKind SamplePlantResourceKind(DeterministicRandom random)
+    public PlantResourceKind SamplePlantResourceKind(DeterministicRandom random, BiomeKind? biomeKind = null)
     {
-        var totalWeight = GenericPlantWeight + TenderPlantWeight + RichPlantWeight + ToughPlantWeight;
+        var genericWeight = GenericPlantWeight;
+        var tenderWeight = TenderPlantWeight;
+        var richWeight = RichPlantWeight;
+        var toughWeight = ToughPlantWeight;
+        if (EnablePlantTypeHabitatAffinity && biomeKind is { } biome)
+        {
+            genericWeight *= PlantResourceTraits.HabitatAffinityMultiplier(PlantResourceKind.Generic, biome);
+            tenderWeight *= PlantResourceTraits.HabitatAffinityMultiplier(PlantResourceKind.Tender, biome);
+            richWeight *= PlantResourceTraits.HabitatAffinityMultiplier(PlantResourceKind.Rich, biome);
+            toughWeight *= PlantResourceTraits.HabitatAffinityMultiplier(PlantResourceKind.Tough, biome);
+        }
+
+        var totalWeight = genericWeight + tenderWeight + richWeight + toughWeight;
         if (totalWeight <= 0f)
         {
             return PlantResourceKind.Generic;
         }
 
         var roll = random.NextSingle(0f, totalWeight);
-        if (roll < GenericPlantWeight)
+        if (roll < genericWeight)
         {
             return PlantResourceKind.Generic;
         }
 
-        roll -= GenericPlantWeight;
-        if (roll < TenderPlantWeight)
+        roll -= genericWeight;
+        if (roll < tenderWeight)
         {
             return PlantResourceKind.Tender;
         }
 
-        roll -= TenderPlantWeight;
-        if (roll < RichPlantWeight)
+        roll -= tenderWeight;
+        if (roll < richWeight)
         {
             return PlantResourceKind.Rich;
         }

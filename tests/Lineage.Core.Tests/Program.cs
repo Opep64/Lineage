@@ -135,6 +135,7 @@ var tests = new (string Name, Action Body)[]
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
     ("Scenario factory seeds requested plant type mix", ScenarioFactorySeedsRequestedPlantTypeMix),
+    ("Plant type habitat affinity biases biome sampling", PlantTypeHabitatAffinityBiasesBiomeSampling),
     ("Scenario factory honors initial spawn region", ScenarioFactoryHonorsInitialSpawnRegion),
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
@@ -5741,6 +5742,45 @@ static void ScenarioFactorySeedsRequestedPlantTypeMix()
     }
 }
 
+static void PlantTypeHabitatAffinityBiasesBiomeSampling()
+{
+    var scenario = new SimulationScenario
+    {
+        GenericPlantWeight = 0.25f,
+        TenderPlantWeight = 0.25f,
+        RichPlantWeight = 0.25f,
+        ToughPlantWeight = 0.25f,
+        EnablePlantTypeHabitatAffinity = true
+    }.Validated();
+
+    var barrenCounts = SamplePlantTypeCounts(scenario, BiomeKind.Barren, seed: 91);
+    var grasslandCounts = SamplePlantTypeCounts(scenario, BiomeKind.Grassland, seed: 91);
+    var richCounts = SamplePlantTypeCounts(scenario, BiomeKind.Rich, seed: 91);
+
+    AssertTrue(
+        barrenCounts[(int)PlantResourceKind.Tough] > barrenCounts[(int)PlantResourceKind.Generic],
+        "Barren biomes should favor tough plants over generic plants");
+    AssertTrue(
+        grasslandCounts[(int)PlantResourceKind.Tender] > grasslandCounts[(int)PlantResourceKind.Generic],
+        "Grassland biomes should favor tender plants over generic plants");
+    AssertTrue(
+        richCounts[(int)PlantResourceKind.Rich] > richCounts[(int)PlantResourceKind.Generic],
+        "Rich biomes should favor rich plants over generic plants");
+}
+
+static int[] SamplePlantTypeCounts(SimulationScenario scenario, BiomeKind biomeKind, ulong seed)
+{
+    const int sampleCount = 4_000;
+    var random = new DeterministicRandom(seed);
+    var counts = new int[Enum.GetValues<PlantResourceKind>().Length];
+    for (var i = 0; i < sampleCount; i++)
+    {
+        counts[(int)scenario.SamplePlantResourceKind(random, biomeKind)]++;
+    }
+
+    return counts;
+}
+
 static void ScenarioFactoryHonorsInitialSpawnRegion()
 {
     var scenario = new SimulationScenario
@@ -7309,6 +7349,7 @@ static void ScenarioJsonRoundTrips()
         TenderPlantWeight = 0.2f,
         RichPlantWeight = 0.35f,
         ToughPlantWeight = 0.2f,
+        EnablePlantTypeHabitatAffinity = true,
         PlantRespawnDelaySecondsMin = 12f,
         PlantRespawnDelaySecondsMax = 34f,
         PlantLocalDispersalChance = 0.27f,
@@ -7411,6 +7452,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
     AssertTrue(json.Contains("\"spawnRegion\": \"leftThird\""), "JSON should serialize species seed spawn regions");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
+    AssertTrue(json.Contains("\"enablePlantTypeHabitatAffinity\""), "JSON should serialize plant habitat affinity");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
     AssertTrue(json.Contains("\"plantLocalDispersalChance\""), "JSON should serialize plant local dispersal chance");
     AssertTrue(json.Contains("\"plantLocalDispersalRadius\""), "JSON should serialize plant local dispersal radius");
@@ -7461,6 +7503,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.TenderPlantWeight, roundTripped.TenderPlantWeight, 0.000001, "Scenario tender plant weight");
     AssertClose(scenario.RichPlantWeight, roundTripped.RichPlantWeight, 0.000001, "Scenario rich plant weight");
     AssertClose(scenario.ToughPlantWeight, roundTripped.ToughPlantWeight, 0.000001, "Scenario tough plant weight");
+    AssertEqual(scenario.EnablePlantTypeHabitatAffinity, roundTripped.EnablePlantTypeHabitatAffinity, "Scenario plant habitat affinity");
     AssertClose(scenario.PlantRespawnDelaySecondsMin, roundTripped.PlantRespawnDelaySecondsMin, 0.000001, "Scenario plant respawn min delay");
     AssertClose(scenario.PlantRespawnDelaySecondsMax, roundTripped.PlantRespawnDelaySecondsMax, 0.000001, "Scenario plant respawn max delay");
     AssertClose(scenario.PlantLocalDispersalChance, roundTripped.PlantLocalDispersalChance, 0.000001, "Scenario plant local dispersal chance");

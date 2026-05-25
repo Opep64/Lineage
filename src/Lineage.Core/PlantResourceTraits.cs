@@ -67,6 +67,39 @@ public static class PlantResourceTraits
     }
 
     /// <summary>
+    /// Optional biome affinity used by scenarios that want plant types to form ecological niches.
+    /// Generic plants stay broadly distributed; typed plants become more common in their favored biomes.
+    /// </summary>
+    public static float HabitatAffinityMultiplier(PlantResourceKind kind, BiomeKind biome)
+    {
+        return kind switch
+        {
+            PlantResourceKind.Tender => biome switch
+            {
+                BiomeKind.Barren => 0.2f,
+                BiomeKind.Sparse => 1.25f,
+                BiomeKind.Rich => 0.8f,
+                _ => 1.8f
+            },
+            PlantResourceKind.Rich => biome switch
+            {
+                BiomeKind.Barren => 0.05f,
+                BiomeKind.Sparse => 0.3f,
+                BiomeKind.Rich => 2.8f,
+                _ => 0.8f
+            },
+            PlantResourceKind.Tough => biome switch
+            {
+                BiomeKind.Barren => 3f,
+                BiomeKind.Sparse => 1.8f,
+                BiomeKind.Rich => 0.2f,
+                _ => 0.55f
+            },
+            _ => 1f
+        };
+    }
+
+    /// <summary>
     /// Normalized cue for how much useful energy this plant type tends to release after digestion.
     /// This is a sensory/taste signal, not a direct calorie conversion.
     /// </summary>

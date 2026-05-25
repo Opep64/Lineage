@@ -336,6 +336,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource calories", FormatRange(scenario.ResourceCaloriesMin, scenario.ResourceCaloriesMax));
         WriteMetric(writer, "Resource regrowth", $"{FormatRange(scenario.ResourceRegrowthMin, scenario.ResourceRegrowthMax)} kcal/s");
         WriteMetric(writer, "Plant type mix", FormatPlantTypeMix(scenario));
+        WriteMetric(writer, "Plant habitat affinity", scenario.EnablePlantTypeHabitatAffinity ? "Enabled" : "Disabled");
         WriteMetric(writer, "Depleted resources relocate", scenario.RelocateDepletedResources ? "Yes" : "No");
         WriteMetric(writer, "Plant respawn delay", $"{FormatRange(scenario.PlantRespawnDelaySecondsMin, scenario.PlantRespawnDelaySecondsMax)} seconds");
         WriteMetric(writer, "Resource clustering", FormatPercent(scenario.ResourceClusterStrength));
