@@ -25,9 +25,12 @@ const scenarioOptionSearch = document.querySelector("#scenarioOptionSearch");
 const scenarioScopeInputs = [...document.querySelectorAll("input[name='scenarioOptionScope']")];
 const resetScenarioGroupButton = document.querySelector("#resetScenarioGroupButton");
 const resetScenarioAllButton = document.querySelector("#resetScenarioAllButton");
+const saveScenarioButton = document.querySelector("#saveScenarioButton");
+const deleteScenarioButton = document.querySelector("#deleteScenarioButton");
 
 let refreshTimer = null;
 let allRuns = [];
+let scenarioOptions = [];
 let selectedRunIds = new Set();
 let expandedRunId = null;
 let runDetailsById = new Map();
@@ -37,18 +40,63 @@ let scenarioEditor = null;
 let scenarioEditorBaseline = null;
 let activeScenarioGroup = null;
 
-async function loadScenarios() {
+async function loadScenarios(selectedPath = scenarioSelect.value) {
   const response = await fetch("/api/scenarios");
-  const scenarios = await response.json();
+  scenarioOptions = await response.json();
   scenarioSelect.innerHTML = "";
-  for (const scenario of scenarios) {
+  for (const scenario of scenarioOptions) {
     const option = document.createElement("option");
     option.value = scenario.path;
-    option.textContent = `${scenario.name} (${scenario.path})`;
+    option.textContent = scenarioOptionLabel(scenario);
+    option.dataset.isUserCreated = String(Boolean(scenario.isUserCreated));
+    option.dataset.canDelete = String(Boolean(scenario.canDelete));
     scenarioSelect.append(option);
   }
 
+  if ([...scenarioSelect.options].some((option) => option.value === selectedPath)) {
+    scenarioSelect.value = selectedPath;
+  } else if (scenarioSelect.options.length > 0) {
+    scenarioSelect.selectedIndex = 0;
+  }
+
   await loadScenarioEditor();
+}
+
+function scenarioOptionLabel(scenario) {
+  const suffix = scenario.isUserCreated ? " [saved]" : "";
+  return `${scenario.name}${suffix} (${scenario.path})`;
+}
+
+function selectedScenarioOption() {
+  const selectedPath = scenarioSelect.value;
+  const fromList = scenarioOptions.find((scenario) => scenario.path === selectedPath);
+  if (fromList) {
+    return fromList;
+  }
+
+  const selectedOption = scenarioSelect.selectedOptions[0];
+  return selectedOption
+    ? {
+        name: selectedOption.textContent,
+        path: selectedPath,
+        isUserCreated: selectedOption.dataset.isUserCreated === "true",
+        canDelete: selectedOption.dataset.canDelete === "true"
+      }
+    : null;
+}
+
+function updateScenarioManagementButtons() {
+  if (saveScenarioButton) {
+    saveScenarioButton.disabled = !scenarioEditor;
+  }
+
+  if (deleteScenarioButton) {
+    const option = selectedScenarioOption();
+    deleteScenarioButton.disabled = !option?.canDelete;
+    deleteScenarioButton.title = option?.canDelete
+      ? "Archive this launcher-saved scenario."
+      : "Built-in scenarios and manually added scenario files are protected.";
+  }
 }
 
 async function loadScenarioEditor() {
@@ -59,9 +107,11 @@ async function loadScenarioEditor() {
   scenarioFields.innerHTML = "";
   scenarioOptionsStatus.textContent = "Loading options...";
   updateScenarioResetButtons();
+  updateScenarioManagementButtons();
 
   if (!scenarioSelect.value) {
     scenarioOptionsStatus.textContent = "No scenario selected.";
+    updateScenarioManagementButtons();
     return;
   }
 
@@ -69,6 +119,7 @@ async function loadScenarioEditor() {
   if (!response.ok) {
     const problem = await response.json().catch(() => ({ error: "Scenario options unavailable." }));
     scenarioOptionsStatus.textContent = problem.error || "Scenario options unavailable.";
+    updateScenarioManagementButtons();
     return;
   }
 
@@ -184,6 +235,7 @@ function loadScenarioEditorDefinition(editor) {
   scenarioEditorBaseline = cloneJson(editor.scenario);
   activeScenarioGroup = scenarioEditorGroups()[0] || null;
   renderScenarioEditor();
+  updateScenarioManagementButtons();
 }
 
 function resetScenarioOptionFilters() {
@@ -385,6 +437,83 @@ function resetAllScenarioOptions() {
   renderScenarioEditor();
 }
 
+async function saveScenarioAs() {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  let scenario;
+  try {
+    scenario = collectScenarioOptions();
+  } catch (error) {
+    formMessage.textContent = error.message;
+    return;
+  }
+
+  const currentName = scenario?.name || selectedScenarioOption()?.name || "New Scenario";
+  const name = prompt("Save scenario as", currentName.replace(/\s+(?:\[[^\]]+\]\s*)?\(.+\)$/u, ""));
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    formMessage.textContent = "Scenario name is required.";
+    return;
+  }
+
+  saveScenarioButton.disabled = true;
+  formMessage.textContent = "Saving scenario...";
+  const response = await fetch("/api/scenarios/user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: trimmedName, scenario })
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Scenario save failed." }));
+    formMessage.textContent = problem.error || "Scenario save failed.";
+    updateScenarioManagementButtons();
+    return;
+  }
+
+  const result = await response.json();
+  await loadScenarios(result.scenario.path);
+  scenarioOptionsPanel.hidden = false;
+  formMessage.textContent = `Saved scenario ${result.scenario.name}.`;
+}
+
+async function deleteSelectedScenario() {
+  const option = selectedScenarioOption();
+  if (!option?.canDelete) {
+    formMessage.textContent = "Built-in scenarios and manually added scenario files are protected.";
+    return;
+  }
+
+  if (!confirm(`Archive saved scenario "${option.name}"?`)) {
+    return;
+  }
+
+  deleteScenarioButton.disabled = true;
+  formMessage.textContent = "Archiving scenario...";
+  const response = await fetch(`/api/scenarios?path=${encodeURIComponent(option.path)}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Scenario delete failed." }));
+    formMessage.textContent = problem.error || "Scenario delete failed.";
+    updateScenarioManagementButtons();
+    return;
+  }
+
+  const result = await response.json();
+  await loadScenarios();
+  formMessage.textContent = result.archivedPath
+    ? `Archived scenario to ${result.archivedPath}.`
+    : "Removed missing saved scenario from the launcher registry.";
+}
+
 function cloneJson(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -534,6 +663,7 @@ function renderRuns() {
       <td>
         <div class="actions">
           <button class="secondary" data-action="clone" data-id="${escapeHtml(run.id)}">Clone Settings</button>
+          <button class="secondary" data-action="rerun" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Rerun</button>
           <button class="secondary" data-action="details" data-id="${escapeHtml(run.id)}">${isExpanded ? "Hide" : "Details"}</button>
           <button class="secondary" data-action="rename" data-id="${escapeHtml(run.id)}">Rename</button>
           <button class="secondary" data-action="checkpoint" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint</button>
@@ -782,6 +912,11 @@ runsBody.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "rerun") {
+    await rerunRun(id);
+    return;
+  }
+
   if (action === "details") {
     await toggleRunDetails(id);
     return;
@@ -941,6 +1076,8 @@ for (const input of scenarioScopeInputs) {
 
 resetScenarioGroupButton.addEventListener("click", resetActiveScenarioGroup);
 resetScenarioAllButton.addEventListener("click", resetAllScenarioOptions);
+saveScenarioButton.addEventListener("click", saveScenarioAs);
+deleteScenarioButton.addEventListener("click", deleteSelectedScenario);
 
 scenarioTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-group]");
@@ -1029,15 +1166,52 @@ async function cloneRunSettings(id) {
   document.querySelector(".launch-panel").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+async function rerunRun(id) {
+  const run = allRuns.find((candidate) => candidate.id === id);
+  const name = run?.name || id;
+  if (!confirm(`Rerun "${name}" and overwrite its current results? This will delete the current run artifacts after the replacement starts.`)) {
+    return;
+  }
+
+  refreshStatus.textContent = "Starting rerun";
+  const response = await fetch(`/api/runs/${encodeURIComponent(id)}/rerun`, { method: "POST" });
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Rerun failed." }));
+    refreshStatus.textContent = problem.error || "Rerun failed.";
+    return;
+  }
+
+  const result = await response.json();
+  selectedRunIds.delete(id);
+  if (expandedRunId === id) {
+    expandedRunId = null;
+  }
+
+  await loadRuns();
+  refreshStatus.textContent = result.deletedOriginal
+    ? `Rerun started: ${result.run.name}`
+    : `Rerun started: ${result.run.name}; original artifacts were kept`;
+}
+
 function ensureScenarioOption(path, name) {
   if ([...scenarioSelect.options].some((option) => option.value === path)) {
     return;
   }
 
+  const scenario = {
+    name,
+    path,
+    isUserCreated: false,
+    canDelete: false
+  };
+  scenarioOptions.push(scenario);
   const option = document.createElement("option");
   option.value = path;
-  option.textContent = `${name} (${path})`;
+  option.textContent = scenarioOptionLabel(scenario);
+  option.dataset.isUserCreated = "false";
+  option.dataset.canDelete = "false";
   scenarioSelect.append(option);
+  updateScenarioManagementButtons();
 }
 
 async function toggleRunDetails(id) {

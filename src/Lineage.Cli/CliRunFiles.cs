@@ -3,6 +3,9 @@ using Lineage.Core;
 
 internal sealed class CliRunFiles
 {
+    private const int AtomicJsonWriteMaxAttempts = 10;
+    private const int AtomicJsonWriteRetryDelayMilliseconds = 25;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -12,6 +15,7 @@ internal sealed class CliRunFiles
     private readonly RunOptions _options;
     private readonly SimulationScenario _scenario;
     private readonly OutputPaths _outputPaths;
+    private bool _statusWriteWarningEmitted;
 
     public CliRunFiles(RunOptions options, SimulationScenario scenario, OutputPaths outputPaths)
     {
@@ -103,7 +107,19 @@ internal sealed class CliRunFiles
             LatestCheckpointPath: latestCheckpoint,
             CheckpointCount: checkpoints.Count);
 
-        WriteAtomicJson(_options.StatusPath, status);
+        try
+        {
+            WriteAtomicJson(_options.StatusPath, status);
+            _statusWriteWarningEmitted = false;
+        }
+        catch (Exception ex) when (IsRetryableAtomicWriteException(ex))
+        {
+            if (!_statusWriteWarningEmitted)
+            {
+                Console.Error.WriteLine($"Warning: could not update status file '{Path.GetFullPath(_options.StatusPath)}': {ex.Message}");
+                _statusWriteWarningEmitted = true;
+            }
+        }
     }
 
     public CliRunControlCommand ReadControlCommand()
@@ -191,8 +207,25 @@ internal sealed class CliRunFiles
         }
 
         var tempPath = $"{path}.tmp";
-        File.WriteAllText(tempPath, JsonSerializer.Serialize(value, JsonOptions));
-        File.Move(tempPath, path, overwrite: true);
+        var json = JsonSerializer.Serialize(value, JsonOptions);
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, path, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsRetryableAtomicWriteException(ex) && attempt < AtomicJsonWriteMaxAttempts)
+            {
+                Thread.Sleep(AtomicJsonWriteRetryDelayMilliseconds * attempt);
+            }
+        }
+    }
+
+    private static bool IsRetryableAtomicWriteException(Exception ex)
+    {
+        return ex is IOException or UnauthorizedAccessException;
     }
 
     private static void TryDelete(string path)

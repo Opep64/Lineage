@@ -15,6 +15,30 @@ var api = app.MapGroup("/api");
 
 api.MapGet("/scenarios", (LineageRunManager manager) => Results.Ok(manager.ListScenarios()));
 
+api.MapPost("/scenarios/user", (ScenarioSaveRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.SaveUserScenario(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapDelete("/scenarios", (string path, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.DeleteUserScenario(path));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapGet("/scenario-editor", (string path, LineageRunManager manager) =>
 {
     try
@@ -63,6 +87,19 @@ api.MapPost("/runs", async (RunCreateRequest request, LineageRunManager manager)
     {
         var run = await manager.StartRunAsync(request);
         return Results.Created($"/api/runs/{run.Id}", run);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/runs/{id}/rerun", async (string id, LineageRunManager manager) =>
+{
+    try
+    {
+        var result = await manager.RerunRunAsync(id);
+        return result is null ? Results.NotFound() : Results.Ok(result);
     }
     catch (Exception ex)
     {

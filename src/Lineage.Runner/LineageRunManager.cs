@@ -12,6 +12,8 @@ namespace Lineage.Runner;
 public sealed partial class LineageRunManager
 {
     private const string ProcessIdToken = "{pid}";
+    private const string UserScenarioFolderName = "user";
+    private const string UserScenarioRegistryFileName = ".lineage-runner-scenarios.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -43,10 +45,36 @@ public sealed partial class LineageRunManager
             return Array.Empty<ScenarioOption>();
         }
 
-        return Directory
+        var registry = LoadUserScenarioRegistry();
+        var rootScenarios = Directory
             .EnumerateFiles(scenarioRoot, "*.json", SearchOption.TopDirectoryOnly)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path => new ScenarioOption(Path.GetFileNameWithoutExtension(path), Path.GetRelativePath(_repoRoot, path)))
+            .Select(path => new ScenarioOption(
+                Path.GetFileNameWithoutExtension(path),
+                Path.GetRelativePath(_repoRoot, path),
+                IsUserCreated: false,
+                CanDelete: false));
+
+        var userScenarioRoot = UserScenarioRoot();
+        var userScenarios = Directory.Exists(userScenarioRoot)
+            ? Directory
+                .EnumerateFiles(userScenarioRoot, "*.json", SearchOption.TopDirectoryOnly)
+                .Where(path => !string.Equals(Path.GetFileName(path), UserScenarioRegistryFileName, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Select(path =>
+                {
+                    var relativePath = NormalizeRelativePath(Path.GetRelativePath(_repoRoot, path));
+                    var isRegistered = registry.Scenarios.TryGetValue(relativePath, out var entry);
+                    return new ScenarioOption(
+                        string.IsNullOrWhiteSpace(entry?.Name) ? Path.GetFileNameWithoutExtension(path) : entry.Name,
+                        relativePath,
+                        IsUserCreated: isRegistered,
+                        CanDelete: isRegistered);
+                })
+            : Array.Empty<ScenarioOption>();
+
+        return rootScenarios
+            .Concat(userScenarios)
             .ToArray();
     }
 
@@ -64,6 +92,96 @@ public sealed partial class LineageRunManager
         }
 
         return BuildScenarioEditor(resolvedPath);
+    }
+
+    public ScenarioSaveResult SaveUserScenario(ScenarioSaveRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Scenario name is required.");
+        }
+
+        if (request.Scenario.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            throw new ArgumentException("Scenario JSON is required.");
+        }
+
+        var slug = SlugRegex().Replace(name.ToLowerInvariant(), "_").Trim('_');
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            throw new ArgumentException("Scenario name must contain letters or numbers.");
+        }
+
+        var fileName = $"{slug}.json";
+        var userScenarioRoot = UserScenarioRoot();
+        Directory.CreateDirectory(userScenarioRoot);
+        var path = Path.GetFullPath(Path.Combine(userScenarioRoot, fileName));
+        EnsurePathInside(path, userScenarioRoot);
+        if (File.Exists(path))
+        {
+            throw new InvalidOperationException($"A user scenario named {fileName} already exists.");
+        }
+
+        var scenario = SimulationScenarioJson.FromJson(request.Scenario.GetRawText()) with { Name = name };
+        SimulationScenarioJson.Save(path, scenario);
+
+        var relativePath = NormalizeRelativePath(Path.GetRelativePath(_repoRoot, path));
+        var registry = LoadUserScenarioRegistry();
+        registry.Scenarios[relativePath] = new UserScenarioRegistryEntry
+        {
+            Path = relativePath,
+            Name = name,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+        SaveUserScenarioRegistry(registry);
+
+        var option = new ScenarioOption(
+            name,
+            relativePath,
+            IsUserCreated: true,
+            CanDelete: true);
+        return new ScenarioSaveResult(option, BuildScenarioEditor(path));
+    }
+
+    public ScenarioDeleteResult DeleteUserScenario(string scenarioPath)
+    {
+        if (string.IsNullOrWhiteSpace(scenarioPath))
+        {
+            throw new ArgumentException("Scenario path is required.");
+        }
+
+        var path = ResolveScenarioPath(scenarioPath);
+        var userScenarioRoot = UserScenarioRoot();
+        EnsurePathInside(path, userScenarioRoot);
+
+        var relativePath = NormalizeRelativePath(Path.GetRelativePath(_repoRoot, path));
+        var registry = LoadUserScenarioRegistry();
+        if (!registry.Scenarios.ContainsKey(relativePath))
+        {
+            throw new InvalidOperationException("Only launcher-created user scenarios can be deleted.");
+        }
+
+        if (!File.Exists(path))
+        {
+            registry.Scenarios.Remove(relativePath);
+            SaveUserScenarioRegistry(registry);
+            return new ScenarioDeleteResult(relativePath, string.Empty);
+        }
+
+        var archiveRoot = Path.Combine(_repoRoot, "out", "scenario-trash");
+        Directory.CreateDirectory(archiveRoot);
+        var archivePath = GetUniqueArchivePath(Path.Combine(
+            archiveRoot,
+            $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_{Path.GetFileName(path)}"));
+        File.Move(path, archivePath);
+
+        registry.Scenarios.Remove(relativePath);
+        SaveUserScenarioRegistry(registry);
+        return new ScenarioDeleteResult(
+            relativePath,
+            NormalizeRelativePath(Path.GetRelativePath(_repoRoot, archivePath)));
     }
 
     public IReadOnlyList<RunSummary> ListRuns()
@@ -119,6 +237,44 @@ public sealed partial class LineageRunManager
             CheckpointIntervalTicks: manifest.CheckpointIntervalTicks,
             StopOnExtinction: manifest.StopOnExtinction,
             ScenarioEditor: BuildScenarioEditor(cloneScenarioPath));
+    }
+
+    public async Task<RunRerunResult?> RerunRunAsync(string id)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        run = RefreshRunLifecycle(run);
+        if (run.IsRunning)
+        {
+            throw new InvalidOperationException("Running simulations cannot be rerun in place.");
+        }
+
+        var manifest = run.Manifest;
+        var cloneScenarioPath = ResolveCloneScenarioPath(manifest);
+        using var document = JsonDocument.Parse(File.ReadAllText(cloneScenarioPath));
+        var scenario = document.RootElement.Clone();
+        var launchScenarioPath = File.Exists(ResolveScenarioPath(manifest.ScenarioPath))
+            ? manifest.ScenarioPath
+            : Path.GetRelativePath(_repoRoot, cloneScenarioPath);
+
+        var replacement = await StartRunAsync(new RunCreateRequest(
+            ScenarioPath: launchScenarioPath,
+            Ticks: manifest.Ticks,
+            Seed: manifest.Seed,
+            CheckpointIntervalTicks: manifest.CheckpointIntervalTicks,
+            StopOnExtinction: manifest.StopOnExtinction,
+            Scenario: scenario));
+
+        if (!string.Equals(replacement.Name, manifest.Name, StringComparison.Ordinal))
+        {
+            replacement = RenameRun(replacement.Id, manifest.Name) ?? replacement;
+        }
+
+        var deletedOriginal = DeleteRun(id, deleteArtifacts: true);
+        return new RunRerunResult(replacement, deletedOriginal);
     }
 
     public async Task<RunSummary> StartRunAsync(RunCreateRequest request)
@@ -782,7 +938,8 @@ public sealed partial class LineageRunManager
 
         try
         {
-            return JsonSerializer.Deserialize<CliStatusFile>(File.ReadAllText(path), JsonOptions);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return JsonSerializer.Deserialize<CliStatusFile>(stream, JsonOptions);
         }
         catch
         {
@@ -939,6 +1096,139 @@ public sealed partial class LineageRunManager
             ? scenarioPath
             : Path.Combine(_repoRoot, scenarioPath);
         return Path.GetFullPath(path);
+    }
+
+    private string UserScenarioRoot()
+    {
+        return Path.Combine(_repoRoot, "scenarios", UserScenarioFolderName);
+    }
+
+    private string UserScenarioRegistryPath()
+    {
+        return Path.Combine(UserScenarioRoot(), UserScenarioRegistryFileName);
+    }
+
+    private UserScenarioRegistry LoadUserScenarioRegistry()
+    {
+        var registryPath = UserScenarioRegistryPath();
+        if (!File.Exists(registryPath))
+        {
+            return new UserScenarioRegistry();
+        }
+
+        try
+        {
+            var loaded = JsonSerializer.Deserialize<UserScenarioRegistry>(
+                File.ReadAllText(registryPath),
+                JsonOptions) ?? new UserScenarioRegistry();
+            var normalized = new UserScenarioRegistry
+            {
+                SchemaVersion = loaded.SchemaVersion
+            };
+
+            foreach (var pair in loaded.Scenarios)
+            {
+                var entry = pair.Value;
+                var relativePath = NormalizeRelativePath(string.IsNullOrWhiteSpace(entry.Path) ? pair.Key : entry.Path);
+                if (string.IsNullOrWhiteSpace(relativePath))
+                {
+                    continue;
+                }
+
+                normalized.Scenarios[relativePath] = new UserScenarioRegistryEntry
+                {
+                    Path = relativePath,
+                    Name = string.IsNullOrWhiteSpace(entry.Name)
+                        ? Path.GetFileNameWithoutExtension(relativePath)
+                        : entry.Name,
+                    CreatedAtUtc = entry.CreatedAtUtc == default ? DateTimeOffset.UtcNow : entry.CreatedAtUtc,
+                    UpdatedAtUtc = entry.UpdatedAtUtc == default ? DateTimeOffset.UtcNow : entry.UpdatedAtUtc
+                };
+            }
+
+            return normalized;
+        }
+        catch
+        {
+            return new UserScenarioRegistry();
+        }
+    }
+
+    private void SaveUserScenarioRegistry(UserScenarioRegistry registry)
+    {
+        Directory.CreateDirectory(UserScenarioRoot());
+        var normalized = new UserScenarioRegistry
+        {
+            SchemaVersion = registry.SchemaVersion
+        };
+
+        foreach (var pair in registry.Scenarios)
+        {
+            var relativePath = NormalizeRelativePath(string.IsNullOrWhiteSpace(pair.Value.Path) ? pair.Key : pair.Value.Path);
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                continue;
+            }
+
+            normalized.Scenarios[relativePath] = new UserScenarioRegistryEntry
+            {
+                Path = relativePath,
+                Name = pair.Value.Name,
+                CreatedAtUtc = pair.Value.CreatedAtUtc,
+                UpdatedAtUtc = pair.Value.UpdatedAtUtc
+            };
+        }
+
+        File.WriteAllText(UserScenarioRegistryPath(), JsonSerializer.Serialize(normalized, JsonOptions));
+    }
+
+    private static void EnsurePathInside(string path, string root)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var fullPath = Path.GetFullPath(path);
+        var fullRoot = Path.GetFullPath(root);
+        if (!fullRoot.EndsWith(Path.DirectorySeparatorChar))
+        {
+            fullRoot += Path.DirectorySeparatorChar;
+        }
+
+        if (!fullPath.StartsWith(fullRoot, comparison))
+        {
+            throw new InvalidOperationException("Scenario path is outside the managed user scenario folder.");
+        }
+    }
+
+    private static string NormalizeRelativePath(string path)
+    {
+        return path
+            .Trim()
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar)
+            .TrimStart(Path.DirectorySeparatorChar);
+    }
+
+    private static string GetUniqueArchivePath(string preferredPath)
+    {
+        if (!File.Exists(preferredPath))
+        {
+            return preferredPath;
+        }
+
+        var directory = Path.GetDirectoryName(preferredPath) ?? ".";
+        var fileName = Path.GetFileNameWithoutExtension(preferredPath);
+        var extension = Path.GetExtension(preferredPath);
+        for (var index = 2; index < 1000; index++)
+        {
+            var candidate = Path.Combine(directory, $"{fileName}_{index}{extension}");
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new IOException("Could not choose a unique scenario archive path.");
     }
 
     private ScenarioEditorDefinition BuildScenarioEditor(string resolvedPath)
@@ -1515,5 +1805,23 @@ public sealed partial class LineageRunManager
         {
             return Interlocked.Exchange(ref _exitRecorded, 1) == 0;
         }
+    }
+
+    private sealed class UserScenarioRegistry
+    {
+        public string SchemaVersion { get; set; } = "lineage.runner.user-scenarios.v1";
+
+        public Dictionary<string, UserScenarioRegistryEntry> Scenarios { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class UserScenarioRegistryEntry
+    {
+        public string Path { get; set; } = string.Empty;
+
+        public string Name { get; set; } = string.Empty;
+
+        public DateTimeOffset CreatedAtUtc { get; set; }
+
+        public DateTimeOffset UpdatedAtUtc { get; set; }
     }
 }

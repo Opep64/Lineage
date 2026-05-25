@@ -271,6 +271,8 @@
         <li>Choose a scenario, tick count, optional seed, optional checkpoint interval, and extinction stop behavior</li>
         <li>Expand grouped scenario options before launch, with tabs and field metadata shared from <code>Lineage.Core</code></li>
         <li>Search scenario options, switch between basic and all fields, reset a group or the whole loaded scenario, and see changed fields highlighted</li>
+        <li>Save edited launch settings as launcher-managed scenarios under <code>scenarios\user</code></li>
+        <li>Archive launcher-managed saved scenarios while keeping built-in project scenarios protected from dashboard deletion</li>
         <li>Start multiple CLI simulations as managed runs</li>
         <li>Watch progress, current tick, creature count, egg count, species cluster count, generation, births, deaths, and checkpoint count</li>
         <li>Request <code>Stop</code>, <code>Checkpoint</code>, or <code>Checkpoint + Stop</code> for an active run</li>
@@ -278,6 +280,7 @@
         <li>Search, sort, and filter runs by status or scenario</li>
         <li>See the seed, brain/starter kind, world size, and resource density used on each run row</li>
         <li>Clone settings from a running or finished run back into the launch form for quick experiment variants</li>
+        <li>Rerun a completed, failed, or lost row after confirming that the previous run artifacts will be replaced</li>
         <li>Open compact run details with command line, paths, resolved scenario path, and log tails</li>
         <li>Export selected run summaries and scenario identity as Markdown for cross-run review or Codex analysis</li>
         <li>Rename runs and delete completed run records individually or in bulk</li>
@@ -293,6 +296,11 @@
         When scenario options are edited in the runner, the dashboard writes a generated launch scenario under
         <code>out/runs/_launch_scenarios</code>, passes that to <code>Lineage.Cli</code>, and still records
         the final CLI-resolved <code>resolved_scenario.json</code> beside the run manifest.
+      </p>
+      <p>
+        Saved scenario variants created from the runner live under <code>scenarios\user</code>. The runner can
+        archive those saved variants to <code>out/scenario-trash</code>, but project scenarios directly under
+        <code>scenarios</code> are treated as protected presets and are not deleteable from the dashboard.
       </p>
 
       <h3>Runner Notes</h3>

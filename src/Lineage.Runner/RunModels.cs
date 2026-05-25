@@ -4,7 +4,11 @@ using System.Text.Json.Serialization;
 
 namespace Lineage.Runner;
 
-public sealed record ScenarioOption(string Name, string Path);
+public sealed record ScenarioOption(
+    string Name,
+    string Path,
+    bool IsUserCreated,
+    bool CanDelete);
 
 public sealed record ScenarioEditorDefinition(
     string ScenarioPath,
@@ -24,6 +28,18 @@ public sealed record ScenarioFieldDefinition(
     double? Step,
     string? Units,
     string? Description);
+
+public sealed record ScenarioSaveRequest(
+    string Name,
+    JsonElement Scenario);
+
+public sealed record ScenarioSaveResult(
+    ScenarioOption Scenario,
+    ScenarioEditorDefinition ScenarioEditor);
+
+public sealed record ScenarioDeleteResult(
+    string Path,
+    string ArchivedPath);
 
 public sealed record RunCreateRequest(
     string ScenarioPath,
@@ -45,6 +61,10 @@ public sealed record RunBulkDeleteResult(
     int Requested,
     int Deleted,
     IReadOnlyList<string> Skipped);
+
+public sealed record RunRerunResult(
+    RunSummary Run,
+    bool DeletedOriginal);
 
 public sealed record RunDetails(
     RunSummary Run,
