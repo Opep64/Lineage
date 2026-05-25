@@ -667,6 +667,42 @@ Verification:
 - `dotnet build Lineage.slnx -v:minimal` passed.
 - Godot headless project load passed.
 
+### Longer Predation Stability Pass
+
+Ran longer stability probes after adding the creature-contact input.
+
+Validation files:
+
+- `out/predation_stability_20260525/predation_contact_30k.csv`
+- `out/predation_stability_20260525/predation_contact_30k.html`
+- `out/predation_stability_20260525/predation_contact_60k.csv`
+- `out/predation_stability_20260525/predation_contact_60k.html`
+- `out/predation_stability_20260525/predation_contact_variants_30k.csv`
+- `out/predation_stability_20260525/predation_contact_variants_30k.html`
+
+Current `predation-pressure` scenario, seeds 42/43/44:
+
+| Ticks | Avg final creatures | Range | Avg births | Avg deaths | Avg starvation deaths | Avg injury deaths | Avg tail creatures | Avg fresh-kill share |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 30k | 19.7 | 17-22 | 303.3 | 283.7 | 108.7 | 167.7 | 21.7 | 22.2% |
+| 60k | 15.0 | 10-18 | 422.3 | 407.3 | 149.3 | 247.0 | 17.5 | 0.0% |
+
+30k temporary variant grid:
+
+| Variant | Avg final creatures | Range | Avg starvation deaths | Avg injury deaths | Avg tail creatures | Avg meat share | Avg fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| base | 19.7 | 17-22 | 108.7 | 167.7 | 21.7 | 45.5% | 22.2% |
+| softer_bite (`biteDamagePerSecond=0.16`, `biteEnergyCostPerSecond=0.22`) | 20.0 | 18-24 | 120.7 | 150.7 | 21.1 | 10.2% | 8.9% |
+| softest_bite (`biteDamagePerSecond=0.13`, `biteEnergyCostPerSecond=0.22`) | 21.3 | 17-24 | 124.3 | 158.0 | 22.2 | 48.3% | 25.4% |
+| prey_buffer (`biteDamagePerSecond=0.16`, `biteEnergyCostPerSecond=0.22`, lower reproduction threshold/investment) | 18.3 | 16-23 | 132.7 | 162.0 | 21.3 | 39.9% | 3.3% |
+
+Interpretation:
+
+- The contact input made predation real, but current `predation-pressure` now trends toward a very low population over 60k ticks.
+- Softer bite damage/cost variants did not clearly solve the stability problem; final population only moved slightly and fresh-kill feeding was inconsistent.
+- The likely design issue is that `predation-pressure` starts every creature as a forager-predator, so the whole population immediately acts as both predator and prey.
+- Next predation work should probably use a mixed predator/prey roster and refresh starter species profiles from the current BrainFactory before more damage tuning. That would let predation emerge as an ecological pressure on foragers instead of turning the entire founding population into mutual predators.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
