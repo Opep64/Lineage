@@ -307,6 +307,7 @@ The launcher should eventually:
 - New dashboard-launched runs save a resolved scenario JSON beside the run manifest and surface compact scenario identity: brain architecture, starter brain, vision mode, world size, resource density, terrain, and meat-pressure knobs.
 - The launcher has a first grouped scenario-options editor. It builds tabs from `SimulationScenario` fields, lets a run start from edited scenario JSON, writes the generated launch scenario under `out/runs/_launch_scenarios/`, and still saves the CLI-resolved scenario beside the run manifest.
 - Run rows can clone settings back into the launch form. The clone path prefers the run's `resolved_scenario.json`, falls back to the generated launch scenario, then falls back to the original scenario file so users can duplicate an experiment and make small changes.
+- The scenario-options editor supports search, basic/all filtering, changed-field highlighting, and reset actions for the current group or all loaded scenario options.
 
 ## Phase 2: Run Library
 

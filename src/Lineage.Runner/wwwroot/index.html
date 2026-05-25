@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260525-clone-settings">
+  <link rel="stylesheet" href="/styles.css?v=20260525-editor-polish">
 </head>
 <body>
   <header class="app-header">
@@ -46,6 +46,26 @@
         <span id="scenarioOptionsStatus" class="scenario-options-status"></span>
       </div>
       <div id="scenarioOptionsPanel" class="scenario-options-panel" hidden>
+        <div class="scenario-options-toolbar">
+          <label>
+            Find
+            <input id="scenarioOptionSearch" type="search" placeholder="field, group, help">
+          </label>
+          <div class="scenario-scope" role="radiogroup" aria-label="Scenario option scope">
+            <label>
+              <input type="radio" name="scenarioOptionScope" value="basic" checked>
+              <span>Basic</span>
+            </label>
+            <label>
+              <input type="radio" name="scenarioOptionScope" value="all">
+              <span>All</span>
+            </label>
+          </div>
+          <div class="scenario-reset-actions">
+            <button id="resetScenarioGroupButton" class="secondary" type="button" disabled>Reset Group</button>
+            <button id="resetScenarioAllButton" class="secondary" type="button" disabled>Reset All</button>
+          </div>
+        </div>
         <div id="scenarioTabs" class="scenario-tabs" role="tablist" aria-label="Scenario option groups"></div>
         <div id="scenarioFields" class="scenario-fields"></div>
       </div>
@@ -114,6 +134,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260525-clone-settings"></script>
+  <script src="/app.js?v=20260525-editor-polish"></script>
 </body>
 </html>

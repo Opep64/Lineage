@@ -222,6 +222,48 @@ textarea {
   padding-top: 12px;
 }
 
+.scenario-options-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.scenario-scope {
+  display: inline-flex;
+  min-height: 38px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.scenario-scope label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scenario-scope label + label {
+  border-left: 1px solid var(--line);
+}
+
+.scenario-scope input {
+  width: 14px;
+  min-height: 14px;
+  padding: 0;
+}
+
+.scenario-reset-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .scenario-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -249,6 +291,20 @@ button.scenario-tab.is-active {
 
 .scenario-field {
   min-width: 0;
+  position: relative;
+  padding-left: 8px;
+  border-left: 3px solid transparent;
+}
+
+.scenario-field.is-changed {
+  border-left-color: var(--warn);
+}
+
+.scenario-field.is-changed input,
+.scenario-field.is-changed select,
+.scenario-field.is-changed textarea {
+  border-color: #d6a23a;
+  background: #fffaf0;
 }
 
 .scenario-field.is-advanced .scenario-field-label::after {
@@ -261,6 +317,12 @@ button.scenario-tab.is-active {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.scenario-field-changed {
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .scenario-field-description {
@@ -291,6 +353,13 @@ button.scenario-tab.is-active {
   font-size: 12px;
   line-height: 1.45;
   resize: vertical;
+}
+
+.scenario-options-empty {
+  grid-column: 1 / -1;
+  padding: 16px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .form-message {
@@ -562,6 +631,14 @@ tr.is-expanded td {
 
   .launch-form {
     grid-template-columns: 1fr;
+  }
+
+  .scenario-options-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-reset-actions {
+    flex-wrap: wrap;
   }
 
   .run-tools {

@@ -21,6 +21,10 @@ const scenarioOptionsStatus = document.querySelector("#scenarioOptionsStatus");
 const scenarioOptionsPanel = document.querySelector("#scenarioOptionsPanel");
 const scenarioTabs = document.querySelector("#scenarioTabs");
 const scenarioFields = document.querySelector("#scenarioFields");
+const scenarioOptionSearch = document.querySelector("#scenarioOptionSearch");
+const scenarioScopeInputs = [...document.querySelectorAll("input[name='scenarioOptionScope']")];
+const resetScenarioGroupButton = document.querySelector("#resetScenarioGroupButton");
+const resetScenarioAllButton = document.querySelector("#resetScenarioAllButton");
 
 let refreshTimer = null;
 let allRuns = [];
@@ -30,6 +34,7 @@ let runDetailsById = new Map();
 let sortKey = "createdAtUtc";
 let sortDirection = "desc";
 let scenarioEditor = null;
+let scenarioEditorBaseline = null;
 let activeScenarioGroup = null;
 
 async function loadScenarios() {
@@ -48,10 +53,12 @@ async function loadScenarios() {
 
 async function loadScenarioEditor() {
   scenarioEditor = null;
+  scenarioEditorBaseline = null;
   activeScenarioGroup = null;
   scenarioTabs.innerHTML = "";
   scenarioFields.innerHTML = "";
   scenarioOptionsStatus.textContent = "Loading options...";
+  updateScenarioResetButtons();
 
   if (!scenarioSelect.value) {
     scenarioOptionsStatus.textContent = "No scenario selected.";
@@ -65,10 +72,8 @@ async function loadScenarioEditor() {
     return;
   }
 
-  scenarioEditor = await response.json();
-  const groups = scenarioEditorGroups();
-  activeScenarioGroup = groups[0] || null;
-  renderScenarioEditor();
+  resetScenarioOptionFilters();
+  loadScenarioEditorDefinition(await response.json());
 }
 
 function renderScenarioEditor() {
@@ -95,12 +100,19 @@ function renderScenarioEditor() {
     scenarioTabs.append(button);
   }
 
-  const activeFields = scenarioEditor.fields.filter((field) => field.group === activeScenarioGroup);
+  const activeFields = filteredScenarioFields().filter((field) => field.group === activeScenarioGroup);
   for (const field of activeFields) {
     scenarioFields.append(createScenarioField(field));
   }
 
-  scenarioOptionsStatus.textContent = `${scenarioEditor.fields.length} options`;
+  if (activeFields.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "scenario-options-empty";
+    empty.textContent = "No scenario options match.";
+    scenarioFields.append(empty);
+  }
+
+  updateScenarioEditorStatus();
 }
 
 function scenarioEditorGroups() {
@@ -121,7 +133,7 @@ function scenarioEditorGroups() {
     "Species",
     "Advanced"
   ];
-  const groups = [...new Set(scenarioEditor.fields.map((field) => field.group))];
+  const groups = [...new Set(filteredScenarioFields().map((field) => field.group))];
   return groups.sort((left, right) => {
     const leftIndex = preferredOrder.indexOf(left);
     const rightIndex = preferredOrder.indexOf(right);
@@ -134,14 +146,74 @@ function scenarioEditorGroups() {
   });
 }
 
+function filteredScenarioFields() {
+  if (!scenarioEditor) {
+    return [];
+  }
+
+  return scenarioEditor.fields.filter((field) =>
+    scenarioFieldMatchesScope(field) && scenarioFieldMatchesSearch(field));
+}
+
+function scenarioFieldMatchesScope(field) {
+  return showAdvancedScenarioOptions() || !field.advanced;
+}
+
+function scenarioFieldMatchesSearch(field) {
+  const query = scenarioOptionSearch.value.trim().toLowerCase();
+  if (query.length === 0) {
+    return true;
+  }
+
+  return [
+    field.name,
+    field.jsonName,
+    field.label,
+    field.group,
+    field.units,
+    field.description
+  ].some((value) => String(value ?? "").toLowerCase().includes(query));
+}
+
+function showAdvancedScenarioOptions() {
+  return scenarioScopeInputs.some((input) => input.checked && input.value === "all");
+}
+
+function loadScenarioEditorDefinition(editor) {
+  scenarioEditor = editor;
+  scenarioEditorBaseline = cloneJson(editor.scenario);
+  activeScenarioGroup = scenarioEditorGroups()[0] || null;
+  renderScenarioEditor();
+}
+
+function resetScenarioOptionFilters() {
+  scenarioOptionSearch.value = "";
+  const basicScope = scenarioScopeInputs.find((input) => input.value === "basic");
+  if (basicScope) {
+    basicScope.checked = true;
+  }
+}
+
 function createScenarioField(field) {
   const wrapper = document.createElement("label");
-  wrapper.className = `scenario-field scenario-field-${field.type}${field.advanced ? " is-advanced" : ""}`;
+  wrapper.className = [
+    "scenario-field",
+    `scenario-field-${field.type}`,
+    field.advanced ? "is-advanced" : "",
+    isScenarioFieldChanged(field) ? "is-changed" : ""
+  ].filter(Boolean).join(" ");
 
   const label = document.createElement("span");
   label.className = "scenario-field-label";
   label.textContent = field.units ? `${field.label} (${field.units})` : field.label;
   wrapper.append(label);
+
+  if (isScenarioFieldChanged(field)) {
+    const changed = document.createElement("span");
+    changed.className = "scenario-field-changed";
+    changed.textContent = "changed";
+    wrapper.append(changed);
+  }
 
   wrapper.append(createScenarioControl(field));
   if (field.description) {
@@ -222,6 +294,117 @@ function storeVisibleScenarioValues() {
 
     scenarioEditor.scenario[field.jsonName] = readScenarioControlValue(control, field);
   }
+}
+
+function updateScenarioEditorStatus() {
+  if (!scenarioEditor) {
+    updateScenarioResetButtons();
+    return;
+  }
+
+  const visibleCount = filteredScenarioFields().length;
+  const totalCount = scenarioEditor.fields.length;
+  const changedCount = changedScenarioFields().length;
+  scenarioOptionsStatus.textContent = changedCount === 0
+    ? `${visibleCount} of ${totalCount} options`
+    : `${visibleCount} of ${totalCount} options, ${changedCount} changed`;
+  updateScenarioResetButtons();
+}
+
+function updateScenarioResetButtons() {
+  if (!scenarioEditor || !scenarioEditorBaseline) {
+    resetScenarioGroupButton.disabled = true;
+    resetScenarioAllButton.disabled = true;
+    return;
+  }
+
+  resetScenarioGroupButton.disabled = !scenarioEditor.fields.some((field) =>
+    field.group === activeScenarioGroup && isScenarioFieldChanged(field));
+  resetScenarioAllButton.disabled = changedScenarioFields().length === 0;
+}
+
+function updateScenarioFieldChangeMarkers() {
+  for (const fieldNode of scenarioFields.querySelectorAll(".scenario-field")) {
+    const control = fieldNode.querySelector(".scenario-control");
+    const field = scenarioEditor?.fields.find((candidate) => candidate.jsonName === control?.dataset.jsonName);
+    if (!field) {
+      continue;
+    }
+
+    const isChanged = isScenarioFieldChanged(field);
+    fieldNode.classList.toggle("is-changed", isChanged);
+    const existingChanged = fieldNode.querySelector(".scenario-field-changed");
+    if (isChanged && !existingChanged) {
+      const changed = document.createElement("span");
+      changed.className = "scenario-field-changed";
+      changed.textContent = "changed";
+      fieldNode.insertBefore(changed, control);
+    } else if (!isChanged && existingChanged) {
+      existingChanged.remove();
+    }
+  }
+
+  updateScenarioEditorStatus();
+}
+
+function changedScenarioFields() {
+  if (!scenarioEditor) {
+    return [];
+  }
+
+  return scenarioEditor.fields.filter(isScenarioFieldChanged);
+}
+
+function isScenarioFieldChanged(field) {
+  if (!scenarioEditor || !scenarioEditorBaseline) {
+    return false;
+  }
+
+  return stableStringify(scenarioEditor.scenario?.[field.jsonName])
+    !== stableStringify(scenarioEditorBaseline?.[field.jsonName]);
+}
+
+function resetActiveScenarioGroup() {
+  if (!scenarioEditor || !scenarioEditorBaseline || !activeScenarioGroup) {
+    return;
+  }
+
+  for (const field of scenarioEditor.fields.filter((candidate) => candidate.group === activeScenarioGroup)) {
+    scenarioEditor.scenario[field.jsonName] = cloneJson(scenarioEditorBaseline[field.jsonName]);
+  }
+
+  renderScenarioEditor();
+}
+
+function resetAllScenarioOptions() {
+  if (!scenarioEditor || !scenarioEditorBaseline) {
+    return;
+  }
+
+  scenarioEditor.scenario = cloneJson(scenarioEditorBaseline);
+  renderScenarioEditor();
+}
+
+function cloneJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function stableStringify(value) {
+  return JSON.stringify(canonicalizeJson(value));
+}
+
+function canonicalizeJson(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonicalizeJson);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value)
+      .sort()
+      .map((key) => [key, canonicalizeJson(value[key])]));
+  }
+
+  return value;
 }
 
 function readScenarioControlValue(control, field) {
@@ -732,6 +915,33 @@ scenarioOptionsToggle.addEventListener("click", () => {
   scenarioOptionsPanel.hidden = !scenarioOptionsPanel.hidden;
 });
 
+scenarioOptionSearch.addEventListener("input", () => {
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  renderScenarioEditor();
+});
+
+for (const input of scenarioScopeInputs) {
+  input.addEventListener("change", () => {
+    try {
+      storeVisibleScenarioValues();
+    } catch (error) {
+      scenarioOptionsStatus.textContent = error.message;
+      return;
+    }
+
+    renderScenarioEditor();
+  });
+}
+
+resetScenarioGroupButton.addEventListener("click", resetActiveScenarioGroup);
+resetScenarioAllButton.addEventListener("click", resetAllScenarioOptions);
+
 scenarioTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-group]");
   if (!button || button.dataset.group === activeScenarioGroup) {
@@ -752,7 +962,16 @@ scenarioTabs.addEventListener("click", (event) => {
 scenarioFields.addEventListener("change", () => {
   try {
     storeVisibleScenarioValues();
-    scenarioOptionsStatus.textContent = `${scenarioEditor?.fields.length ?? 0} options`;
+    updateScenarioFieldChangeMarkers();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+  }
+});
+
+scenarioFields.addEventListener("input", () => {
+  try {
+    storeVisibleScenarioValues();
+    updateScenarioFieldChangeMarkers();
   } catch (error) {
     scenarioOptionsStatus.textContent = error.message;
   }
@@ -802,10 +1021,9 @@ async function cloneRunSettings(id) {
   document.querySelector("#checkpointInterval").value = settings.checkpointIntervalTicks ?? "";
   document.querySelector("#stopOnExtinction").checked = Boolean(settings.stopOnExtinction);
 
-  scenarioEditor = settings.scenarioEditor;
-  activeScenarioGroup = scenarioEditorGroups()[0] || null;
+  resetScenarioOptionFilters();
+  loadScenarioEditorDefinition(settings.scenarioEditor);
   scenarioOptionsPanel.hidden = false;
-  renderScenarioEditor();
   formMessage.textContent = `Loaded settings from ${settings.sourceRunName}.`;
   refreshStatus.textContent = "Clone settings loaded";
   document.querySelector(".launch-panel").scrollIntoView({ behavior: "smooth", block: "start" });
