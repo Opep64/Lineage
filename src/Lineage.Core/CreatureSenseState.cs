@@ -145,6 +145,11 @@ public struct CreatureSenseState
 
     public float EggFoodContact { get; set; }
 
+    /// <summary>
+    /// Contact cue from the previous attack/contact pass; 1 means another creature was within body reach.
+    /// </summary>
+    public float CreatureContact { get; set; }
+
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }
 

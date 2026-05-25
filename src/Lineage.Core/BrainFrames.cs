@@ -73,7 +73,8 @@ public readonly record struct BrainInputFrame(
                 senses.FoodContact,
                 senses.PlantFoodContact,
                 senses.MeatFoodContact,
-                senses.EggFoodContact),
+                senses.EggFoodContact,
+                senses.CreatureContact),
             new InternalInputFrame(
                 senses.EnergyRatio,
                 senses.HealthRatio,
@@ -142,7 +143,8 @@ public readonly record struct BodyInputFrame(
     float FoodContact,
     float PlantFoodContact,
     float MeatFoodContact,
-    float EggFoodContact);
+    float EggFoodContact,
+    float CreatureContact);
 
 /// <summary>
 /// Internal body condition and drives available to the brain.

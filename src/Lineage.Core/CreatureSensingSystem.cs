@@ -148,6 +148,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             senses.EggFoodContact = creature.IsTouchingFood && creature.FoodContactKind == FoodContactKind.Egg
                 ? 1f
                 : 0f;
+            senses.CreatureContact = creature.IsTouchingCreature ? 1f : 0f;
 
             var memorySenseStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()

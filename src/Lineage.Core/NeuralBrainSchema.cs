@@ -23,7 +23,9 @@ public static class NeuralBrainSchema
 
     public const int EggFoodContactInput = FoodContactInput + 3;
 
-    public const int HealthRatioInput = EggFoodContactInput + 1;
+    public const int CreatureContactInput = EggFoodContactInput + 1;
+
+    public const int HealthRatioInput = CreatureContactInput + 1;
 
     public const int InputCount = HealthRatioInput + 1;
 

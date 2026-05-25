@@ -627,6 +627,46 @@ Verification:
 - `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 150 tests.
 - Godot headless project load passed.
 
+## 2026-05-25 Predation Contact Input
+
+Added a direct touch/contact cue for creature contact so predators can react to "I am touching another creature" without relying only on last visible nearest-creature direction/proximity.
+
+Implementation notes:
+
+- `CreatureSenseState`, `BrainInputFrame.Body`, and `LegacyNeuralBrainAdapter` now expose `CreatureContact`.
+- `NeuralBrainSchema` adds `CreatureContactInput` between egg-food contact and health ratio.
+- `NeuralBrainGenome` migrates pre-contact-input brains so old health-ratio weights move to the new health-ratio index and the new creature-contact input starts neutral.
+- The forager-predator starter uses creature contact as an attack cue and slows forward motion slightly while in contact, making contact bites more deliberate without changing bite damage.
+- Added tests for adapter mapping, schema migration, and predator contact attack intent.
+
+Validation files:
+
+- `out/predation_output_tuning_20260525/predation_contact_input.csv`
+- `out/predation_output_tuning_20260525/predation_contact_input.html`
+- `out/predation_output_tuning_20260525/balanced_sanity.csv`
+- `out/predation_output_tuning_20260525/balanced_sanity.html`
+
+Focused 10k predation probe, seeds 42/43/44, compared against the post-cleanup run:
+
+| Seed | Final creatures | Tail contact | Tail attack intent | Tail intent-touch | Tail touch no intent | Tail avg attack | Tail avg touching attack | Injury deaths | Fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 61 -> 48 | 4.4% -> 7.6% | 3.4% -> 7.3% | 1.8% -> 4.4% | 2.7% -> 3.2% | -0.918 -> -0.818 | -0.272 -> 0.414 | 89 | 0.0% |
+| 43 | 76 -> 41 | 9.5% -> 7.7% | 7.9% -> 10.8% | 3.7% -> 6.2% | 5.8% -> 1.5% | -0.810 -> -0.764 | -0.174 -> 0.680 | 98 | 6.7% |
+| 44 | 71 -> 45 | 7.7% -> 8.0% | 6.2% -> 11.5% | 2.7% -> 5.1% | 5.0% -> 2.9% | -0.843 -> -0.725 | -0.176 -> 0.351 | 86 | 11.2% |
+
+Interpretation:
+
+- The contact cue moved touching attack output from negative to positive and roughly doubled intent-while-touching.
+- Actual injury deaths now occur in the predation scenario without changing combat damage.
+- This may be aggressive for the current predation setup because final population dropped, so the next tuning pass should compare long-run stability before raising bite damage or attack weights further.
+- A 5k Balanced Foraging sanity probe stayed non-predatory: zero injury deaths and attack output remained near -1 for seed foragers.
+
+Verification:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj` passed with 152 tests.
+- `dotnet build Lineage.slnx -v:minimal` passed.
+- Godot headless project load passed.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

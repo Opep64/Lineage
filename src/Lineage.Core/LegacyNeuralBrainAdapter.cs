@@ -77,6 +77,7 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.PlantFoodContactInput] = frame.Body.PlantFoodContact;
         inputs[NeuralBrainSchema.MeatFoodContactInput] = frame.Body.MeatFoodContact;
         inputs[NeuralBrainSchema.EggFoodContactInput] = frame.Body.EggFoodContact;
+        inputs[NeuralBrainSchema.CreatureContactInput] = frame.Body.CreatureContact;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

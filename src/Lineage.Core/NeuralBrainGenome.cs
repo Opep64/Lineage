@@ -39,6 +39,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyCreatureSectorMotionFoodContactInput =
         NeuralBrainSchema.VisionSectorInputStart + VisionSectorSet.SectorCount * LegacyCreatureSectorSizeChannelCount;
     private const int LegacyInputCountWithoutCreatureSectorMotion = LegacyCreatureSectorMotionFoodContactInput + 5;
+    private const int LegacyInputCountWithoutCreatureContact = NeuralBrainSchema.HealthRatioInput;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
 
@@ -245,6 +246,7 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureForwardInput, 1.2f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureProximityInput, -0.6f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureContactInput, -0.7f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 0.8f);
 
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
@@ -255,6 +257,7 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.EnergyRatioInput, -1.5f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.HungerInput, 2f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 4f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureContactInput, 4.5f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.8f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureFacingAlignmentInput, -0.3f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.5f);
@@ -466,6 +469,7 @@ public sealed class NeuralBrainGenome
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.BiasInput, -0.2f);
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureForwardInput, 1.0f);
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureProximityInput, 1.1f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureContactInput, 1.0f);
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.4f);
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureApproachRateInput, 0.4f);
         }
@@ -872,6 +876,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutCreatureContact,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutCreatureContact,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutCreatureSectorMotion,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -1212,6 +1231,12 @@ public sealed class NeuralBrainGenome
         if (input == oldReproductionReadinessInput)
         {
             return NeuralBrainSchema.ReproductionReadinessInput;
+        }
+
+        if (legacyInputCount == LegacyInputCountWithoutCreatureContact
+            && input == NeuralBrainSchema.CreatureContactInput)
+        {
+            return NeuralBrainSchema.HealthRatioInput;
         }
 
         if (legacyInputCount >= LegacyInputCountWithoutCreatureSectorMotion)

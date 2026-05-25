@@ -74,6 +74,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural controller writes spatial memory", NeuralControllerWritesSpatialMemory),
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
+    ("Forager predator turns creature contact into attack intent", ForagerPredatorTurnsCreatureContactIntoAttackIntent),
     ("Sector forager starter follows sector plant cues", SectorForagerStarterFollowsSectorPlantCues),
     ("Scavenger starter follows sector meat cues", ScavengerStarterFollowsSectorMeatCues),
     ("Predator starter follows sector creature cues", PredatorStarterFollowsSectorCreatureCues),
@@ -99,6 +100,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates food contact input", NeuralBrainMigratesFoodContactInput),
     ("Neural brain migrates health ratio input", NeuralBrainMigratesHealthRatioInput),
     ("Neural brain migrates creature sector motion inputs", NeuralBrainMigratesCreatureSectorMotionInputs),
+    ("Neural brain migrates creature contact input", NeuralBrainMigratesCreatureContactInput),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2788,6 +2790,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         PlantFoodContact = 1f,
         MeatFoodContact = 0.25f,
         EggFoodContact = 0.5f,
+        CreatureContact = 0.75f,
         MemoryDirectionForward = 0.11f,
         MemoryDirectionRight = -0.21f,
         MemoryStrength = 0.31f
@@ -2823,6 +2826,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(1f, inputs[NeuralBrainSchema.PlantFoodContactInput], 0.000001, "Plant food contact input");
     AssertClose(0.25f, inputs[NeuralBrainSchema.MeatFoodContactInput], 0.000001, "Meat food contact input");
     AssertClose(0.5f, inputs[NeuralBrainSchema.EggFoodContactInput], 0.000001, "Egg food contact input");
+    AssertClose(0.75f, inputs[NeuralBrainSchema.CreatureContactInput], 0.000001, "Creature contact input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
@@ -3106,6 +3110,37 @@ static void ForagerPredatorTurnsCreatureProximityIntoAttackIntent()
     simulation.Step();
 
     AssertTrue(simulation.State.Creatures[0].Actions.WantsAttack, "Forager predator should attack when a visible creature is very close");
+}
+
+static void ForagerPredatorTurnsCreatureContactIntoAttackIntent()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 308,
+        systems: [new NeuralControllerSystem(enableLegacyNearestFoodVisionInputs: false)]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 10f,
+        MaxTurnRadiansPerSecond = 4f,
+        DietaryAdaptation = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator());
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        Hunger = 1f,
+        CreatureContact = 1f
+    };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertTrue(creature.Actions.WantsAttack, "Forager predator should attack when creature contact says it has arrived");
+    AssertTrue(creature.Actions.MoveForward < 0.5f, "Forager predator should slow down when already in creature contact");
 }
 
 static void SectorForagerStarterFollowsSectorPlantCues()
@@ -3878,6 +3913,52 @@ static void NeuralBrainMigratesCreatureSectorMotionInputs()
             NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)),
         0.000001,
         "New hidden sector creature facing input starts neutral");
+}
+
+static void NeuralBrainMigratesCreatureContactInput()
+{
+    const int legacyInputCount = 195;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    var oldHealthRatioInput = NeuralBrainSchema.CreatureContactInput;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldHealthRatioInput] = -2.2f;
+    legacyWeights[legacyHiddenInputOffset + oldHealthRatioInput] = 1.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.AttackOutput * hiddenNodeCount] = 1.1f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Creature contact migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Creature contact migrated weight count");
+    AssertClose(
+        -2.2f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HealthRatioInput),
+        0.000001,
+        "Existing health ratio direct input remains in place");
+    AssertClose(
+        1.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.HealthRatioInput),
+        0.000001,
+        "Existing hidden health input remains in place");
+    AssertClose(
+        1.1f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.AttackOutput, 0),
+        0.000001,
+        "Existing hidden attack output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureContactInput),
+        0.000001,
+        "New creature contact direct input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactInput),
+        0.000001,
+        "New creature contact hidden input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -4844,7 +4925,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
     AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot max hidden nodes");
-    AssertClose(14.2f / (4f * NeuralBrainSchema.InputCount), snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
+    AssertClose(15.2f / (4f * NeuralBrainSchema.InputCount), snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
     AssertClose(0f, snapshot.AverageBrainHiddenOutputWeightMagnitude, 0.000001, "Snapshot hidden output weight magnitude");
     AssertClose(0f, snapshot.ActiveBrainHiddenOutputShare, 0.000001, "Snapshot active hidden output share");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
