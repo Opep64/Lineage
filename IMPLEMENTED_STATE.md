@@ -206,6 +206,7 @@ Recent mainline validation:
 - Post-merge 90k weak-scenario pass across Balanced, Carrion, Harsh, Omnivore, and Predation completed 15/15 runs with no extinctions.
 - Post-merge 150k weak-scenario pass across Balanced, Carrion, Harsh, Omnivore, and Predation with seeds 42-46 completed 25/25 runs with no extinctions.
 - A matching 150k `HiddenLayerNeural` 8-node pass across the same weak scenarios and seeds completed 25/25 runs with no extinctions, but Predation Pressure had thinner worst-seed populations than Hybrid.
+- Targeted 150k Harsh/Predation recovery-floor pass across seeds 42-46 completed 10/10 runs after scenario tuning: Harsh averaged `40.2` final creatures with range `32-48`; Predation averaged `26.0` with range `14-40`.
 - Balanced 10k tail profile now shows `CreatureSensingSystem` at 39.9% and `NeuralControllerSystem` at 27.9% of profiled system time.
 - Earlier Godot export smoke wrote all 12 viewer export files and reloaded the snapshot.
 - Earlier CLI-run-style output smoke wrote sidecars, report, snapshot, scenario JSON, and checkpoints, then resumed from snapshot.

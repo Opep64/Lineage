@@ -224,6 +224,13 @@ Brain rework and sparse-balance update from 2026-05-25:
   - a CLI-run-style smoke using the Godot output naming convention wrote report, snapshot, sidecars, and two checkpoints under `out/godot_cli_sanity_20260525`
   - the CLI successfully resumed from the exported snapshot for 10 additional ticks
   - Godot headless launch still passed after the export checks
+
+Harsh/Predation stability update from 2026-05-26:
+
+- A targeted recovery-floor pass raised Harsh Foraging's local fertility floor from `0.35` to `0.45`.
+- Predation Pressure kept a smaller local fertility floor lift from `0.35` to `0.40` and lowered reproduction threshold from `118` to `112`.
+- Final selected 150k probe across seeds 42-46 completed 10/10 runs: Harsh averaged `40.2` final creatures with range `32-48`; Predation averaged `26.0` with range `14-40`.
+- Predation remains intentionally thin and should get 300k+ confirmation before adding stronger predator-specific pressure.
 - Current design decision:
   - keep `HybridNeural` as the default until the new perception/balance work has had more long-run validation
   - keep `HiddenLayerNeural` available for scenario comparison, with 8 hidden nodes as its default

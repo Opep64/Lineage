@@ -1872,6 +1872,42 @@ Validation:
 - `dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release --no-build`
 - 5k `plant-diversity-pressure` CLI report smoke confirmed the new rows appear in the HTML report.
 
+## 2026-05-26 Harsh And Predation Recovery Floor Pass
+
+Goal: improve the thin Harsh Foraging and Predation Pressure tails without raising global plant density, lowering movement/search pressure, or weakening predation into a normal foraging preset.
+
+Probe files:
+
+- `out/harsh_predation_stability_20260526/fertility_variants_60k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/floor_variants_150k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/predation_weak_seed_variants_150k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/selected_final_150k.csv` and `.html`
+
+Findings:
+
+- In the shared 60k fertility-variant probe, raising `localFertilityMinimumMultiplier` was the cleanest improvement. Faster fertility recovery and lower neighbor depletion did not improve the sampled tails.
+- In the 150k floor probe, Harsh Foraging responded best to a `0.45` fertility floor, while Predation Pressure responded best to a more modest `0.40` floor.
+- Predation weak seeds `45` and `46` still stayed thin with only the floor change. Lowering `reproductionEnergyThreshold` from `118` to `112` was the best small pacing tweak. Softer bite damage did not help the weak-seed average, and a higher fertility floor caused one extinction in the two-seed probe.
+
+Checked-in changes:
+
+- `scenarios/harsh-foraging.json`: `localFertilityMinimumMultiplier` `0.35 -> 0.45`.
+- `scenarios/predation-pressure.json`: `localFertilityMinimumMultiplier` `0.35 -> 0.40`.
+- `scenarios/predation-pressure.json`: `reproductionEnergyThreshold` `118 -> 112`.
+
+Final selected validation, 150k ticks, seeds `42-46`:
+
+| Scenario | Avg final | Final range | Avg tail pop | Min tail pop | Births | Deaths | Starvation | Injury | Max gen | Meal gap | Kcal/dist | Tail fertility | Tail depleted fertility |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Harsh Foraging | 40.2 | 32-48 | 29.6 | 21.3 | 519.2 | 479.0 | 479.0 | 0.0 | 11.4 | 64.3s | 0.207 | 0.578 | 85.6% |
+| Predation Pressure | 26.0 | 14-40 | 21.7 | 13.1 | 913.8 | 887.8 | 375.6 | 495.0 | 14.4 | 28.0s | 0.402 | 0.503 | 94.3% |
+
+Readout:
+
+- Harsh is no longer riding the single-digit/teen population floor in the sampled 150k window.
+- Predation remains a low-population pressure scenario, but the selected pacing improved the five-seed average and kept every sampled seed alive through 150k.
+- The high Predation depleted-fertility share says the ecology is still under real pressure. Future work should validate at 300k+ before adding more predator-specific pressures.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

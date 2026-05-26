@@ -19,7 +19,7 @@ Status: completed enough for current mainline
 Status: active design direction
 
 - Keep `HybridNeural` default until hidden-layer and sector-vision behavior has more long-run evidence.
-- Continue comparing `HiddenLayerNeural`; the 8-node architecture passed the 150k weak-scenario matrix, but Predation Pressure remained thinner than Hybrid in worst seeds.
+- Continue comparing `HiddenLayerNeural`; the 8-node architecture passed the 150k weak-scenario matrix. Rerun comparisons after the Harsh/Predation recovery-floor tuning if hidden-layer defaults become active again.
 - Consider a fully generic brain interface beyond `BrainFactory`, where specific brain implementations own opaque genome/state payloads.
 - Future brain candidates:
   - fixed layered neural net with no direct path
@@ -84,6 +84,7 @@ Status: first plant diversity slice implemented, broader ecology future
 Status: ongoing tuning
 
 - Continue seeking lower but stable populations for large worlds.
+- Harsh and Predation have a first recovery-floor tune; confirm at 300k+ before adding stronger scarcity or predator-specific pressure.
 - Keep birth rates controlled through egg reserve, maturity, investment, cooldown, crowding, fertility, and resource scarcity.
 - Add stronger search pressure without causing frequent long-run extinction.
 - Watch for scarcity boom-crash cycles.
