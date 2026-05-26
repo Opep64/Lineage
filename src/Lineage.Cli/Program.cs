@@ -89,6 +89,7 @@ static void PrintHelp()
           --stdout-log <path>        Append console output to a file.
           --stderr-log <path>        Append console errors to a file.
           --status-interval <n>      Status write interval in ticks. Default: 100
+          --status-detail-interval <n> Recompute heavier status metrics every n ticks. Default: 1000
           --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
           --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
           --inject-species-count <n> Founder count per injected profile. Default: 10
@@ -878,6 +879,8 @@ internal sealed record RunOptions
 
     public int StatusIntervalTicks { get; init; } = 100;
 
+    public int StatusDetailIntervalTicks { get; init; } = 1000;
+
     public bool StopOnExtinction { get; init; }
 
     public IReadOnlyList<string> InjectSpeciesPaths { get; init; } = Array.Empty<string>();
@@ -1202,6 +1205,9 @@ internal sealed record RunOptions
                     break;
                 case "--status-interval":
                     options = options with { StatusIntervalTicks = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--status-detail-interval":
+                    options = options with { StatusDetailIntervalTicks = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--stop-on-extinction":
                     options = options with { StopOnExtinction = true };

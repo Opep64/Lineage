@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "lineage.runner.scenario-recipe.v1",
+  "name": "Double Mutation",
+  "description": "",
+  "tags": [
+    "mutation"
+  ],
+  "changes": {
+    "mutationStrength": 0.12,
+    "brainMutationRate": 0.16
+  },
+  "createdAtUtc": "2026-05-26T03:15:28.7891082+00:00",
+  "updatedAtUtc": "2026-05-26T03:15:28.7891082+00:00"
+}

@@ -15,6 +15,7 @@ internal sealed class CliRunFiles
     private readonly RunOptions _options;
     private readonly SimulationScenario _scenario;
     private readonly OutputPaths _outputPaths;
+    private CliRunStatusDetails? _cachedStatusDetails;
     private bool _statusWriteWarningEmitted;
 
     public CliRunFiles(RunOptions options, SimulationScenario scenario, OutputPaths outputPaths)
@@ -56,17 +57,7 @@ internal sealed class CliRunFiles
 
         var world = simulation.State;
         var stats = world.Stats;
-        var maxGeneration = 0;
-        for (var i = 0; i < world.Creatures.Count; i++)
-        {
-            maxGeneration = Math.Max(maxGeneration, world.Creatures[i].Generation);
-        }
-
-        var speciesClusterCount = 0;
-        if (world.Creatures.Count > 0)
-        {
-            speciesClusterCount = SpeciesClusterAnalyzer.Analyze(world).Count;
-        }
+        var details = GetStatusDetails(state, simulation, completedSteps, stopReason);
 
         var progress = _options.Ticks <= 0
             ? 1d
@@ -89,9 +80,9 @@ internal sealed class CliRunFiles
             Progress: progress,
             CreatureCount: world.Creatures.Count,
             EggCount: world.Eggs.Count,
-            SpeciesClusterCount: speciesClusterCount,
+            SpeciesClusterCount: details.SpeciesClusterCount,
             ResourceCount: world.Resources.Count,
-            MaxGeneration: maxGeneration,
+            MaxGeneration: details.MaxGeneration,
             CreatureBirthCount: stats.CreatureBirthCount,
             CreatureDeathCount: stats.CreatureDeathCount,
             StarvationDeathCount: stats.StarvationDeathCount,
@@ -105,7 +96,9 @@ internal sealed class CliRunFiles
             SaveSnapshotPath: _options.SaveSnapshotPath,
             CheckpointDirectory: ResolveCheckpointDirectory(),
             LatestCheckpointPath: latestCheckpoint,
-            CheckpointCount: checkpoints.Count);
+            CheckpointCount: checkpoints.Count,
+            DetailedMetricsUpdatedAtUtc: details.UpdatedAtUtc,
+            DetailedMetricsCompletedSteps: details.CompletedSteps);
 
         try
         {
@@ -120,6 +113,54 @@ internal sealed class CliRunFiles
                 _statusWriteWarningEmitted = true;
             }
         }
+    }
+
+    private CliRunStatusDetails GetStatusDetails(
+        string state,
+        Simulation simulation,
+        long completedSteps,
+        string? stopReason)
+    {
+        if (ShouldRefreshStatusDetails(state, completedSteps, stopReason))
+        {
+            _cachedStatusDetails = MeasureStatusDetails(simulation.State, completedSteps);
+        }
+
+        return _cachedStatusDetails ?? MeasureStatusDetails(simulation.State, completedSteps);
+    }
+
+    private bool ShouldRefreshStatusDetails(string state, long completedSteps, string? stopReason)
+    {
+        if (_cachedStatusDetails is null
+            || stopReason is not null
+            || !string.Equals(state, "running", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var interval = Math.Max(1, _options.StatusDetailIntervalTicks);
+        return completedSteps - _cachedStatusDetails.Value.CompletedSteps >= interval;
+    }
+
+    private static CliRunStatusDetails MeasureStatusDetails(WorldState world, long completedSteps)
+    {
+        var maxGeneration = 0;
+        for (var i = 0; i < world.Creatures.Count; i++)
+        {
+            maxGeneration = Math.Max(maxGeneration, world.Creatures[i].Generation);
+        }
+
+        var speciesClusterCount = 0;
+        if (world.Creatures.Count > 0)
+        {
+            speciesClusterCount = SpeciesClusterAnalyzer.Analyze(world).Count;
+        }
+
+        return new CliRunStatusDetails(
+            speciesClusterCount,
+            maxGeneration,
+            DateTimeOffset.UtcNow,
+            completedSteps);
     }
 
     public CliRunControlCommand ReadControlCommand()
@@ -304,7 +345,15 @@ internal sealed record CliRunStatusFile(
     string? SaveSnapshotPath,
     string CheckpointDirectory,
     string? LatestCheckpointPath,
-    int CheckpointCount);
+    int CheckpointCount,
+    DateTimeOffset DetailedMetricsUpdatedAtUtc,
+    long DetailedMetricsCompletedSteps);
+
+internal readonly record struct CliRunStatusDetails(
+    int SpeciesClusterCount,
+    int MaxGeneration,
+    DateTimeOffset UpdatedAtUtc,
+    long CompletedSteps);
 
 internal readonly record struct SimulationRunResult(
     IReadOnlyList<CheckpointArtifact> Checkpoints,

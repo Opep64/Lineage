@@ -15,6 +15,8 @@ public sealed partial class LineageRunManager
     private const string UserScenarioFolderName = "user";
     private const string ScenarioRecipeFolderName = "recipes";
     private const string UserScenarioRegistryFileName = ".lineage-runner-scenarios.json";
+    private const int CliStatusIntervalTicks = 100;
+    private const int CliStatusDetailIntervalTicks = 5000;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -1907,24 +1909,26 @@ public sealed partial class LineageRunManager
 
     private (string FileName, IReadOnlyList<string> PrefixArguments) ResolveCliLaunchTarget()
     {
-        var configuration = ResolveBuildConfiguration();
-        var cliOutputDirectory = Path.Combine(_repoRoot, "src", "Lineage.Cli", "bin", configuration, "net8.0");
-        var executablePath = Path.Combine(
-            cliOutputDirectory,
-            OperatingSystem.IsWindows() ? "Lineage.Cli.exe" : "Lineage.Cli");
-        if (File.Exists(executablePath))
+        foreach (var configuration in CliBuildConfigurations())
         {
-            return (executablePath, Array.Empty<string>());
-        }
+            var cliOutputDirectory = Path.Combine(_repoRoot, "src", "Lineage.Cli", "bin", configuration, "net8.0");
+            var executablePath = Path.Combine(
+                cliOutputDirectory,
+                OperatingSystem.IsWindows() ? "Lineage.Cli.exe" : "Lineage.Cli");
+            if (File.Exists(executablePath))
+            {
+                return (executablePath, Array.Empty<string>());
+            }
 
-        var dllPath = Path.Combine(cliOutputDirectory, "Lineage.Cli.dll");
-        if (File.Exists(dllPath))
-        {
-            return ("dotnet", [dllPath]);
+            var dllPath = Path.Combine(cliOutputDirectory, "Lineage.Cli.dll");
+            if (File.Exists(dllPath))
+            {
+                return ("dotnet", [dllPath]);
+            }
         }
 
         throw new InvalidOperationException(
-            $"Could not find a built Lineage.Cli executable under {cliOutputDirectory}. Build the solution before launching runs.");
+            "Could not find a built Lineage.Cli executable under src/Lineage.Cli/bin. Build the solution before launching runs.");
     }
 
     private IReadOnlyList<string> BuildCliArguments(RunManifest manifest)
@@ -1964,7 +1968,9 @@ public sealed partial class LineageRunManager
             "--stderr-log",
             manifest.StderrPath,
             "--status-interval",
-            "100"
+            CliStatusIntervalTicks.ToString(CultureInfo.InvariantCulture),
+            "--status-detail-interval",
+            CliStatusDetailIntervalTicks.ToString(CultureInfo.InvariantCulture)
         });
 
         if (manifest.Seed is not null)
@@ -2002,6 +2008,14 @@ public sealed partial class LineageRunManager
         }
 
         return "Debug";
+    }
+
+    private static IReadOnlyList<string> CliBuildConfigurations()
+    {
+        var current = ResolveBuildConfiguration();
+        return string.Equals(current, "Release", StringComparison.OrdinalIgnoreCase)
+            ? ["Release", "Debug"]
+            : ["Release", current];
     }
 
     private static string FormatCommandLine(string fileName, IEnumerable<string> arguments)
