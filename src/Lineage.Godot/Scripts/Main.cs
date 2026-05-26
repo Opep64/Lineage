@@ -19,6 +19,7 @@ public partial class Main : Node2D
 {
     private const string StartupScenarioFileName = "balanced-foraging.json";
     private const string SpeciesProfileDirectoryName = "species";
+    private const string ReadableTokensThemePath = "res://Assets/SpriteThemes/readable_tokens.png";
     private const float LauncherPanelWidth = 520f;
     private const float RightPanelWidth = 640f;
     private const float ViewMargin = 24f;
@@ -35,6 +36,21 @@ public partial class Main : Node2D
     private const int MiniGraphCount = 4;
     private const int MiniGraphCompactColumnCount = 2;
     private const int MaxGraphSamplesDrawn = 8_000;
+    private const int SpriteAtlasColumns = 4;
+    private const int SpriteAtlasRows = 5;
+    private const float MinCreatureSpriteRadiusPixels = 0.5f;
+    private const float MinResourceSpriteRadiusPixels = 0.5f;
+    private const float CreatureSpriteScalePixels = 8.0f;
+    private const float PlantSpriteScalePixels = 6.4f;
+    private const float MeatSpriteScalePixels = 6.6f;
+    private const float EggSpriteScalePixels = 5.4f;
+    private const float MinCreatureSpriteSizePixels = 22f;
+    private const float MaxCreatureSpriteSizePixels = 100f;
+    private const float MinResourceSpriteSizePixels = 14f;
+    private const float MaxPlantSpriteSizePixels = 50f;
+    private const float MaxMeatSpriteSizePixels = 54f;
+    private const float MinEggSpriteSizePixels = 13f;
+    private const float MaxEggSpriteSizePixels = 42f;
     private const float MinZoom = 0.25f;
     private const float MaxZoom = 80f;
     private const float KeyboardPanPixelsPerSecond = 650f;
@@ -103,7 +119,7 @@ public partial class Main : Node2D
     private Label _scaleBarLabel = null!;
     private bool _paused;
     private float _speedMultiplier = 1f;
-    private CreatureColorMode _colorMode = CreatureColorMode.Generation;
+    private CreatureColorMode _colorMode = CreatureColorMode.Off;
     private double _stepAccumulator;
     private EntityId _selectedCreatureId;
     private EntityId _selectedEggId;
@@ -127,6 +143,9 @@ public partial class Main : Node2D
     private bool _showBiomeOverlay = true;
     private bool _renderMap = true;
     private bool _showVisionSectorDebug = true;
+    private VisualRenderMode _visualRenderMode = VisualRenderMode.SpriteTheme;
+    private int _spriteThemeIndex;
+    private readonly List<SpriteTheme> _spriteThemes = [];
     private Vector2 _lastPanPosition;
     private ResourceRenderCache _resourceRenderCache = new();
     private ulong _resourceCacheLastRefreshMilliseconds;
@@ -186,6 +205,7 @@ public partial class Main : Node2D
         _scaleBarLabel.HorizontalAlignment = HorizontalAlignment.Center;
         LoadStartupScenario();
         _currentSeed = _scenario.Seed;
+        LoadSpriteThemes();
 
         AddChild(_hud);
         AddChild(_hudSecondary);
@@ -204,6 +224,56 @@ public partial class Main : Node2D
         _scenarioEditor.SetScenario(_scenario);
 
         ResetSimulation(resetView: true);
+    }
+
+    private void LoadSpriteThemes()
+    {
+        _spriteThemes.Clear();
+        AddSpriteTheme("Readable Tokens", ReadableTokensThemePath, drawProceduralCreatureEyes: false);
+
+        if (_spriteThemes.Count == 0)
+        {
+            _visualRenderMode = VisualRenderMode.LegacyShapes;
+            _spriteThemeIndex = 0;
+        }
+    }
+
+    private void AddSpriteTheme(string name, string resourcePath, bool drawProceduralCreatureEyes)
+    {
+        var filePath = ProjectSettings.GlobalizePath(resourcePath);
+        if (!System.IO.File.Exists(filePath))
+        {
+            GD.PushWarning($"Sprite theme not found: {resourcePath}");
+            return;
+        }
+
+        var image = Image.LoadFromFile(filePath);
+        if (image is null || image.IsEmpty())
+        {
+            GD.PushWarning($"Sprite theme could not be loaded: {resourcePath}");
+            return;
+        }
+
+        var texture = ImageTexture.CreateFromImage(image);
+        _spriteThemes.Add(new SpriteTheme(name, resourcePath, texture, BuildSpriteAtlasRegions(texture.GetSize()), drawProceduralCreatureEyes));
+    }
+
+    private static Rect2[] BuildSpriteAtlasRegions(Vector2 atlasSize)
+    {
+        var regions = new Rect2[SpriteAtlasColumns * SpriteAtlasRows];
+        var cellSize = new Vector2(atlasSize.X / SpriteAtlasColumns, atlasSize.Y / SpriteAtlasRows);
+        for (var row = 0; row < SpriteAtlasRows; row++)
+        {
+            for (var column = 0; column < SpriteAtlasColumns; column++)
+            {
+                var index = row * SpriteAtlasColumns + column;
+                regions[index] = new Rect2(
+                    new Vector2(column * cellSize.X, row * cellSize.Y),
+                    cellSize);
+            }
+        }
+
+        return regions;
     }
 
     private PanelContainer BuildSelectionPanel()
@@ -453,6 +523,9 @@ public partial class Main : Node2D
                 case Key.V:
                     _showVisionSectorDebug = !_showVisionSectorDebug;
                     break;
+                case Key.T:
+                    CycleVisualRenderMode();
+                    break;
                 case Key.Equal:
                 case Key.Plus:
                 case Key.KpAdd:
@@ -545,6 +618,29 @@ public partial class Main : Node2D
         if (!_renderMap)
         {
             ClearMapRenderStats();
+        }
+    }
+
+    private void CycleVisualRenderMode()
+    {
+        if (_spriteThemes.Count == 0)
+        {
+            _visualRenderMode = VisualRenderMode.LegacyShapes;
+            return;
+        }
+
+        if (_visualRenderMode == VisualRenderMode.LegacyShapes)
+        {
+            _visualRenderMode = VisualRenderMode.SpriteTheme;
+            _spriteThemeIndex = 0;
+            return;
+        }
+
+        _spriteThemeIndex++;
+        if (_spriteThemeIndex >= _spriteThemes.Count)
+        {
+            _spriteThemeIndex = 0;
+            _visualRenderMode = VisualRenderMode.LegacyShapes;
         }
     }
 
@@ -1005,7 +1101,8 @@ public partial class Main : Node2D
             $"TPS {_measuredTicksPerSecond:0.0}  Frame {_measuredFrameMilliseconds:0.0}ms\n" +
             $"Seed {_currentSeed}\n" +
             $"Tick {state.Tick}  Time {state.ElapsedSeconds:0.0}s\n" +
-            $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}";
+            $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}\n" +
+            $"Color {FormatColorMode(_colorMode)}";
 
         _hudSecondary.Text =
             $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
@@ -1013,6 +1110,7 @@ public partial class Main : Node2D
             $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
+            $"Visual {FormatVisualRenderMode()}\n" +
             (seasonText.Length > 0 ? seasonText.TrimEnd() : "Season off");
 
         _runtimeStatsLabel.Text =
@@ -1062,7 +1160,7 @@ public partial class Main : Node2D
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Population)}\n" +
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Season)}\n" +
             "Keys: Space/P pause  +/- speed  R restart  N seed  S scenario\n" +
-            $"Move: Arrows/Wheel/Drag  Click select  G follow  F reset  B/C/V/M toggles";
+            $"Move: Arrows/Wheel/Drag  Click select  G follow  F reset  T visual  B/C/V/M toggles";
 
         _miniGraphLabels[0].Text = $"Population {state.Creatures.Count}";
         _miniGraphLabels[0].AddThemeColorOverride("font_color", _graphPopulationColor);
@@ -1142,7 +1240,8 @@ public partial class Main : Node2D
     {
         if (_selectedCreatureId != default && TryGetSelectedCreature(out var creature))
         {
-            return $"Creature #{creature.Id.Value} - {_selectedInspectorView}";
+            var genome = _simulation.State.GetGenome(creature.GenomeId);
+            return $"Creature #{creature.Id.Value} ({CreatureRoleName(genome)}) - {_selectedInspectorView}";
         }
 
         if (_selectedEggId != default && TryGetSelectedEgg(out var egg))
@@ -1151,6 +1250,19 @@ public partial class Main : Node2D
         }
 
         return "Selected";
+    }
+
+    private static string CreatureRoleName(CreatureGenome genome)
+    {
+        return SpriteSlotForCreature(genome) switch
+        {
+            SpriteAtlasSlot.CreatureGrazer => "Grazer",
+            SpriteAtlasSlot.CreaturePredator => "Predator",
+            SpriteAtlasSlot.CreatureScavenger => "Scavenger",
+            SpriteAtlasSlot.CreatureFast => "Fast",
+            SpriteAtlasSlot.CreatureArmored => "Armored",
+            _ => "Generalist"
+        };
     }
 
     private string BuildInspectorText()
@@ -1656,6 +1768,227 @@ public partial class Main : Node2D
         return $"{source} {amount:0.00} raw";
     }
 
+    private bool TryGetSpriteTheme(out SpriteTheme theme)
+    {
+        theme = null!;
+        if (_visualRenderMode != VisualRenderMode.SpriteTheme || _spriteThemes.Count == 0)
+        {
+            return false;
+        }
+
+        _spriteThemeIndex = Math.Clamp(_spriteThemeIndex, 0, _spriteThemes.Count - 1);
+        theme = _spriteThemes[_spriteThemeIndex];
+        return true;
+    }
+
+    private bool TryDrawSpriteRegion(SpriteTheme theme, SpriteAtlasSlot slot, Vector2 center, Vector2 size, float rotation, Color modulate)
+    {
+        var index = (int)slot;
+        if (index < 0 || index >= theme.Regions.Length || theme.Texture is null)
+        {
+            return false;
+        }
+
+        DrawSetTransform(center, rotation, Vector2.One);
+        DrawTextureRectRegion(
+            theme.Texture,
+            new Rect2(size * -0.5f, size),
+            theme.Regions[index],
+            modulate);
+        DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+        return true;
+    }
+
+    private void DrawSpriteBackplate(Vector2 center, float radius, Color color, float alpha)
+    {
+        if (radius <= 0f)
+        {
+            return;
+        }
+
+        var clampedAlpha = Math.Clamp(alpha, 0f, 0.8f);
+        DrawCircle(center + new Vector2(1.25f, 1.5f), radius * 1.08f, new Color(0.0f, 0.0f, 0.0f, clampedAlpha * 0.72f));
+        DrawCircle(center, radius, new Color(color.R, color.G, color.B, clampedAlpha));
+    }
+
+    private void DrawSpriteShadow(Vector2 center, float radius, float alpha)
+    {
+        if (radius <= 0f)
+        {
+            return;
+        }
+
+        DrawCircle(center + new Vector2(1.25f, 1.5f), radius * 1.08f, new Color(0.0f, 0.0f, 0.0f, Math.Clamp(alpha, 0f, 0.7f)));
+    }
+
+    private static float SpriteSizeFromScreenRadius(float radius, float scale, float minSize, float maxSize)
+    {
+        var softenedRadius = MathF.Pow(MathF.Max(0f, radius), 0.72f);
+        return Math.Clamp(minSize + softenedRadius * scale, minSize, maxSize);
+    }
+
+    private bool TryDrawSpriteResource(ResourcePatchState resource, Vector2 screenPosition, float radius, Color color, float fullness)
+    {
+        if (!TryGetSpriteTheme(out var theme) || radius < MinResourceSpriteRadiusPixels)
+        {
+            return false;
+        }
+
+        var slot = SpriteSlotForResource(resource, fullness);
+        var sizePixels = resource.Kind == ResourceKind.Meat
+            ? SpriteSizeFromScreenRadius(radius, MeatSpriteScalePixels, MinResourceSpriteSizePixels, MaxMeatSpriteSizePixels)
+            : SpriteSizeFromScreenRadius(radius, PlantSpriteScalePixels, MinResourceSpriteSizePixels, MaxPlantSpriteSizePixels);
+        var modulate = ResourceSpriteTint(resource, color, fullness);
+        var rotation = resource.Kind == ResourceKind.Meat
+            ? StableAngle(resource.Id.Value)
+            : 0f;
+        DrawSpriteBackplate(screenPosition, sizePixels * 0.30f, color, resource.Kind == ResourceKind.Meat ? 0.32f : 0.22f);
+        return TryDrawSpriteRegion(theme, slot, screenPosition, new Vector2(sizePixels, sizePixels), rotation, modulate);
+    }
+
+    private bool TryDrawSpriteEgg(EggState egg, Vector2 screenPosition, float radius, Color color)
+    {
+        if (!TryGetSpriteTheme(out var theme) || radius < MinResourceSpriteRadiusPixels)
+        {
+            return false;
+        }
+
+        var slot = egg.Id.Value % 2 == 0
+            ? SpriteAtlasSlot.EggA
+            : SpriteAtlasSlot.EggB;
+        var sizePixels = SpriteSizeFromScreenRadius(radius, EggSpriteScalePixels, MinEggSpriteSizePixels, MaxEggSpriteSizePixels);
+        var modulate = Colors.White.Lerp(color, 0.10f);
+        DrawSpriteBackplate(screenPosition, sizePixels * 0.34f, color, 0.26f);
+        return TryDrawSpriteRegion(theme, slot, screenPosition, new Vector2(sizePixels, sizePixels), StableAngle(egg.Id.Value), modulate);
+    }
+
+    private bool TryDrawSpriteCreature(CreatureState creature, CreatureGenome genome, Vector2 screenPosition, float radius, Color color)
+    {
+        if (!TryGetSpriteTheme(out var theme) || radius < MinCreatureSpriteRadiusPixels)
+        {
+            return false;
+        }
+
+        var slot = SpriteSlotForCreature(genome);
+        var sizePixels = SpriteSizeFromScreenRadius(radius, CreatureSpriteScalePixels, MinCreatureSpriteSizePixels, MaxCreatureSpriteSizePixels);
+        var selected = creature.Id == _selectedCreatureId;
+        var colorModeEnabled = _colorMode != CreatureColorMode.Off || selected;
+        var modulate = colorModeEnabled
+            ? Colors.White.Lerp(color, selected ? 0.10f : 0.16f)
+            : Colors.White;
+        if (colorModeEnabled)
+        {
+            DrawSpriteBackplate(screenPosition, sizePixels * 0.34f, color, selected ? 0.62f : 0.38f);
+        }
+        else
+        {
+            DrawSpriteShadow(screenPosition, sizePixels * 0.34f, 0.24f);
+        }
+        var drawn = TryDrawSpriteRegion(
+            theme,
+            slot,
+            screenPosition,
+            new Vector2(sizePixels, sizePixels),
+            creature.HeadingRadians,
+            modulate);
+        if (drawn && theme.DrawProceduralCreatureEyes)
+        {
+            DrawCreatureSpriteEyes(creature, screenPosition, sizePixels);
+        }
+
+        return drawn;
+    }
+
+    private void DrawCreatureSpriteEyes(CreatureState creature, Vector2 screenPosition, float sizePixels)
+    {
+        if (sizePixels < 18f)
+        {
+            return;
+        }
+
+        var forward = ToGodot(SimVector2.FromAngle(creature.HeadingRadians));
+        var side = new Vector2(-forward.Y, forward.X);
+        var eyeRadius = Math.Clamp(sizePixels * 0.075f, 1.4f, 4.4f);
+        var pupilRadius = Math.Clamp(eyeRadius * 0.42f, 0.7f, 1.8f);
+        var eyeBase = screenPosition + forward * sizePixels * 0.22f;
+        var spacing = Math.Clamp(sizePixels * 0.105f, 2.0f, 7.5f);
+        var lookOffset = forward * eyeRadius * 0.32f;
+        var left = eyeBase + side * spacing;
+        var right = eyeBase - side * spacing;
+
+        DrawCircle(left, eyeRadius, Colors.White);
+        DrawCircle(right, eyeRadius, Colors.White);
+        DrawCircle(left + lookOffset, pupilRadius, Colors.Black);
+        DrawCircle(right + lookOffset, pupilRadius, Colors.Black);
+    }
+
+    private SpriteAtlasSlot SpriteSlotForResource(ResourcePatchState resource, float fullness)
+    {
+        if (resource.Kind == ResourceKind.Meat)
+        {
+            return MeatQuality.Freshness(resource) > 0.45f
+                ? SpriteAtlasSlot.MeatFresh
+                : SpriteAtlasSlot.MeatStale;
+        }
+
+        if (fullness < 0.16f)
+        {
+            return SpriteAtlasSlot.PlantDormant;
+        }
+
+        return resource.PlantKind switch
+        {
+            PlantResourceKind.Tender => SpriteAtlasSlot.PlantTender,
+            PlantResourceKind.Rich => SpriteAtlasSlot.PlantRich,
+            PlantResourceKind.Tough => SpriteAtlasSlot.PlantTough,
+            _ => SpriteAtlasSlot.PlantGeneric
+        };
+    }
+
+    private static SpriteAtlasSlot SpriteSlotForCreature(CreatureGenome genome)
+    {
+        var plantScore = MathF.Max(genome.TenderPlantAdaptation, MathF.Max(genome.RichPlantAdaptation, genome.ToughPlantAdaptation));
+        var predatorScore = MathF.Max(genome.DietaryAdaptation, genome.BiteStrength / 2.5f);
+        if (genome.CarrionAdaptation >= 0.48f && genome.CarrionAdaptation >= predatorScore * 0.8f)
+        {
+            return SpriteAtlasSlot.CreatureScavenger;
+        }
+
+        if (predatorScore >= 0.62f)
+        {
+            return SpriteAtlasSlot.CreaturePredator;
+        }
+
+        if (plantScore >= 0.45f && plantScore >= predatorScore)
+        {
+            return SpriteAtlasSlot.CreatureGrazer;
+        }
+
+        if (genome.DamageResistance >= 1.35f || genome.BodyRadius >= 4.4f)
+        {
+            return SpriteAtlasSlot.CreatureArmored;
+        }
+
+        if (genome.MaxSpeed >= 34f && genome.BodyRadius <= 4.0f)
+        {
+            return SpriteAtlasSlot.CreatureFast;
+        }
+
+        return SpriteAtlasSlot.CreatureGeneralist;
+    }
+
+    private static Color ResourceSpriteTint(ResourcePatchState resource, Color color, float fullness)
+    {
+        var tintAmount = resource.Kind == ResourceKind.Meat ? 0.14f : 0.08f + fullness * 0.06f;
+        return Colors.White.Lerp(color, tintAmount);
+    }
+
+    private static float StableAngle(int id)
+    {
+        var hash = unchecked((ulong)id) * 11400714819323198485UL;
+        return (hash & 0xffff) / 65535f * MathF.Tau;
+    }
+
     private void DrawResources()
     {
         UpdateResourceRenderCache();
@@ -1733,8 +2066,12 @@ public partial class Main : Node2D
                 var color = ColorForResource(resource, fullness);
                 var screenPosition = ToScreen(resource.Position);
                 var radius = MathF.Max(2f, resource.Radius * _worldScale);
-                DrawCircle(screenPosition, radius, color);
-                DrawPlantTypeMarker(resource, screenPosition, radius, fullness);
+                if (!TryDrawSpriteResource(resource, screenPosition, radius, color, fullness))
+                {
+                    DrawCircle(screenPosition, radius, color);
+                    DrawPlantTypeMarker(resource, screenPosition, radius, fullness);
+                }
+
                 _drawnResourceCount++;
             }
         }
@@ -1837,7 +2174,11 @@ public partial class Main : Node2D
                 color = color.Lerp(_selectedColor, 0.4f);
             }
 
-            DrawCircle(screenPosition, radius, color);
+            if (!TryDrawSpriteEgg(egg, screenPosition, radius, color))
+            {
+                DrawCircle(screenPosition, radius, color);
+            }
+
             DrawArc(screenPosition, radius + 1.5f, -MathF.PI * 0.5f, -MathF.PI * 0.5f + MathF.Tau * hatchProgress, 18, _selectedColor, width: 1f);
         }
     }
@@ -1996,12 +2337,15 @@ public partial class Main : Node2D
         var isSelected = creature.Id == _selectedCreatureId;
         var color = isSelected ? _selectedColor : ColorForCreature(creature, genome);
 
-        DrawCircle(screenPosition, radius, color);
-        DrawLine(
-            screenPosition,
-            screenPosition + ToGodot(SimVector2.FromAngle(creature.HeadingRadians)) * (radius + 7f),
-            Colors.Black,
-            width: 1.5f);
+        if (!TryDrawSpriteCreature(creature, genome, screenPosition, radius, color))
+        {
+            DrawCircle(screenPosition, radius, color);
+            DrawLine(
+                screenPosition,
+                screenPosition + ToGodot(SimVector2.FromAngle(creature.HeadingRadians)) * (radius + 7f),
+                Colors.Black,
+                width: 1.5f);
+        }
 
         if (isSelected)
         {
@@ -2465,6 +2809,7 @@ public partial class Main : Node2D
             CreatureColorMode.FounderLineage => ColorForStableId(ResolveFounderId(creature.Id).Value),
             CreatureColorMode.Energy => ColorForEnergy(creature.Energy, genome.ReproductionEnergyThreshold),
             CreatureColorMode.Age => ColorForAge(creature.AgeSeconds),
+            CreatureColorMode.Off => new Color(0.92f, 0.90f, 0.82f),
             _ => ColorForGeneration(creature.Generation)
         };
     }
@@ -3710,6 +4055,16 @@ public partial class Main : Node2D
         };
     }
 
+    private string FormatVisualRenderMode()
+    {
+        if (_visualRenderMode == VisualRenderMode.LegacyShapes || _spriteThemes.Count == 0)
+        {
+            return "legacy shapes";
+        }
+
+        return _spriteThemes[Math.Clamp(_spriteThemeIndex, 0, _spriteThemes.Count - 1)].Name;
+    }
+
     private static string FormatResourceRenderMode(ResourceRenderMode mode)
     {
         return mode switch
@@ -4191,7 +4546,8 @@ public partial class Main : Node2D
         Generation,
         FounderLineage,
         Energy,
-        Age
+        Age,
+        Off
     }
 
     private enum SelectedInspectorView
@@ -4210,6 +4566,36 @@ public partial class Main : Node2D
         Season
     }
 
+    private enum VisualRenderMode
+    {
+        LegacyShapes,
+        SpriteTheme
+    }
+
+    private enum SpriteAtlasSlot
+    {
+        CreatureGrazer = 0,
+        CreaturePredator = 1,
+        CreatureScavenger = 2,
+        CreatureFast = 3,
+        CreatureArmored = 4,
+        CreatureGeneralist = 5,
+        PlantGeneric = 6,
+        PlantTender = 7,
+        PlantRich = 8,
+        PlantTough = 9,
+        PlantDormant = 10,
+        EggA = 11,
+        EggB = 12,
+        MeatFresh = 13,
+        MeatStale = 14,
+        FoodParticleA = 15,
+        FoodParticleB = 16,
+        FoodParticleC = 17,
+        EyeOverlay = 18,
+        MarkingOverlay = 19
+    }
+
     private enum ResourceRenderMode
     {
         Individual,
@@ -4221,4 +4607,11 @@ public partial class Main : Node2D
         Individual,
         Aggregate
     }
+
+    private sealed record SpriteTheme(
+        string Name,
+        string ResourcePath,
+        Texture2D Texture,
+        Rect2[] Regions,
+        bool DrawProceduralCreatureEyes);
 }
