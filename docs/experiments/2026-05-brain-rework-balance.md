@@ -1322,6 +1322,54 @@ Interpretation:
 - The branch has automated coverage for export bundle writing, output naming, snapshot reload, checkpoint writing, and Godot startup.
 - A final manual UI spot-check is still useful before merge because automation here does not click the launcher controls or verify browser opening.
 
+## 2026-05-25 Plant Diversity Recovery Tuning
+
+After adding sector-level plant quality cues and recent food-energy payoff feedback, the first 150k `plant-diversity-pressure` pass still stayed in a narrow starvation-filtered window.
+
+Baseline sector-quality 150k, seeds 42-44:
+
+- Average final population: `19.3`.
+- Average max generation: `10.0`.
+- Tail plant seen/eating: `18.3%` / `12.0%`.
+- Tail meal gap: `93.2s`.
+- Tail recent food energy yield: `0.178`.
+- Final tender/rich/tough plant adaptation: `0.013` / `0.012` / `0.037`.
+- Tail tender/rich/tough calories eaten per second: `4.48` / `8.18` / `1.82`.
+
+Ran a 90k tuning probe against three modest survival variants while keeping the same initial plant density:
+
+| Variant | Avg final | Tail pop | Max gen | Plant seen | Eating | Tail meal gap |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Base | 19.3 | 23.2 | 6.7 | 18.9% | 14.1% | 84.1s |
+| Lower creature costs | 33.3 | 35.6 | 7.0 | 15.6% | 11.3% | 104.1s |
+| Faster plant recovery | 40.3 | 37.0 | 7.3 | 24.2% | 13.6% | 86.1s |
+| Combined | 30.3 | 42.5 | 7.0 | 28.0% | 18.5% | 109.9s |
+
+Selected the faster plant recovery variant because it improved viability most consistently without lowering travel/search costs or raising initial plant density:
+
+- `resourceRegrowthMin`: `0.22 -> 0.35`
+- `resourceRegrowthMax`: `1.2 -> 1.6`
+- `plantRespawnDelaySecondsMin`: `75 -> 45`
+- `plantRespawnDelaySecondsMax`: `240 -> 160`
+
+Full 150k recovery-tuned pass, seeds 42-44:
+
+- Average final population: `40.3`.
+- Average max generation: `10.7`.
+- Tail plant seen/eating: `20.2%` / `13.9%`.
+- Tail meal gap: `90.1s`.
+- Tail recent food energy yield: `0.198`.
+- Final tender/rich/tough plant adaptation: `0.012` / `0.022` / `0.028`.
+- Tail tender/rich/tough calories eaten per second: `6.67` / `16.19` / `3.18`.
+- Tail rich intake per available rich plant was about `0.258` kcal/s/resource, versus `0.130` for tender and `0.113` for tough.
+
+Readout:
+
+- Faster plant recovery gives the plant-diversity preset enough breathing room to observe behavior instead of mostly selecting for immediate starvation avoidance.
+- Rich-plant intake now separates from tender/tough intake more clearly, including after normalizing roughly by available resources.
+- Genetic plant-type adaptation is still weak and noisy at 150k ticks. Do not treat this as a solved preference system yet; it is better described as the first observable payoff/intake separation.
+- Future work should track type-specific intake and adaptation trends in reports/probes, then run longer or higher-replication checks before drawing conclusions about evolved plant preference.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
