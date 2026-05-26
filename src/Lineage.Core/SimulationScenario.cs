@@ -70,6 +70,10 @@ public sealed record SimulationScenario
 
     public int StatsSnapshotIntervalTicks { get; init; } = 10;
 
+    public bool EnableExtinctPayloadPruning { get; init; }
+
+    public int ExtinctPayloadPruneIntervalTicks { get; init; } = 1_000;
+
     public int InitialCreatureCount { get; init; } = 80;
 
     public InitialCreatureSpawnRegion InitialCreatureSpawnRegion { get; init; } = InitialCreatureSpawnRegion.Uniform;
@@ -313,6 +317,7 @@ public sealed record SimulationScenario
         EnsureRange(CloseSenseRefreshProximity, 0f, 1f, nameof(CloseSenseRefreshProximity));
         EnsurePositive(PlantPayoffTraceHalfLifeSeconds, nameof(PlantPayoffTraceHalfLifeSeconds));
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
+        EnsurePositive(ExtinctPayloadPruneIntervalTicks, nameof(ExtinctPayloadPruneIntervalTicks));
         EnsureNonNegative(InitialCreatureCount, nameof(InitialCreatureCount));
         EnsureEnumDefined(InitialCreatureSpawnRegion, nameof(InitialCreatureSpawnRegion));
         EnsurePositive(InitialBodyRadius, nameof(InitialBodyRadius));

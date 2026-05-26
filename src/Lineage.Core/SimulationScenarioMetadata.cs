@@ -191,6 +191,8 @@ public static class SimulationScenarioMetadata
             "EnableLegacyNearestFoodVisionInputs" => "Keeps legacy nearest-food inputs available beside sector vision.",
             "EnableLegacyNearestCreatureVisionInputs" => "Keeps legacy nearest-creature inputs available beside sector vision.",
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
+            "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are no longer referenced by living creatures or eggs.",
+            "ExtinctPayloadPruneIntervalTicks" => "How often extinct genome and brain payload compaction runs.",
             "SpeciesSeeds" => "Optional authored founder roster stored as scenario JSON.",
             _ => null
         };
@@ -339,6 +341,13 @@ public static class SimulationScenarioMetadata
         if (name.Contains("Species", StringComparison.Ordinal))
         {
             return "Species";
+        }
+
+        if (name.Contains("Prune", StringComparison.Ordinal)
+            || name.Contains("Pruning", StringComparison.Ordinal)
+            || name.Contains("Payload", StringComparison.Ordinal))
+        {
+            return "Performance";
         }
 
         return "Advanced";

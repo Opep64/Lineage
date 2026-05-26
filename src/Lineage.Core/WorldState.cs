@@ -83,6 +83,18 @@ public sealed class WorldState
         return Genomes[genomeId];
     }
 
+    public bool TryGetGenome(int genomeId, out CreatureGenome genome)
+    {
+        if ((uint)genomeId < (uint)Genomes.Count)
+        {
+            genome = Genomes[genomeId];
+            return true;
+        }
+
+        genome = default;
+        return false;
+    }
+
     public int AddBrain(
         NeuralBrainGenome brain,
         BrainArchitectureKind architectureKind = BrainArchitectureKind.HybridNeural)
@@ -104,6 +116,18 @@ public sealed class WorldState
         return Brains[brainId];
     }
 
+    public bool TryGetBrain(int brainId, out NeuralBrainGenome? brain)
+    {
+        if ((uint)brainId < (uint)Brains.Count)
+        {
+            brain = Brains[brainId];
+            return true;
+        }
+
+        brain = null;
+        return false;
+    }
+
     public BrainArchitectureKind GetBrainArchitectureKind(int brainId)
     {
         if ((uint)brainId >= (uint)Brains.Count)
@@ -114,6 +138,27 @@ public sealed class WorldState
         return (uint)brainId < (uint)BrainArchitectureKinds.Count
             ? BrainArchitectureKinds[brainId]
             : BrainArchitectureKind.HybridNeural;
+    }
+
+    public ExtinctPayloadPruneResult PruneExtinctPayloads()
+    {
+        var oldGenomeCount = Genomes.Count;
+        var oldBrainCount = Brains.Count;
+        var genomeMap = BuildRetainedPayloadMap(oldGenomeCount, EnumerateActiveGenomeIds(), "genome");
+        var brainMap = BuildRetainedPayloadMap(oldBrainCount, EnumerateActiveBrainIds(), "brain");
+
+        CompactGenomes(genomeMap);
+        CompactBrains(brainMap);
+        RemapActivePayloadReferences(genomeMap, brainMap);
+        RemapLineagePayloadReferences(genomeMap, brainMap);
+
+        return new ExtinctPayloadPruneResult(
+            oldGenomeCount,
+            Genomes.Count,
+            oldBrainCount,
+            Brains.Count,
+            oldGenomeCount - Genomes.Count,
+            oldBrainCount - Brains.Count);
     }
 
     public void SetBiomes(BiomeMap biomes)
@@ -484,4 +529,173 @@ public sealed class WorldState
         _lineageRecords.Add(record);
         Stats.RecordCreatureBirth(record);
     }
+
+    private IEnumerable<int> EnumerateActiveGenomeIds()
+    {
+        foreach (var creature in Creatures)
+        {
+            yield return creature.GenomeId;
+        }
+
+        foreach (var egg in Eggs)
+        {
+            yield return egg.GenomeId;
+        }
+    }
+
+    private IEnumerable<int> EnumerateActiveBrainIds()
+    {
+        foreach (var creature in Creatures)
+        {
+            if (creature.BrainId >= 0)
+            {
+                yield return creature.BrainId;
+            }
+        }
+
+        foreach (var egg in Eggs)
+        {
+            if (egg.BrainId >= 0)
+            {
+                yield return egg.BrainId;
+            }
+        }
+    }
+
+    private static int[] BuildRetainedPayloadMap(int payloadCount, IEnumerable<int> referencedIds, string payloadName)
+    {
+        var retain = new bool[payloadCount];
+        foreach (var id in referencedIds)
+        {
+            if ((uint)id >= (uint)payloadCount)
+            {
+                throw new InvalidOperationException($"Active entity references missing {payloadName} payload {id}.");
+            }
+
+            retain[id] = true;
+        }
+
+        var map = new int[payloadCount];
+        Array.Fill(map, -1);
+        var nextId = 0;
+        for (var oldId = 0; oldId < retain.Length; oldId++)
+        {
+            if (retain[oldId])
+            {
+                map[oldId] = nextId++;
+            }
+        }
+
+        return map;
+    }
+
+    private void CompactGenomes(IReadOnlyList<int> genomeMap)
+    {
+        if (Genomes.Count == 0)
+        {
+            return;
+        }
+
+        var oldGenomes = Genomes.ToArray();
+        Genomes.Clear();
+        for (var oldId = 0; oldId < oldGenomes.Length; oldId++)
+        {
+            if (genomeMap[oldId] >= 0)
+            {
+                Genomes.Add(oldGenomes[oldId]);
+            }
+        }
+    }
+
+    private void CompactBrains(IReadOnlyList<int> brainMap)
+    {
+        if (Brains.Count == 0)
+        {
+            BrainArchitectureKinds.Clear();
+            return;
+        }
+
+        var oldBrains = Brains.ToArray();
+        var oldKinds = BrainArchitectureKinds.ToArray();
+        Brains.Clear();
+        BrainArchitectureKinds.Clear();
+        for (var oldId = 0; oldId < oldBrains.Length; oldId++)
+        {
+            if (brainMap[oldId] < 0)
+            {
+                continue;
+            }
+
+            Brains.Add(oldBrains[oldId]);
+            BrainArchitectureKinds.Add((uint)oldId < (uint)oldKinds.Length
+                ? oldKinds[oldId]
+                : BrainArchitectureKind.HybridNeural);
+        }
+    }
+
+    private void RemapActivePayloadReferences(IReadOnlyList<int> genomeMap, IReadOnlyList<int> brainMap)
+    {
+        for (var i = 0; i < Creatures.Count; i++)
+        {
+            var creature = Creatures[i];
+            creature.GenomeId = RemapRequiredPayloadId(genomeMap, creature.GenomeId, "creature genome");
+            if (creature.BrainId >= 0)
+            {
+                creature.BrainId = RemapRequiredPayloadId(brainMap, creature.BrainId, "creature brain");
+            }
+
+            Creatures[i] = creature;
+        }
+
+        for (var i = 0; i < Eggs.Count; i++)
+        {
+            var egg = Eggs[i];
+            egg.GenomeId = RemapRequiredPayloadId(genomeMap, egg.GenomeId, "egg genome");
+            if (egg.BrainId >= 0)
+            {
+                egg.BrainId = RemapRequiredPayloadId(brainMap, egg.BrainId, "egg brain");
+            }
+
+            Eggs[i] = egg;
+        }
+    }
+
+    private void RemapLineagePayloadReferences(IReadOnlyList<int> genomeMap, IReadOnlyList<int> brainMap)
+    {
+        for (var i = 0; i < _lineageRecords.Count; i++)
+        {
+            var record = _lineageRecords[i];
+            record.GenomeId = RemapOptionalPayloadId(genomeMap, record.GenomeId);
+            record.BrainId = RemapOptionalPayloadId(brainMap, record.BrainId);
+            _lineageRecords[i] = record;
+        }
+    }
+
+    private static int RemapRequiredPayloadId(IReadOnlyList<int> map, int oldId, string description)
+    {
+        if ((uint)oldId >= (uint)map.Count || map[oldId] < 0)
+        {
+            throw new InvalidOperationException($"Active {description} payload {oldId} was not retained during pruning.");
+        }
+
+        return map[oldId];
+    }
+
+    private static int RemapOptionalPayloadId(IReadOnlyList<int> map, int oldId)
+    {
+        if ((uint)oldId >= (uint)map.Count)
+        {
+            return -1;
+        }
+
+        return map[oldId];
+    }
 }
+
+public readonly record struct ExtinctPayloadPruneResult(
+    int PreviousGenomeCount,
+    int CurrentGenomeCount,
+    int PreviousBrainCount,
+    int CurrentBrainCount,
+    int PrunedGenomeCount,
+    int PrunedBrainCount);

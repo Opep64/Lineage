@@ -712,10 +712,33 @@ public sealed class StatsRecordingSystem(
         var hiddenInputWeightCount = 0;
         var hiddenOutputWeightCount = 0;
         var activeHiddenOutputWeightCount = 0;
-        for (var i = 0; i < state.Brains.Count; i++)
+        var activeBrainIds = new HashSet<int>();
+        var evaluatedBrainCount = 0;
+        foreach (var creature in state.Creatures)
         {
-            var brain = state.Brains[i];
+            if (creature.BrainId >= 0)
+            {
+                activeBrainIds.Add(creature.BrainId);
+            }
+        }
+
+        foreach (var egg in state.Eggs)
+        {
+            if (egg.BrainId >= 0)
+            {
+                activeBrainIds.Add(egg.BrainId);
+            }
+        }
+
+        foreach (var brainId in activeBrainIds)
+        {
+            if (!state.TryGetBrain(brainId, out var brain) || brain is null)
+            {
+                continue;
+            }
+
             var hiddenNodeCount = brain.HiddenNodeCount;
+            evaluatedBrainCount++;
             totalBrainHiddenNodeCount += hiddenNodeCount;
             maxBrainHiddenNodeCount = Math.Max(maxBrainHiddenNodeCount, hiddenNodeCount);
             totalHiddenInputWeightMagnitude += brain.SumAbsoluteHiddenInputWeights();
@@ -725,8 +748,8 @@ public sealed class StatsRecordingSystem(
             activeHiddenOutputWeightCount += brain.CountActiveHiddenOutputWeights(ActiveHiddenOutputWeightThreshold);
         }
 
-        var averageBrainHiddenNodeCount = state.Brains.Count > 0
-            ? totalBrainHiddenNodeCount / (float)state.Brains.Count
+        var averageBrainHiddenNodeCount = evaluatedBrainCount > 0
+            ? totalBrainHiddenNodeCount / (float)evaluatedBrainCount
             : 0f;
         var averageHiddenInputWeightMagnitude = hiddenInputWeightCount > 0
             ? totalHiddenInputWeightMagnitude / hiddenInputWeightCount

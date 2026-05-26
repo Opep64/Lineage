@@ -91,6 +91,8 @@ static void PrintHelp()
           --status-interval <n>      Status write interval in ticks. Default: 100
           --status-detail-interval <n> Recompute heavier status metrics every n ticks. Default: 1000
           --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
+          --prune-extinct-payloads   Compact genome/brain payloads not referenced by living creatures or eggs.
+          --prune-extinct-payload-interval <n> Payload pruning interval in ticks. Default: scenario value.
           --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
           --inject-species-count <n> Founder count per injected profile. Default: 10
           --inject-species-region <region> Spawn region for injected species. Default: uniform
@@ -178,7 +180,11 @@ static (SimulationScenario Scenario, Simulation Simulation) CreateSimulationRun(
 {
     if (options.LoadSnapshotPath is not null)
     {
-        var restored = SimulationSnapshotJson.LoadSimulation(options.LoadSnapshotPath);
+        var snapshot = SimulationSnapshotJson.Load(options.LoadSnapshotPath);
+        var restored = SimulationSnapshotJson.RestoreSimulation(snapshot with
+        {
+            Scenario = options.ApplySnapshotRuntimeOverrides(snapshot.Scenario)
+        });
         return (restored.Scenario, restored.Simulation);
     }
 
@@ -883,6 +889,10 @@ internal sealed record RunOptions
 
     public bool StopOnExtinction { get; init; }
 
+    public bool EnableExtinctPayloadPruning { get; init; }
+
+    public int? ExtinctPayloadPruneIntervalTicksOverride { get; init; }
+
     public IReadOnlyList<string> InjectSpeciesPaths { get; init; } = Array.Empty<string>();
 
     public int InjectSpeciesCount { get; init; } = 10;
@@ -990,7 +1000,10 @@ internal sealed record RunOptions
             PipelineKind = PipelineKindOverride ?? scenario.PipelineKind,
             InitialCreatureCount = InitialCreatureCountOverride ?? scenario.InitialCreatureCount,
             SpatialCellSize = SpatialCellSizeOverride ?? scenario.SpatialCellSize,
-            StatsSnapshotIntervalTicks = SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks
+            StatsSnapshotIntervalTicks = SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks,
+            EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
+            ExtinctPayloadPruneIntervalTicks = ExtinctPayloadPruneIntervalTicksOverride
+                ?? scenario.ExtinctPayloadPruneIntervalTicks
         };
 
         if (LegacyInitialResourceCountOverride is not null)
@@ -1013,6 +1026,16 @@ internal sealed record RunOptions
         }
 
         return scenario.Validated();
+    }
+
+    public SimulationScenario ApplySnapshotRuntimeOverrides(SimulationScenario scenario)
+    {
+        return scenario with
+        {
+            EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
+            ExtinctPayloadPruneIntervalTicks = ExtinctPayloadPruneIntervalTicksOverride
+                ?? scenario.ExtinctPayloadPruneIntervalTicks
+        };
     }
 
     public OutputPaths ResolveOutputPaths(SimulationScenario scenario)
@@ -1211,6 +1234,12 @@ internal sealed record RunOptions
                     break;
                 case "--stop-on-extinction":
                     options = options with { StopOnExtinction = true };
+                    break;
+                case "--prune-extinct-payloads":
+                    options = options with { EnableExtinctPayloadPruning = true };
+                    break;
+                case "--prune-extinct-payload-interval":
+                    options = options with { ExtinctPayloadPruneIntervalTicksOverride = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--inject-species":
                     options = options with { InjectSpeciesPaths = Append(options.InjectSpeciesPaths, ReadValue(args, ref i, arg)) };
@@ -4517,6 +4546,12 @@ internal static class RunReportWriter
         WriteMetric(writer, "Simulated seconds", state.ElapsedSeconds.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Wall time", $"{elapsed.TotalSeconds:0.###} seconds");
         WriteMetric(writer, "Snapshot interval", $"{scenario.StatsSnapshotIntervalTicks} ticks");
+        WriteMetric(
+            writer,
+            "Extinct payload pruning",
+            scenario.EnableExtinctPayloadPruning
+                ? $"Every {scenario.ExtinctPayloadPruneIntervalTicks} ticks"
+                : "Off");
         WriteMetric(
             writer,
             "Checkpoint interval",

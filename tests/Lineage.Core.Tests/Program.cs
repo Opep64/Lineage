@@ -138,7 +138,11 @@ var tests = new (string Name, Action Body)[]
     ("Spawned creatures create lineage records", SpawnedCreaturesCreateLineageRecords),
     ("Offspring lineage records parent and generation", OffspringLineageRecordsParentAndGeneration),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
+    ("World state prunes extinct payloads", WorldStatePrunesExtinctPayloads),
+    ("Pruned simulation snapshots restore continuation", PrunedSimulationSnapshotsRestoreContinuation),
+    ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
+    ("Stats recording ignores extinct brain payloads", StatsRecordingIgnoresExtinctBrainPayloads),
     ("Stats recording reports biome pressure telemetry", StatsRecordingReportsBiomePressureTelemetry),
     ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
@@ -5760,6 +5764,115 @@ static void DeathSystemMarksLineageDeathReason()
     AssertEqual(CreatureDeathReason.Starvation, record.DeathReason, "Death reason");
 }
 
+static void WorldStatePrunesExtinctPayloads()
+{
+    var simulation = CreatePayloadPruningFixture(runPruningSystem: false);
+    var deadCreatureId = simulation.State.Creatures[0].Id;
+    var liveCreatureId = simulation.State.Creatures[1].Id;
+
+    var deadCreature = simulation.State.Creatures[0];
+    deadCreature.Energy = 0f;
+    simulation.State.Creatures[0] = deadCreature;
+    simulation.Step();
+
+    AssertEqual(1, simulation.State.Creatures.Count, "Living creature count before pruning");
+    AssertEqual(2, simulation.State.Genomes.Count, "Genome count before pruning");
+    AssertEqual(2, simulation.State.Brains.Count, "Brain count before pruning");
+
+    var result = simulation.State.PruneExtinctPayloads();
+
+    AssertEqual(1, result.PrunedGenomeCount, "Pruned genome count");
+    AssertEqual(1, result.PrunedBrainCount, "Pruned brain count");
+    AssertEqual(1, simulation.State.Genomes.Count, "Genome count after pruning");
+    AssertEqual(1, simulation.State.Brains.Count, "Brain count after pruning");
+
+    var survivor = simulation.State.Creatures[0];
+    AssertEqual(liveCreatureId, survivor.Id, "Survivor id");
+    AssertEqual(0, survivor.GenomeId, "Survivor genome remap");
+    AssertEqual(0, survivor.BrainId, "Survivor brain remap");
+    AssertClose(4f, simulation.State.GetGenome(survivor.GenomeId).BodyRadius, 0.000001, "Survivor genome payload");
+    AssertEqual(BrainArchitectureKind.HiddenLayerNeural, simulation.State.GetBrainArchitectureKind(survivor.BrainId), "Survivor brain architecture");
+
+    AssertTrue(simulation.State.TryGetLineageRecord(deadCreatureId, out var deadRecord), "Dead lineage lookup");
+    AssertEqual(-1, deadRecord.GenomeId, "Dead lineage genome payload should be pruned");
+    AssertEqual(-1, deadRecord.BrainId, "Dead lineage brain payload should be pruned");
+
+    AssertTrue(simulation.State.TryGetLineageRecord(liveCreatureId, out var liveRecord), "Live lineage lookup");
+    AssertEqual(0, liveRecord.GenomeId, "Live lineage genome remap");
+    AssertEqual(0, liveRecord.BrainId, "Live lineage brain remap");
+}
+
+static void PrunedSimulationSnapshotsRestoreContinuation()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 112,
+        WorldWidth = 500f,
+        WorldHeight = 500f,
+        ResourceVoidBorderWidth = 20f,
+        FixedDeltaSeconds = 1f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        EnableExtinctPayloadPruning = true,
+        ExtinctPayloadPruneIntervalTicks = 1
+    };
+    var simulation = CreatePayloadPruningFixture(runPruningSystem: false);
+    var deadCreature = simulation.State.Creatures[0];
+    deadCreature.Energy = 0f;
+    simulation.State.Creatures[0] = deadCreature;
+    simulation.Step();
+    simulation.State.PruneExtinctPayloads();
+
+    var snapshotJson = SimulationSnapshotJson.ToJson(SimulationSnapshot.Capture(scenario, simulation));
+    var restored = SimulationSnapshotJson.RestoreSimulation(SimulationSnapshotJson.FromJson(snapshotJson)).Simulation;
+
+    AssertEqual(1, restored.State.Creatures.Count, "Restored living creature count");
+    AssertEqual(1, restored.State.Genomes.Count, "Restored genome payload count");
+    AssertEqual(1, restored.State.Brains.Count, "Restored brain payload count");
+    AssertEqual(2, restored.State.LineageRecords.Count, "Restored lineage count");
+    AssertTrue(restored.State.LineageRecords.Any(record => record.GenomeId < 0), "Restored lineage should preserve pruned marker");
+
+    restored.RunSteps(2);
+    AssertTrue(restored.State.Tick >= simulation.State.Tick + 2, "Restored pruned snapshot should continue running");
+}
+
+static void ExtinctPayloadPruningSystemRunsInPipeline()
+{
+    var simulation = CreatePayloadPruningFixture(runPruningSystem: true);
+    var deadCreature = simulation.State.Creatures[0];
+    deadCreature.Energy = 0f;
+    simulation.State.Creatures[0] = deadCreature;
+
+    simulation.Step();
+
+    AssertEqual(1, simulation.State.Creatures.Count, "Living creature count after pipeline pruning");
+    AssertEqual(1, simulation.State.Genomes.Count, "Genome count after pipeline pruning");
+    AssertEqual(1, simulation.State.Brains.Count, "Brain count after pipeline pruning");
+    AssertEqual(0, simulation.State.Creatures[0].GenomeId, "Pipeline pruning survivor genome remap");
+    AssertEqual(0, simulation.State.Creatures[0].BrainId, "Pipeline pruning survivor brain remap");
+}
+
+static Simulation CreatePayloadPruningFixture(bool runPruningSystem)
+{
+    var systems = runPruningSystem
+        ? new ISimulationSystem[] { new DeathSystem(), new ExtinctPayloadPruningSystem(intervalTicks: 1) }
+        : [new DeathSystem()];
+    var simulation = new Simulation(
+        new SimulationConfig { WorldWidth = 500f, WorldHeight = 500f, FixedDeltaSeconds = 1f },
+        seed: 111,
+        systems: systems);
+    var deadGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { BodyRadius = 2f });
+    var deadBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    var liveGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { BodyRadius = 4f });
+    var liveBrainId = simulation.State.AddBrain(
+        NeuralBrainGenome.CreateHiddenLayerRandom(new DeterministicRandom(123), hiddenNodeCount: 8),
+        BrainArchitectureKind.HiddenLayerNeural);
+
+    simulation.State.SpawnCreature(deadGenomeId, new SimVector2(20f, 20f), energy: 5f, brainId: deadBrainId);
+    simulation.State.SpawnCreature(liveGenomeId, new SimVector2(40f, 20f), energy: 50f, brainId: liveBrainId);
+    return simulation;
+}
+
 static void StatsRecordingCapturesAggregateSnapshot()
 {
     var simulation = new Simulation(
@@ -5775,9 +5888,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
             seasonPhaseOffsetSeconds: 1f)]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
-    simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
-    var parentId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 5f);
-    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 20f), energy: 7f, generation: 2);
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
+    var parentId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 5f, brainId: brainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 20f), energy: 7f, generation: 2, brainId: brainId);
     var seeingCreature = simulation.State.Creatures[0];
     seeingCreature.Senses = new CreatureSenseState
     {
@@ -6059,6 +6172,31 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.PlantDormancyCompletedCount, "Snapshot plant dormancy completed count");
     AssertClose(0f, snapshot.AverageLifespanSeconds, 0.000001, "Snapshot average lifespan without deaths");
     AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
+}
+
+static void StatsRecordingIgnoresExtinctBrainPayloads()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 114,
+        systems: [new DeathSystem(), new StatsRecordingSystem()]);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var extinctBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(16));
+    var activeBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 2f, brainId: extinctBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 20f), energy: 8f, brainId: activeBrainId);
+    var extinctCreature = simulation.State.Creatures[0];
+    extinctCreature.Energy = 0f;
+    simulation.State.Creatures[0] = extinctCreature;
+
+    simulation.Step();
+
+    var snapshot = simulation.State.Stats.Snapshots.Single();
+    AssertEqual(1, snapshot.CreatureCount, "Snapshot living creature count");
+    AssertEqual(2, snapshot.BrainCount, "Snapshot retained brain payload count");
+    AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot active average hidden nodes");
+    AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot active max hidden nodes");
 }
 
 static void StatsRecordingReportsBiomePressureTelemetry()

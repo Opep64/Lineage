@@ -52,7 +52,10 @@ public static class BrainInputDiagnostics
                 continue;
             }
 
-            accumulator.Add(state.GetBrain(creature.BrainId));
+            if (state.TryGetBrain(creature.BrainId, out var brain) && brain is not null)
+            {
+                accumulator.Add(brain);
+            }
         }
 
         return accumulator.ToSummary();
@@ -78,13 +81,18 @@ public static class BrainInputDiagnostics
                 continue;
             }
 
+            if (!state.TryGetBrain(creature.BrainId, out var brain) || brain is null)
+            {
+                continue;
+            }
+
             var founderId = FindFounderId(creature, recordsById);
             if (!groups.TryGetValue(founderId, out var group))
             {
                 group = new LineageBrainInputAccumulator { FounderId = founderId };
             }
 
-            group.Diagnostics.Add(state.GetBrain(creature.BrainId));
+            group.Diagnostics.Add(brain);
             groups[founderId] = group;
             totalEvaluated++;
         }

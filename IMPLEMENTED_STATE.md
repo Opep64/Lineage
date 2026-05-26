@@ -1,6 +1,6 @@
 # Lineage Implemented State
 
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-26
 
 This file describes what is actually implemented now. It is intentionally separate from future plans.
 
@@ -21,6 +21,7 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Authored scenarios enable sector vision and disable legacy nearest-food and nearest-creature vision inputs.
 - Balanced Foraging remains the default Godot startup scenario.
 - `HybridNeural` remains the default brain architecture unless a scenario explicitly opts into `HiddenLayerNeural`.
+- Extinct genome/brain payload pruning is scenario-backed but disabled by default.
 
 ## Core Entities
 
@@ -53,6 +54,7 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Juveniles cannot reproduce before maturity.
 - Offspring inherit mutated genome and brain data.
 - Trait and brain mutation rates are sparse and heritable/configurable.
+- Optional extinct-payload pruning compacts genome and brain storage to payloads referenced by living creatures and eggs. Lineage records remain available; records whose heavy payloads were pruned use `-1` genome/brain IDs.
 
 ## Diet, Digestion, Meat, And Combat
 
@@ -165,6 +167,7 @@ CLI supports:
 - CSV sidecars.
 - HTML reports.
 - Profiling and sensing profile sidecars.
+- Extinct genome/brain payload pruning through scenario JSON or CLI flags.
 
 Godot supports:
 
@@ -196,7 +199,7 @@ Reports include:
 
 Recent mainline validation:
 
-- 157 core tests passed.
+- 179 core tests passed.
 - Release solution build passed.
 - Post-merge 10k seed-42 baseline across 11 checked scenarios completed with no extinctions and no population-cap trips.
 - Post-merge 60k stability pass across 10 scenarios and seeds 42-44 completed 30/30 runs with no extinctions.

@@ -55,7 +55,9 @@ public static class SimulationPipelines
         float reproductiveSenescenceAgeSeconds = 900f,
         float senescentFertilityMultiplier = 0.18f,
         float crowdingFertilityPenalty = 0.65f,
-        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null)
+        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null,
+        bool enableExtinctPayloadPruning = false,
+        int extinctPayloadPruneIntervalTicks = 1_000)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -106,6 +108,7 @@ public static class SimulationPipelines
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
+            .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
             new StatsRecordingSystem(
                 statsSnapshotIntervalTicks,
                 biomeMovementCostProfile,
@@ -177,7 +180,9 @@ public static class SimulationPipelines
         float reproductiveSenescenceAgeSeconds = 900f,
         float senescentFertilityMultiplier = 0.18f,
         float crowdingFertilityPenalty = 0.65f,
-        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null)
+        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null,
+        bool enableExtinctPayloadPruning = false,
+        int extinctPayloadPruneIntervalTicks = 1_000)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -248,6 +253,7 @@ public static class SimulationPipelines
                 biteRangePadding,
                 requireAttackIntent: true),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
+            .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
             new StatsRecordingSystem(
                 statsSnapshotIntervalTicks,
                 biomeMovementCostProfile,
@@ -259,5 +265,14 @@ public static class SimulationPipelines
                 seasonPhaseOffsetSeconds,
                 seasonPhaseMode)
         ];
+    }
+
+    private static ISimulationSystem[] CreateExtinctPayloadPruningSystems(
+        bool enabled,
+        int intervalTicks)
+    {
+        return enabled
+            ? [new ExtinctPayloadPruningSystem(intervalTicks)]
+            : [];
     }
 }

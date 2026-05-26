@@ -80,8 +80,12 @@ public static class BehaviorAssay
                 continue;
             }
 
-            var brain = state.GetBrain(creature.BrainId);
-            var genome = state.GetGenome(creature.GenomeId);
+            if (!state.TryGetBrain(creature.BrainId, out var brain)
+                || brain is null
+                || !state.TryGetGenome(creature.GenomeId, out var genome))
+            {
+                continue;
+            }
 
             Accumulate(brain, genome, CreateBaselineSenses(), inputs, outputs, ref baseline);
             Accumulate(brain, genome, CreateHungryNoCueSenses(), inputs, outputs, ref hungryNoCue);

@@ -1065,8 +1065,8 @@ public static class SpeciesClusterAnalyzer
 
     private static float[] CreateBrainFeatures(WorldState state, int brainId)
     {
-        return brainId >= 0
-            ? CreateBrainFeatures(state.GetBrain(brainId))
+        return state.TryGetBrain(brainId, out var brain) && brain is not null
+            ? CreateBrainFeatures(brain)
             : Array.Empty<float>();
     }
 
@@ -1217,12 +1217,26 @@ public static class SpeciesClusterAnalyzer
         SpeciesClusterOptions options)
     {
         var clusters = new List<SpeciesLineageClusterAccumulator>();
+        var clustersBySpeciesId = new Dictionary<int, SpeciesLineageClusterAccumulator>();
         var recordClusterById = new Dictionary<EntityId, int>();
         foreach (var record in state.LineageRecords
             .OrderBy(record => record.BirthTick)
             .ThenBy(record => record.Id.Value))
         {
-            var genomeFeatures = CreateGenomeFeatures(state.GetGenome(record.GenomeId));
+            if (!state.TryGetGenome(record.GenomeId, out var genome))
+            {
+                if (record.ParentId != default
+                    && recordClusterById.TryGetValue(record.ParentId, out var parentSpeciesId)
+                    && clustersBySpeciesId.TryGetValue(parentSpeciesId, out var parentCluster))
+                {
+                    parentCluster.AddRecordWithoutPayload(record);
+                    recordClusterById[record.Id] = parentSpeciesId;
+                }
+
+                continue;
+            }
+
+            var genomeFeatures = CreateGenomeFeatures(genome);
             var brainFeatures = CreateBrainFeatures(state, record.BrainId);
             var bestIndex = -1;
             var bestCombinedDistance = float.MaxValue;
@@ -1251,7 +1265,9 @@ public static class SpeciesClusterAnalyzer
 
             if (bestIndex < 0)
             {
-                clusters.Add(new SpeciesLineageClusterAccumulator(record, genomeFeatures, brainFeatures));
+                var cluster = new SpeciesLineageClusterAccumulator(record, genomeFeatures, brainFeatures);
+                clusters.Add(cluster);
+                clustersBySpeciesId[cluster.SpeciesId] = cluster;
                 bestIndex = clusters.Count - 1;
             }
             else
@@ -1580,7 +1596,11 @@ public static class SpeciesClusterAnalyzer
         CreatureLineageRecord record,
         IReadOnlyDictionary<EntityId, int> recordClusterById)
     {
-        var speciesId = recordClusterById[record.Id];
+        if (!recordClusterById.TryGetValue(record.Id, out var speciesId))
+        {
+            return;
+        }
+
         if (!activeClusters.TryGetValue(speciesId, out var accumulator))
         {
             accumulator = new SpeciesHistoryGenerationAccumulator();
@@ -1597,7 +1617,11 @@ public static class SpeciesClusterAnalyzer
         CreatureLineageRecord record,
         IReadOnlyDictionary<EntityId, int> recordClusterById)
     {
-        var speciesId = recordClusterById[record.Id];
+        if (!recordClusterById.TryGetValue(record.Id, out var speciesId))
+        {
+            return;
+        }
+
         if (activeClusters.TryGetValue(speciesId, out var accumulator))
         {
             accumulator.Remove(record.Generation);
@@ -1643,6 +1667,8 @@ public static class SpeciesClusterAnalyzer
 
     private sealed class SpeciesLineageClusterAccumulator
     {
+        private int _payloadCount = 1;
+
         public SpeciesLineageClusterAccumulator(CreatureLineageRecord initialRecord, float[] genomeFeatures, float[] brainFeatures)
         {
             SpeciesId = initialRecord.Id.Value;
@@ -1662,12 +1688,18 @@ public static class SpeciesClusterAnalyzer
         public void Add(CreatureLineageRecord record, float[] genomeFeatures, float[] brainFeatures)
         {
             Records.Add(record);
+            _payloadCount++;
             var genomeCentroid = GenomeCentroid;
             var brainCentroid = BrainCentroid;
-            SpeciesClusterAnalyzer.UpdateCentroid(ref genomeCentroid, genomeFeatures, Records.Count);
-            SpeciesClusterAnalyzer.UpdateCentroid(ref brainCentroid, brainFeatures, Records.Count);
+            SpeciesClusterAnalyzer.UpdateCentroid(ref genomeCentroid, genomeFeatures, _payloadCount);
+            SpeciesClusterAnalyzer.UpdateCentroid(ref brainCentroid, brainFeatures, _payloadCount);
             GenomeCentroid = genomeCentroid;
             BrainCentroid = brainCentroid;
+        }
+
+        public void AddRecordWithoutPayload(CreatureLineageRecord record)
+        {
+            Records.Add(record);
         }
     }
 
