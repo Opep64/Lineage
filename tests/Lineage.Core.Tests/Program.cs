@@ -71,6 +71,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports plant preference bridge", CreatureSensingReportsPlantPreferenceBridge),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
     ("Creature sensing smells similar creatures beyond vision", CreatureSensingSmellsSimilarCreaturesBeyondVision),
+    ("Creature sensing separates predator prey similarity", CreatureSensingSeparatesPredatorPreySimilarity),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
@@ -89,6 +90,8 @@ var tests = new (string Name, Action Body)[]
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Forager predator turns creature contact into attack intent", ForagerPredatorTurnsCreatureContactIntoAttackIntent),
+    ("Forager predator suppresses similar creature contact attack", ForagerPredatorSuppressesSimilarCreatureContactAttack),
+    ("Forager predator steers away from similar creature scent", ForagerPredatorSteersAwayFromSimilarCreatureScent),
     ("Sector forager starter follows sector plant cues", SectorForagerStarterFollowsSectorPlantCues),
     ("Scavenger starter follows sector meat cues", ScavengerStarterFollowsSectorMeatCues),
     ("Predator starter follows sector creature cues", PredatorStarterFollowsSectorCreatureCues),
@@ -2769,6 +2772,57 @@ static void CreatureSensingSmellsSimilarCreaturesBeyondVision()
     AssertClose(1f, senses.CreatureContactSimilarity, 0.000001, "Identical contact similarity");
 }
 
+static void CreatureSensingSeparatesPredatorPreySimilarity()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 1308,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
+        ]);
+
+    var preyGenome = CreatureGenome.Baseline with
+    {
+        SenseRadius = 60f,
+        VisionAngleRadians = MathF.PI / 3f,
+        DietaryAdaptation = 0.05f,
+        CarrionAdaptation = 0f,
+        BiteStrength = 0.15f,
+        DamageResistance = 0.7f,
+        MaturityAgeSeconds = 0f
+    };
+    var predatorGenome = preyGenome with
+    {
+        DietaryAdaptation = 0.9f,
+        CarrionAdaptation = 0.3f,
+        BiteStrength = 1.2f,
+        DamageResistance = 1.2f
+    };
+    var preyGenomeId = simulation.State.AddGenome(preyGenome);
+    var predatorGenomeId = simulation.State.AddGenome(predatorGenome);
+
+    simulation.State.SpawnCreature(preyGenomeId, new SimVector2(80f, 80f), energy: 25f);
+    var observer = simulation.State.Creatures[0];
+    observer.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = observer;
+
+    var predatorId = simulation.State.SpawnCreature(predatorGenomeId, new SimVector2(74f, 80f), energy: 25f);
+    observer = simulation.State.Creatures[0];
+    observer.IsTouchingCreature = true;
+    observer.CreatureContactId = predatorId;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.CreatureDetected, "Predator-like creature behind the observer should not be visually detected");
+    AssertTrue(!senses.CreatureSimilarityScentDetected, "Predator-prey trait split should not create kin scent");
+    AssertTrue(senses.CreatureContactSimilarity < 0.82f, "Predator-prey trait split should stay below scent similarity floor");
+}
+
 static void CreatureSensingSmellsMeatBeyondVision()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -3777,6 +3831,86 @@ static void ForagerPredatorTurnsCreatureContactIntoAttackIntent()
     creature = simulation.State.Creatures[0];
     AssertTrue(creature.Actions.WantsAttack, "Forager predator should attack when creature contact says it has arrived");
     AssertTrue(creature.Actions.MoveForward < 0.5f, "Forager predator should slow down when already in creature contact");
+}
+
+static void ForagerPredatorSuppressesSimilarCreatureContactAttack()
+{
+    var unlikeContact = MeasureForagerPredatorActions(
+        new CreatureSenseState
+        {
+            Hunger = 1f,
+            CreatureContact = 1f,
+            CreatureContactSimilarity = 0.2f
+        });
+    var similarContact = MeasureForagerPredatorActions(
+        new CreatureSenseState
+        {
+            Hunger = 1f,
+            CreatureContact = 1f,
+            CreatureContactSimilarity = 0.9f
+        });
+
+    AssertTrue(unlikeContact.WantsAttack, "Predator should still attack low-similarity creature contact");
+    AssertTrue(!similarContact.WantsAttack, "Predator should suppress attack against high-similarity creature contact");
+    AssertTrue(
+        unlikeContact.AttackOutput > similarContact.AttackOutput + 1f,
+        "Creature contact similarity should strongly reduce predator attack output");
+}
+
+static void ForagerPredatorSteersAwayFromSimilarCreatureScent()
+{
+    var baseline = MeasureForagerPredatorActions(new CreatureSenseState { Hunger = 0.5f });
+    var similarAhead = MeasureForagerPredatorActions(
+        new CreatureSenseState
+        {
+            Hunger = 0.5f,
+            CreatureSimilarityScentDetected = true,
+            CreatureSimilarityScentDensity = 0.8f,
+            CreatureSimilarityScentDirectionForward = 0.8f
+        });
+    var similarRight = MeasureForagerPredatorActions(
+        new CreatureSenseState
+        {
+            Hunger = 0.5f,
+            CreatureSimilarityScentDetected = true,
+            CreatureSimilarityScentDensity = 0.8f,
+            CreatureSimilarityScentDirectionRight = 0.8f
+        });
+
+    AssertTrue(
+        similarAhead.MoveForward < baseline.MoveForward - 0.18f,
+        "Predator should slow down when similar creature scent is directly ahead");
+    AssertTrue(similarRight.Turn < -0.2f, "Predator should turn away from similar creature scent on the right");
+}
+
+static CreatureActionState MeasureForagerPredatorActions(CreatureSenseState senses)
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 309,
+        systems:
+        [
+            new NeuralControllerSystem(
+                enableLegacyNearestFoodVisionInputs: false,
+                enableLegacyNearestCreatureVisionInputs: false)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 10f,
+        MaxTurnRadiansPerSecond = 4f,
+        DietaryAdaptation = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator(NeuralBrainSchema.DefaultHiddenNodeCount));
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = senses;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    return simulation.State.Creatures[0].Actions;
 }
 
 static void SectorForagerStarterFollowsSectorPlantCues()

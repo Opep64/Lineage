@@ -257,10 +257,13 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureForwardInput, 1.2f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureProximityInput, -0.6f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureContactInput, -0.7f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureSimilarityScentDensityInput, -0.05f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureSimilarityScentForwardInput, -0.25f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 0.8f);
 
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.CreatureRightInput, 2.8f);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.CreatureSimilarityScentRightInput, -0.35f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 1.4f);
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
@@ -268,9 +271,17 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.HungerInput, 2f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 4f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureContactInput, 4.5f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureContactSimilarityInput, -4f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.8f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureFacingAlignmentInput, -0.3f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.5f);
+
+        if (hiddenNodeCount > SeedTerrainDragHiddenNode)
+        {
+            SetHiddenInput(weights, hiddenNodeCount, SeedTerrainDragHiddenNode, NeuralBrainSchema.BiasInput, -4.25f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedTerrainDragHiddenNode, NeuralBrainSchema.CreatureContactSimilarityInput, 5f);
+            SetHiddenOutput(weights, hiddenNodeCount, NeuralBrainSchema.AttackOutput, SeedTerrainDragHiddenNode, -4f);
+        }
 
         return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
     }

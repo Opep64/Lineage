@@ -27,15 +27,15 @@ internal static class CreatureSimilarity
         AddLogScaledDifference(left.EggIncubationSeconds, right.EggIncubationSeconds, 1f, 300f, 0.25f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.MaturityAgeSeconds, right.MaturityAgeSeconds, 10f, 600f, 0.35f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.ReproductionCooldownSeconds, right.ReproductionCooldownSeconds, 1f, 60f, 0.3f, ref weightedDistance, ref totalWeight);
-        AddUnitDifference(left.DietaryAdaptation, right.DietaryAdaptation, 3.0f, ref weightedDistance, ref totalWeight);
-        AddUnitDifference(left.CarrionAdaptation, right.CarrionAdaptation, 1.0f, ref weightedDistance, ref totalWeight);
+        AddUnitDifference(left.DietaryAdaptation, right.DietaryAdaptation, 4.0f, ref weightedDistance, ref totalWeight);
+        AddUnitDifference(left.CarrionAdaptation, right.CarrionAdaptation, 1.2f, ref weightedDistance, ref totalWeight);
         AddUnitDifference(left.TenderPlantAdaptation, right.TenderPlantAdaptation, 0.5f, ref weightedDistance, ref totalWeight);
         AddUnitDifference(left.RichPlantAdaptation, right.RichPlantAdaptation, 0.5f, ref weightedDistance, ref totalWeight);
         AddUnitDifference(left.ToughPlantAdaptation, right.ToughPlantAdaptation, 0.5f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.GutCapacityCalories, right.GutCapacityCalories, 5f, 250f, 0.35f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.DigestionCaloriesPerSecond, right.DigestionCaloriesPerSecond, 1f, 60f, 0.35f, ref weightedDistance, ref totalWeight);
-        AddLogScaledDifference(left.BiteStrength, right.BiteStrength, 0.05f, 4f, 2.5f, ref weightedDistance, ref totalWeight);
-        AddLogScaledDifference(left.DamageResistance, right.DamageResistance, 0.25f, 4f, 1.0f, ref weightedDistance, ref totalWeight);
+        AddLogScaledDifference(left.BiteStrength, right.BiteStrength, 0.05f, 4f, 3.0f, ref weightedDistance, ref totalWeight);
+        AddLogScaledDifference(left.DamageResistance, right.DamageResistance, 0.25f, 4f, 1.15f, ref weightedDistance, ref totalWeight);
 
         return totalWeight > 0f
             ? Math.Clamp(1f - weightedDistance / totalWeight, 0f, 1f)
