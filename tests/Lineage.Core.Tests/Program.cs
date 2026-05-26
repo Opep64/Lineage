@@ -95,6 +95,7 @@ var tests = new (string Name, Action Body)[]
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
     ("Behavior assay reports plant choice probes", BehaviorAssayReportsPlantChoiceProbes),
+    ("Behavior assay reports plant preference bridge probes", BehaviorAssayReportsPlantPreferenceBridgeProbes),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
@@ -3905,7 +3906,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(41, summary.Results.Count, "Assay result count");
+    AssertEqual(47, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
@@ -3918,6 +3919,16 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
         summary.RichTraceRichRight.Turn,
         0.000001,
         "Seed forager should not have built-in recent rich payoff steering");
+    AssertClose(
+        summary.Baseline.MoveForward,
+        summary.PlantPreferenceAhead.MoveForward,
+        0.000001,
+        "Seed forager should not have built-in plant preference approach");
+    AssertClose(
+        summary.Baseline.Turn,
+        summary.PlantPreferenceRight.Turn,
+        0.000001,
+        "Seed forager should not have built-in plant preference turning");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
     AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
@@ -3951,6 +3962,40 @@ static void BehaviorAssayReportsPlantChoiceProbes()
     AssertTrue(
         summary.TenderPlantContact.EatShare > summary.ToughPlantContact.EatShare,
         "Plant-choice probe should expose bite-ease differences in contact cues");
+}
+
+static void BehaviorAssayReportsPlantPreferenceBridgeProbes()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 410, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.PlantPreferenceForwardInput] = 4f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.PlantPreferenceRightInput] = 4f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.PlantFoodContactPreferenceInput] = 4f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(
+        summary.PlantPreferenceAhead.MoveForward > summary.Baseline.MoveForward + 0.8f,
+        "Plant preference bridge ahead should expose forward preference wiring");
+    AssertTrue(
+        summary.PlantPreferenceRight.Turn > summary.Baseline.Turn + 0.8f,
+        "Plant preference bridge right should expose turning preference wiring");
+    AssertTrue(
+        summary.RichPreferenceRichRight.Turn > summary.RichPreferenceToughRight.Turn + 0.5f,
+        "Rich payoff bridge should distinguish matching rich plants from mismatched tough plants");
+    AssertTrue(
+        summary.TenderPreferenceTenderRight.Turn > summary.Baseline.Turn + 0.8f,
+        "Tender payoff bridge should expose matching tender preference");
+    AssertTrue(
+        summary.PlantPreferenceContact.EatShare > summary.RichPlantContact.EatShare,
+        "Plant preference contact should expose contact preference wiring beyond ordinary plant contact");
 }
 
 static void BehaviorAssayDetectsFreshMeatPreference()

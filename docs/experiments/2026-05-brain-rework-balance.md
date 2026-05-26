@@ -1853,6 +1853,25 @@ Readout:
 - The gene response remains noisy. At 300k, rich adaptation averaged `0.022`, while tender/tough averaged `0.032` and `0.027`.
 - Keep the bridge for now because it gives evolution a cleaner association handle without changing behavior directly, but do not treat plant preference as solved.
 
+## 2026-05-26 Plant Preference Behavior Diagnostics
+
+Added behavior-assay rows that report whether living brains actually respond to the plant preference bridge inputs:
+
+- `Plant preference bridge ahead`
+- `Plant preference bridge right`
+- `Rich preference bridge, rich right`
+- `Rich preference bridge, tough right`
+- `Tender preference bridge, tender right`
+- `Plant preference contact`
+
+These probes are diagnostics only. The two pure bridge rows isolate `PlantPreferenceDirectionForward` and `PlantPreferenceDirectionRight` without ordinary plant-sector cues. The typed bridge rows combine visible typed plant sectors with matching or mismatched payoff traces, so reports can show whether a lineage responds differently when recent payoff and visible plant profile align.
+
+Validation:
+
+- `dotnet build .\Lineage.slnx -c Release -v:minimal`
+- `dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release --no-build`
+- 5k `plant-diversity-pressure` CLI report smoke confirmed the new rows appear in the HTML report.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
