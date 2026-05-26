@@ -1418,6 +1418,62 @@ Readout:
 - Genetic plant adaptation is not yet aligned with the rich-intake signal. The strongest 300k adaptation drift is toward tough plants, likely because adaptation is still weak/noisy and may be responding to scarcity or survival filtering rather than direct rich-plant preference.
 - Next likely design lever: make plant-type adaptation produce a clearer tradeoff, especially by making mismatched specialization and broad generalism cost enough that genetic drift can be distinguished from availability/pathing.
 
+## 2026-05-25 Plant Specialization Tradeoff
+
+Plant-type adaptation previously only added a same-type bonus. That made adaptation mostly free, so tough-plant adaptation could drift upward even when behavior and energy payoff were centered on rich plants.
+
+Changed plant digestion specialization into an explicit tradeoff:
+
+- Matching bonuses: tender `+0.40`, rich `+0.55`, tough `+0.85` at full adaptation.
+- Mismatched typed plants subtract `0.18` per off-type specialization.
+- Generic plants subtract `0.08` per typed specialization.
+- Plant-type adaptation multipliers clamp to `0.55..2.00`.
+- Founder genomes remain neutral because tender/rich/tough adaptation starts at `0`.
+
+Comparison across seeds 42-44:
+
+| Run set | Final pop | Tail pop | Births | Max gen | Plant seen | Eating | Meal gap | Food yield |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 150k recovery baseline | 40.3 | 36.3 | 623.0 | 10.7 | 20.2% | 13.9% | 90.1s | 0.193 |
+| 150k tradeoff | 38.0 | 36.5 | 623.3 | 11.7 | 24.1% | 17.2% | 81.0s | 0.215 |
+| 300k previous | 38.7 | 42.2 | 1154.7 | 21.7 | 19.2% | 11.5% | 114.0s | 0.138 |
+| 300k tradeoff | 36.0 | 41.7 | 1130.3 | 17.7 | 18.6% | 12.0% | 105.0s | 0.140 |
+
+Tail plant-type intake share:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 150k recovery baseline | 20.6% | 20.8% | 48.7% | 10.0% |
+| 150k tradeoff | 17.3% | 21.0% | 52.9% | 8.7% |
+| 300k previous | 19.9% | 22.3% | 49.4% | 8.5% |
+| 300k tradeoff | 21.3% | 22.0% | 49.5% | 7.1% |
+
+Tail intake per available plant resource:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 150k recovery baseline | 0.173 | 0.131 | 0.271 | 0.115 |
+| 150k tradeoff | 0.176 | 0.164 | 0.362 | 0.136 |
+| 300k previous | 0.191 | 0.179 | 0.330 | 0.113 |
+| 300k tradeoff | 0.239 | 0.198 | 0.391 | 0.097 |
+
+Average plant adaptation trend, early -> tail:
+
+| Run set | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: |
+| 150k recovery baseline | 0.000 -> 0.014 | 0.000 -> 0.023 | 0.000 -> 0.025 |
+| 150k tradeoff | 0.000 -> 0.017 | 0.000 -> 0.015 | 0.000 -> 0.009 |
+| 300k previous | 0.000 -> 0.024 | 0.000 -> 0.023 | 0.000 -> 0.090 |
+| 300k tradeoff | 0.000 -> 0.023 | 0.000 -> 0.041 | 0.000 -> 0.010 |
+
+Readout:
+
+- The tradeoff preserves 300k viability and similar tail population.
+- Rich plants remain the main behavioral payoff: about half of plant intake, and the highest intake per available resource.
+- The previous tough-adaptation drift dropped from `0.090` to `0.010` at 300k.
+- Rich adaptation became the strongest plant adaptation signal at 300k (`0.041` tail average), which aligns better with observed rich-plant intake.
+- This is still early selection signal, not proof of stable long-term plant specialization. Larger replicate counts or longer runs are still needed before treating the plant-preference system as tuned.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

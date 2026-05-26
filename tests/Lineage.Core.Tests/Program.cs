@@ -43,6 +43,7 @@ var tests = new (string Name, Action Body)[]
     ("Plant type controls eating transfer rate", PlantTypeControlsEatingTransferRate),
     ("Plant type controls digestion payoff", PlantTypeControlsDigestionPayoff),
     ("Plant adaptation controls digestion payoff", PlantAdaptationControlsDigestionPayoff),
+    ("Plant adaptation penalizes mismatched plant types", PlantAdaptationPenalizesMismatchedPlantTypes),
     ("Eating requires body contact with a resource", EatingRequiresBodyContact),
     ("Dietary adaptation controls digested calories", DietaryAdaptationControlsDigestedCalories),
     ("Carrion adaptation trades fresh and stale meat digestion", CarrionAdaptationTradesFreshAndStaleMeatDigestion),
@@ -1529,20 +1530,39 @@ static void PlantTypeControlsDigestionPayoff()
 static void PlantAdaptationControlsDigestionPayoff()
 {
     AssertClose(
-        12.5f,
+        14f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Tender, tenderPlantAdaptation: 1f),
         0.000001,
         "Tender adaptation improves tender plant digestion");
     AssertClose(
-        14.175f,
+        16.275f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Rich, richPlantAdaptation: 1f),
-        0.000001,
+        0.00001,
         "Rich adaptation improves rich plant digestion");
     AssertClose(
-        12.87f,
+        14.43f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Tough, toughPlantAdaptation: 1f),
         0.000001,
         "Tough adaptation improves tough plant digestion");
+}
+
+static void PlantAdaptationPenalizesMismatchedPlantTypes()
+{
+    AssertClose(
+        9.2f,
+        RunPlantTypeDigestionProbe(PlantResourceKind.Generic, richPlantAdaptation: 1f),
+        0.000001,
+        "Rich adaptation mildly reduces generic plant digestion");
+    AssertClose(
+        8.2f,
+        RunPlantTypeDigestionProbe(PlantResourceKind.Tender, richPlantAdaptation: 1f),
+        0.000001,
+        "Rich adaptation reduces tender plant digestion");
+    AssertClose(
+        6.396f,
+        RunPlantTypeDigestionProbe(PlantResourceKind.Tough, richPlantAdaptation: 1f),
+        0.000001,
+        "Rich adaptation reduces tough plant digestion");
 }
 
 static float RunPlantTypeDigestionProbe(

@@ -16,9 +16,12 @@ public static class CreatureDigestion
     public const float FullCarrionFreshMeatPenalty = 0.25f;
     public const float FullCarrionStaleMeatRecovery = 0.85f;
     public const float FullCarrionRottenMeatProtection = 0.9f;
-    private const float TenderPlantAdaptationBonus = 0.25f;
-    private const float RichPlantAdaptationBonus = 0.35f;
-    private const float ToughPlantAdaptationBonus = 0.65f;
+    private const float TenderPlantAdaptationBonus = 0.4f;
+    private const float RichPlantAdaptationBonus = 0.55f;
+    private const float ToughPlantAdaptationBonus = 0.85f;
+    private const float CrossPlantAdaptationPenalty = 0.18f;
+    private const float GenericPlantAdaptationPenalty = 0.08f;
+    private const float MinimumPlantTypeAdaptationMultiplier = 0.55f;
 
     public static float PlantEfficiency(CreatureGenome genome)
     {
@@ -96,12 +99,24 @@ public static class CreatureDigestion
 
     private static float PlantTypeAdaptationMultiplier(CreatureGenome genome, PlantResourceKind plantKind)
     {
-        return plantKind switch
+        var tender = Math.Clamp(genome.TenderPlantAdaptation, 0f, 1f);
+        var rich = Math.Clamp(genome.RichPlantAdaptation, 0f, 1f);
+        var tough = Math.Clamp(genome.ToughPlantAdaptation, 0f, 1f);
+        var multiplier = plantKind switch
         {
-            PlantResourceKind.Tender => 1f + Math.Clamp(genome.TenderPlantAdaptation, 0f, 1f) * TenderPlantAdaptationBonus,
-            PlantResourceKind.Rich => 1f + Math.Clamp(genome.RichPlantAdaptation, 0f, 1f) * RichPlantAdaptationBonus,
-            PlantResourceKind.Tough => 1f + Math.Clamp(genome.ToughPlantAdaptation, 0f, 1f) * ToughPlantAdaptationBonus,
+            PlantResourceKind.Tender => 1f
+                + tender * TenderPlantAdaptationBonus
+                - (rich + tough) * CrossPlantAdaptationPenalty,
+            PlantResourceKind.Rich => 1f
+                + rich * RichPlantAdaptationBonus
+                - (tender + tough) * CrossPlantAdaptationPenalty,
+            PlantResourceKind.Tough => 1f
+                + tough * ToughPlantAdaptationBonus
+                - (tender + rich) * CrossPlantAdaptationPenalty,
+            PlantResourceKind.Generic => 1f
+                - (tender + rich + tough) * GenericPlantAdaptationPenalty,
             _ => 1f
         };
+        return Math.Clamp(multiplier, MinimumPlantTypeAdaptationMultiplier, 2f);
     }
 }
