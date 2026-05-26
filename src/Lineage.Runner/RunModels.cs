@@ -197,6 +197,8 @@ public sealed record RunSummary(
     string? StopReason,
     string? LatestCheckpointPath,
     int CheckpointCount,
+    long ArtifactSizeBytes,
+    int ArtifactFileCount,
     bool IsRunning,
     bool HasReport);
 

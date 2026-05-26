@@ -633,6 +633,11 @@ tr.is-expanded td {
   overflow-wrap: anywhere;
 }
 
+.artifact-size {
+  font-size: 15px;
+  font-weight: 700;
+}
+
 .run-error {
   max-width: 260px;
   margin-top: 5px;

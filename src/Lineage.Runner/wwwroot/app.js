@@ -1184,6 +1184,8 @@ function renderRuns() {
         </div>
       </td>
       <td>
+        <div class="artifact-size">${escapeHtml(formatArtifactTotalSize(run.artifactSizeBytes))}</div>
+        <div class="run-sub">${formatNumber(run.artifactFileCount)} file${Number(run.artifactFileCount || 0) === 1 ? "" : "s"}</div>
         <div class="run-sub">${escapeHtml(run.runDirectory)}</div>
         ${run.latestCheckpointPath ? `<div class="run-sub">Latest: ${escapeHtml(run.latestCheckpointPath)}</div>` : ""}
       </td>
@@ -1379,6 +1381,8 @@ function sortValue(run, key) {
       return Number(run.creatureCount || 0);
     case "seed":
       return Number(run.seed ?? -1);
+    case "artifactSize":
+      return Number(run.artifactSizeBytes || 0);
     case "createdAtUtc":
     default:
       return Date.parse(run.createdAtUtc || 0);
@@ -1957,6 +1961,10 @@ function formatFileSize(value) {
   }
 
   return `${scaled.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[unitIndex]}`;
+}
+
+function formatArtifactTotalSize(value) {
+  return formatFileSize(value) || "0 B";
 }
 
 function formatDownloadTimestamp(value) {

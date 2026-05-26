@@ -854,6 +854,7 @@ public sealed partial class LineageRunManager
         var statusText = isRunning
             ? status?.State ?? manifest.Status
             : manifest.Status;
+        var artifactInventory = run.GetArtifactInventory(MeasureRunArtifacts, DateTimeOffset.UtcNow);
 
         return new RunSummary(
             Id: manifest.Id,
@@ -895,8 +896,72 @@ public sealed partial class LineageRunManager
             StopReason: status?.StopReason,
             LatestCheckpointPath: status?.LatestCheckpointPath,
             CheckpointCount: status?.CheckpointCount ?? 0,
+            ArtifactSizeBytes: artifactInventory.SizeBytes,
+            ArtifactFileCount: artifactInventory.FileCount,
             IsRunning: isRunning,
             HasReport: File.Exists(manifest.ReportPath));
+    }
+
+    private RunArtifactInventory MeasureRunArtifacts(RunManifest manifest)
+    {
+        var seenPaths = new HashSet<string>(PathComparer());
+        long sizeBytes = 0;
+        var fileCount = 0;
+
+        AddDirectory(manifest.RunDirectory);
+        AddFile(manifest.LaunchScenarioPath);
+
+        return new RunArtifactInventory(sizeBytes, fileCount);
+
+        void AddDirectory(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                var resolvedPath = ResolveArtifactPath(path);
+                if (!Directory.Exists(resolvedPath))
+                {
+                    return;
+                }
+
+                foreach (var filePath in Directory.EnumerateFiles(resolvedPath, "*", SearchOption.AllDirectories))
+                {
+                    AddFile(filePath);
+                }
+            }
+            catch
+            {
+                // The runner is a live view; ignore files that move while a run is writing artifacts.
+            }
+        }
+
+        void AddFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                var resolvedPath = Path.GetFullPath(ResolveArtifactPath(path));
+                if (!seenPaths.Add(resolvedPath) || !File.Exists(resolvedPath))
+                {
+                    return;
+                }
+
+                var info = new FileInfo(resolvedPath);
+                sizeBytes += info.Length;
+                fileCount++;
+            }
+            catch
+            {
+            }
+        }
     }
 
     private static string? BuildFailureReason(RunManifest manifest, string status)
@@ -942,6 +1007,7 @@ public sealed partial class LineageRunManager
         manifest.EndedAtUtc = DateTimeOffset.UtcNow;
         manifest.Status = manifest.ExitCode == 0 ? "completed" : "failed";
         SaveManifest(manifest);
+        run.InvalidateArtifactInventory();
         run.DisposeProcess();
     }
 
@@ -2319,9 +2385,16 @@ public sealed partial class LineageRunManager
     [GeneratedRegex("(?:^|_)tick_(\\d+)", RegexOptions.IgnoreCase)]
     private static partial Regex CheckpointTickRegex();
 
+    private readonly record struct RunArtifactInventory(long SizeBytes, int FileCount);
+
     private sealed class ManagedRun(RunManifest manifest, Process? process)
     {
+        private static readonly TimeSpan ArtifactInventoryRefreshInterval = TimeSpan.FromSeconds(10);
+
         private int _exitRecorded;
+        private readonly object _artifactInventoryLock = new();
+        private RunArtifactInventory _artifactInventory;
+        private DateTimeOffset _artifactInventoryMeasuredAtUtc;
 
         public RunManifest Manifest { get; } = manifest;
 
@@ -2334,6 +2407,7 @@ public sealed partial class LineageRunManager
             DisposeProcess();
             Process = process;
             Interlocked.Exchange(ref _exitRecorded, 0);
+            InvalidateArtifactInventory();
         }
 
         public void DisposeProcess()
@@ -2345,6 +2419,33 @@ public sealed partial class LineageRunManager
         public bool TryRecordExit()
         {
             return Interlocked.Exchange(ref _exitRecorded, 1) == 0;
+        }
+
+        public RunArtifactInventory GetArtifactInventory(
+            Func<RunManifest, RunArtifactInventory> measure,
+            DateTimeOffset now)
+        {
+            lock (_artifactInventoryLock)
+            {
+                if (_artifactInventoryMeasuredAtUtc != default
+                    && now - _artifactInventoryMeasuredAtUtc < ArtifactInventoryRefreshInterval)
+                {
+                    return _artifactInventory;
+                }
+
+                _artifactInventory = measure(Manifest);
+                _artifactInventoryMeasuredAtUtc = now;
+                return _artifactInventory;
+            }
+        }
+
+        public void InvalidateArtifactInventory()
+        {
+            lock (_artifactInventoryLock)
+            {
+                _artifactInventory = default;
+                _artifactInventoryMeasuredAtUtc = default;
+            }
         }
     }
 
