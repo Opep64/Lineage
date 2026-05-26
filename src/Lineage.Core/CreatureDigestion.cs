@@ -16,10 +16,10 @@ public static class CreatureDigestion
     public const float FullCarrionFreshMeatPenalty = 0.25f;
     public const float FullCarrionStaleMeatRecovery = 0.85f;
     public const float FullCarrionRottenMeatProtection = 0.9f;
-    private const float TenderPlantAdaptationBonus = 0.4f;
-    private const float RichPlantAdaptationBonus = 0.55f;
-    private const float ToughPlantAdaptationBonus = 0.85f;
-    private const float CrossPlantAdaptationPenalty = 0.18f;
+    private const float TenderPlantAdaptationBonus = 0.55f;
+    private const float RichPlantAdaptationBonus = 1.0f;
+    private const float ToughPlantAdaptationBonus = 1.0f;
+    private const float CrossPlantAdaptationPenalty = 0.25f;
     private const float GenericPlantAdaptationPenalty = 0.08f;
     private const float MinimumPlantTypeAdaptationMultiplier = 0.55f;
 

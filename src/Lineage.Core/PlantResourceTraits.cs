@@ -16,10 +16,10 @@ public readonly record struct PlantResourceTraitProfile(
 /// </summary>
 public static class PlantResourceTraits
 {
-    private const float MinimumDigestionQualityMultiplier = 0.75f;
-    private const float MaximumDigestionQualityMultiplier = 1.1f;
+    private const float MinimumDigestionQualityMultiplier = 0.6f;
+    private const float MaximumDigestionQualityMultiplier = 1.0f;
     private const float MinimumBiteEaseMultiplier = 0.55f;
-    private const float MaximumBiteEaseMultiplier = 1.3f;
+    private const float MaximumBiteEaseMultiplier = 1.35f;
 
     public static PlantResourceTraitProfile For(PlantResourceKind kind)
     {
@@ -29,22 +29,22 @@ public static class PlantResourceTraits
                 InitialCaloriesMultiplier: 0.75f,
                 MaxCaloriesMultiplier: 0.8f,
                 RegrowthMultiplier: 1.45f,
-                EatRateMultiplier: 1.25f,
-                DigestionEnergyMultiplier: 1.0f,
+                EatRateMultiplier: 1.35f,
+                DigestionEnergyMultiplier: 0.95f,
                 RadiusMultiplier: 0.9f),
             PlantResourceKind.Rich => new PlantResourceTraitProfile(
                 InitialCaloriesMultiplier: 1.25f,
                 MaxCaloriesMultiplier: 1.35f,
                 RegrowthMultiplier: 0.65f,
-                EatRateMultiplier: 0.9f,
-                DigestionEnergyMultiplier: 1.05f,
+                EatRateMultiplier: 0.75f,
+                DigestionEnergyMultiplier: 0.9f,
                 RadiusMultiplier: 1.1f),
             PlantResourceKind.Tough => new PlantResourceTraitProfile(
                 InitialCaloriesMultiplier: 1.1f,
                 MaxCaloriesMultiplier: 1.2f,
                 RegrowthMultiplier: 0.85f,
-                EatRateMultiplier: 0.6f,
-                DigestionEnergyMultiplier: 0.78f,
+                EatRateMultiplier: 0.55f,
+                DigestionEnergyMultiplier: 0.65f,
                 RadiusMultiplier: 1.15f),
             _ => new PlantResourceTraitProfile(
                 InitialCaloriesMultiplier: 1f,

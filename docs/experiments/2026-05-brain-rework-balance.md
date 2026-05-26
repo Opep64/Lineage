@@ -1623,6 +1623,106 @@ Readout:
 - Longer half-lives produced stronger average payoff traces, as expected, but did not clearly improve survival or intake quality in this short sweep.
 - `45s` remains a reasonable default for now: it gives visible signal without making the internal trace dominate the run, and the scenario knob lets future tuning sweeps move it quickly.
 
+## 2026-05-26 Plant Diversity Long-Run Survival Tune
+
+Goal: make `plant-diversity-pressure` healthier over 500k ticks without undoing the lower-density pressure or flattening the typed-plant selection signal.
+
+Candidate sweep, 250k ticks, seeds 42-44:
+
+| Variant | Final pop | Tail 25% pop | Tail 10% pop | Min tail 10% | Births | Max gen | Plant seen | Eating | Food yield | Meal gap | Trace T/R/Tough | Intake G/T/R/Tough |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Density 17 | 42.3 | 44.5 | 42.5 | 32.3 | 1154.7 | 16.3 | 23.2% | 14.3% | 0.204 | 91.7s | 0.124 / 0.265 / 0.032 | 20.0% / 18.6% / 54.9% / 6.5% |
+| Sense 105 | 31.0 | 39.0 | 37.6 | 26.0 | 1023.0 | 17.0 | 21.8% | 14.4% | 0.196 | 100.2s | 0.137 / 0.232 / 0.039 | 20.2% / 21.5% / 49.9% / 8.5% |
+| Density 17 + sense 105 | 39.3 | 47.4 | 43.2 | 32.0 | 1188.3 | 17.7 | 22.5% | 14.2% | 0.202 | 90.3s | 0.141 / 0.235 / 0.046 | 20.3% / 22.1% / 48.5% / 9.1% |
+
+Decision:
+
+- Use only the density bump: `initialResourcesPerMillionArea` `15 -> 17`.
+- Do not change starter vision yet. The combined variant was only slightly better on tail population and weaker on rich-plant dominance.
+
+500k validation, seeds 42-44:
+
+| Run set | Final pop | Tail 25% pop | Tail 10% pop | Tail 5% pop | Min tail 10% | Births | Deaths | Max gen | Plant seen | Eating | Food yield | Meal gap | Kcal/dist |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline density 15 | 35.0 | 42.8 | 42.0 | 39.6 | 28.0 | 1976.0 | 1941.0 | 28.3 | 22.2% | 15.0% | 0.213 | 84.6s | 0.175 |
+| Tuned density 17 | 42.0 | 48.3 | 52.2 | 49.0 | 32.7 | 2277.3 | 2235.3 | 27.3 | 20.2% | 12.8% | 0.187 | 105.2s | 0.183 |
+
+500k plant-type signal:
+
+| Run set | Trace T/R/Tough | Adapt tail T/R/Tough | Intake G/T/R/Tough |
+| --- | ---: | ---: | ---: |
+| Baseline density 15 | 0.132 / 0.261 / 0.040 | 0.074 / 0.102 / 0.054 | 19.6% / 20.4% / 51.9% / 8.0% |
+| Tuned density 17 | 0.135 / 0.234 / 0.034 | 0.055 / 0.030 / 0.026 | 20.8% / 22.3% / 49.2% / 7.7% |
+
+Readout:
+
+- The density-only tune improved long-run population stability: tail-10 population rose from `42.0` to `52.2`, final population rose from `35.0` to `42.0`, and the weakest tail-10 floor rose from `28.0` to `32.7`.
+- Rich plants are still the strongest payoff trace and intake target, but the adaptation gene signal weakened in this sample.
+- Treat this as a practical survivability tune, not final plant-diversity balance. Future passes should make food-type preference more actionable without simply raising global food density.
+
+## 2026-05-26 Plant Type Digestion Tradeoffs
+
+Goal: make typed plants create clearer physiological selection pressure while leaving generic-only scenarios on the neutral food path.
+
+Food trait changes:
+
+| Plant type | Bite rate multiplier | Digestion multiplier | Intended role |
+| --- | ---: | ---: | --- |
+| Generic | 1.00 | 1.00 | Neutral control food |
+| Tender | 1.35 | 0.95 | Fast/easy food, lower total payoff |
+| Rich | 0.75 | 0.90 | Slower food that becomes high value when specialized |
+| Tough | 0.55 | 0.65 | Poor default food, useful mainly with specialization |
+
+Adaptation changes:
+
+| Gene | Matched bonus | Cross-type penalty |
+| --- | ---: | ---: |
+| Tender plant adaptation | 0.55 | 0.25 |
+| Rich plant adaptation | 1.00 | 0.25 |
+| Tough plant adaptation | 1.00 | 0.25 |
+
+Generic plant values were left unchanged. A creature that mutates typed plant adaptation in a generic-only world still pays the existing mild generic mismatch penalty, so typed specialization should be selected against when no typed plants exist.
+
+250k plant-diversity sweep, seeds 42-44:
+
+| Variant | Final pop | Tail 25% pop | Tail 10% pop | Min tail 10% | Births | Max gen | Plant seen | Eating | Food yield | Meal gap | Trace T/R/Tough | Intake G/T/R/Tough |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Tradeoff density 17 | 30.3 | 43.1 | 40.8 | 26.7 | 1008.0 | 15.7 | 24.6% | 15.7% | 0.199 | 83.3s | 0.110 / 0.238 / 0.036 | 21.2% / 16.3% / 53.5% / 9.1% |
+| Tradeoff density 18 | 46.7 | 43.5 | 43.1 | 32.0 | 1102.3 | 17.0 | 23.7% | 16.1% | 0.202 | 86.4s | 0.133 / 0.217 / 0.043 | 21.3% / 20.0% / 47.8% / 10.9% |
+
+Decision:
+
+- Move `plant-diversity-pressure` to `initialResourcesPerMillionArea = 18`.
+- Density `17` preserved the richest rich-plant intake signal but thinned final population too much with the new digestion tradeoffs.
+
+500k validation, seeds 42-44:
+
+| Run set | Final pop | Tail 25% pop | Tail 10% pop | Tail 5% pop | Min tail 10% | Births | Deaths | Max gen | Plant seen | Eating | Food yield | Meal gap | Kcal/dist |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline density 15 | 35.0 | 42.8 | 42.0 | 39.6 | 28.0 | 1976.0 | 1941.0 | 28.3 | 22.2% | 15.0% | 0.213 | 84.6s | 0.175 |
+| Survival tune density 17 | 42.0 | 48.3 | 52.2 | 49.0 | 32.7 | 2277.3 | 2235.3 | 27.3 | 20.2% | 12.8% | 0.187 | 105.2s | 0.183 |
+| Digestion tradeoff density 18 | 48.0 | 45.6 | 46.4 | 44.9 | 31.0 | 2078.0 | 2030.0 | 26.0 | 21.9% | 14.5% | 0.191 | 89.6s | 0.186 |
+
+500k plant-type signal:
+
+| Run set | Trace T/R/Tough | Adapt tail T/R/Tough | Intake G/T/R/Tough |
+| --- | ---: | ---: | ---: |
+| Baseline density 15 | 0.132 / 0.261 / 0.040 | 0.074 / 0.102 / 0.054 | 19.6% / 20.4% / 51.9% / 8.0% |
+| Survival tune density 17 | 0.135 / 0.234 / 0.034 | 0.055 / 0.030 / 0.026 | 20.8% / 22.3% / 49.2% / 7.7% |
+| Digestion tradeoff density 18 | 0.131 / 0.239 / 0.030 | 0.055 / 0.075 / 0.022 | 21.4% / 20.7% / 49.6% / 8.3% |
+
+Generic-only smoke, `balanced-foraging`, 150k ticks, seeds 42-44:
+
+| Final pop | Tail 10% pop | Births | Deaths | Max gen | Plant seen | Eating | Food yield |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 49.3 | 40.7 | 661.3 | 612.0 | 12.0 | 22.2% | 15.2% | 0.218 |
+
+Readout:
+
+- The tradeoff pass kept population healthier than the original density-15 run and recovered rich adaptation compared with the density-only survival tune.
+- Rich plants remain the top payoff trace and intake target, but not overwhelmingly so; this is closer to a useful selection pressure than a free best food.
+- Generic-only behavior should not require broad retuning from this change because the generic plant trait path remains `1.0 / 1.0`.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

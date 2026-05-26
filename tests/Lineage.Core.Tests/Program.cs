@@ -1479,9 +1479,10 @@ static void GutCapacityLimitsAdditionalEating()
 
 static void PlantTypeControlsEatingTransferRate()
 {
-    AssertClose(12.5f, RunPlantTypeEatingProbe(PlantResourceKind.Tender), 0.000001, "Tender plant eating transfer");
+    AssertClose(13.5f, RunPlantTypeEatingProbe(PlantResourceKind.Tender), 0.000001, "Tender plant eating transfer");
     AssertClose(10f, RunPlantTypeEatingProbe(PlantResourceKind.Generic), 0.000001, "Generic plant eating transfer");
-    AssertClose(6f, RunPlantTypeEatingProbe(PlantResourceKind.Tough), 0.000001, "Tough plant eating transfer");
+    AssertClose(7.5f, RunPlantTypeEatingProbe(PlantResourceKind.Rich), 0.000001, "Rich plant eating transfer");
+    AssertClose(5.5f, RunPlantTypeEatingProbe(PlantResourceKind.Tough), 0.000001, "Tough plant eating transfer");
 }
 
 static float RunPlantTypeEatingProbe(PlantResourceKind plantKind)
@@ -1524,25 +1525,25 @@ static float RunPlantTypeEatingProbe(PlantResourceKind plantKind)
 static void PlantTypeControlsDigestionPayoff()
 {
     AssertClose(10f, RunPlantTypeDigestionProbe(PlantResourceKind.Generic), 0.000001, "Generic plant digestion");
-    AssertClose(10f, RunPlantTypeDigestionProbe(PlantResourceKind.Tender), 0.000001, "Tender plant digestion");
-    AssertClose(10.5f, RunPlantTypeDigestionProbe(PlantResourceKind.Rich), 0.000001, "Rich plant digestion");
-    AssertClose(7.8f, RunPlantTypeDigestionProbe(PlantResourceKind.Tough), 0.000001, "Tough plant digestion");
+    AssertClose(9.5f, RunPlantTypeDigestionProbe(PlantResourceKind.Tender), 0.000001, "Tender plant digestion");
+    AssertClose(9f, RunPlantTypeDigestionProbe(PlantResourceKind.Rich), 0.000001, "Rich plant digestion");
+    AssertClose(6.5f, RunPlantTypeDigestionProbe(PlantResourceKind.Tough), 0.000001, "Tough plant digestion");
 }
 
 static void PlantAdaptationControlsDigestionPayoff()
 {
     AssertClose(
-        14f,
+        14.725f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Tender, tenderPlantAdaptation: 1f),
         0.000001,
         "Tender adaptation improves tender plant digestion");
     AssertClose(
-        16.275f,
+        18f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Rich, richPlantAdaptation: 1f),
         0.00001,
         "Rich adaptation improves rich plant digestion");
     AssertClose(
-        14.43f,
+        13f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Tough, toughPlantAdaptation: 1f),
         0.000001,
         "Tough adaptation improves tough plant digestion");
@@ -1556,12 +1557,12 @@ static void PlantAdaptationPenalizesMismatchedPlantTypes()
         0.000001,
         "Rich adaptation mildly reduces generic plant digestion");
     AssertClose(
-        8.2f,
+        7.125f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Tender, richPlantAdaptation: 1f),
         0.000001,
         "Rich adaptation reduces tender plant digestion");
     AssertClose(
-        6.396f,
+        4.875f,
         RunPlantTypeDigestionProbe(PlantResourceKind.Tough, richPlantAdaptation: 1f),
         0.000001,
         "Rich adaptation reduces tough plant digestion");

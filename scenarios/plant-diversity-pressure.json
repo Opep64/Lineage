@@ -18,7 +18,7 @@
   "enableLegacyNearestCreatureVisionInputs": false,
   "statsSnapshotIntervalTicks": 10,
   "initialCreatureCount": 80,
-  "initialResourcesPerMillionArea": 15,
+  "initialResourcesPerMillionArea": 18,
   "initialCreatureEnergyMin": 70,
   "initialCreatureEnergyMax": 120,
   "resourceRadiusMin": 3,
