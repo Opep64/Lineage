@@ -224,6 +224,21 @@ public struct CreatureSenseState
     public float RecentToughPlantEnergyYield { get; set; }
 
     /// <summary>
+    /// Decaying trace of recent tender plant digestion payoff.
+    /// </summary>
+    public float TenderPlantPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Decaying trace of recent rich plant digestion payoff.
+    /// </summary>
+    public float RichPlantPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Decaying trace of recent tough plant digestion payoff.
+    /// </summary>
+    public float ToughPlantPayoffTrace { get; set; }
+
+    /// <summary>
     /// Recent usable energy released from any gut contents, normalized to expected digestion capacity.
     /// </summary>
     public float RecentFoodEnergyYield { get; set; }

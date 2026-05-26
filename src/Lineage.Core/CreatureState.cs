@@ -138,6 +138,21 @@ public struct CreatureState
 
     public float LastToughPlantDigestedEnergy { get; set; }
 
+    /// <summary>
+    /// Short-lived internal trace of recent tender plant digestion payoff.
+    /// </summary>
+    public float TenderPlantPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Short-lived internal trace of recent rich plant digestion payoff.
+    /// </summary>
+    public float RichPlantPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Short-lived internal trace of recent tough plant digestion payoff.
+    /// </summary>
+    public float ToughPlantPayoffTrace { get; set; }
+
     public float LastMeatDigestedEnergy { get; set; }
 
     public float LastRottenMeatDamage { get; set; }

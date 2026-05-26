@@ -1522,7 +1522,77 @@ Readout:
 
 - Adding the typed payoff inputs did not destabilize the plant-diversity preset at 150k.
 - The new inputs are a wiring/selection affordance, not an immediate behavior change, because existing starter weights for them are neutral and any useful wiring must mutate in.
-- The next meaningful read is a longer `300k+` comparison after descendants have enough time to mutate onto the new feedback channels.
+- A 300k follow-up stayed viable and kept rich plants as the strongest intake-per-resource target, but adaptation still drifted toward tender plants in that sample: tender `0.038`, rich `0.011`, tough `0.015`.
+- Because the immediate typed payoff input is narrow and digestion can lag behind visual choice/eating behavior, the next lever was a short-lived internal payoff trace rather than a map memory.
+
+## 2026-05-25 Plant Payoff Trace
+
+Added three short-lived internal plant payoff traces:
+
+- `TenderPlantPayoffTrace`
+- `RichPlantPayoffTrace`
+- `ToughPlantPayoffTrace`
+
+These are physiology-like internal state, not explicit map memory. Each trace keeps the strongest recent typed plant digestion payoff and decays with a `45s` half-life when no new payoff arrives:
+
+```text
+trace = max(trace * decay, immediate_typed_energy_yield)
+```
+
+The trace values are appended to the neural input schema after the immediate typed payoff inputs:
+
+- `TenderPlantPayoffTraceInput`
+- `RichPlantPayoffTraceInput`
+- `ToughPlantPayoffTraceInput`
+
+Existing saved/starter brains migrate with these new trace inputs neutral.
+
+Validation:
+
+- Full solution build passed.
+- Core tests passed: `171 test(s) passed`.
+- Added coverage for trace decay, adapter wiring, and old-brain migration with neutral trace inputs.
+
+150k smoke across seeds 42-44:
+
+| Run set | Final pop | Tail pop | Births | Max gen | Plant seen | Eating | Meal gap | Food yield |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 150k payoff trace | 38.7 | 37.6 | 635.3 | 9.7 | 23.1% | 15.1% | 76.3s | 0.196 |
+
+300k trace pass across seeds 42-44:
+
+| Run set | Final pop | Tail pop | Births | Max gen | Plant seen | Eating | Meal gap | Food yield |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 300k typed payoff inputs, no trace | 42.3 | 44.5 | 1194.3 | 23.0 | 18.8% | 12.6% | 107.0s | 0.169 |
+| 300k payoff trace | 42.3 | 48.9 | 1184.3 | 17.7 | 15.0% | 10.6% | 98.6s | 0.122 |
+
+Tail plant-type intake share:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 300k typed payoff inputs, no trace | 18.0% | 20.5% | 50.8% | 10.7% |
+| 300k payoff trace | 20.8% | 23.3% | 45.9% | 10.0% |
+
+Tail intake per available plant resource:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 300k typed payoff inputs, no trace | 0.221 | 0.172 | 0.443 | 0.180 |
+| 300k payoff trace | 0.310 | 0.251 | 0.445 | 0.163 |
+
+Average plant adaptation trend, early -> tail:
+
+| Run set | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: |
+| 300k typed payoff inputs, no trace | 0.000 -> 0.038 | 0.000 -> 0.011 | 0.000 -> 0.015 |
+| 300k payoff trace | 0.000 -> 0.039 | 0.000 -> 0.053 | 0.000 -> 0.019 |
+
+Readout:
+
+- The trace does not destabilize the preset through 300k.
+- Rich plants remain the best plant type after normalizing by available resources.
+- Rich adaptation becomes the strongest tail adaptation signal with the trace (`0.053`), which aligns better with the rich-plant payoff than the immediate-only input did.
+- The trace also lowers tail eating and food-yield metrics in this sample, so treat this as promising but not final tuning. A future pass should compare more seeds and possibly test half-lives around `20s`, `45s`, and `90s`.
 
 ## Open Questions
 

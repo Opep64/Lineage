@@ -16,6 +16,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumExpectedFoodTransfer = 0.001f;
     private const float MinimumExpectedPlantDigestiveYield = 0.001f;
     private const float MinimumPlantQualityClarity = 0.04f;
+    private const float PlantPayoffTraceHalfLifeSeconds = 45f;
     public const int DefaultWorldSenseIntervalTicks = 4;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const bool DefaultEnableSectorVision = false;
@@ -131,7 +132,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var internalStateStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
-            ApplyInternalSense(ref senses, creature, genome, deltaSeconds);
+            ApplyInternalSense(ref senses, ref creature, genome, deltaSeconds);
             sensingProfile?.RecordInternalState(Stopwatch.GetTimestamp() - internalStateStartedAt);
 
             senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
@@ -610,7 +611,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private static void ApplyInternalSense(
         ref CreatureSenseState senses,
-        CreatureState creature,
+        ref CreatureState creature,
         CreatureGenome genome,
         float deltaSeconds)
     {
@@ -658,6 +659,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creature.LastCaloriesDigested / expectedPlantDigestiveYield,
             0f,
             1f);
+        creature.TenderPlantPayoffTrace = UpdatePlantPayoffTrace(
+            creature.TenderPlantPayoffTrace,
+            recentTenderPlantEnergyYield,
+            deltaSeconds);
+        creature.RichPlantPayoffTrace = UpdatePlantPayoffTrace(
+            creature.RichPlantPayoffTrace,
+            recentRichPlantEnergyYield,
+            deltaSeconds);
+        creature.ToughPlantPayoffTrace = UpdatePlantPayoffTrace(
+            creature.ToughPlantPayoffTrace,
+            recentToughPlantEnergyYield,
+            deltaSeconds);
         var isReadyToLay =
             eggReserveRatio >= 1f
             && creature.AgeSeconds >= genome.MaturityAgeSeconds
@@ -674,8 +687,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.RecentTenderPlantEnergyYield = recentTenderPlantEnergyYield;
         senses.RecentRichPlantEnergyYield = recentRichPlantEnergyYield;
         senses.RecentToughPlantEnergyYield = recentToughPlantEnergyYield;
+        senses.TenderPlantPayoffTrace = creature.TenderPlantPayoffTrace;
+        senses.RichPlantPayoffTrace = creature.RichPlantPayoffTrace;
+        senses.ToughPlantPayoffTrace = creature.ToughPlantPayoffTrace;
         senses.RecentFoodEnergyYield = recentFoodEnergyYield;
         senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
+    }
+
+    private static float UpdatePlantPayoffTrace(float currentTrace, float immediateYield, float deltaSeconds)
+    {
+        var safeDeltaSeconds = Math.Max(0f, deltaSeconds);
+        var decay = MathF.Pow(0.5f, safeDeltaSeconds / PlantPayoffTraceHalfLifeSeconds);
+        return Math.Clamp(Math.Max(currentTrace * decay, immediateYield), 0f, 1f);
     }
 
     private void ApplyTerrainDragSense(

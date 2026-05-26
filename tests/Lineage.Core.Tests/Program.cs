@@ -117,6 +117,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates recent food energy yield input", NeuralBrainMigratesRecentFoodEnergyYieldInput),
     ("Neural brain migrates sector plant quality inputs", NeuralBrainMigratesSectorPlantQualityInputs),
     ("Neural brain migrates typed plant energy yield inputs", NeuralBrainMigratesTypedPlantEnergyYieldInputs),
+    ("Neural brain migrates plant payoff trace inputs", NeuralBrainMigratesPlantPayoffTraceInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2981,6 +2982,26 @@ static void CreatureSensingReportsReproductiveContext()
     AssertClose(0.2f, senses.RecentTenderPlantEnergyYield, 0.000001, "Recent tender plant energy yield");
     AssertClose(0.5f, senses.RecentRichPlantEnergyYield, 0.000001, "Recent rich plant energy yield");
     AssertClose(0.3f, senses.RecentToughPlantEnergyYield, 0.000001, "Recent tough plant energy yield");
+    AssertClose(0.2f, senses.TenderPlantPayoffTrace, 0.000001, "Tender plant payoff trace");
+    AssertClose(0.5f, senses.RichPlantPayoffTrace, 0.000001, "Rich plant payoff trace");
+    AssertClose(0.3f, senses.ToughPlantPayoffTrace, 0.000001, "Tough plant payoff trace");
+
+    creature = simulation.State.Creatures[0];
+    creature.LastCaloriesEaten = 0f;
+    creature.LastCaloriesDigested = 0f;
+    creature.LastPlantDigestedEnergy = 0f;
+    creature.LastTenderPlantDigestedEnergy = 0f;
+    creature.LastRichPlantDigestedEnergy = 0f;
+    creature.LastToughPlantDigestedEnergy = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var decayedSenses = simulation.State.Creatures[0].Senses;
+    AssertTrue(
+        decayedSenses.RichPlantPayoffTrace < senses.RichPlantPayoffTrace,
+        "Plant payoff trace should decay without new payoff");
+    AssertTrue(decayedSenses.RichPlantPayoffTrace > 0f, "Plant payoff trace should persist briefly after payoff");
 }
 
 static void CreatureVisionConeHidesFoodBehindIt()
@@ -3174,6 +3195,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         RecentTenderPlantEnergyYield = 0.16f,
         RecentRichPlantEnergyYield = 0.26f,
         RecentToughPlantEnergyYield = 0.36f,
+        TenderPlantPayoffTrace = 0.06f,
+        RichPlantPayoffTrace = 0.07f,
+        ToughPlantPayoffTrace = 0.08f,
         CreatureProximity = 0.52f,
         CreatureDirectionForward = -0.62f,
         CreatureDirectionRight = 0.72f,
@@ -3249,6 +3273,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.16f, inputs[NeuralBrainSchema.RecentTenderPlantEnergyYieldInput], 0.000001, "Recent tender plant energy yield input");
     AssertClose(0.26f, inputs[NeuralBrainSchema.RecentRichPlantEnergyYieldInput], 0.000001, "Recent rich plant energy yield input");
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentToughPlantEnergyYieldInput], 0.000001, "Recent tough plant energy yield input");
+    AssertClose(0.06f, inputs[NeuralBrainSchema.TenderPlantPayoffTraceInput], 0.000001, "Tender plant payoff trace input");
+    AssertClose(0.07f, inputs[NeuralBrainSchema.RichPlantPayoffTraceInput], 0.000001, "Rich plant payoff trace input");
+    AssertClose(0.08f, inputs[NeuralBrainSchema.ToughPlantPayoffTraceInput], 0.000001, "Tough plant payoff trace input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
@@ -4652,6 +4679,57 @@ static void NeuralBrainMigratesTypedPlantEnergyYieldInputs()
         brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentToughPlantEnergyYieldInput),
         0.000001,
         "New recent tough plant yield hidden input starts neutral");
+}
+
+static void NeuralBrainMigratesPlantPayoffTraceInputs()
+{
+    const int legacyInputCount = 224;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int oldRecentRichPlantEnergyYieldInput = 222;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.EatOutput * legacyInputCount + oldRecentRichPlantEnergyYieldInput] = 0.9f;
+    legacyWeights[legacyHiddenInputOffset + oldRecentRichPlantEnergyYieldInput] = -1.1f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.TurnOutput * hiddenNodeCount] = 1.6f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Plant payoff trace migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Plant payoff trace migrated weight count");
+    AssertClose(
+        0.9f,
+        brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.RecentRichPlantEnergyYieldInput),
+        0.000001,
+        "Existing rich plant yield direct input remains in place");
+    AssertClose(
+        -1.1f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentRichPlantEnergyYieldInput),
+        0.000001,
+        "Existing rich plant yield hidden input remains in place");
+    AssertClose(
+        1.6f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.TurnOutput, 0),
+        0.000001,
+        "Existing hidden turn output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.TenderPlantPayoffTraceInput),
+        0.000001,
+        "New tender plant payoff trace input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RichPlantPayoffTraceInput),
+        0.000001,
+        "New rich plant payoff trace hidden input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.ToughPlantPayoffTraceInput),
+        0.000001,
+        "New tough plant payoff trace hidden input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
