@@ -1792,10 +1792,21 @@ Decision:
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 36 | 50.8 | 1209 | 1173 | 23 | 19.7% | 13.6% | 87.9s | 0.163 | 14.4% / 32.8% / 46.8% / 6.0% | 15.1% / 40.4% / 27.5% / 17.0% | 0.158 / 0.241 / 0.017 | 0.022 / 0.151 / 0.004 |
 
+500k confirmation, seeds 42-44, density 17:
+
+| Seed | Final pop | Tail 10% pop | Births | Max gen | Plant seen | Eating | Meal gap | Kcal/dist | Intake G/T/R/Tough | Resource G/T/R/Tough | Trace T/R/Tough | Adapt T/R/Tough |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 35 | 44.3 | 1919 | 27 | 23.6% | 14.3% | 89.9s | 0.180 | 19.9% / 28.2% / 47.5% / 4.5% | 20.4% / 39.7% / 26.9% / 13.0% | 0.151 / 0.249 / 0.015 | 0.063 / 0.071 / 0.101 |
+| 43 | 41 | 37.5 | 2061 | 24 | 25.9% | 18.1% | 89.5s | 0.177 | 17.2% / 28.1% / 43.2% / 11.5% | 17.4% / 37.9% / 28.2% / 16.5% | 0.164 / 0.234 / 0.043 | 0.021 / 0.045 / 0.070 |
+| 44 | 39 | 41.1 | 1776 | 26 | 23.5% | 15.2% | 105.8s | 0.181 | 15.5% / 24.5% / 54.5% / 5.5% | 14.3% / 39.3% / 30.7% / 15.7% | 0.140 / 0.268 / 0.019 | 0.037 / 0.076 / 0.042 |
+| Avg | 38.3 | 41.0 | 1918.7 | 25.7 | 24.3% | 15.9% | 95.1s | 0.180 | 17.5% / 26.9% / 48.4% / 7.2% | 17.4% / 39.0% / 28.6% / 15.1% | 0.152 / 0.250 / 0.026 | 0.040 / 0.064 / 0.071 |
+
 Readout:
 
 - The physiology/diet signal is now stronger: rich plants are about `27.5%` of tail plant resources but `46.8%` of tail plant intake in the 300k validation.
 - Rich adaptation rose to `0.151` in the 300k tail, which is a clearer gene-level response than the earlier 150k samples.
+- The 500k confirmation kept all sampled seeds alive and preserved the rich-intake signal: rich plants averaged `28.6%` of available plant resources but `48.4%` of plant intake.
+- The 500k adaptation genes were still noisy: rich adaptation averaged `0.064`, while tough adaptation averaged `0.071`. That suggests plant choice pressure is visible in behavior/intake and payoff traces, but the trait response is not yet cleanly specialized.
 - Behavior assays still show weak explicit steering differences between plant types, so the next question is whether selection over longer/more varied runs strengthens brain use of plant identity or whether we need more direct taste/association mechanics.
 
 ## Open Questions
