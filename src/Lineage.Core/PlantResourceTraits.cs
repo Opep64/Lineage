@@ -16,36 +16,36 @@ public readonly record struct PlantResourceTraitProfile(
 /// </summary>
 public static class PlantResourceTraits
 {
-    private const float MinimumDigestionQualityMultiplier = 0.6f;
-    private const float MaximumDigestionQualityMultiplier = 1.0f;
-    private const float MinimumBiteEaseMultiplier = 0.55f;
-    private const float MaximumBiteEaseMultiplier = 1.35f;
+    private const float MinimumDigestionQualityMultiplier = 0.5f;
+    private const float MaximumDigestionQualityMultiplier = 1.05f;
+    private const float MinimumBiteEaseMultiplier = 0.45f;
+    private const float MaximumBiteEaseMultiplier = 1.5f;
 
     public static PlantResourceTraitProfile For(PlantResourceKind kind)
     {
         return kind switch
         {
             PlantResourceKind.Tender => new PlantResourceTraitProfile(
-                InitialCaloriesMultiplier: 0.75f,
-                MaxCaloriesMultiplier: 0.8f,
-                RegrowthMultiplier: 1.45f,
-                EatRateMultiplier: 1.35f,
-                DigestionEnergyMultiplier: 0.95f,
-                RadiusMultiplier: 0.9f),
+                InitialCaloriesMultiplier: 0.68f,
+                MaxCaloriesMultiplier: 0.7f,
+                RegrowthMultiplier: 1.6f,
+                EatRateMultiplier: 1.5f,
+                DigestionEnergyMultiplier: 0.85f,
+                RadiusMultiplier: 0.85f),
             PlantResourceKind.Rich => new PlantResourceTraitProfile(
-                InitialCaloriesMultiplier: 1.25f,
-                MaxCaloriesMultiplier: 1.35f,
-                RegrowthMultiplier: 0.65f,
-                EatRateMultiplier: 0.75f,
-                DigestionEnergyMultiplier: 0.9f,
-                RadiusMultiplier: 1.1f),
-            PlantResourceKind.Tough => new PlantResourceTraitProfile(
-                InitialCaloriesMultiplier: 1.1f,
-                MaxCaloriesMultiplier: 1.2f,
-                RegrowthMultiplier: 0.85f,
-                EatRateMultiplier: 0.55f,
-                DigestionEnergyMultiplier: 0.65f,
+                InitialCaloriesMultiplier: 1.45f,
+                MaxCaloriesMultiplier: 1.7f,
+                RegrowthMultiplier: 0.55f,
+                EatRateMultiplier: 0.65f,
+                DigestionEnergyMultiplier: 1.05f,
                 RadiusMultiplier: 1.15f),
+            PlantResourceKind.Tough => new PlantResourceTraitProfile(
+                InitialCaloriesMultiplier: 1.05f,
+                MaxCaloriesMultiplier: 1.1f,
+                RegrowthMultiplier: 0.75f,
+                EatRateMultiplier: 0.45f,
+                DigestionEnergyMultiplier: 0.5f,
+                RadiusMultiplier: 1.1f),
             _ => new PlantResourceTraitProfile(
                 InitialCaloriesMultiplier: 1f,
                 MaxCaloriesMultiplier: 1f,

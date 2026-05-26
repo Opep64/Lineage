@@ -1756,6 +1756,48 @@ Next use:
 - Check exported reports from long plant-diversity runs for evolved lineages whose assay rows diverge by plant type.
 - If evolved lineages still show no plant-choice differentiation despite typed plant pressure, the next likely issue is not physiology but whether the brain has enough usable plant identity/payoff association.
 
+## 2026-05-26 Plant Choice Pressure Tune
+
+Goal: make plant-diversity runs reward choosing better plants while keeping generic-only scenarios on the unchanged generic plant path.
+
+Trait changes:
+
+| Plant type | Initial kcal | Max kcal | Regrowth | Bite rate | Digestion | Radius | Intended role |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Generic | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | Neutral control food |
+| Tender | 0.68x | 0.70x | 1.60x | 1.50x | 0.85x | 0.85x | Fast/common food, lower payoff |
+| Rich | 1.45x | 1.70x | 0.55x | 0.65x | 1.05x | 1.15x | Slower/scarcer high-value food |
+| Tough | 1.05x | 1.10x | 0.75x | 0.45x | 0.50x | 1.10x | Poor default food unless specialized |
+
+Scenario changes for `plant-diversity-pressure`:
+
+- `initialResourcesPerMillionArea` moved from `18` to `17`.
+- Plant mix moved from even weights to generic/tender/rich/tough `0.20 / 0.35 / 0.20 / 0.25`.
+
+150k density check, seeds 42-44, tuned food traits:
+
+| Variant | Final pop | Tail 10% pop | Births | Max gen | Plant seen | Eating | Meal gap | Kcal/dist | Intake G/T/R/Tough | Resource G/T/R/Tough | Trace T/R/Tough | Adapt T/R/Tough |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Density 16 | 29.0 | 30.6 | 567.3 | 10.7 | 24.2% | 15.0% | 87.4s | 0.192 | 16.9% / 25.3% / 50.6% / 7.2% | 18.5% / 38.6% / 29.5% / 13.4% | 0.150 / 0.256 / 0.024 | 0.017 / 0.004 / 0.009 |
+| Density 17 | 40.7 | 42.8 | 596.7 | 11.7 | 22.9% | 14.4% | 89.1s | 0.181 | 15.7% / 26.1% / 49.4% / 8.8% | 18.8% / 38.2% / 28.6% / 14.3% | 0.158 / 0.246 / 0.029 | 0.021 / 0.010 / 0.054 |
+
+Decision:
+
+- Use density `17`. Density `16` survived all sampled seeds, but the lower tail population was brittle enough that it is better kept as a harsher future variant.
+- The tuned mix keeps rich plants below tender plants in availability, while rich still wins a much larger share of actual intake.
+
+300k validation, default seed `20260519`, density 17:
+
+| Final pop | Tail 10% pop | Births | Deaths | Max gen | Plant seen | Eating | Meal gap | Kcal/dist | Intake G/T/R/Tough | Resource G/T/R/Tough | Trace T/R/Tough | Adapt T/R/Tough |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 36 | 50.8 | 1209 | 1173 | 23 | 19.7% | 13.6% | 87.9s | 0.163 | 14.4% / 32.8% / 46.8% / 6.0% | 15.1% / 40.4% / 27.5% / 17.0% | 0.158 / 0.241 / 0.017 | 0.022 / 0.151 / 0.004 |
+
+Readout:
+
+- The physiology/diet signal is now stronger: rich plants are about `27.5%` of tail plant resources but `46.8%` of tail plant intake in the 300k validation.
+- Rich adaptation rose to `0.151` in the 300k tail, which is a clearer gene-level response than the earlier 150k samples.
+- Behavior assays still show weak explicit steering differences between plant types, so the next question is whether selection over longer/more varied runs strengthens brain use of plant identity or whether we need more direct taste/association mechanics.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
