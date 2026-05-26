@@ -1371,6 +1371,53 @@ Readout:
 - Follow-up reporting work now adds a `Plant Type Diagnostics` table plus HTML graphs for plant-type intake share, intake per available resource, and tender/rich/tough adaptation trends in CLI and Godot exported reports.
 - Future work should run longer or higher-replication checks before drawing conclusions about evolved plant preference.
 
+## 2026-05-25 Plant Diversity 300k Validation
+
+After adding the plant-type report diagnostics, ran `plant-diversity-pressure` for 300k ticks across seeds 42-44.
+
+Output files:
+
+- `out/plant_diversity_validation_300k_seed42_report.html`
+- `out/plant_diversity_validation_300k_seed43_report.html`
+- `out/plant_diversity_validation_300k_seed44_report.html`
+
+Run summary:
+
+| Seed | Final pop | Tail pop | Max gen | Tail plant seen | Tail eating | Tail meal gap | Tail food yield |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 35 | 39.4 | 21 | 21.1% | 11.6% | 105.8s | 0.164 |
+| 43 | 40 | 49.1 | 23 | 18.4% | 10.3% | 128.9s | 0.153 |
+| 44 | 41 | 38.2 | 21 | 18.0% | 12.6% | 107.5s | 0.183 |
+| Average | 38.7 | 42.2 | 21.7 | 19.2% | 11.5% | 114.0s | 0.167 |
+
+Tail plant-type intake share:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 150k recovery | 20.6% | 20.8% | 48.7% | 10.0% |
+| 300k validation | 19.9% | 22.3% | 49.4% | 8.5% |
+
+Tail intake per available plant resource:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 150k recovery | 0.173 | 0.131 | 0.271 | 0.115 |
+| 300k validation | 0.191 | 0.179 | 0.330 | 0.113 |
+
+Average plant adaptation trend, early -> tail:
+
+| Run set | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: |
+| 150k recovery | 0.000 -> 0.014 | 0.000 -> 0.023 | 0.000 -> 0.025 |
+| 300k validation | 0.000 -> 0.024 | 0.000 -> 0.023 | 0.000 -> 0.090 |
+
+Readout:
+
+- The preset is viable through 300k ticks in all three seeds, with final populations around 35-41 and max generations around 21-23.
+- Rich plants remain the clearest behavioral/payoff target: about half of plant intake and the highest intake per available resource.
+- Genetic plant adaptation is not yet aligned with the rich-intake signal. The strongest 300k adaptation drift is toward tough plants, likely because adaptation is still weak/noisy and may be responding to scarcity or survival filtering rather than direct rich-plant preference.
+- Next likely design lever: make plant-type adaptation produce a clearer tradeoff, especially by making mismatched specialization and broad generalism cost enough that genetic drift can be distinguished from availability/pathing.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
