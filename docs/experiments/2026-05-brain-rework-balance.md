@@ -1954,6 +1954,37 @@ Readout:
 - Seed `45` remains a clear caveat. Its predator line reproduced early but washed out, leaving an explorer-prey grazing endpoint with little tail predation.
 - Further gains probably need mechanics or diagnostics, not only scenario pressure: species-blind attacks allow predator attrition, and predator lineages still do not reliably convert early kills into long-run reproduction.
 
+## 2026-05-26 Roster Predation Diagnostics
+
+Added roster-level predation diagnostics:
+
+- Injury-death lineage records now store `death_attacker_id`.
+- Lineage CSV output includes `death_attacker_id`.
+- Roster lineage CSV/report output now includes tail-average living creatures, extinction tick, same-profile injury deaths, other-profile injury deaths, unattributed injury deaths, same-profile injury kills dealt, and cross-profile injury kills dealt.
+
+Validation:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release --no-build`
+- `dotnet build Lineage.slnx -c Release -v:minimal`
+- 150k `predator-prey-pressure` seed `45` roster diagnostic run:
+  - `out/predator_prey_diagnostics_20260526/seed45_150k_roster.csv`
+  - `out/predator_prey_diagnostics_20260526/seed45_150k_report.html`
+
+Seed `45` diagnostic readout:
+
+| Profile | Living | Tail living | Extinct tick | Starvation | Injury | Same-profile injury deaths | Other-profile injury deaths | Cross-profile kills dealt | Same-profile kills dealt | Rotten |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Efficient Prey Forager | 0 | 0.0 | 101341 | 824 | 100 | 0 | 100 | 0 | 0 | 0 |
+| Efficient Explorer Prey Forager | 143 | 136.9 | survived | 1314 | 2 | 0 | 2 | 0 | 0 | 0 |
+| Meat Predator Forager | 0 | 0.0 | 105667 | 36 | 96 | 96 | 0 | 102 | 96 | 33 |
+
+Readout:
+
+- Seed `45` did not fail because predators never hunted. The predator profile dealt `102` cross-profile injury kills.
+- The predator line also suffered `96` same-profile injury deaths and `33` rotten-meat deaths, then went extinct around tick `105,667`.
+- This strongly suggests species-blind predator-on-predator aggression and carcass attrition are major causes of mixed-roster washout.
+- Next predation work should test social/species discrimination or predator payoff/recovery mechanics before adding more bite damage or predator founders.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

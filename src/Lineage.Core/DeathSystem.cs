@@ -36,7 +36,10 @@ public sealed class DeathSystem : ISimulationSystem
                     creature.Id,
                     reason,
                     state.Biomes.GetKindAt(creature.Position),
-                    creature.MaxXReached);
+                    creature.MaxXReached,
+                    reason == CreatureDeathReason.Injury
+                        ? creature.LastDamagingCreatureId
+                        : default);
                 continue;
             }
 

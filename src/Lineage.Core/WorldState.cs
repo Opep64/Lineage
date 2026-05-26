@@ -326,7 +326,12 @@ public sealed class WorldState
         return false;
     }
 
-    internal void MarkCreatureDead(EntityId id, CreatureDeathReason reason, BiomeKind deathBiome, float maxXReached)
+    internal void MarkCreatureDead(
+        EntityId id,
+        CreatureDeathReason reason,
+        BiomeKind deathBiome,
+        float maxXReached,
+        EntityId attackerId = default)
     {
         if (!_lineageRecordByEntityId.TryGetValue(id, out var index))
         {
@@ -342,6 +347,7 @@ public sealed class WorldState
         record.DeathTick = Tick;
         record.DeathElapsedSeconds = ElapsedSeconds;
         record.DeathReason = reason;
+        record.DeathAttackerId = attackerId;
         record.MaxXReached = Math.Max(record.MaxXReached, maxXReached);
         _lineageRecords[index] = record;
         var lifespanSeconds = MathF.Max(0f, (float)(record.DeathElapsedSeconds.Value - record.BirthElapsedSeconds));

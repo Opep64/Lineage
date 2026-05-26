@@ -5451,6 +5451,7 @@ static void CreatureAttackDeathsBecomeInjuryMeat()
     AssertEqual(1, simulation.State.Stats.InjuryDeathCount, "Injury death count");
     AssertTrue(simulation.State.TryGetLineageRecord(targetId, out var targetRecord), "Target lineage lookup");
     AssertEqual(CreatureDeathReason.Injury, targetRecord.DeathReason, "Target death reason");
+    AssertEqual(attackerId, targetRecord.DeathAttackerId, "Target death attacker");
     AssertEqual(1, simulation.State.Resources.Count, "Meat resource count");
     var meat = simulation.State.Resources[0];
     AssertEqual(ResourceKind.Meat, meat.Kind, "Killed target should leave meat");
@@ -7612,12 +7613,34 @@ static void RosterLineageSummariesGroupInjectedProfileDescendants()
     AssertEqual(3, foragerSummary.LivingCreatures, "Forager living count");
     AssertEqual(1, foragerSummary.MaxGeneration, "Forager max generation");
 
+    var scavenger = simulation.State.Creatures.First(creature => creature.Id == scavengerInjection.CreatureIds[0]);
+    scavenger.Health = 0f;
+    scavenger.LastAttackDamageTaken = 1f;
+    scavenger.LastDamagingCreatureId = foragerInjection.CreatureIds[0];
+    var scavengerIndex = simulation.State.Creatures.FindIndex(creature => creature.Id == scavenger.Id);
+    simulation.State.Creatures[scavengerIndex] = scavenger;
+    new DeathSystem().Update(simulation.State, 1f);
+
+    summaries = RosterLineageAnalyzer.Analyze(
+            simulation.State.LineageRecords,
+            [foragerInjection, scavengerInjection],
+            finalTick: 10)
+        .ToDictionary(summary => summary.ProfileName);
+    foragerSummary = summaries["Roster forager"];
+    AssertEqual(1, foragerSummary.CrossProfileInjuryKillsDealt, "Forager cross-profile kills dealt");
+    AssertEqual(0, foragerSummary.SameProfileInjuryKillsDealt, "Forager same-profile kills dealt");
+
     var scavengerSummary = summaries["Roster scavenger"];
     AssertEqual(1, scavengerSummary.FounderCount, "Scavenger founder count");
     AssertEqual(1, scavengerSummary.TotalCreatures, "Scavenger total count");
     AssertEqual(0, scavengerSummary.DescendantCount, "Scavenger descendant count");
-    AssertEqual(1, scavengerSummary.LivingCreatures, "Scavenger living count");
+    AssertEqual(0, scavengerSummary.LivingCreatures, "Scavenger living count");
     AssertEqual(0, scavengerSummary.MaxGeneration, "Scavenger max generation");
+    AssertEqual(1, scavengerSummary.InjuryDeathsFromOtherProfile, "Scavenger other-profile injury death");
+    AssertEqual(0, scavengerSummary.InjuryDeathsFromSameProfile, "Scavenger same-profile injury death");
+    AssertEqual(0, scavengerSummary.InjuryDeathsFromUnknownProfile, "Scavenger unattributed injury death");
+    AssertEqual((long?)0, scavengerSummary.ExtinctionTick, "Scavenger extinction tick");
+    AssertClose(0f, scavengerSummary.TailAverageLivingCreatures, 0.000001, "Scavenger tail living");
 }
 
 static void SimulationSnapshotsRestoreExactContinuation()

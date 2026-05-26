@@ -34,6 +34,8 @@ public struct CreatureLineageRecord
 
     public CreatureDeathReason? DeathReason { get; set; }
 
+    public EntityId DeathAttackerId { get; set; }
+
     public bool IsFounder => ParentId == default;
 
     public bool IsAlive => DeathTick is null;

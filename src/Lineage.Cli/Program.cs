@@ -561,7 +561,11 @@ static void WriteRunOutputs(
         FounderSummaryCsvWriter.Write(outputPaths.FounderSummaryPath!, simulation.State.LineageRecords);
         GenerationSummaryCsvWriter.Write(outputPaths.GenerationSummaryPath!, simulation.State.LineageRecords);
         LineageTrendCsvWriter.Write(outputPaths.LineageTrendPath!, simulation.State.Stats.Snapshots, simulation.State.LineageRecords);
-        RosterLineageSummaryCsvWriter.Write(outputPaths.RosterSummaryPath!, simulation.State.LineageRecords, speciesInjections);
+        RosterLineageSummaryCsvWriter.Write(
+            outputPaths.RosterSummaryPath!,
+            simulation.State.LineageRecords,
+            speciesInjections,
+            simulation.State.Tick);
     }
 
     if (outputPaths.ProfilePath is not null && simulation.Profile is not null)
@@ -2936,7 +2940,7 @@ internal static class LineageCsvWriter
     public static void Write(string path, IReadOnlyList<CreatureLineageRecord> records)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("id,parent_id,birth_tick,birth_elapsed_seconds,generation,genome_id,brain_id,birth_energy,max_x_reached,death_tick,death_elapsed_seconds,death_reason,is_founder,is_alive");
+        writer.WriteLine("id,parent_id,birth_tick,birth_elapsed_seconds,generation,genome_id,brain_id,birth_energy,max_x_reached,death_tick,death_elapsed_seconds,death_reason,death_attacker_id,is_founder,is_alive");
 
         foreach (var record in records)
         {
@@ -2954,6 +2958,9 @@ internal static class LineageCsvWriter
                 record.DeathTick?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 record.DeathElapsedSeconds?.ToString("0.######", CultureInfo.InvariantCulture) ?? string.Empty,
                 record.DeathReason?.ToString() ?? string.Empty,
+                record.DeathAttackerId == default
+                    ? string.Empty
+                    : record.DeathAttackerId.Value.ToString(CultureInfo.InvariantCulture),
                 record.IsFounder.ToString(CultureInfo.InvariantCulture),
                 record.IsAlive.ToString(CultureInfo.InvariantCulture)));
         }
@@ -3251,12 +3258,13 @@ internal static class RosterLineageSummaryCsvWriter
     public static void Write(
         string path,
         IReadOnlyList<CreatureLineageRecord> records,
-        IReadOnlyList<SpeciesInjectionResult> injections)
+        IReadOnlyList<SpeciesInjectionResult> injections,
+        long? finalTick = null)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,unknown_deaths,genome_ids,brain_ids");
+        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,unknown_deaths,tail_avg_living_creatures,extinction_tick,extinction_elapsed_seconds,injury_deaths_from_same_profile,injury_deaths_from_other_profile,injury_deaths_unattributed,same_profile_injury_kills_dealt,cross_profile_injury_kills_dealt,genome_ids,brain_ids");
 
-        foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections))
+        foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections, finalTick))
         {
             writer.WriteLine(string.Join(
                 ',',
@@ -3271,6 +3279,14 @@ internal static class RosterLineageSummaryCsvWriter
                 summary.InjuryDeaths.ToString(CultureInfo.InvariantCulture),
                 summary.RottenMeatDeaths.ToString(CultureInfo.InvariantCulture),
                 summary.UnknownDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.TailAverageLivingCreatures.ToString("0.######", CultureInfo.InvariantCulture),
+                summary.ExtinctionTick?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                summary.ExtinctionElapsedSeconds?.ToString("0.######", CultureInfo.InvariantCulture) ?? string.Empty,
+                summary.InjuryDeathsFromSameProfile.ToString(CultureInfo.InvariantCulture),
+                summary.InjuryDeathsFromOtherProfile.ToString(CultureInfo.InvariantCulture),
+                summary.InjuryDeathsFromUnknownProfile.ToString(CultureInfo.InvariantCulture),
+                summary.SameProfileInjuryKillsDealt.ToString(CultureInfo.InvariantCulture),
+                summary.CrossProfileInjuryKillsDealt.ToString(CultureInfo.InvariantCulture),
                 EscapeCsv(string.Join("|", summary.GenomeIds)),
                 EscapeCsv(string.Join("|", summary.BrainIds))));
         }
@@ -4498,7 +4514,7 @@ internal static class RunReportWriter
             .ThenBy(summary => summary.FounderId.Value)
             .ToArray();
         TraceTiming("founder_summaries");
-        var rosterSummaries = RosterLineageAnalyzer.Analyze(state.LineageRecords, speciesInjections)
+        var rosterSummaries = RosterLineageAnalyzer.Analyze(state.LineageRecords, speciesInjections, state.Tick)
             .OrderByDescending(summary => summary.LivingCreatures)
             .ThenByDescending(summary => summary.TotalCreatures)
             .ThenBy(summary => summary.ProfileName, StringComparer.Ordinal)
@@ -5005,7 +5021,7 @@ internal static class RunReportWriter
             writer.WriteLine("<section>");
             writer.WriteLine("<h2>Injected Profile Lineages</h2>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
-            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Tail Living</th><th>Extinct At</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Same-Profile Injury</th><th>Other-Profile Injury</th><th>Unattributed Injury</th><th>Cross Kills Dealt</th><th>Same Kills Dealt</th><th>Rotten</th><th>Other</th></tr></thead>");
             writer.WriteLine("<tbody>");
             foreach (var summary in rosterSummaries)
             {
@@ -5016,10 +5032,17 @@ internal static class RunReportWriter
                     $"<td>{Html(summary.TotalCreatures)}</td>" +
                     $"<td>{Html(summary.DescendantCount)}</td>" +
                     $"<td>{Html(summary.LivingCreatures)}</td>" +
+                    $"<td>{Html(summary.TailAverageLivingCreatures.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(FormatOptionalTick(summary.ExtinctionTick))}</td>" +
                     $"<td>{Html(summary.DeadCreatures)}</td>" +
                     $"<td>{Html(summary.MaxGeneration)}</td>" +
                     $"<td>{Html(summary.StarvationDeaths)}</td>" +
                     $"<td>{Html(summary.InjuryDeaths)}</td>" +
+                    $"<td>{Html(summary.InjuryDeathsFromSameProfile)}</td>" +
+                    $"<td>{Html(summary.InjuryDeathsFromOtherProfile)}</td>" +
+                    $"<td>{Html(summary.InjuryDeathsFromUnknownProfile)}</td>" +
+                    $"<td>{Html(summary.CrossProfileInjuryKillsDealt)}</td>" +
+                    $"<td>{Html(summary.SameProfileInjuryKillsDealt)}</td>" +
                     $"<td>{Html(summary.RottenMeatDeaths)}</td>" +
                     $"<td>{Html(summary.UnknownDeaths)}</td>" +
                     "</tr>");
@@ -5467,6 +5490,11 @@ internal static class RunReportWriter
         return band.SampleCount > 0
             ? $"{band.AveragePopulation:0.#} avg, {band.MinPopulation} min"
             : "No samples";
+    }
+
+    private static string FormatOptionalTick(long? tick)
+    {
+        return tick?.ToString(CultureInfo.InvariantCulture) ?? "survived";
     }
 
     private static string FormatSeasonPlantCalories(SeasonPressureBand band)

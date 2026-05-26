@@ -116,7 +116,8 @@ Status: first pass implemented, not final ecology
 
 - Improve predation-specific diagnostics and long-run stability.
 - Tune predator/prey starter behavior through scenario or species rosters rather than globally increasing bite damage; the efficient-prey roster is viable but not yet a reliable sustained predator/prey loop.
-- Investigate whether species-blind aggression is causing predator-line attrition in mixed rosters.
+- Roster diagnostics now confirm species-blind aggression can cause predator-line attrition: in the seed-45 predator/prey run, Meat Predator dealt `102` cross-profile kills but also suffered `96` same-profile injury deaths before extinction.
+- Next likely experiment: add imperfect similarity/species cues or a predator social-tolerance gate, then compare same-profile injury deaths and cross-profile kills.
 - Investigate hard action gates, especially attack intent, because partial progress toward rare actions may not be rewarded.
 - Add generic intent/progress/frustration feedback so brains can learn when intended effort is not producing results.
 - Future interactions:
