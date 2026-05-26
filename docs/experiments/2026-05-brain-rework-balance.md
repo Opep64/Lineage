@@ -1832,6 +1832,27 @@ Validation:
 - `dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release --no-build`
 - 20k `plant-diversity-pressure` smoke, seed `42`: final creatures `68`, eggs `1`, births `182`, deaths `114`, max generation `2`.
 
+Follow-up comparison, `plant-diversity-pressure`, seeds `42-44`, current `SectorForager` starter. Tail values use the final 10% of snapshots.
+
+150k:
+
+| Final pop | Tail 10% pop | Births | Deaths | Max gen | Plant seen | Eating | Food yield | Meal gap | Kcal/dist | Intake G/T/R/Tough | Resource G/T/R/Tough | Trace T/R/Tough | Adapt T/R/Tough |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 35.3 | 35.5 | 644.0 | 608.7 | 10.7 | 26.0% | 15.6% | 0.212 | 93.2s | 0.225 | 22.8% / 24.4% / 47.3% / 5.6% | 17.4% / 29.0% / 37.4% / 16.2% | 0.137 / 0.256 / 0.021 | 0.018 / 0.007 / 0.017 |
+
+300k:
+
+| Final pop | Tail 10% pop | Births | Deaths | Max gen | Plant seen | Eating | Food yield | Meal gap | Kcal/dist | Intake G/T/R/Tough | Resource G/T/R/Tough | Trace T/R/Tough | Adapt T/R/Tough |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 35.0 | 38.7 | 1148.0 | 1113.0 | 17.3 | 22.0% | 15.2% | 0.200 | 83.5s | 0.193 | 19.0% / 25.3% / 49.2% / 7.0% | 17.7% / 27.7% / 38.1% / 16.5% | 0.151 / 0.258 / 0.021 | 0.032 / 0.022 / 0.027 |
+
+Readout:
+
+- The bridge did not improve population stability in these short-to-mid comparisons. Current starter brains begin with neutral bridge weights, so useful bridge behavior must still be found through mutation.
+- Rich plants remain a strong intake/payoff target: in the 300k tail they were `38.1%` of available plant calories but `49.2%` of intake, with the highest payoff trace.
+- The gene response remains noisy. At 300k, rich adaptation averaged `0.022`, while tender/tough averaged `0.032` and `0.027`.
+- Keep the bridge for now because it gives evolution a cleaner association handle without changing behavior directly, but do not treat plant preference as solved.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
