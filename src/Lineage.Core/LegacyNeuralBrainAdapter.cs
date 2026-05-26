@@ -81,6 +81,9 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.PlantPreferenceForwardInput] = frame.Vision.PlantPreferenceDirectionForward;
         inputs[NeuralBrainSchema.PlantPreferenceRightInput] = frame.Vision.PlantPreferenceDirectionRight;
         inputs[NeuralBrainSchema.PlantFoodContactPreferenceInput] = frame.Body.PlantFoodContactPreference;
+        inputs[NeuralBrainSchema.CreatureSimilarityScentDensityInput] = frame.Scent.CreatureSimilarity.Density;
+        inputs[NeuralBrainSchema.CreatureSimilarityScentForwardInput] = frame.Scent.CreatureSimilarity.DirectionForward;
+        inputs[NeuralBrainSchema.CreatureSimilarityScentRightInput] = frame.Scent.CreatureSimilarity.DirectionRight;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;
@@ -99,6 +102,7 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.MeatFoodContactInput] = frame.Body.MeatFoodContact;
         inputs[NeuralBrainSchema.EggFoodContactInput] = frame.Body.EggFoodContact;
         inputs[NeuralBrainSchema.CreatureContactInput] = frame.Body.CreatureContact;
+        inputs[NeuralBrainSchema.CreatureContactSimilarityInput] = frame.Body.CreatureContactSimilarity;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

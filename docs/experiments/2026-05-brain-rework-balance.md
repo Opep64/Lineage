@@ -1985,6 +1985,16 @@ Readout:
 - This strongly suggests species-blind predator-on-predator aggression and carcass attrition are major causes of mixed-roster washout.
 - Next predation work should test social/species discrimination or predator payoff/recovery mechanics before adding more bite damage or predator founders.
 
+## 2026-05-26 Creature Similarity Scent
+
+Added a fuzzy creature-similarity scent so brains can distinguish close genetically similar bodies from unrelated prey without receiving exact species/profile labels.
+
+- Similarity is derived from heritable trait distance, with strong weight on diet and combat traits but no direct roster/species id.
+- Sensing now exposes creature-similarity scent density plus rough forward/right direction, and contact exposes the contacted creature's similarity.
+- Neural schema migration keeps old brains loadable with neutral weights for the new inputs.
+- Stats, CLI CSVs, reports, and the Godot runtime panel now surface similarity scent, similar contact, average contact similarity, and attack intent while touching similar creatures.
+- A 10k `predator-prey-pressure` seed `45` smoke run wrote `out/similarity_scent_smoke_20260526/seed45_10k_stats.csv` and showed the new diagnostics populating: the final sampled row had `52` similarity-scent detections, `5` creature contacts, `4` similar contacts, and `1` attack intent while touching a similar creature.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

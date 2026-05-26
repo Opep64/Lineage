@@ -52,6 +52,7 @@ public sealed class StatsRecordingSystem(
         var totalVisibleMeatFreshness = 0f;
         var totalMeatScentDensity = 0f;
         var totalRottenMeatScentDensity = 0f;
+        var totalCreatureSimilarityScentDensity = 0f;
         var totalVisibleCreatureDensity = 0f;
         var totalCaloriesEaten = 0f;
         var totalPlantCaloriesEaten = 0f;
@@ -134,13 +135,16 @@ public sealed class StatsRecordingSystem(
         var creatureDetectedCreatureCount = 0;
         var meatScentDetectedCreatureCount = 0;
         var rottenMeatScentDetectedCreatureCount = 0;
+        var creatureSimilarityScentDetectedCreatureCount = 0;
         var foodContactCreatureCount = 0;
         var eatingCreatureCount = 0;
         var rottenMeatDamagedCreatureCount = 0;
         var attackingCreatureCount = 0;
         var creatureContactCreatureCount = 0;
+        var similarCreatureContactCreatureCount = 0;
         var attackIntentCreatureCount = 0;
         var attackIntentWhileTouchingCreatureCount = 0;
+        var attackIntentWhileTouchingSimilarCreatureCount = 0;
         var attackNoIntentContactCreatureCount = 0;
         var rawAttackPositiveCreatureCount = 0;
         var rawAttackNearGateCreatureCount = 0;
@@ -160,6 +164,7 @@ public sealed class StatsRecordingSystem(
         var nonAttackingCreatureCount = 0;
         var totalAttackOutput = 0f;
         var totalTouchingAttackOutput = 0f;
+        var totalCreatureContactSimilarity = 0f;
         var barrenCreatureCount = 0;
         var sparseCreatureCount = 0;
         var grasslandCreatureCount = 0;
@@ -189,6 +194,7 @@ public sealed class StatsRecordingSystem(
                 : 0f;
             totalMeatScentDensity += creature.Senses.MeatScentDensity;
             totalRottenMeatScentDensity += creature.Senses.RottenMeatScentDensity;
+            totalCreatureSimilarityScentDensity += creature.Senses.CreatureSimilarityScentDensity;
             totalVisibleCreatureDensity += creature.Senses.VisibleCreatureDensity;
             totalCaloriesEaten += creature.LastCaloriesEaten;
             totalPlantCaloriesEaten += creature.LastPlantCaloriesEaten;
@@ -403,6 +409,11 @@ public sealed class StatsRecordingSystem(
                 rottenMeatScentDetectedCreatureCount++;
             }
 
+            if (creature.Senses.CreatureSimilarityScentDetected)
+            {
+                creatureSimilarityScentDetectedCreatureCount++;
+            }
+
             if (creature.IsTouchingFood)
             {
                 foodContactCreatureCount++;
@@ -432,9 +443,21 @@ public sealed class StatsRecordingSystem(
             {
                 creatureContactCreatureCount++;
                 totalTouchingAttackOutput += creature.Actions.AttackOutput;
+                var contactSimilarity = Math.Clamp(creature.Senses.CreatureContactSimilarity, 0f, 1f);
+                totalCreatureContactSimilarity += contactSimilarity;
+                var isSimilarCreatureContact = contactSimilarity >= CreatureSimilarity.SimilarContactThreshold;
+                if (isSimilarCreatureContact)
+                {
+                    similarCreatureContactCreatureCount++;
+                }
+
                 if (creature.Actions.WantsAttack)
                 {
                     attackIntentWhileTouchingCreatureCount++;
+                    if (isSimilarCreatureContact)
+                    {
+                        attackIntentWhileTouchingSimilarCreatureCount++;
+                    }
                 }
                 else
                 {
@@ -863,6 +886,8 @@ public sealed class StatsRecordingSystem(
             rottenMeatScentDetectedCreatureCount,
             totalRottenMeatScentDensity / divisor,
             totalVisibleCreatureDensity / divisor,
+            creatureSimilarityScentDetectedCreatureCount,
+            totalCreatureSimilarityScentDensity / divisor,
             caloriesEatenPerSecond,
             plantCaloriesEatenPerSecond,
             tenderPlantCaloriesEatenPerSecond,
@@ -882,8 +907,11 @@ public sealed class StatsRecordingSystem(
             totalGutMeatShare / divisor,
             attackingCreatureCount,
             creatureContactCreatureCount,
+            similarCreatureContactCreatureCount,
+            creatureContactCreatureCount > 0 ? totalCreatureContactSimilarity / creatureContactCreatureCount : 0f,
             attackIntentCreatureCount,
             attackIntentWhileTouchingCreatureCount,
+            attackIntentWhileTouchingSimilarCreatureCount,
             attackNoIntentContactCreatureCount,
             rawAttackPositiveCreatureCount,
             rawAttackNearGateCreatureCount,

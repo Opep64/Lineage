@@ -70,6 +70,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports plant quality cues", CreatureSensingReportsPlantQualityCues),
     ("Creature sensing reports plant preference bridge", CreatureSensingReportsPlantPreferenceBridge),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
+    ("Creature sensing smells similar creatures beyond vision", CreatureSensingSmellsSimilarCreaturesBeyondVision),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
@@ -122,6 +123,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates typed plant energy yield inputs", NeuralBrainMigratesTypedPlantEnergyYieldInputs),
     ("Neural brain migrates plant payoff trace inputs", NeuralBrainMigratesPlantPayoffTraceInputs),
     ("Neural brain migrates plant preference bridge inputs", NeuralBrainMigratesPlantPreferenceBridgeInputs),
+    ("Neural brain migrates creature similarity inputs", NeuralBrainMigratesCreatureSimilarityInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2726,6 +2728,47 @@ static void CreatureSensingReportsVisibleCreatureCues()
     AssertTrue(senses.CreatureFacingAlignment > 0.99f, "Visible creature should be pointed at observer");
 }
 
+static void CreatureSensingSmellsSimilarCreaturesBeyondVision()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 1307,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 60f,
+        VisionAngleRadians = MathF.PI / 3f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(80f, 80f), energy: 25f);
+    var observer = simulation.State.Creatures[0];
+    observer.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = observer;
+
+    var similarId = simulation.State.SpawnCreature(genomeId, new SimVector2(74f, 80f), energy: 25f);
+    observer = simulation.State.Creatures[0];
+    observer.IsTouchingCreature = true;
+    observer.CreatureContactId = similarId;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.CreatureDetected, "Creature behind the observer should not be visually detected");
+    AssertTrue(senses.CreatureSimilarityScentDetected, "Similar creature scent should not require vision");
+    AssertTrue(senses.CreatureSimilarityScentDensity > 0.9f, "Nearby identical creature should have strong similarity scent");
+    AssertTrue(senses.CreatureSimilarityScentDirectionForward < -0.9f, "Similar creature scent should point behind");
+    AssertClose(0f, senses.CreatureSimilarityScentDirectionRight, 0.0001, "Similar creature scent right direction");
+    AssertClose(1f, senses.CreatureContactSimilarity, 0.000001, "Identical contact similarity");
+}
+
 static void CreatureSensingSmellsMeatBeyondVision()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -3279,6 +3322,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         RottenMeatScentDensity = 0.13f,
         RottenMeatScentDirectionForward = -0.23f,
         RottenMeatScentDirectionRight = 0.34f,
+        CreatureSimilarityScentDensity = 0.43f,
+        CreatureSimilarityScentDirectionForward = -0.53f,
+        CreatureSimilarityScentDirectionRight = 0.63f,
         CurrentTerrainDrag = 0.44f,
         ForwardTerrainDrag = 0.54f,
         LeftTerrainDrag = 0.64f,
@@ -3294,6 +3340,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         MeatFoodContact = 0.25f,
         EggFoodContact = 0.5f,
         CreatureContact = 0.75f,
+        CreatureContactSimilarity = 0.85f,
         MemoryDirectionForward = 0.11f,
         MemoryDirectionRight = -0.21f,
         MemoryStrength = 0.31f
@@ -3325,6 +3372,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.82f, inputs[NeuralBrainSchema.VisibleCreatureDensityInput], 0.000001, "Creature density input");
     AssertClose(0.68f, inputs[NeuralBrainSchema.MeatScentForwardInput], 0.000001, "Meat scent forward input");
     AssertClose(0.34f, inputs[NeuralBrainSchema.RottenMeatScentRightInput], 0.000001, "Rot scent right input");
+    AssertClose(0.43f, inputs[NeuralBrainSchema.CreatureSimilarityScentDensityInput], 0.000001, "Creature similarity scent density input");
+    AssertClose(-0.53f, inputs[NeuralBrainSchema.CreatureSimilarityScentForwardInput], 0.000001, "Creature similarity scent forward input");
+    AssertClose(0.63f, inputs[NeuralBrainSchema.CreatureSimilarityScentRightInput], 0.000001, "Creature similarity scent right input");
     AssertClose(0.54f, inputs[NeuralBrainSchema.ForwardTerrainDragInput], 0.000001, "Terrain input");
     AssertClose(0.84f, inputs[NeuralBrainSchema.ForwardObstacleInput], 0.000001, "Obstacle input");
     AssertClose(0.93f, inputs[NeuralBrainSchema.FoodContactInput], 0.000001, "Food contact input");
@@ -3334,6 +3384,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.25f, inputs[NeuralBrainSchema.MeatFoodContactInput], 0.000001, "Meat food contact input");
     AssertClose(0.5f, inputs[NeuralBrainSchema.EggFoodContactInput], 0.000001, "Egg food contact input");
     AssertClose(0.75f, inputs[NeuralBrainSchema.CreatureContactInput], 0.000001, "Creature contact input");
+    AssertClose(0.85f, inputs[NeuralBrainSchema.CreatureContactSimilarityInput], 0.000001, "Creature contact similarity input");
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentPlantRawYieldInput], 0.000001, "Recent plant raw yield input");
     AssertClose(0.46f, inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput], 0.000001, "Recent plant energy yield input");
     AssertClose(0.56f, inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput], 0.000001, "Recent food energy yield input");
@@ -4934,6 +4985,57 @@ static void NeuralBrainMigratesPlantPreferenceBridgeInputs()
         "New plant contact preference hidden input starts neutral");
 }
 
+static void NeuralBrainMigratesCreatureSimilarityInputs()
+{
+    const int legacyInputCount = 231;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int oldPlantFoodContactPreferenceInput = 230;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.EatOutput * legacyInputCount + oldPlantFoodContactPreferenceInput] = 1.3f;
+    legacyWeights[legacyHiddenInputOffset + oldPlantFoodContactPreferenceInput] = -0.9f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 1.6f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Creature similarity migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Creature similarity migrated weight count");
+    AssertClose(
+        1.3f,
+        brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactPreferenceInput),
+        0.000001,
+        "Existing plant contact preference direct input remains in place");
+    AssertClose(
+        -0.9f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.PlantFoodContactPreferenceInput),
+        0.000001,
+        "Existing plant contact preference hidden input remains in place");
+    AssertClose(
+        1.6f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden movement output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureSimilarityScentDensityInput),
+        0.000001,
+        "New creature similarity scent density input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureSimilarityScentRightInput),
+        0.000001,
+        "New creature similarity scent right hidden input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactSimilarityInput),
+        0.000001,
+        "New creature contact similarity hidden input starts neutral");
+}
+
 static void NeuralBrainSupportsHiddenNodes()
 {
     const int hiddenNodeCount = 4;
@@ -5904,8 +6006,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
         MeatScentDensity = 0.3f,
         RottenMeatScentDetected = true,
         RottenMeatScentDensity = 0.1f,
+        CreatureSimilarityScentDetected = true,
+        CreatureSimilarityScentDensity = 0.8f,
         CreatureDetected = true,
         VisibleCreatureDensity = 0.05f,
+        CreatureContactSimilarity = 0.9f,
         EggReserveRatio = 0.5f,
         EnergySurplusRatio = 0.25f,
         RecentFoodSuccess = 0.75f,
@@ -5958,7 +6063,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
         MeatScentDensity = 0.7f,
         RottenMeatScentDetected = true,
         RottenMeatScentDensity = 0.5f,
+        CreatureSimilarityScentDetected = true,
+        CreatureSimilarityScentDensity = 0.4f,
         VisibleCreatureDensity = 0.15f,
+        CreatureContactSimilarity = 0.2f,
         EggReserveRatio = 0.25f,
         EnergySurplusRatio = 0.05f,
         RecentFoodSuccess = 0.25f,
@@ -6075,6 +6183,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(2, snapshot.RottenMeatScentDetectedCreatureCount, "Rotten meat scent detected count");
     AssertClose(0.3f, snapshot.AverageRottenMeatScentDensity, 0.000001, "Average rotten meat scent density");
     AssertClose(0.1f, snapshot.AverageVisibleCreatureDensity, 0.000001, "Average visible creature density");
+    AssertEqual(2, snapshot.CreatureSimilarityScentDetectedCreatureCount, "Creature similarity scent detected count");
+    AssertClose(0.6f, snapshot.AverageCreatureSimilarityScentDensity, 0.000001, "Average creature similarity scent density");
     AssertClose(4.25f, snapshot.TotalCaloriesEatenPerSecond, 0.000001, "Calories eaten per second");
     AssertClose(2.5f, snapshot.TotalPlantCaloriesEatenPerSecond, 0.000001, "Plant calories eaten per second");
     AssertClose(1f, snapshot.TotalCarcassCaloriesEatenPerSecond, 0.000001, "Carcass calories eaten per second");
@@ -6098,8 +6208,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.1f, snapshot.AverageGutMeatShare, 0.000001, "Average gut meat share");
     AssertEqual(1, snapshot.AttackingCreatureCount, "Attacking creature count");
     AssertEqual(2, snapshot.CreatureContactCreatureCount, "Creature contact count");
+    AssertEqual(1, snapshot.SimilarCreatureContactCreatureCount, "Similar creature contact count");
+    AssertClose(0.55f, snapshot.AverageCreatureContactSimilarity, 0.000001, "Average creature contact similarity");
     AssertEqual(1, snapshot.AttackIntentCreatureCount, "Attack intent count");
     AssertEqual(1, snapshot.AttackIntentWhileTouchingCreatureCount, "Attack intent while touching count");
+    AssertEqual(1, snapshot.AttackIntentWhileTouchingSimilarCreatureCount, "Attack intent while touching similar count");
     AssertEqual(1, snapshot.AttackNoIntentContactCreatureCount, "Contact without attack intent count");
     AssertEqual(2, snapshot.RawAttackPositiveCreatureCount, "Raw attack positive count");
     AssertEqual(1, snapshot.RawAttackNearGateCreatureCount, "Raw attack near gate count");

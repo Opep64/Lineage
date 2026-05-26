@@ -65,7 +65,12 @@ public readonly record struct BrainInputFrame(
                     senses.RottenMeatScentDetected,
                     senses.RottenMeatScentDensity,
                     senses.RottenMeatScentDirectionForward,
-                    senses.RottenMeatScentDirectionRight)),
+                    senses.RottenMeatScentDirectionRight),
+                new DirectionalGradientSignal(
+                    senses.CreatureSimilarityScentDetected,
+                    senses.CreatureSimilarityScentDensity,
+                    senses.CreatureSimilarityScentDirectionForward,
+                    senses.CreatureSimilarityScentDirectionRight)),
             new BodyInputFrame(
                 senses.CurrentTerrainDrag,
                 senses.ForwardTerrainDrag,
@@ -82,7 +87,8 @@ public readonly record struct BrainInputFrame(
                 senses.PlantFoodContactPreference,
                 senses.MeatFoodContact,
                 senses.EggFoodContact,
-                senses.CreatureContact),
+                senses.CreatureContact,
+                senses.CreatureContactSimilarity),
             new InternalInputFrame(
                 senses.EnergyRatio,
                 senses.HealthRatio,
@@ -148,7 +154,8 @@ public readonly record struct VisionInputFrame(
 /// </summary>
 public readonly record struct ScentInputFrame(
     DirectionalGradientSignal Meat,
-    DirectionalGradientSignal RottenMeat);
+    DirectionalGradientSignal RottenMeat,
+    DirectionalGradientSignal CreatureSimilarity);
 
 /// <summary>
 /// Touch/contact/proprioception: facts the body feels directly rather than sees or smells.
@@ -169,7 +176,8 @@ public readonly record struct BodyInputFrame(
     float PlantFoodContactPreference,
     float MeatFoodContact,
     float EggFoodContact,
-    float CreatureContact);
+    float CreatureContact,
+    float CreatureContactSimilarity);
 
 /// <summary>
 /// Internal body condition and drives available to the brain.

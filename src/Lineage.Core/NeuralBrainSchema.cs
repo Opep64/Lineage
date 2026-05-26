@@ -61,7 +61,15 @@ public static class NeuralBrainSchema
 
     public const int PlantFoodContactPreferenceInput = PlantPreferenceRightInput + 1;
 
-    public const int InputCount = PlantFoodContactPreferenceInput + 1;
+    public const int CreatureSimilarityScentDensityInput = PlantFoodContactPreferenceInput + 1;
+
+    public const int CreatureSimilarityScentForwardInput = CreatureSimilarityScentDensityInput + 1;
+
+    public const int CreatureSimilarityScentRightInput = CreatureSimilarityScentForwardInput + 1;
+
+    public const int CreatureContactSimilarityInput = CreatureSimilarityScentRightInput + 1;
+
+    public const int InputCount = CreatureContactSimilarityInput + 1;
 
     public const int OutputCount = 7;
 

@@ -74,6 +74,14 @@ public struct CreatureSenseState
 
     public float RottenMeatScentDirectionRight { get; set; }
 
+    public bool CreatureSimilarityScentDetected { get; set; }
+
+    public float CreatureSimilarityScentDensity { get; set; }
+
+    public float CreatureSimilarityScentDirectionForward { get; set; }
+
+    public float CreatureSimilarityScentDirectionRight { get; set; }
+
     public bool CreatureDetected { get; set; }
 
     public float CreatureProximity { get; set; }
@@ -169,6 +177,11 @@ public struct CreatureSenseState
     /// Contact cue from the previous attack/contact pass; 1 means another creature was within body reach.
     /// </summary>
     public float CreatureContact { get; set; }
+
+    /// <summary>
+    /// Fuzzy trait similarity of the contacted creature when touch/contact is available.
+    /// </summary>
+    public float CreatureContactSimilarity { get; set; }
 
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }

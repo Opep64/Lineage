@@ -16,6 +16,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumExpectedFoodTransfer = 0.001f;
     private const float MinimumExpectedPlantDigestiveYield = 0.001f;
     private const float MinimumPlantQualityClarity = 0.04f;
+    private const float CreatureSimilarityScentRangeMultiplier = 1.5f;
+    private const float CreatureSimilarityScentDensitySaturation = 1f;
     public const int DefaultWorldSenseIntervalTicks = 4;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const bool DefaultEnableSectorVision = false;
@@ -39,6 +41,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly IndexStampSet _seenMeatResourceCandidates = new();
     private readonly List<int> _eggCandidates = [];
     private readonly IndexStampSet _seenEggCandidates = new();
+    private readonly List<int> _creatureCandidates = [];
     private float[] _cachedBodyRadii = [];
     private float[] _cachedMaxSpeeds = [];
     private int[] _cachedTraitStamps = [];
@@ -129,6 +132,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 : -1f;
             var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
             var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
+            var creatureSimilarityScentRadius = effectiveSenseRadius * CreatureSimilarityScentRangeMultiplier;
             sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
 
             var worldSenseRefreshReason = GetWorldSenseRefreshReason(state, creature);
@@ -165,6 +169,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 ? 1f
                 : 0f;
             senses.CreatureContact = creature.IsTouchingCreature ? 1f : 0f;
+            if (!creature.IsTouchingCreature)
+            {
+                senses.CreatureContactSimilarity = 0f;
+            }
 
             var memorySenseStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
@@ -241,6 +249,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             sensingProfile?.RecordCreatureScan(
                 creatureVisibility.VisibleCount,
                 0L);
+            var creatureTraits = GetCreatureTraits(state, i);
+            var creatureSimilaritySense = CalculateCreatureSimilaritySense(
+                state,
+                i,
+                creature,
+                creatureTraits,
+                forward,
+                creatureSimilarityScentRadius);
 
             var terrainSenseStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
@@ -508,6 +524,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             senses.VisionSectors = visionSectors;
             ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
             ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
+            ApplyCreatureSimilarityScentSense(
+                ref senses,
+                creatureSimilaritySense.ScentVector,
+                creatureSimilaritySense.TotalScentStrength,
+                forward,
+                right);
+            senses.CreatureContactSimilarity = creatureSimilaritySense.ContactSimilarity;
 
             if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
             {
@@ -568,7 +591,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     ref senses,
                     state.Creatures[nearestVisibleCreatureIndex],
                     GetCreatureTraits(state, nearestVisibleCreatureIndex),
-                    GetCreatureTraits(state, i),
+                    creatureTraits,
                     creature,
                     forward,
                     right,
@@ -970,6 +993,109 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.RottenMeatScentDirectionRight = Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 
+    private void ApplyCreatureSimilarityScentSense(
+        ref CreatureSenseState senses,
+        SimVector2 scentVector,
+        float totalScentStrength,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        if (totalScentStrength <= MinimumScentStrength)
+        {
+            return;
+        }
+
+        var density = Math.Clamp(totalScentStrength / CreatureSimilarityScentDensitySaturation, 0f, 1f);
+        senses.CreatureSimilarityScentDetected = true;
+        senses.CreatureSimilarityScentDensity = density;
+
+        if (scentVector.LengthSquared <= 0.000001f)
+        {
+            senses.CreatureSimilarityScentDirectionForward = 0f;
+            senses.CreatureSimilarityScentDirectionRight = 0f;
+            return;
+        }
+
+        var direction = scentVector.Normalized();
+        var directionalConfidence = Math.Clamp(scentVector.Length / totalScentStrength, 0f, 1f) * density;
+        senses.CreatureSimilarityScentDirectionForward =
+            Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
+        senses.CreatureSimilarityScentDirectionRight =
+            Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
+    }
+
+    private CreatureSimilaritySense CalculateCreatureSimilaritySense(
+        WorldState state,
+        int creatureIndex,
+        CreatureState creature,
+        CreatureSensingTraits creatureTraits,
+        SimVector2 forward,
+        float scentRadius)
+    {
+        _spatialIndex.AddCreatureCandidates(
+            state,
+            creature.Position,
+            scentRadius + 12f,
+            _creatureCandidates);
+
+        var totalScentStrength = 0f;
+        var scentVector = SimVector2.Zero;
+        var contactSimilarity = 0f;
+        var hasContact = creature.IsTouchingCreature && creature.CreatureContactId != default;
+
+        foreach (var otherCreatureIndex in _creatureCandidates)
+        {
+            if (otherCreatureIndex == creatureIndex)
+            {
+                continue;
+            }
+
+            var otherCreature = state.Creatures[otherCreatureIndex];
+            if (otherCreature.Id == creature.Id
+                || otherCreature.Health <= 0f
+                || otherCreature.Energy <= 0f)
+            {
+                continue;
+            }
+
+            var otherTraits = GetCreatureTraits(state, otherCreatureIndex);
+            var similarity = CreatureSimilarity.GeneticSimilarity(creatureTraits.Genome, otherTraits.Genome);
+            if (hasContact && otherCreature.Id == creature.CreatureContactId)
+            {
+                contactSimilarity = similarity;
+            }
+
+            var toOther = otherCreature.Position - creature.Position;
+            var centerDistance = toOther.Length;
+            var edgeDistance = Math.Max(0f, centerDistance - otherTraits.BodyRadius);
+            if (edgeDistance > scentRadius)
+            {
+                continue;
+            }
+
+            var similarityWeight = CreatureSimilarity.ScentWeight(similarity);
+            if (similarityWeight <= 0f)
+            {
+                continue;
+            }
+
+            var distanceFactor = 1f - Math.Clamp(edgeDistance / scentRadius, 0f, 1f);
+            var scentStrength = similarityWeight * distanceFactor * distanceFactor;
+            if (scentStrength <= MinimumScentStrength)
+            {
+                continue;
+            }
+
+            var scentDirection = centerDistance > 0.0001f
+                ? toOther / centerDistance
+                : forward;
+            totalScentStrength += scentStrength;
+            scentVector += scentDirection * scentStrength;
+        }
+
+        return new CreatureSimilaritySense(totalScentStrength, scentVector, contactSimilarity);
+    }
+
     private static void ApplyGenericFoodSense(
         ref CreatureSenseState senses,
         ResourcePatchState resource,
@@ -1233,12 +1359,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private CreatureSensingTraits GetCreatureTraits(WorldState state, int creatureIndex)
     {
+        var creature = state.Creatures[creatureIndex];
+        var genome = state.GetGenome(creature.GenomeId);
         if (_cachedTraitStamps[creatureIndex] != _traitCacheStamp
             || _cachedBodyRadii[creatureIndex] < 0f
             || _cachedMaxSpeeds[creatureIndex] < 0f)
         {
-            var creature = state.Creatures[creatureIndex];
-            var genome = state.GetGenome(creature.GenomeId);
             if (_cachedBodyRadii[creatureIndex] < 0f
                 || _cachedTraitStamps[creatureIndex] != _traitCacheStamp)
             {
@@ -1256,7 +1382,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         return new CreatureSensingTraits(
             _cachedBodyRadii[creatureIndex],
-            _cachedMaxSpeeds[creatureIndex]);
+            _cachedMaxSpeeds[creatureIndex],
+            genome);
     }
 
     private readonly record struct ResourceSense(
@@ -1266,7 +1393,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private readonly record struct CreatureSensingTraits(
         float BodyRadius,
-        float MaxSpeed);
+        float MaxSpeed,
+        CreatureGenome Genome);
+
+    private readonly record struct CreatureSimilaritySense(
+        float TotalScentStrength,
+        SimVector2 ScentVector,
+        float ContactSimilarity);
 
     private readonly record struct CreatureVisualSense(
         float Proximity,
