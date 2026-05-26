@@ -107,6 +107,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Tick", state.Tick.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Simulated seconds", state.ElapsedSeconds.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Snapshot interval", $"{scenario.StatsSnapshotIntervalTicks} ticks");
+        WriteMetric(writer, "Plant payoff trace half-life", $"{scenario.PlantPayoffTraceHalfLifeSeconds:0.###} seconds");
         WriteMetric(writer, "Seasons", scenario.EnableSeasons ? "Enabled" : "Disabled");
         WriteMetric(writer, "Season length", $"{scenario.SeasonLengthSeconds:0.###} seconds");
         WriteMetric(writer, "Season fertility swing", FormatPercent(scenario.SeasonFertilityAmplitude));
@@ -159,6 +160,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
         WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
         WriteMetric(writer, "Food energy yield", FormatPercent(snapshot.AverageRecentFoodEnergyYield));
+        WriteMetric(writer, "Plant payoff traces", FormatPlantPayoffTraces(snapshot));
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
         WriteMetric(writer, "Memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
@@ -1142,6 +1144,14 @@ public static class ViewerReportWriter
             new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.ToughPlantCaloriesEatenPerSecond, snapshot.ToughPlantTypeResourceCount)).ToArray()));
         WriteLineChart(
             writer,
+            "Plant payoff trace",
+            "",
+            snapshots,
+            new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => snapshot.AverageTenderPlantPayoffTrace).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => snapshot.AverageRichPlantPayoffTrace).ToArray()),
+            new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => snapshot.AverageToughPlantPayoffTrace).ToArray()));
+        WriteLineChart(
+            writer,
             "Predation Diagnostics",
             "%",
             snapshots,
@@ -2071,7 +2081,7 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Plant Type Diagnostics</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Type</th><th>Resources</th><th>Plant kcal</th><th>Raw eaten/s</th><th>Intake share</th><th>Raw/resource</th><th>Digested energy/s</th><th>Adaptation</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Type</th><th>Resources</th><th>Plant kcal</th><th>Raw eaten/s</th><th>Intake share</th><th>Raw/resource</th><th>Digested energy/s</th><th>Adaptation</th><th>Payoff trace</th></tr></thead>");
         writer.WriteLine("<tbody>");
         WritePlantTypeDiagnosticsRow(
             writer,
@@ -2081,6 +2091,7 @@ public static class ViewerReportWriter
             GenericPlantCaloriesEatenPerSecond(snapshot),
             snapshot.TotalPlantCaloriesEatenPerSecond,
             GenericPlantDigestedEnergyPerSecond(snapshot),
+            null,
             null);
         WritePlantTypeDiagnosticsRow(
             writer,
@@ -2090,7 +2101,8 @@ public static class ViewerReportWriter
             snapshot.TenderPlantCaloriesEatenPerSecond,
             snapshot.TotalPlantCaloriesEatenPerSecond,
             snapshot.TenderPlantDigestedEnergyPerSecond,
-            snapshot.AverageTenderPlantAdaptation);
+            snapshot.AverageTenderPlantAdaptation,
+            snapshot.AverageTenderPlantPayoffTrace);
         WritePlantTypeDiagnosticsRow(
             writer,
             "Rich",
@@ -2099,7 +2111,8 @@ public static class ViewerReportWriter
             snapshot.RichPlantCaloriesEatenPerSecond,
             snapshot.TotalPlantCaloriesEatenPerSecond,
             snapshot.RichPlantDigestedEnergyPerSecond,
-            snapshot.AverageRichPlantAdaptation);
+            snapshot.AverageRichPlantAdaptation,
+            snapshot.AverageRichPlantPayoffTrace);
         WritePlantTypeDiagnosticsRow(
             writer,
             "Tough",
@@ -2108,7 +2121,8 @@ public static class ViewerReportWriter
             snapshot.ToughPlantCaloriesEatenPerSecond,
             snapshot.TotalPlantCaloriesEatenPerSecond,
             snapshot.ToughPlantDigestedEnergyPerSecond,
-            snapshot.AverageToughPlantAdaptation);
+            snapshot.AverageToughPlantAdaptation,
+            snapshot.AverageToughPlantPayoffTrace);
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
     }
@@ -2121,7 +2135,8 @@ public static class ViewerReportWriter
         float rawEatenPerSecond,
         float totalPlantEatenPerSecond,
         float digestedEnergyPerSecond,
-        float? adaptation)
+        float? adaptation,
+        float? payoffTrace)
     {
         writer.WriteLine(
             "<tr>" +
@@ -2133,6 +2148,7 @@ public static class ViewerReportWriter
             $"<td>{Html(FormatPlantTypeIntakePerResource(rawEatenPerSecond, resources))}</td>" +
             $"<td>{Html(digestedEnergyPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
             $"<td>{Html(adaptation.HasValue ? adaptation.Value.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")}</td>" +
+            $"<td>{Html(payoffTrace.HasValue ? payoffTrace.Value.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")}</td>" +
             "</tr>");
     }
 
@@ -2171,6 +2187,13 @@ public static class ViewerReportWriter
             snapshot.RichPlantDigestedEnergyPerSecond,
             snapshot.ToughPlantDigestedEnergyPerSecond,
             "0.###");
+    }
+
+    private static string FormatPlantPayoffTraces(SimulationStatsSnapshot snapshot)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"tender {snapshot.AverageTenderPlantPayoffTrace:0.###}, rich {snapshot.AverageRichPlantPayoffTrace:0.###}, tough {snapshot.AverageToughPlantPayoffTrace:0.###}");
     }
 
     private static string FormatPlantTypeValues(float generic, float tender, float rich, float tough, string format)

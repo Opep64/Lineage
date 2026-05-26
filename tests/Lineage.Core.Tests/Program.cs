@@ -2951,7 +2951,7 @@ static void CreatureSensingReportsReproductiveContext()
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new CreatureSensingSystem(spatialIndex)
+            new CreatureSensingSystem(spatialIndex, plantPayoffTraceHalfLifeSeconds: 0.1f)
         ]);
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
@@ -2998,6 +2998,7 @@ static void CreatureSensingReportsReproductiveContext()
     simulation.Step();
 
     var decayedSenses = simulation.State.Creatures[0].Senses;
+    AssertClose(0.25f, decayedSenses.RichPlantPayoffTrace, 0.000001, "Configured payoff trace half-life");
     AssertTrue(
         decayedSenses.RichPlantPayoffTrace < senses.RichPlantPayoffTrace,
         "Plant payoff trace should decay without new payoff");
@@ -5598,6 +5599,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
         EnergySurplusRatio = 0.25f,
         RecentFoodSuccess = 0.75f,
         RecentFoodEnergyYield = 0.6f,
+        TenderPlantPayoffTrace = 0.9f,
+        RichPlantPayoffTrace = 0.3f,
+        ToughPlantPayoffTrace = 0.1f,
         ReproductionReadiness = 1f,
         ForwardObstacle = 0.5f,
         LeftObstacle = 0.25f,
@@ -5648,6 +5652,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
         EnergySurplusRatio = 0.05f,
         RecentFoodSuccess = 0.25f,
         RecentFoodEnergyYield = 0.2f,
+        TenderPlantPayoffTrace = 0.1f,
+        RichPlantPayoffTrace = 0.7f,
+        ToughPlantPayoffTrace = 0.2f,
         ForwardObstacle = 0.25f,
         LeftObstacle = 0.5f,
         RightObstacle = 0.2f
@@ -5813,6 +5820,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
     AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");
     AssertClose(0.4f, snapshot.AverageRecentFoodEnergyYield, 0.000001, "Average recent food energy yield");
+    AssertClose(0.5f, snapshot.AverageTenderPlantPayoffTrace, 0.000001, "Average tender plant payoff trace");
+    AssertClose(0.5f, snapshot.AverageRichPlantPayoffTrace, 0.000001, "Average rich plant payoff trace");
+    AssertClose(0.15f, snapshot.AverageToughPlantPayoffTrace, 0.000001, "Average tough plant payoff trace");
     AssertEqual(1, snapshot.ActiveMemoryCreatureCount, "Active memory creature count");
     AssertClose(0.1f, snapshot.AverageMemoryStrength, 0.000001, "Average memory strength");
     AssertClose(1f, snapshot.MemoryUserFoodContactShare, 0.000001, "Memory food contact share");
@@ -7605,6 +7615,7 @@ static void ScenarioJsonRoundTrips()
         WorldHeight = 300f,
         WorldSenseIntervalTicks = 6,
         CloseSenseRefreshProximity = 0.93f,
+        PlantPayoffTraceHalfLifeSeconds = 31f,
         EnableSectorVision = true,
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
@@ -7749,6 +7760,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
     AssertTrue(json.Contains("\"worldSenseIntervalTicks\""), "JSON should serialize world sense interval");
     AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
+    AssertTrue(json.Contains("\"plantPayoffTraceHalfLifeSeconds\""), "JSON should serialize plant payoff trace half-life");
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertTrue(json.Contains("\"plantSpecializationEnergyCostPerSecond\""), "JSON should serialize plant specialization cost");
@@ -7770,6 +7782,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.WorldHeight, roundTripped.WorldHeight, 0.000001, "Scenario world height");
     AssertEqual(scenario.WorldSenseIntervalTicks, roundTripped.WorldSenseIntervalTicks, "Scenario world sense interval");
     AssertClose(scenario.CloseSenseRefreshProximity, roundTripped.CloseSenseRefreshProximity, 0.000001, "Scenario close sense threshold");
+    AssertClose(scenario.PlantPayoffTraceHalfLifeSeconds, roundTripped.PlantPayoffTraceHalfLifeSeconds, 0.000001, "Scenario plant payoff trace half-life");
     AssertEqual(scenario.EnableSectorVision, roundTripped.EnableSectorVision, "Scenario sector vision toggle");
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");

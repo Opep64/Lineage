@@ -190,6 +190,7 @@ public static class SimulationScenarioMetadata
             "EnableSectorVision" => "Enables grouped sector vision inputs for the neural controller.",
             "EnableLegacyNearestFoodVisionInputs" => "Keeps legacy nearest-food inputs available beside sector vision.",
             "EnableLegacyNearestCreatureVisionInputs" => "Keeps legacy nearest-creature inputs available beside sector vision.",
+            "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
             "SpeciesSeeds" => "Optional authored founder roster stored as scenario JSON.",
             _ => null
         };

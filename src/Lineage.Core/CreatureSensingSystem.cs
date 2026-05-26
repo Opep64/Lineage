@@ -16,10 +16,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumExpectedFoodTransfer = 0.001f;
     private const float MinimumExpectedPlantDigestiveYield = 0.001f;
     private const float MinimumPlantQualityClarity = 0.04f;
-    private const float PlantPayoffTraceHalfLifeSeconds = 45f;
     public const int DefaultWorldSenseIntervalTicks = 4;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const bool DefaultEnableSectorVision = false;
+    public const float DefaultPlantPayoffTraceHalfLifeSeconds = 45f;
 
     private readonly UniformSpatialIndex _spatialIndex;
     private readonly BiomePressureProfile _biomeSpeedProfile;
@@ -31,6 +31,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly int _worldSenseIntervalTicks;
     private readonly float _closeSenseRefreshProximity;
     private readonly bool _enableSectorVision;
+    private readonly float _plantPayoffTraceHalfLifeSeconds;
 
     private readonly List<int> _plantResourceCandidates = [];
     private readonly IndexStampSet _seenPlantResourceCandidates = new();
@@ -51,7 +52,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         BiomePressureProfile? biomeSpeedProfile = null,
         int worldSenseIntervalTicks = DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity,
-        bool enableSectorVision = DefaultEnableSectorVision)
+        bool enableSectorVision = DefaultEnableSectorVision,
+        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -78,6 +80,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             throw new ArgumentOutOfRangeException(nameof(closeSenseRefreshProximity), "Close sense refresh proximity must be in [0, 1].");
         }
 
+        if (plantPayoffTraceHalfLifeSeconds <= 0f || !float.IsFinite(plantPayoffTraceHalfLifeSeconds))
+        {
+            throw new ArgumentOutOfRangeException(nameof(plantPayoffTraceHalfLifeSeconds), "Plant payoff trace half-life must be finite and positive.");
+        }
+
         _spatialIndex = spatialIndex;
         _biomeSpeedProfile = BiomePressureProfile.Validate(
             biomeSpeedProfile ?? BiomePressureProfile.Neutral,
@@ -90,6 +97,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _worldSenseIntervalTicks = worldSenseIntervalTicks;
         _closeSenseRefreshProximity = closeSenseRefreshProximity;
         _enableSectorVision = enableSectorVision;
+        _plantPayoffTraceHalfLifeSeconds = plantPayoffTraceHalfLifeSeconds;
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -132,7 +140,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var internalStateStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
-            ApplyInternalSense(ref senses, ref creature, genome, deltaSeconds);
+            ApplyInternalSense(ref senses, ref creature, genome, deltaSeconds, _plantPayoffTraceHalfLifeSeconds);
             sensingProfile?.RecordInternalState(Stopwatch.GetTimestamp() - internalStateStartedAt);
 
             senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
@@ -613,7 +621,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         ref CreatureSenseState senses,
         ref CreatureState creature,
         CreatureGenome genome,
-        float deltaSeconds)
+        float deltaSeconds,
+        float plantPayoffTraceHalfLifeSeconds)
     {
         var energyRatio = Math.Clamp(creature.Energy / genome.ReproductionEnergyThreshold, 0f, 1f);
         var maxHealth = OffspringDevelopment.JuvenileGrowthScale(creature.BirthInvestmentRatio);
@@ -662,15 +671,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         creature.TenderPlantPayoffTrace = UpdatePlantPayoffTrace(
             creature.TenderPlantPayoffTrace,
             recentTenderPlantEnergyYield,
-            deltaSeconds);
+            deltaSeconds,
+            plantPayoffTraceHalfLifeSeconds);
         creature.RichPlantPayoffTrace = UpdatePlantPayoffTrace(
             creature.RichPlantPayoffTrace,
             recentRichPlantEnergyYield,
-            deltaSeconds);
+            deltaSeconds,
+            plantPayoffTraceHalfLifeSeconds);
         creature.ToughPlantPayoffTrace = UpdatePlantPayoffTrace(
             creature.ToughPlantPayoffTrace,
             recentToughPlantEnergyYield,
-            deltaSeconds);
+            deltaSeconds,
+            plantPayoffTraceHalfLifeSeconds);
         var isReadyToLay =
             eggReserveRatio >= 1f
             && creature.AgeSeconds >= genome.MaturityAgeSeconds
@@ -694,10 +706,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
     }
 
-    private static float UpdatePlantPayoffTrace(float currentTrace, float immediateYield, float deltaSeconds)
+    private static float UpdatePlantPayoffTrace(
+        float currentTrace,
+        float immediateYield,
+        float deltaSeconds,
+        float halfLifeSeconds)
     {
         var safeDeltaSeconds = Math.Max(0f, deltaSeconds);
-        var decay = MathF.Pow(0.5f, safeDeltaSeconds / PlantPayoffTraceHalfLifeSeconds);
+        var decay = MathF.Pow(0.5f, safeDeltaSeconds / halfLifeSeconds);
         return Math.Clamp(Math.Max(currentTrace * decay, immediateYield), 0f, 1f);
     }
 

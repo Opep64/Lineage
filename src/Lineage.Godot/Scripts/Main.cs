@@ -967,6 +967,7 @@ public partial class Main : Node2D
             $"Energy surplus {senses.EnergySurplusRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
             $"Food energy yield {senses.RecentFoodEnergyYield:0.00}  plant energy {senses.RecentPlantEnergyYield:0.00}\n" +
             $"Plant yield raw {senses.RecentPlantRawYield:0.00}\n" +
+            $"Plant payoff trace T {senses.TenderPlantPayoffTrace:0.00}  R {senses.RichPlantPayoffTrace:0.00}  Tough {senses.ToughPlantPayoffTrace:0.00}\n" +
             $"Memory {senses.MemoryStrength:0.00}  fwd {senses.MemoryDirectionForward:0.00}  right {senses.MemoryDirectionRight:0.00}\n" +
             $"Memory write fwd {creature.Actions.MemoryForward:0.00}  right {creature.Actions.MemoryRight:0.00}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +

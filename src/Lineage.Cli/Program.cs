@@ -2613,7 +2613,7 @@ internal static class StatsCsvWriter
     public static void Write(string path, IReadOnlyList<SimulationStatsSnapshot> snapshots)
     {
         using var writer = CreateWriter(path);
-        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,dormant_plant_resources,total_dormant_plant_seconds_remaining,avg_dormant_plant_seconds_remaining,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,tender_plant_type_resources,rich_plant_type_resources,tough_plant_type_resources,tender_plant_type_calories,rich_plant_type_calories,tough_plant_type_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,obstacle_blocked_creatures,obstacle_blocked_share,obstacle_sensed_creatures,obstacle_sensed_share,avg_forward_obstacle,avg_left_obstacle,avg_right_obstacle,barren_plant_calories,sparse_plant_calories,grassland_plant_calories,rich_plant_calories,barren_meat_calories,sparse_meat_calories,grassland_meat_calories,rich_meat_calories,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,avg_creature_x,max_creature_x,avg_max_creature_x_reached,max_creature_x_reached,run_max_creature_x_reached,current_east_progress_share,run_east_progress_share,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,fresh_meat_detected_creatures,fresh_meat_detected_share,stale_meat_detected_creatures,stale_meat_detected_share,stale_meat_avoided_creatures,stale_meat_avoided_share,avg_visible_meat_freshness,avg_meat_scent_density,rotten_meat_scent_detected_creatures,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,tender_plant_calories_eaten_per_second,rich_plant_calories_eaten_per_second,tough_plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,tender_plant_digested_energy_per_second,rich_plant_digested_energy_per_second,tough_plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,rotten_meat_deaths,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,avg_plant_dormancy_scheduled_seconds,avg_plant_dormancy_completed_seconds,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,rotten_meat_damaged_creatures,rotten_meat_damaged_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_recent_food_success,avg_recent_food_energy_yield,active_memory_creatures,active_memory_share,avg_memory_strength,memory_food_contact_share,non_memory_food_contact_share,memory_eating_share,non_memory_eating_share,memory_calories_eaten_per_distance,non_memory_calories_eaten_per_distance,memory_avg_seconds_since_last_meal,non_memory_avg_seconds_since_last_meal,memory_avg_distance_since_last_meal,non_memory_avg_distance_since_last_meal,memory_avg_recent_food_success,non_memory_avg_recent_food_success,memory_avg_generation,non_memory_avg_generation,memory_avg_max_x_progress_share,non_memory_avg_max_x_progress_share,memory_right_region_share,non_memory_right_region_share,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility,creature_contact_creatures,creature_contact_share,attack_intent_creatures,attack_intent_share,attack_intent_touching_creatures,attack_intent_touching_share,attack_no_intent_contact_creatures,attack_no_intent_contact_share,raw_attack_positive_creatures,raw_attack_positive_share,raw_attack_near_gate_creatures,raw_attack_near_gate_share,raw_attack_near_gate_touching_creatures,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output");
+        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,dormant_plant_resources,total_dormant_plant_seconds_remaining,avg_dormant_plant_seconds_remaining,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,tender_plant_type_resources,rich_plant_type_resources,tough_plant_type_resources,tender_plant_type_calories,rich_plant_type_calories,tough_plant_type_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,obstacle_blocked_creatures,obstacle_blocked_share,obstacle_sensed_creatures,obstacle_sensed_share,avg_forward_obstacle,avg_left_obstacle,avg_right_obstacle,barren_plant_calories,sparse_plant_calories,grassland_plant_calories,rich_plant_calories,barren_meat_calories,sparse_meat_calories,grassland_meat_calories,rich_meat_calories,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,avg_creature_x,max_creature_x,avg_max_creature_x_reached,max_creature_x_reached,run_max_creature_x_reached,current_east_progress_share,run_east_progress_share,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,fresh_meat_detected_creatures,fresh_meat_detected_share,stale_meat_detected_creatures,stale_meat_detected_share,stale_meat_avoided_creatures,stale_meat_avoided_share,avg_visible_meat_freshness,avg_meat_scent_density,rotten_meat_scent_detected_creatures,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,tender_plant_calories_eaten_per_second,rich_plant_calories_eaten_per_second,tough_plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,tender_plant_digested_energy_per_second,rich_plant_digested_energy_per_second,tough_plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,rotten_meat_deaths,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,avg_plant_dormancy_scheduled_seconds,avg_plant_dormancy_completed_seconds,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,rotten_meat_damaged_creatures,rotten_meat_damaged_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_recent_food_success,avg_recent_food_energy_yield,avg_tender_plant_payoff_trace,avg_rich_plant_payoff_trace,avg_tough_plant_payoff_trace,active_memory_creatures,active_memory_share,avg_memory_strength,memory_food_contact_share,non_memory_food_contact_share,memory_eating_share,non_memory_eating_share,memory_calories_eaten_per_distance,non_memory_calories_eaten_per_distance,memory_avg_seconds_since_last_meal,non_memory_avg_seconds_since_last_meal,memory_avg_distance_since_last_meal,non_memory_avg_distance_since_last_meal,memory_avg_recent_food_success,non_memory_avg_recent_food_success,memory_avg_generation,non_memory_avg_generation,memory_avg_max_x_progress_share,non_memory_avg_max_x_progress_share,memory_right_region_share,non_memory_right_region_share,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility,creature_contact_creatures,creature_contact_share,attack_intent_creatures,attack_intent_share,attack_intent_touching_creatures,attack_intent_touching_share,attack_no_intent_contact_creatures,attack_no_intent_contact_share,raw_attack_positive_creatures,raw_attack_positive_share,raw_attack_near_gate_creatures,raw_attack_near_gate_share,raw_attack_near_gate_touching_creatures,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output");
 
         foreach (var snapshot in snapshots)
         {
@@ -2810,6 +2810,9 @@ internal static class StatsCsvWriter
                 snapshot.AverageEnergySurplusRatio.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageRecentFoodSuccess.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.AverageRecentFoodEnergyYield.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageTenderPlantPayoffTrace.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageRichPlantPayoffTrace.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageToughPlantPayoffTrace.ToString("0.######", CultureInfo.InvariantCulture),
                 snapshot.ActiveMemoryCreatureCount.ToString(CultureInfo.InvariantCulture),
                 FormatShare(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount),
                 snapshot.AverageMemoryStrength.ToString("0.######", CultureInfo.InvariantCulture),
@@ -4540,6 +4543,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Initial creature spawn", scenario.InitialCreatureSpawnRegion.ToString());
         WriteMetric(writer, "World sense interval", $"{scenario.WorldSenseIntervalTicks} ticks");
         WriteMetric(writer, "Close sense refresh", FormatPercent(scenario.CloseSenseRefreshProximity));
+        WriteMetric(writer, "Plant payoff trace half-life", $"{scenario.PlantPayoffTraceHalfLifeSeconds:0.###} seconds");
         WriteMetric(writer, "Initial resource density", $"{scenario.InitialResourcesPerMillionArea:0.###} per 1M area");
         WriteMetric(writer, "Initial resource patches", scenario.CalculateInitialResourceCount().ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");
@@ -4675,6 +4679,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Energy surplus", FormatPercent(finalSnapshot.AverageEnergySurplusRatio));
         WriteMetric(writer, "Food success", FormatPercent(finalSnapshot.AverageRecentFoodSuccess));
         WriteMetric(writer, "Food energy yield", FormatPercent(finalSnapshot.AverageRecentFoodEnergyYield));
+        WriteMetric(writer, "Plant payoff traces", FormatPlantPayoffTraces(finalSnapshot));
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(finalSnapshot.ActiveMemoryCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.ActiveMemoryCreatureCount})");
         WriteMetric(writer, "Memory strength", finalSnapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
@@ -5698,6 +5703,14 @@ internal static class RunReportWriter
             new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.TenderPlantCaloriesEatenPerSecond, snapshot.TenderPlantTypeResourceCount)).ToArray()),
             new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.RichPlantCaloriesEatenPerSecond, snapshot.RichPlantTypeResourceCount)).ToArray()),
             new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.ToughPlantCaloriesEatenPerSecond, snapshot.ToughPlantTypeResourceCount)).ToArray()));
+        WriteLineChart(
+            writer,
+            "Plant payoff trace",
+            "",
+            snapshots,
+            new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => snapshot.AverageTenderPlantPayoffTrace).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => snapshot.AverageRichPlantPayoffTrace).ToArray()),
+            new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => snapshot.AverageToughPlantPayoffTrace).ToArray()));
         WriteLineChart(
             writer,
             "Predation Diagnostics",
@@ -6797,7 +6810,7 @@ internal static class RunReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Plant Type Diagnostics</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Type</th><th>Resources</th><th>Plant kcal</th><th>Raw eaten/s</th><th>Intake share</th><th>Raw/resource</th><th>Digested energy/s</th><th>Adaptation</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Type</th><th>Resources</th><th>Plant kcal</th><th>Raw eaten/s</th><th>Intake share</th><th>Raw/resource</th><th>Digested energy/s</th><th>Adaptation</th><th>Payoff trace</th></tr></thead>");
         writer.WriteLine("<tbody>");
         WritePlantTypeDiagnosticsRow(
             writer,
@@ -6807,6 +6820,7 @@ internal static class RunReportWriter
             GenericPlantCaloriesEatenPerSecond(snapshot),
             snapshot.TotalPlantCaloriesEatenPerSecond,
             GenericPlantDigestedEnergyPerSecond(snapshot),
+            null,
             null);
         WritePlantTypeDiagnosticsRow(
             writer,
@@ -6816,7 +6830,8 @@ internal static class RunReportWriter
             snapshot.TenderPlantCaloriesEatenPerSecond,
             snapshot.TotalPlantCaloriesEatenPerSecond,
             snapshot.TenderPlantDigestedEnergyPerSecond,
-            snapshot.AverageTenderPlantAdaptation);
+            snapshot.AverageTenderPlantAdaptation,
+            snapshot.AverageTenderPlantPayoffTrace);
         WritePlantTypeDiagnosticsRow(
             writer,
             "Rich",
@@ -6825,7 +6840,8 @@ internal static class RunReportWriter
             snapshot.RichPlantCaloriesEatenPerSecond,
             snapshot.TotalPlantCaloriesEatenPerSecond,
             snapshot.RichPlantDigestedEnergyPerSecond,
-            snapshot.AverageRichPlantAdaptation);
+            snapshot.AverageRichPlantAdaptation,
+            snapshot.AverageRichPlantPayoffTrace);
         WritePlantTypeDiagnosticsRow(
             writer,
             "Tough",
@@ -6834,7 +6850,8 @@ internal static class RunReportWriter
             snapshot.ToughPlantCaloriesEatenPerSecond,
             snapshot.TotalPlantCaloriesEatenPerSecond,
             snapshot.ToughPlantDigestedEnergyPerSecond,
-            snapshot.AverageToughPlantAdaptation);
+            snapshot.AverageToughPlantAdaptation,
+            snapshot.AverageToughPlantPayoffTrace);
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
     }
@@ -6847,7 +6864,8 @@ internal static class RunReportWriter
         float rawEatenPerSecond,
         float totalPlantEatenPerSecond,
         float digestedEnergyPerSecond,
-        float? adaptation)
+        float? adaptation,
+        float? payoffTrace)
     {
         writer.WriteLine(
             "<tr>" +
@@ -6859,6 +6877,7 @@ internal static class RunReportWriter
             $"<td>{Html(FormatPlantTypeIntakePerResource(rawEatenPerSecond, resources))}</td>" +
             $"<td>{Html(digestedEnergyPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
             $"<td>{Html(adaptation.HasValue ? adaptation.Value.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")}</td>" +
+            $"<td>{Html(payoffTrace.HasValue ? payoffTrace.Value.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")}</td>" +
             "</tr>");
     }
 
@@ -6897,6 +6916,13 @@ internal static class RunReportWriter
             snapshot.RichPlantDigestedEnergyPerSecond,
             snapshot.ToughPlantDigestedEnergyPerSecond,
             "0.###");
+    }
+
+    private static string FormatPlantPayoffTraces(SimulationStatsSnapshot snapshot)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"tender {snapshot.AverageTenderPlantPayoffTrace:0.###}, rich {snapshot.AverageRichPlantPayoffTrace:0.###}, tough {snapshot.AverageToughPlantPayoffTrace:0.###}");
     }
 
     private static string FormatPlantTypeValues(float generic, float tender, float rich, float tough, string format)

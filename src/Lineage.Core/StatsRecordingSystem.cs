@@ -82,6 +82,9 @@ public sealed class StatsRecordingSystem(
         var totalEnergySurplusRatio = 0f;
         var totalRecentFoodSuccess = 0f;
         var totalRecentFoodEnergyYield = 0f;
+        var totalTenderPlantPayoffTrace = 0f;
+        var totalRichPlantPayoffTrace = 0f;
+        var totalToughPlantPayoffTrace = 0f;
         var totalMemoryStrength = 0f;
         var memoryUserCaloriesEaten = 0f;
         var nonMemoryUserCaloriesEaten = 0f;
@@ -229,6 +232,9 @@ public sealed class StatsRecordingSystem(
             totalEnergySurplusRatio += creature.Senses.EnergySurplusRatio;
             totalRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
             totalRecentFoodEnergyYield += creature.Senses.RecentFoodEnergyYield;
+            totalTenderPlantPayoffTrace += creature.Senses.TenderPlantPayoffTrace;
+            totalRichPlantPayoffTrace += creature.Senses.RichPlantPayoffTrace;
+            totalToughPlantPayoffTrace += creature.Senses.ToughPlantPayoffTrace;
             var memoryStrength = Math.Clamp(creature.MemoryVector.Length, 0f, 1f);
             totalMemoryStrength += memoryStrength;
             var isActiveMemoryUser = memoryStrength > 0.05f;
@@ -922,6 +928,9 @@ public sealed class StatsRecordingSystem(
             totalEnergySurplusRatio / divisor,
             totalRecentFoodSuccess / divisor,
             totalRecentFoodEnergyYield / divisor,
+            totalTenderPlantPayoffTrace / divisor,
+            totalRichPlantPayoffTrace / divisor,
+            totalToughPlantPayoffTrace / divisor,
             activeMemoryCreatureCount,
             totalMemoryStrength / divisor,
             memoryUserFoodContactCount / (float)memoryUserDivisor,

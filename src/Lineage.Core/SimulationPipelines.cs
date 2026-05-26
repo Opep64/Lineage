@@ -148,6 +148,7 @@ public static class SimulationPipelines
         int worldSenseIntervalTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = CreatureSensingSystem.DefaultCloseSenseRefreshProximity,
         bool enableSectorVision = CreatureSensingSystem.DefaultEnableSectorVision,
+        float plantPayoffTraceHalfLifeSeconds = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds,
         bool enableLegacyNearestFoodVisionInputs = true,
         bool enableLegacyNearestCreatureVisionInputs = true,
         float biteDamagePerSecond = 0.25f,
@@ -221,7 +222,8 @@ public static class SimulationPipelines
                 biomeSpeedProfile,
                 worldSenseIntervalTicks,
                 closeSenseRefreshProximity,
-                enableSectorVision),
+                enableSectorVision,
+                plantPayoffTraceHalfLifeSeconds),
             new NeuralControllerSystem(
                 memoryDecayPerSecond: memoryDecayPerSecond,
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,

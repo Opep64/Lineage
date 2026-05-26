@@ -61,6 +61,7 @@ public static class SimulationScenarioFactory
                 scenario.WorldSenseIntervalTicks,
                 scenario.CloseSenseRefreshProximity,
                 scenario.EnableSectorVision,
+                scenario.PlantPayoffTraceHalfLifeSeconds,
                 scenario.EnableLegacyNearestFoodVisionInputs,
                 scenario.EnableLegacyNearestCreatureVisionInputs,
                 scenario.BiteDamagePerSecond,

@@ -1594,6 +1594,35 @@ Readout:
 - Rich adaptation becomes the strongest tail adaptation signal with the trace (`0.053`), which aligns better with the rich-plant payoff than the immediate-only input did.
 - The trace also lowers tail eating and food-yield metrics in this sample, so treat this as promising but not final tuning. A future pass should compare more seeds and possibly test half-lives around `20s`, `45s`, and `90s`.
 
+## 2026-05-26 Plant Payoff Trace Visibility And Tuning
+
+Promoted the plant payoff trace from brain-only state into observable run data:
+
+- Added scenario setting `PlantPayoffTraceHalfLifeSeconds`, default `45s`.
+- Added average tender/rich/tough payoff trace columns to CLI and Godot stats CSV exports.
+- Added payoff trace metrics and a chart to CLI/Godot HTML reports.
+- Added selected-creature payoff trace readout in Godot.
+
+Validation:
+
+- Full solution build passed.
+- Core tests passed: `171 test(s) passed`.
+- Added coverage for scenario JSON round-trip, configured half-life decay, and aggregate stats.
+
+150k half-life sweep on `plant-diversity-pressure`, seeds 42-44:
+
+| Trace half-life | Final pop | Tail pop | Births | Deaths | Max gen | Eating | Food yield | Tail trace T/R/Tough | Intake G/T/R/Tough |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 20s | 60.3 | 53.9 | 1292.3 | 1232.0 | 14.7 | 15.5% | 0.219 | 0.095 / 0.183 / 0.028 | 0.0% / 22.0% / 48.0% / 8.5% |
+| 45s | 55.0 | 47.6 | 1209.3 | 1154.3 | 14.0 | 15.6% | 0.217 | 0.130 / 0.257 / 0.046 | 0.0% / 19.9% / 49.8% / 9.0% |
+| 90s | 56.3 | 53.8 | 1285.7 | 1229.3 | 14.3 | 14.9% | 0.210 | 0.194 / 0.329 / 0.055 | 0.0% / 21.6% / 49.6% / 8.4% |
+
+Readout:
+
+- All three half-lives stayed viable through 150k.
+- Longer half-lives produced stronger average payoff traces, as expected, but did not clearly improve survival or intake quality in this short sweep.
+- `45s` remains a reasonable default for now: it gives visible signal without making the internal trace dominate the run, and the scenario knob lets future tuning sweeps move it quickly.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
