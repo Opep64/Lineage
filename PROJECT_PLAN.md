@@ -228,9 +228,19 @@ Brain rework and sparse-balance update from 2026-05-25:
 Harsh/Predation stability update from 2026-05-26:
 
 - A targeted recovery-floor pass raised Harsh Foraging's local fertility floor from `0.35` to `0.45`.
-- Predation Pressure kept a smaller local fertility floor lift from `0.35` to `0.40` and lowered reproduction threshold from `118` to `112`.
-- Final selected 150k probe across seeds 42-46 completed 10/10 runs: Harsh averaged `40.2` final creatures with range `32-48`; Predation averaged `26.0` with range `14-40`.
-- Predation remains intentionally thin and should get 300k+ confirmation before adding stronger predator-specific pressure.
+- Predation Pressure kept a smaller local fertility floor lift from `0.35` to `0.40`, lowered reproduction threshold from `118` to `112`, matured earlier (`115s -> 100s`), and softened bite damage (`0.21 -> 0.18`).
+- The first selected 300k probe exposed a Predation seed-46 extinction, so a second weak-seed pass chose the maturity/bite adjustment.
+- Final selected 300k probe across seeds 42-46 completed 10/10 runs: Harsh averaged `27.8` final creatures with range `21-34`; Predation averaged `14.4` with range `5-25`.
+- Predation remains intentionally thin but still predator-leaning: tail meat calories averaged `20.3%`, tail fresh-kill calories averaged `9.4%`, and injury deaths exceeded starvation deaths.
+- Avoid adding stronger predator-specific pressure until broader seed or 500k+ confirmation looks comfortable.
+
+Efficient predator/prey roster update from 2026-05-26:
+
+- `predator-prey-pressure` now uses explicit efficient prey and meat-biased predator species profiles instead of the ordinary starter roster.
+- The checked roster starts `84` efficient sector prey, `36` efficient explorer prey, and `12` meat predator founders; predators receive `energyOverride=110`.
+- The support window was widened to resource density `30/M`, local fertility floor `0.60`, plant respawn `55-190s`, and bite damage `0.18`.
+- A 150k probe across seeds 42-46 completed 5/5 runs with average final population `72.6` and range `14-143`.
+- Four of five seeds retained tail fresh-kill predation; seed `45` washed out to an explorer-prey grazer endpoint. Treat this as a better mixed-role experiment, not solved predator ecology.
 - Current design decision:
   - keep `HybridNeural` as the default until the new perception/balance work has had more long-run validation
   - keep `HiddenLayerNeural` available for scenario comparison, with 8 hidden nodes as its default

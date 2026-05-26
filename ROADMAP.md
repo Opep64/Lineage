@@ -19,7 +19,7 @@ Status: completed enough for current mainline
 Status: active design direction
 
 - Keep `HybridNeural` default until hidden-layer and sector-vision behavior has more long-run evidence.
-- Continue comparing `HiddenLayerNeural`; the 8-node architecture passed the 150k weak-scenario matrix. Rerun comparisons after the Harsh/Predation recovery-floor tuning if hidden-layer defaults become active again.
+- Continue comparing `HiddenLayerNeural`; the 8-node architecture passed the earlier 150k weak-scenario matrix. Rerun comparisons after the Harsh/Predation 300k stability tuning if hidden-layer defaults become active again.
 - Consider a fully generic brain interface beyond `BrainFactory`, where specific brain implementations own opaque genome/state payloads.
 - Future brain candidates:
   - fixed layered neural net with no direct path
@@ -84,7 +84,8 @@ Status: first plant diversity slice implemented, broader ecology future
 Status: ongoing tuning
 
 - Continue seeking lower but stable populations for large worlds.
-- Harsh and Predation have a first recovery-floor tune; confirm at 300k+ before adding stronger scarcity or predator-specific pressure.
+- Harsh and Predation have a 300k stability tune; confirm Predation with broader seeds or 500k+ before adding stronger scarcity or predator-specific pressure.
+- Predator Prey now has explicit efficient-prey and meat-biased-predator profiles, but one of five 150k sampled seeds still washed out into a grazer endpoint.
 - Keep birth rates controlled through egg reserve, maturity, investment, cooldown, crowding, fertility, and resource scarcity.
 - Add stronger search pressure without causing frequent long-run extinction.
 - Watch for scarcity boom-crash cycles.
@@ -114,7 +115,8 @@ Status: parked for now
 Status: first pass implemented, not final ecology
 
 - Improve predation-specific diagnostics and long-run stability.
-- Tune predator/prey starter behavior through scenario or species rosters rather than globally increasing bite damage.
+- Tune predator/prey starter behavior through scenario or species rosters rather than globally increasing bite damage; the efficient-prey roster is viable but not yet a reliable sustained predator/prey loop.
+- Investigate whether species-blind aggression is causing predator-line attrition in mixed rosters.
 - Investigate hard action gates, especially attack intent, because partial progress toward rare actions may not be rewarded.
 - Add generic intent/progress/frustration feedback so brains can learn when intended effort is not producing results.
 - Future interactions:

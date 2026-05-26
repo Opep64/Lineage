@@ -1882,31 +1882,77 @@ Probe files:
 - `out/harsh_predation_stability_20260526/floor_variants_150k.csv` and `.html`
 - `out/harsh_predation_stability_20260526/predation_weak_seed_variants_150k.csv` and `.html`
 - `out/harsh_predation_stability_20260526/selected_final_150k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/selected_final_300k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/predation_recovery_variants_300k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/predation_lifecycle_variants_300k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/predation_combat_recovery_variants_300k.csv` and `.html`
+- `out/harsh_predation_stability_20260526/selected_final_300k_v2.csv` and `.html`
 
 Findings:
 
 - In the shared 60k fertility-variant probe, raising `localFertilityMinimumMultiplier` was the cleanest improvement. Faster fertility recovery and lower neighbor depletion did not improve the sampled tails.
 - In the 150k floor probe, Harsh Foraging responded best to a `0.45` fertility floor, while Predation Pressure responded best to a more modest `0.40` floor.
 - Predation weak seeds `45` and `46` still stayed thin with only the floor change. Lowering `reproductionEnergyThreshold` from `118` to `112` was the best small pacing tweak. Softer bite damage did not help the weak-seed average, and a higher fertility floor caused one extinction in the two-seed probe.
+- The first 300k selected pass kept Harsh stable but exposed a Predation seed-46 extinction and seed-45 near-extinction. The final single-creature tail had abundant plants, so this was not a raw food-field collapse.
+- Predation 300k weak-seed variants showed that `biteDamagePerSecond=0.18` plus `maturityAgeSeconds=100` kept seeds `45` and `46` alive while preserving meat/fresh-kill intake.
 
 Checked-in changes:
 
 - `scenarios/harsh-foraging.json`: `localFertilityMinimumMultiplier` `0.35 -> 0.45`.
 - `scenarios/predation-pressure.json`: `localFertilityMinimumMultiplier` `0.35 -> 0.40`.
 - `scenarios/predation-pressure.json`: `reproductionEnergyThreshold` `118 -> 112`.
+- `scenarios/predation-pressure.json`: `maturityAgeSeconds` `115 -> 100`.
+- `scenarios/predation-pressure.json`: `biteDamagePerSecond` `0.21 -> 0.18`.
 
-Final selected validation, 150k ticks, seeds `42-46`:
+Final selected validation, 300k ticks, seeds `42-46`:
 
-| Scenario | Avg final | Final range | Avg tail pop | Min tail pop | Births | Deaths | Starvation | Injury | Max gen | Meal gap | Kcal/dist | Tail fertility | Tail depleted fertility |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Harsh Foraging | 40.2 | 32-48 | 29.6 | 21.3 | 519.2 | 479.0 | 479.0 | 0.0 | 11.4 | 64.3s | 0.207 | 0.578 | 85.6% |
-| Predation Pressure | 26.0 | 14-40 | 21.7 | 13.1 | 913.8 | 887.8 | 375.6 | 495.0 | 14.4 | 28.0s | 0.402 | 0.503 | 94.3% |
+| Scenario | Avg final | Final range | Avg tail pop | Min tail pop | Births | Deaths | Starvation | Injury | Max gen | Meal gap | Kcal/dist | Tail fertility | Tail depleted fertility | Tail meat | Tail fresh kill |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Harsh Foraging | 27.8 | 21-34 | 30.2 | 23.3 | 980.4 | 952.6 | 952.6 | 0.0 | 20.2 | 85.5s | 0.193 | 0.567 | 86.2% | 0.1% | 0.0% |
+| Predation Pressure | 14.4 | 5-25 | 20.6 | 6.9 | 1609.6 | 1595.2 | 664.8 | 907.0 | 24.6 | 21.3s | 0.330 | 0.553 | 86.9% | 20.3% | 9.4% |
 
 Readout:
 
-- Harsh is no longer riding the single-digit/teen population floor in the sampled 150k window.
-- Predation remains a low-population pressure scenario, but the selected pacing improved the five-seed average and kept every sampled seed alive through 150k.
-- The high Predation depleted-fertility share says the ecology is still under real pressure. Future work should validate at 300k+ before adding more predator-specific pressures.
+- Harsh is no longer riding the single-digit/teen population floor in the sampled 300k window.
+- Predation remains a low-population pressure scenario, but the second-pass selected tuning kept every sampled seed alive through 300k.
+- Predation still leans to actual predation: injury deaths exceeded starvation deaths, tail meat calories averaged `20.3%`, and tail fresh-kill calories averaged `9.4%`.
+- Predation should still be treated as intentionally harsh. Future work should avoid adding stronger predator-specific pressure until broader seed or 500k+ confirmation looks comfortable.
+
+## 2026-05-26 Efficient Predator/Prey Roster Pass
+
+Goal: make `predator-prey-pressure` a clearer mixed-role scenario by adding deliberately efficient prey founders alongside meat-biased predators, instead of only mixing the ordinary starter forager profiles.
+
+Checked-in roster/profile changes:
+
+- Added `species/efficient-prey-forager.species.json`, a plant-efficient sector prey starter with `dietaryAdaptation=0.02`, low bite strength, and paced reproduction.
+- Added `species/efficient-explorer-prey-forager.species.json`, a matching plant-efficient explorer prey starter so the prey base is not only sector-local.
+- Added `species/meat-predator-forager.species.json`, a meat-biased predator starter with `dietaryAdaptation=0.60`, `biteStrength=0.72`, and `damageResistance=1.05`.
+- Updated `scenarios/predator-prey-pressure.json` to start with `84` sector prey, `36` explorer prey, and `12` predator founders. Predators start with `energyOverride=110`.
+- Raised the scenario support window to keep the mixed roster viable: resource density `24/M -> 30/M`, plant respawn `65-220s -> 55-190s`, local fertility floor `0.35 -> 0.60`, and bite damage `0.21 -> 0.18`.
+
+Probe files:
+
+- `out/predator_prey_efficient_20260526/probe_150k_v4.csv` and `.html` for seeds `42-44`.
+- `out/predator_prey_efficient_20260526/probe_150k_v4_extra_seeds.csv` and `.html` for seeds `45-46`.
+- Earlier rejected tuning probes in the same folder document the overshoot/collapse and grazer-washout attempts.
+
+Selected 150k validation, seeds `42-46`:
+
+| Seed | Final pop | Tail pop | Starvation | Injury | Max gen | Tail diet | Tail meat | Tail fresh kill | Tail meat energy | Tail attack | Meal gap |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 14 | 24.5 | 1044 | 458 | 13 | 0.397 | 11.1% | 5.6% | 11.8% | 1.83% | 33.7s |
+| 43 | 121 | 75.7 | 1363 | 408 | 15 | 0.097 | 6.4% | 3.3% | 5.1% | 1.19% | 34.1s |
+| 44 | 67 | 67.4 | 1590 | 292 | 17 | 0.053 | 6.5% | 2.0% | 3.5% | 0.44% | 77.6s |
+| 45 | 143 | 136.4 | 2174 | 198 | 10 | 0.021 | 0.5% | 0.0% | 0.0% | 0.00% | 49.5s |
+| 46 | 18 | 25.1 | 1099 | 231 | 14 | 0.128 | 9.0% | 3.0% | 9.1% | 0.98% | 56.4s |
+| Avg | 72.6 | 65.8 | 1454.0 | 317.4 | 13.8 | 0.139 | 6.7% | 2.8% | 5.9% | 0.89% | 50.3s |
+
+Readout:
+
+- The efficient prey base fixed the original setup problem: the scenario now explicitly contains highly plant-efficient prey plus more meat-biased predators.
+- All five sampled seeds survived to 150k, and four of five retained measurable tail fresh-kill predation.
+- Seed `45` remains a clear caveat. Its predator line reproduced early but washed out, leaving an explorer-prey grazing endpoint with little tail predation.
+- Further gains probably need mechanics or diagnostics, not only scenario pressure: species-blind attacks allow predator attrition, and predator lineages still do not reliably convert early kills into long-run reproduction.
 
 ## Open Questions
 
