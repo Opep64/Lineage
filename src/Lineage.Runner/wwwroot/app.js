@@ -27,10 +27,30 @@ const resetScenarioGroupButton = document.querySelector("#resetScenarioGroupButt
 const resetScenarioAllButton = document.querySelector("#resetScenarioAllButton");
 const saveScenarioButton = document.querySelector("#saveScenarioButton");
 const deleteScenarioButton = document.querySelector("#deleteScenarioButton");
+const recipePicker = document.querySelector("#recipePicker");
+const recipeOptions = document.querySelector("#recipeOptions");
+const applyRecipeButton = document.querySelector("#applyRecipeButton");
+const archiveRecipeButton = document.querySelector("#archiveRecipeButton");
+const deleteRecipeButton = document.querySelector("#deleteRecipeButton");
+const reviewLaunchDiffButton = document.querySelector("#reviewLaunchDiffButton");
+const saveRecipeButton = document.querySelector("#saveRecipeButton");
+const saveNewRecipeButton = document.querySelector("#saveNewRecipeButton");
+const recipeStack = document.querySelector("#recipeStack");
+const scenarioDiffPanel = document.querySelector("#scenarioDiffPanel");
+const scenarioDiffTitle = document.querySelector("#scenarioDiffTitle");
+const scenarioDiffSummary = document.querySelector("#scenarioDiffSummary");
+const scenarioDiffBody = document.querySelector("#scenarioDiffBody");
+const confirmSaveRecipeButton = document.querySelector("#confirmSaveRecipeButton");
+const closeScenarioDiffButton = document.querySelector("#closeScenarioDiffButton");
 
 let refreshTimer = null;
 let allRuns = [];
 let scenarioOptions = [];
+let scenarioRecipes = [];
+let appliedRecipes = [];
+let recipeBaseScenario = null;
+let recipeDiffCheckpoint = null;
+let pendingRecipeSave = null;
 let selectedRunIds = new Set();
 let expandedRunId = null;
 let runDetailsById = new Map();
@@ -62,6 +82,13 @@ async function loadScenarios(selectedPath = scenarioSelect.value) {
   await loadScenarioEditor();
 }
 
+async function loadScenarioRecipes() {
+  const response = await fetch("/api/scenario-recipes");
+  scenarioRecipes = response.ok ? await response.json() : [];
+  renderRecipePicker();
+  renderRecipeStack();
+}
+
 function scenarioOptionLabel(scenario) {
   const suffix = scenario.isUserCreated ? " [saved]" : "";
   return `${scenario.name}${suffix} (${scenario.path})`;
@@ -90,6 +117,30 @@ function updateScenarioManagementButtons() {
     saveScenarioButton.disabled = !scenarioEditor;
   }
 
+  if (saveRecipeButton) {
+    saveRecipeButton.disabled = !scenarioEditor || changedScenarioFields().length === 0;
+  }
+
+  if (saveNewRecipeButton) {
+    saveNewRecipeButton.disabled = !scenarioEditor || buildNewRecipeChanges().length === 0;
+  }
+
+  if (applyRecipeButton) {
+    applyRecipeButton.disabled = !scenarioEditor || !selectedRecipe();
+  }
+
+  if (archiveRecipeButton) {
+    archiveRecipeButton.disabled = !selectedRecipe();
+  }
+
+  if (deleteRecipeButton) {
+    deleteRecipeButton.disabled = !selectedRecipe();
+  }
+
+  if (reviewLaunchDiffButton) {
+    reviewLaunchDiffButton.disabled = !scenarioEditor;
+  }
+
   if (deleteScenarioButton) {
     const option = selectedScenarioOption();
     deleteScenarioButton.disabled = !option?.canDelete;
@@ -103,8 +154,13 @@ async function loadScenarioEditor() {
   scenarioEditor = null;
   scenarioEditorBaseline = null;
   activeScenarioGroup = null;
+  appliedRecipes = [];
+  recipeBaseScenario = null;
+  recipeDiffCheckpoint = null;
+  closeScenarioDiffPanel();
   scenarioTabs.innerHTML = "";
   scenarioFields.innerHTML = "";
+  renderRecipeStack();
   scenarioOptionsStatus.textContent = "Loading options...";
   updateScenarioResetButtons();
   updateScenarioManagementButtons();
@@ -164,6 +220,467 @@ function renderScenarioEditor() {
   }
 
   updateScenarioEditorStatus();
+}
+
+function renderRecipePicker() {
+  if (!recipeOptions) {
+    return;
+  }
+
+  const query = recipePicker.value.trim().toLowerCase();
+  const visibleRecipes = scenarioRecipes.filter((recipe) => recipeMatchesSearch(recipe, query));
+  recipeOptions.innerHTML = "";
+  for (const recipe of visibleRecipes) {
+    const option = document.createElement("option");
+    option.value = recipeOptionLabel(recipe);
+    option.label = recipePickerDetail(recipe);
+    recipeOptions.append(option);
+  }
+
+  updateScenarioManagementButtons();
+}
+
+function selectedRecipe() {
+  const value = recipePicker?.value.trim() || "";
+  if (!value) {
+    return null;
+  }
+
+  return scenarioRecipes.find((recipe) =>
+    recipeOptionLabel(recipe) === value
+    || recipe.name === value
+    || recipe.path === value) ?? null;
+}
+
+function recipeMatchesSearch(recipe, query) {
+  if (!query) {
+    return true;
+  }
+
+  return [
+    recipe.name,
+    recipe.description,
+    recipe.path,
+    ...(recipe.tags || []),
+    ...recipeFieldNames(recipe).map((field) => scenarioFieldLabel(field))
+  ].some((value) => String(value ?? "").toLowerCase().includes(query));
+}
+
+function renderRecipeStack() {
+  if (!recipeStack) {
+    return;
+  }
+
+  if (!scenarioEditor) {
+    recipeStack.innerHTML = "";
+    return;
+  }
+
+  if (appliedRecipes.length === 0) {
+    recipeStack.innerHTML = `<div class="recipe-stack-empty">No recipes applied.</div>`;
+    return;
+  }
+
+  recipeStack.innerHTML = appliedRecipes.map((recipe, index) => {
+    const fields = recipeFieldNames(recipe);
+    const overrideCount = countPriorRecipeOverrides(index);
+    const title = fields.map((field) => scenarioFieldLabel(field)).join(", ");
+    return `
+      <div class="recipe-stack-item">
+        <div>
+          <strong>${escapeHtml(recipe.name)}</strong>
+          <span>${fields.length} field${fields.length === 1 ? "" : "s"}${overrideCount > 0 ? `, overrides ${overrideCount}` : ""}</span>
+          ${title ? `<div class="run-sub">${escapeHtml(title)}</div>` : ""}
+        </div>
+        <div class="recipe-stack-actions">
+          <button class="secondary" type="button" data-recipe-action="up" data-index="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
+          <button class="secondary" type="button" data-recipe-action="down" data-index="${index}" ${index === appliedRecipes.length - 1 ? "disabled" : ""}>Down</button>
+          <button class="secondary" type="button" data-recipe-action="remove" data-index="${index}">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function recipeOptionLabel(recipe) {
+  const tags = Array.isArray(recipe.tags) && recipe.tags.length > 0
+    ? ` [${recipe.tags.join(", ")}]`
+    : "";
+  return `${recipe.name}${tags} - ${recipe.path} (${recipeFieldNames(recipe).length} fields)`;
+}
+
+function recipePickerDetail(recipe) {
+  return recipeFieldNames(recipe).map((field) => scenarioFieldLabel(field)).join(", ");
+}
+
+function recipeFieldNames(recipe) {
+  return Object.keys(recipe?.changes || {});
+}
+
+function scenarioFieldLabel(jsonName) {
+  const field = scenarioEditor?.fields.find((candidate) => candidate.jsonName === jsonName);
+  return field?.label || jsonName;
+}
+
+function countPriorRecipeOverrides(index) {
+  const currentFields = new Set(recipeFieldNames(appliedRecipes[index]));
+  let count = 0;
+  for (let priorIndex = 0; priorIndex < index; priorIndex++) {
+    for (const field of recipeFieldNames(appliedRecipes[priorIndex])) {
+      if (currentFields.has(field)) {
+        count++;
+      }
+    }
+  }
+
+  return count;
+}
+
+function applySelectedRecipe() {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  const recipe = selectedRecipe();
+  if (!recipe) {
+    formMessage.textContent = "Recipe is not available.";
+    return;
+  }
+
+  try {
+    let manualOverrides = {};
+    if (appliedRecipes.length === 0) {
+      storeVisibleScenarioValues();
+      recipeBaseScenario = cloneJson(scenarioEditor.scenario);
+    } else {
+      manualOverrides = captureManualScenarioOverrides();
+    }
+
+    appliedRecipes.push(recipe);
+    recomposeScenarioFromRecipes(manualOverrides);
+    recipeDiffCheckpoint = cloneJson(scenarioEditor.scenario);
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  recipePicker.value = "";
+  renderRecipePicker();
+  updateScenarioManagementButtons();
+  formMessage.textContent = `Applied recipe ${recipe.name}.`;
+}
+
+function updateRecipeStack(action, index) {
+  if (!scenarioEditor || index < 0 || index >= appliedRecipes.length) {
+    return;
+  }
+
+  try {
+    const manualOverrides = captureManualScenarioOverrides();
+    if (action === "remove") {
+      appliedRecipes.splice(index, 1);
+    } else if (action === "up" && index > 0) {
+      [appliedRecipes[index - 1], appliedRecipes[index]] = [appliedRecipes[index], appliedRecipes[index - 1]];
+    } else if (action === "down" && index < appliedRecipes.length - 1) {
+      [appliedRecipes[index + 1], appliedRecipes[index]] = [appliedRecipes[index], appliedRecipes[index + 1]];
+    }
+
+    recomposeScenarioFromRecipes(manualOverrides);
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+  }
+}
+
+function captureManualScenarioOverrides() {
+  storeVisibleScenarioValues();
+  const recipeScenario = composeScenarioFromRecipes(appliedRecipes);
+  return diffScenarioFields(scenarioEditor.scenario, recipeScenario);
+}
+
+function recomposeScenarioFromRecipes(manualOverrides = {}) {
+  const scenario = composeScenarioFromRecipes(appliedRecipes);
+  for (const [jsonName, value] of Object.entries(manualOverrides)) {
+    scenario[jsonName] = cloneJson(value);
+  }
+
+  scenarioEditor.scenario = scenario;
+  renderScenarioEditor();
+  renderRecipeStack();
+}
+
+function composeScenarioFromRecipes(recipes) {
+  const scenario = cloneJson(recipeBaseScenario || scenarioEditorBaseline);
+  for (const recipe of recipes) {
+    applyRecipeChanges(scenario, recipe.changes);
+  }
+
+  return scenario;
+}
+
+function applyRecipeChanges(scenario, changes) {
+  for (const [jsonName, value] of Object.entries(changes || {})) {
+    if (scenarioEditor.fields.some((field) => field.jsonName === jsonName)) {
+      scenario[jsonName] = cloneJson(value);
+    }
+  }
+}
+
+function diffScenarioFields(leftScenario, rightScenario) {
+  const changes = {};
+  for (const field of scenarioEditor.fields) {
+    if (stableStringify(leftScenario?.[field.jsonName]) !== stableStringify(rightScenario?.[field.jsonName])) {
+      changes[field.jsonName] = cloneJson(leftScenario?.[field.jsonName]);
+    }
+  }
+
+  return changes;
+}
+
+function buildNewRecipeChanges() {
+  if (!scenarioEditor || !recipeDiffCheckpoint) {
+    return [];
+  }
+
+  return buildScenarioDiffRows(recipeDiffCheckpoint, scenarioEditor.scenario);
+}
+
+function buildScenarioDiffRows(leftScenario, rightScenario) {
+  if (!scenarioEditor) {
+    return [];
+  }
+
+  return scenarioEditor.fields
+    .filter((field) => stableStringify(leftScenario?.[field.jsonName]) !== stableStringify(rightScenario?.[field.jsonName]))
+    .map((field) => ({
+      jsonName: field.jsonName,
+      label: field.label,
+      group: field.group,
+      before: cloneJson(leftScenario?.[field.jsonName]),
+      after: cloneJson(rightScenario?.[field.jsonName])
+    }));
+}
+
+function showScenarioDiffPanel(title, rows, summary, options = {}) {
+  scenarioDiffTitle.textContent = title;
+  scenarioDiffSummary.textContent = summary;
+  confirmSaveRecipeButton.hidden = !options.confirmSave;
+  confirmSaveRecipeButton.textContent = options.confirmLabel || "Save Recipe";
+  scenarioDiffBody.innerHTML = rows.length === 0
+    ? `<tr><td class="empty" colspan="4">No scenario option changes.</td></tr>`
+    : rows.map((row) => `
+      <tr>
+        <td>
+          <div class="artifact-label">${escapeHtml(row.label)}</div>
+          <div class="run-sub">${escapeHtml(row.jsonName)}</div>
+        </td>
+        <td>${escapeHtml(row.group)}</td>
+        <td><pre>${escapeHtml(formatScenarioValue(row.before))}</pre></td>
+        <td><pre>${escapeHtml(formatScenarioValue(row.after))}</pre></td>
+      </tr>
+    `).join("");
+  scenarioDiffPanel.hidden = false;
+}
+
+function closeScenarioDiffPanel() {
+  scenarioDiffPanel.hidden = true;
+  pendingRecipeSave = null;
+  confirmSaveRecipeButton.hidden = true;
+}
+
+function formatScenarioValue(value) {
+  if (value === undefined) {
+    return "";
+  }
+
+  if (value === null || typeof value !== "object") {
+    return String(value);
+  }
+
+  return JSON.stringify(value, null, 2);
+}
+
+function reviewLaunchDiff() {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  const rows = buildScenarioDiffRows(scenarioEditorBaseline, scenarioEditor.scenario);
+  showScenarioDiffPanel(
+    "Launch Diff",
+    rows,
+    rows.length === 0
+      ? "No scenario option changes from the loaded base scenario."
+      : `${rows.length} scenario option${rows.length === 1 ? "" : "s"} will differ from the loaded base scenario.`);
+}
+
+function saveCurrentDiffAsRecipe() {
+  prepareRecipeSave("full");
+}
+
+function saveNewDiffsAsRecipe() {
+  prepareRecipeSave("new");
+}
+
+function prepareRecipeSave(mode) {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  const baseScenario = mode === "new"
+    ? recipeDiffCheckpoint || scenarioEditorBaseline
+    : scenarioEditorBaseline;
+  const changes = diffScenarioFields(scenarioEditor.scenario, baseScenario);
+  const rows = buildScenarioDiffRows(baseScenario, scenarioEditor.scenario);
+  const changeCount = Object.keys(changes).length;
+  if (changeCount === 0) {
+    formMessage.textContent = mode === "new"
+      ? "No new scenario option changes since the last recipe save or apply."
+      : "Change at least one scenario option before saving a recipe.";
+    return;
+  }
+
+  const name = prompt(mode === "new" ? "Save new diffs as recipe" : "Save recipe as", "New Recipe");
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    formMessage.textContent = "Recipe name is required.";
+    return;
+  }
+
+  const tagsText = prompt("Recipe tags, comma-separated", "");
+  if (tagsText === null) {
+    return;
+  }
+
+  pendingRecipeSave = {
+    name: trimmedName,
+    description: "",
+    tags: tagsText.split(",").map((tag) => tag.trim()).filter(Boolean),
+    changes,
+    changeCount,
+    mode
+  };
+  showScenarioDiffPanel(
+    `Save Recipe: ${trimmedName}`,
+    rows,
+    mode === "new"
+      ? `${changeCount} new field${changeCount === 1 ? "" : "s"} will be saved since the last recipe save/apply point.`
+      : `${changeCount} field${changeCount === 1 ? "" : "s"} will be saved from the full base-scenario diff.`,
+    { confirmSave: true, confirmLabel: "Save Recipe" });
+}
+
+async function confirmPendingRecipeSave() {
+  if (!pendingRecipeSave) {
+    return;
+  }
+
+  saveRecipeButton.disabled = true;
+  formMessage.textContent = "Saving recipe...";
+  const response = await fetch("/api/scenario-recipes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(pendingRecipeSave)
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Recipe save failed." }));
+    formMessage.textContent = problem.error || "Recipe save failed.";
+    updateScenarioManagementButtons();
+    return;
+  }
+
+  const result = await response.json();
+  const changeCount = pendingRecipeSave.changeCount;
+  pendingRecipeSave = null;
+  scenarioDiffPanel.hidden = true;
+  recipeDiffCheckpoint = cloneJson(scenarioEditor.scenario);
+  await loadScenarioRecipes();
+  recipePicker.value = recipeOptionLabel(result.recipe);
+  renderRecipePicker();
+  formMessage.textContent = `Saved recipe ${result.recipe.name} with ${changeCount} field${changeCount === 1 ? "" : "s"}.`;
+  updateScenarioManagementButtons();
+}
+
+async function archiveSelectedRecipe() {
+  const recipe = selectedRecipe();
+  if (!recipe) {
+    formMessage.textContent = "Choose a recipe to archive.";
+    return;
+  }
+
+  if (!confirm(`Archive recipe "${recipe.name}"?`)) {
+    return;
+  }
+
+  archiveRecipeButton.disabled = true;
+  formMessage.textContent = "Archiving recipe...";
+  const response = await fetch(`/api/scenario-recipes?path=${encodeURIComponent(recipe.path)}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Recipe archive failed." }));
+    formMessage.textContent = problem.error || "Recipe archive failed.";
+    updateScenarioManagementButtons();
+    return;
+  }
+
+  const result = await response.json();
+  scenarioRecipes = scenarioRecipes.filter((candidate) => candidate.path !== recipe.path);
+  recipePicker.value = "";
+  renderRecipePicker();
+  renderRecipeStack();
+  formMessage.textContent = `Archived recipe to ${result.archivedPath}.`;
+  updateScenarioManagementButtons();
+}
+
+async function deleteSelectedRecipe() {
+  const recipe = selectedRecipe();
+  if (!recipe) {
+    formMessage.textContent = "Choose a recipe to delete.";
+    return;
+  }
+
+  if (!confirm(`Permanently delete recipe "${recipe.name}"? This cannot be undone.`)) {
+    return;
+  }
+
+  deleteRecipeButton.disabled = true;
+  formMessage.textContent = "Deleting recipe...";
+  const response = await fetch(`/api/scenario-recipes/permanent?path=${encodeURIComponent(recipe.path)}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Recipe delete failed." }));
+    formMessage.textContent = problem.error || "Recipe delete failed.";
+    updateScenarioManagementButtons();
+    return;
+  }
+
+  scenarioRecipes = scenarioRecipes.filter((candidate) => candidate.path !== recipe.path);
+  recipePicker.value = "";
+  renderRecipePicker();
+  renderRecipeStack();
+  formMessage.textContent = `Deleted recipe ${recipe.name}.`;
+  updateScenarioManagementButtons();
 }
 
 function scenarioEditorGroups() {
@@ -233,8 +750,12 @@ function showAdvancedScenarioOptions() {
 function loadScenarioEditorDefinition(editor) {
   scenarioEditor = editor;
   scenarioEditorBaseline = cloneJson(editor.scenario);
+  appliedRecipes = [];
+  recipeBaseScenario = cloneJson(editor.scenario);
+  recipeDiffCheckpoint = cloneJson(editor.scenario);
   activeScenarioGroup = scenarioEditorGroups()[0] || null;
   renderScenarioEditor();
+  renderRecipeStack();
   updateScenarioManagementButtons();
 }
 
@@ -361,6 +882,7 @@ function updateScenarioEditorStatus() {
     ? `${visibleCount} of ${totalCount} options`
     : `${visibleCount} of ${totalCount} options, ${changedCount} changed`;
   updateScenarioResetButtons();
+  updateScenarioManagementButtons();
 }
 
 function updateScenarioResetButtons() {
@@ -434,7 +956,11 @@ function resetAllScenarioOptions() {
   }
 
   scenarioEditor.scenario = cloneJson(scenarioEditorBaseline);
+  appliedRecipes = [];
+  recipeBaseScenario = cloneJson(scenarioEditorBaseline);
+  recipeDiffCheckpoint = cloneJson(scenarioEditorBaseline);
   renderScenarioEditor();
+  renderRecipeStack();
 }
 
 async function saveScenarioAs() {
@@ -754,7 +1280,7 @@ function renderArtifactsPanel(details) {
       <tr>
         <td>
           <div class="artifact-label">${escapeHtml(artifact.label)}</div>
-          <div class="run-sub">${escapeHtml(artifact.type)}${artifact.isLatestCheckpoint ? " · latest" : ""}</div>
+          <div class="run-sub">${escapeHtml(artifact.type)}${artifact.isLatestCheckpoint ? " - latest" : ""}</div>
         </td>
         <td>${artifact.tick === null || artifact.tick === undefined ? "" : formatNumber(artifact.tick)}</td>
         <td>${escapeHtml(formatFileSize(artifact.sizeBytes))}</td>
@@ -1154,6 +1680,27 @@ resetScenarioGroupButton.addEventListener("click", resetActiveScenarioGroup);
 resetScenarioAllButton.addEventListener("click", resetAllScenarioOptions);
 saveScenarioButton.addEventListener("click", saveScenarioAs);
 deleteScenarioButton.addEventListener("click", deleteSelectedScenario);
+recipePicker.addEventListener("input", () => {
+  renderRecipePicker();
+  updateScenarioManagementButtons();
+});
+applyRecipeButton.addEventListener("click", applySelectedRecipe);
+archiveRecipeButton.addEventListener("click", archiveSelectedRecipe);
+deleteRecipeButton.addEventListener("click", deleteSelectedRecipe);
+reviewLaunchDiffButton.addEventListener("click", reviewLaunchDiff);
+saveRecipeButton.addEventListener("click", saveCurrentDiffAsRecipe);
+saveNewRecipeButton.addEventListener("click", saveNewDiffsAsRecipe);
+confirmSaveRecipeButton.addEventListener("click", confirmPendingRecipeSave);
+closeScenarioDiffButton.addEventListener("click", closeScenarioDiffPanel);
+
+recipeStack.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-recipe-action]");
+  if (!button) {
+    return;
+  }
+
+  updateRecipeStack(button.dataset.recipeAction, Number(button.dataset.index));
+});
 
 scenarioTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-group]");
@@ -1519,6 +2066,7 @@ function escapeHtml(value) {
 }
 
 async function boot() {
+  await loadScenarioRecipes();
   await loadScenarios();
   await loadRuns();
   refreshTimer = setInterval(loadRuns, 2000);

@@ -13,6 +13,7 @@ public sealed partial class LineageRunManager
 {
     private const string ProcessIdToken = "{pid}";
     private const string UserScenarioFolderName = "user";
+    private const string ScenarioRecipeFolderName = "recipes";
     private const string UserScenarioRegistryFileName = ".lineage-runner-scenarios.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -76,6 +77,93 @@ public sealed partial class LineageRunManager
         return rootScenarios
             .Concat(userScenarios)
             .ToArray();
+    }
+
+    public IReadOnlyList<ScenarioRecipe> ListScenarioRecipes()
+    {
+        var recipeRoot = ScenarioRecipeRoot();
+        if (!Directory.Exists(recipeRoot))
+        {
+            return Array.Empty<ScenarioRecipe>();
+        }
+
+        return Directory
+            .EnumerateFiles(recipeRoot, "*.json", SearchOption.TopDirectoryOnly)
+            .Select(TryReadScenarioRecipe)
+            .OfType<ScenarioRecipe>()
+            .OrderBy(recipe => recipe.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public ScenarioRecipeSaveResult SaveScenarioRecipe(ScenarioRecipeSaveRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Recipe name is required.");
+        }
+
+        if (request.Changes.ValueKind != JsonValueKind.Object)
+        {
+            throw new ArgumentException("Recipe changes must be a JSON object.");
+        }
+
+        var changes = JsonNode.Parse(request.Changes.GetRawText())?.AsObject()
+            ?? throw new ArgumentException("Recipe changes must be a JSON object.");
+        ValidateRecipeChanges(changes);
+
+        var slug = SlugRegex().Replace(name.ToLowerInvariant(), "_").Trim('_');
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            throw new ArgumentException("Recipe name must contain letters or numbers.");
+        }
+
+        var recipeRoot = ScenarioRecipeRoot();
+        Directory.CreateDirectory(recipeRoot);
+        var path = Path.GetFullPath(Path.Combine(recipeRoot, $"{slug}.json"));
+        EnsurePathInside(path, recipeRoot);
+        if (File.Exists(path))
+        {
+            throw new InvalidOperationException($"A recipe named {slug}.json already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var file = new ScenarioRecipeFile
+        {
+            Name = name,
+            Description = (request.Description ?? string.Empty).Trim(),
+            Tags = NormalizeTags(request.Tags),
+            Changes = changes,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        SaveScenarioRecipeFile(path, file);
+        return new ScenarioRecipeSaveResult(ToScenarioRecipe(path, file));
+    }
+
+    public ScenarioRecipeArchiveResult ArchiveScenarioRecipe(string recipePath)
+    {
+        var path = ResolveRecipePath(recipePath);
+
+        var archiveRoot = Path.Combine(_repoRoot, "out", "recipe-trash");
+        Directory.CreateDirectory(archiveRoot);
+        var archivePath = GetUniqueArchivePath(Path.Combine(
+            archiveRoot,
+            $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_{Path.GetFileName(path)}"));
+        File.Move(path, archivePath);
+
+        return new ScenarioRecipeArchiveResult(
+            NormalizeRelativePath(Path.GetRelativePath(_repoRoot, path)),
+            NormalizeRelativePath(Path.GetRelativePath(_repoRoot, archivePath)));
+    }
+
+    public ScenarioRecipeDeleteResult DeleteScenarioRecipe(string recipePath)
+    {
+        var path = ResolveRecipePath(recipePath);
+        var relativePath = NormalizeRelativePath(Path.GetRelativePath(_repoRoot, path));
+        File.Delete(path);
+        return new ScenarioRecipeDeleteResult(relativePath);
     }
 
     public ScenarioEditorDefinition GetScenarioEditor(string scenarioPath)
@@ -1439,6 +1527,108 @@ public sealed partial class LineageRunManager
         return Path.Combine(UserScenarioRoot(), UserScenarioRegistryFileName);
     }
 
+    private string ScenarioRecipeRoot()
+    {
+        return Path.Combine(_repoRoot, "scenarios", ScenarioRecipeFolderName);
+    }
+
+    private string ResolveRecipePath(string recipePath)
+    {
+        if (string.IsNullOrWhiteSpace(recipePath))
+        {
+            throw new ArgumentException("Recipe path is required.");
+        }
+
+        var path = ResolveScenarioPath(recipePath);
+        EnsurePathInside(path, ScenarioRecipeRoot());
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Recipe file was not found.", recipePath);
+        }
+
+        return path;
+    }
+
+    private ScenarioRecipe? TryReadScenarioRecipe(string path)
+    {
+        try
+        {
+            var file = JsonSerializer.Deserialize<ScenarioRecipeFile>(File.ReadAllText(path), JsonOptions);
+            if (file is null || string.IsNullOrWhiteSpace(file.Name))
+            {
+                return null;
+            }
+
+            file.Tags ??= [];
+            file.Changes ??= new JsonObject();
+            return ToScenarioRecipe(path, file);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private ScenarioRecipe ToScenarioRecipe(string path, ScenarioRecipeFile file)
+    {
+        return new ScenarioRecipe(
+            Name: file.Name,
+            Path: NormalizeRelativePath(Path.GetRelativePath(_repoRoot, path)),
+            Description: file.Description ?? string.Empty,
+            Tags: file.Tags ?? [],
+            Changes: CloneJsonObject(file.Changes ?? new JsonObject()),
+            CreatedAtUtc: file.CreatedAtUtc,
+            UpdatedAtUtc: file.UpdatedAtUtc);
+    }
+
+    private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)
+    {
+        if (tags is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return tags
+            .Select(tag => (tag ?? string.Empty).Trim())
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static JsonObject CloneJsonObject(JsonObject value)
+    {
+        return JsonNode.Parse(value.ToJsonString())?.AsObject() ?? new JsonObject();
+    }
+
+    private static void ValidateRecipeChanges(JsonObject changes)
+    {
+        if (changes.Count == 0)
+        {
+            throw new ArgumentException("Recipe changes cannot be empty.");
+        }
+
+        var knownFields = ScenarioFieldDefinitions
+            .Select(field => field.JsonName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknownFields = changes
+            .Select(pair => pair.Key)
+            .Where(field => !knownFields.Contains(field))
+            .OrderBy(field => field, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (unknownFields.Length > 0)
+        {
+            throw new ArgumentException($"Recipe contains unknown scenario field(s): {string.Join(", ", unknownFields)}.");
+        }
+    }
+
+    private static void SaveScenarioRecipeFile(string path, ScenarioRecipeFile file)
+    {
+        var tempPath = $"{path}.tmp";
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(file, JsonOptions));
+        File.Move(tempPath, path, overwrite: true);
+    }
+
     private UserScenarioRegistry LoadUserScenarioRegistry()
     {
         var registryPath = UserScenarioRegistryPath();
@@ -2170,6 +2360,23 @@ public sealed partial class LineageRunManager
         public string Path { get; set; } = string.Empty;
 
         public string Name { get; set; } = string.Empty;
+
+        public DateTimeOffset CreatedAtUtc { get; set; }
+
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+    }
+
+    private sealed class ScenarioRecipeFile
+    {
+        public string SchemaVersion { get; set; } = "lineage.runner.scenario-recipe.v1";
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> Tags { get; set; } = Array.Empty<string>();
+
+        public JsonObject Changes { get; set; } = new();
 
         public DateTimeOffset CreatedAtUtc { get; set; }
 

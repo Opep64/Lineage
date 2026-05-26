@@ -15,6 +15,44 @@ var api = app.MapGroup("/api");
 
 api.MapGet("/scenarios", (LineageRunManager manager) => Results.Ok(manager.ListScenarios()));
 
+api.MapGet("/scenario-recipes", (LineageRunManager manager) => Results.Ok(manager.ListScenarioRecipes()));
+
+api.MapPost("/scenario-recipes", (ScenarioRecipeSaveRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.SaveScenarioRecipe(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapDelete("/scenario-recipes", (string path, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.ArchiveScenarioRecipe(path));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapDelete("/scenario-recipes/permanent", (string path, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.DeleteScenarioRecipe(path));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/scenarios/user", (ScenarioSaveRequest request, LineageRunManager manager) =>
 {
     try

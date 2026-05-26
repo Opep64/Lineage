@@ -222,6 +222,65 @@ textarea {
   padding-top: 12px;
 }
 
+.recipe-panel {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.recipe-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+
+.recipe-toolbar label {
+  flex: 1 1 360px;
+}
+
+.recipe-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.recipe-stack-empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.recipe-stack-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.recipe-stack-item strong,
+.recipe-stack-item span {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.recipe-stack-item span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recipe-stack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .scenario-options-toolbar {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto auto;
@@ -362,6 +421,66 @@ button.scenario-tab.is-active {
   padding: 16px;
   color: var(--muted);
   text-align: center;
+}
+
+.scenario-diff-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.scenario-diff-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.scenario-diff-header span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scenario-diff-scroll {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.scenario-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.scenario-diff-table th,
+.scenario-diff-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+
+.scenario-diff-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f7f9;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.scenario-diff-table pre {
+  max-width: 420px;
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  font-family: Consolas, "Courier New", monospace;
+  white-space: pre-wrap;
 }
 
 .form-message {
@@ -703,6 +822,15 @@ tr.is-expanded td {
 
   .scenario-options-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .recipe-toolbar,
+  .recipe-stack-item {
+    grid-template-columns: 1fr;
+  }
+
+  .recipe-stack-actions {
+    justify-content: flex-start;
   }
 
   .scenario-reset-actions {

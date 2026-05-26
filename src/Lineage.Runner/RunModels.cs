@@ -41,6 +41,31 @@ public sealed record ScenarioDeleteResult(
     string Path,
     string ArchivedPath);
 
+public sealed record ScenarioRecipe(
+    string Name,
+    string Path,
+    string Description,
+    IReadOnlyList<string> Tags,
+    JsonObject Changes,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record ScenarioRecipeSaveRequest(
+    string Name,
+    string? Description,
+    IReadOnlyList<string>? Tags,
+    JsonElement Changes);
+
+public sealed record ScenarioRecipeSaveResult(
+    ScenarioRecipe Recipe);
+
+public sealed record ScenarioRecipeArchiveResult(
+    string Path,
+    string ArchivedPath);
+
+public sealed record ScenarioRecipeDeleteResult(
+    string Path);
+
 public sealed record RunCreateRequest(
     string ScenarioPath,
     int Ticks,

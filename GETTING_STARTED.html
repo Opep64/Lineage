@@ -271,6 +271,10 @@
         <li>Choose a scenario, tick count, optional seed, optional checkpoint interval, and extinction stop behavior</li>
         <li>Expand grouped scenario options before launch, with tabs and field metadata shared from <code>Lineage.Core</code></li>
         <li>Search scenario options, switch between basic and all fields, reset a group or the whole loaded scenario, and see changed fields highlighted</li>
+        <li>Apply one or more sparse scenario recipes onto the working launch settings; later recipes win when they set the same field</li>
+        <li>Review the current launch diff before starting a run, and preview the exact fields before saving a recipe</li>
+        <li>Save the full scenario-option diff or only new changes since the last recipe save/apply point as reusable recipes under <code>scenarios\recipes</code></li>
+        <li>Archive recipes to <code>out\recipe-trash</code>, or permanently delete a recipe when it is no longer useful</li>
         <li>Save edited launch settings as launcher-managed scenarios under <code>scenarios\user</code></li>
         <li>Archive launcher-managed saved scenarios while keeping built-in project scenarios protected from dashboard deletion</li>
         <li>Start multiple CLI simulations as managed runs</li>
@@ -298,6 +302,8 @@
         When scenario options are edited in the runner, the dashboard writes a generated launch scenario under
         <code>out/runs/_launch_scenarios</code>, passes that to <code>Lineage.Cli</code>, and still records
         the final CLI-resolved <code>resolved_scenario.json</code> beside the run manifest.
+        Scenario recipes are sparse overlays that store only named field changes. They are applied to the
+        working launch scenario, not written back to the base scenario file.
       </p>
       <p>
         Saved scenario variants created from the runner live under <code>scenarios\user</code>. The runner can

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260525-artifacts">
+  <link rel="stylesheet" href="/styles.css?v=20260525-recipe-picker">
 </head>
 <body>
   <header class="app-header">
@@ -46,6 +46,22 @@
         <span id="scenarioOptionsStatus" class="scenario-options-status"></span>
       </div>
       <div id="scenarioOptionsPanel" class="scenario-options-panel" hidden>
+        <div class="recipe-panel">
+          <div class="recipe-toolbar">
+            <label>
+              Recipe
+              <input id="recipePicker" type="search" list="recipeOptions" placeholder="search recipes by name, tag, field">
+              <datalist id="recipeOptions"></datalist>
+            </label>
+            <button id="applyRecipeButton" class="secondary" type="button" disabled>Apply Recipe</button>
+            <button id="archiveRecipeButton" class="danger" type="button" disabled>Archive Recipe</button>
+            <button id="deleteRecipeButton" class="danger" type="button" disabled>Delete Recipe</button>
+            <button id="reviewLaunchDiffButton" class="secondary" type="button" disabled>Review Launch Diff</button>
+            <button id="saveRecipeButton" class="secondary" type="button" disabled>Save Full Diff</button>
+            <button id="saveNewRecipeButton" class="secondary" type="button" disabled>Save New Diffs</button>
+          </div>
+          <div id="recipeStack" class="recipe-stack"></div>
+        </div>
         <div class="scenario-options-toolbar">
           <label>
             Find
@@ -70,6 +86,31 @@
         </div>
         <div id="scenarioTabs" class="scenario-tabs" role="tablist" aria-label="Scenario option groups"></div>
         <div id="scenarioFields" class="scenario-fields"></div>
+        <div id="scenarioDiffPanel" class="scenario-diff-panel" hidden>
+          <div class="scenario-diff-header">
+            <div>
+              <strong id="scenarioDiffTitle">Scenario Diff</strong>
+              <span id="scenarioDiffSummary"></span>
+            </div>
+            <div class="section-actions">
+              <button id="confirmSaveRecipeButton" class="secondary" type="button" hidden>Save Recipe</button>
+              <button id="closeScenarioDiffButton" class="secondary" type="button">Close</button>
+            </div>
+          </div>
+          <div class="scenario-diff-scroll">
+            <table class="scenario-diff-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Group</th>
+                  <th>Base</th>
+                  <th>Final</th>
+                </tr>
+              </thead>
+              <tbody id="scenarioDiffBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
       <p id="formMessage" class="form-message" role="status"></p>
     </section>
@@ -136,6 +177,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260525-artifacts"></script>
+  <script src="/app.js?v=20260525-recipe-picker"></script>
 </body>
 </html>
