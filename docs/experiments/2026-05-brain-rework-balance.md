@@ -1717,11 +1717,22 @@ Generic-only smoke, `balanced-foraging`, 150k ticks, seeds 42-44:
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 49.3 | 40.7 | 661.3 | 612.0 | 12.0 | 22.2% | 15.2% | 0.218 |
 
+Broad 150k scenario regression after the plant tradeoff commit, seeds 42-44:
+
+| Scenario | Final pop | Final min | Tail 10% pop | Min tail 10% | Births | Deaths | Max gen | Plant seen | Eating | Food yield | Meal gap | Intake G/T/R/Tough |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Balanced foraging | 49.3 | 40.0 | 40.7 | 33.3 | 661.3 | 612.0 | 12.0 | 22.2% | 15.2% | 0.218 | 82.2s | 100.0% / 0.0% / 0.0% / 0.0% |
+| Gentle foraging | 52.0 | 49.0 | 49.4 | 42.0 | 1006.3 | 954.3 | 12.7 | 27.0% | 17.5% | 0.225 | 87.8s | 100.0% / 0.0% / 0.0% / 0.0% |
+| Harsh foraging | 15.0 | 7.0 | 14.2 | 9.7 | 432.0 | 417.0 | 11.0 | 30.8% | 14.3% | 0.230 | 86.6s | 100.0% / 0.0% / 0.0% / 0.0% |
+| Omnivore pressure | 24.7 | 16.0 | 21.9 | 16.7 | 492.0 | 467.3 | 11.0 | 21.5% | 14.1% | 0.229 | 38.9s | 100.0% / 0.0% / 0.0% / 0.0% |
+| Plant diversity pressure | 38.3 | 31.0 | 37.8 | 31.0 | 699.7 | 661.3 | 10.3 | 25.7% | 16.6% | 0.212 | 78.5s | 21.9% / 20.3% / 48.4% / 9.5% |
+
 Readout:
 
 - The tradeoff pass kept population healthier than the original density-15 run and recovered rich adaptation compared with the density-only survival tune.
 - Rich plants remain the top payoff trace and intake target, but not overwhelmingly so; this is closer to a useful selection pressure than a free best food.
 - Generic-only behavior should not require broad retuning from this change because the generic plant trait path remains `1.0 / 1.0`.
+- The broad scenario regression did not show a generic-food collapse. Harsh and omnivore remain low-population pressure scenarios, but all sampled seeds survived through 150k ticks.
 
 ## Open Questions
 
