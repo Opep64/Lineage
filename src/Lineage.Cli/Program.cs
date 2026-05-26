@@ -4771,6 +4771,8 @@ internal static class RunReportWriter
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
+        WritePlantTypeDiagnosticsSection(writer, finalSnapshot);
+
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Memory Diagnostics</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
@@ -5680,6 +5682,24 @@ internal static class RunReportWriter
             new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => snapshot.ToughPlantCaloriesEatenPerSecond).ToArray()));
         WriteLineChart(
             writer,
+            "Plant type intake share",
+            "%",
+            snapshots,
+            new ChartSeries("Generic", "#35a862", snapshots.Select(snapshot => PlantTypeShare(GenericPlantCaloriesEatenPerSecond(snapshot), snapshot.TotalPlantCaloriesEatenPerSecond) * 100f).ToArray()),
+            new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => PlantTypeShare(snapshot.TenderPlantCaloriesEatenPerSecond, snapshot.TotalPlantCaloriesEatenPerSecond) * 100f).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => PlantTypeShare(snapshot.RichPlantCaloriesEatenPerSecond, snapshot.TotalPlantCaloriesEatenPerSecond) * 100f).ToArray()),
+            new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => PlantTypeShare(snapshot.ToughPlantCaloriesEatenPerSecond, snapshot.TotalPlantCaloriesEatenPerSecond) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Plant type intake per resource",
+            " kcal/s/resource",
+            snapshots,
+            new ChartSeries("Generic", "#35a862", snapshots.Select(snapshot => PlantTypeIntakePerResource(GenericPlantCaloriesEatenPerSecond(snapshot), GenericPlantTypeResourceCount(snapshot))).ToArray()),
+            new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.TenderPlantCaloriesEatenPerSecond, snapshot.TenderPlantTypeResourceCount)).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.RichPlantCaloriesEatenPerSecond, snapshot.RichPlantTypeResourceCount)).ToArray()),
+            new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => PlantTypeIntakePerResource(snapshot.ToughPlantCaloriesEatenPerSecond, snapshot.ToughPlantTypeResourceCount)).ToArray()));
+        WriteLineChart(
+            writer,
             "Predation Diagnostics",
             "%",
             snapshots,
@@ -5710,6 +5730,14 @@ internal static class RunReportWriter
             snapshots,
             new ChartSeries("Diet meat bias", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageDietaryAdaptation).ToArray()),
             new ChartSeries("Carrion bias", "#7d5546", snapshots.Select(snapshot => snapshot.AverageCarrionAdaptation).ToArray()));
+        WriteLineChart(
+            writer,
+            "Plant adaptation traits",
+            "",
+            snapshots,
+            new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => snapshot.AverageTenderPlantAdaptation).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => snapshot.AverageRichPlantAdaptation).ToArray()),
+            new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => snapshot.AverageToughPlantAdaptation).ToArray()));
         WriteLineChart(
             writer,
             "Digested Energy Source",
@@ -6764,6 +6792,76 @@ internal static class RunReportWriter
         return $"local {stats.PlantLocalDispersalCount}, cluster {stats.PlantClusterRelocationCount}, global {stats.PlantGlobalRelocationCount}";
     }
 
+    private static void WritePlantTypeDiagnosticsSection(StreamWriter writer, SimulationStatsSnapshot snapshot)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Plant Type Diagnostics</h2>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Type</th><th>Resources</th><th>Plant kcal</th><th>Raw eaten/s</th><th>Intake share</th><th>Raw/resource</th><th>Digested energy/s</th><th>Adaptation</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        WritePlantTypeDiagnosticsRow(
+            writer,
+            "Generic",
+            GenericPlantTypeResourceCount(snapshot),
+            GenericPlantTypeCalories(snapshot),
+            GenericPlantCaloriesEatenPerSecond(snapshot),
+            snapshot.TotalPlantCaloriesEatenPerSecond,
+            GenericPlantDigestedEnergyPerSecond(snapshot),
+            null);
+        WritePlantTypeDiagnosticsRow(
+            writer,
+            "Tender",
+            snapshot.TenderPlantTypeResourceCount,
+            snapshot.TenderPlantTypeCalories,
+            snapshot.TenderPlantCaloriesEatenPerSecond,
+            snapshot.TotalPlantCaloriesEatenPerSecond,
+            snapshot.TenderPlantDigestedEnergyPerSecond,
+            snapshot.AverageTenderPlantAdaptation);
+        WritePlantTypeDiagnosticsRow(
+            writer,
+            "Rich",
+            snapshot.RichPlantTypeResourceCount,
+            snapshot.RichPlantTypeCalories,
+            snapshot.RichPlantCaloriesEatenPerSecond,
+            snapshot.TotalPlantCaloriesEatenPerSecond,
+            snapshot.RichPlantDigestedEnergyPerSecond,
+            snapshot.AverageRichPlantAdaptation);
+        WritePlantTypeDiagnosticsRow(
+            writer,
+            "Tough",
+            snapshot.ToughPlantTypeResourceCount,
+            snapshot.ToughPlantTypeCalories,
+            snapshot.ToughPlantCaloriesEatenPerSecond,
+            snapshot.TotalPlantCaloriesEatenPerSecond,
+            snapshot.ToughPlantDigestedEnergyPerSecond,
+            snapshot.AverageToughPlantAdaptation);
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WritePlantTypeDiagnosticsRow(
+        StreamWriter writer,
+        string label,
+        int resources,
+        float plantCalories,
+        float rawEatenPerSecond,
+        float totalPlantEatenPerSecond,
+        float digestedEnergyPerSecond,
+        float? adaptation)
+    {
+        writer.WriteLine(
+            "<tr>" +
+            $"<td>{Html(label)}</td>" +
+            $"<td>{Html(resources)}</td>" +
+            $"<td>{Html(plantCalories.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(rawEatenPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(FormatPercent(PlantTypeShare(rawEatenPerSecond, totalPlantEatenPerSecond)))}</td>" +
+            $"<td>{Html(FormatPlantTypeIntakePerResource(rawEatenPerSecond, resources))}</td>" +
+            $"<td>{Html(digestedEnergyPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+            $"<td>{Html(adaptation.HasValue ? adaptation.Value.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")}</td>" +
+            "</tr>");
+    }
+
     private static string FormatPlantTypeMix(SimulationScenario scenario)
     {
         return string.Create(
@@ -6808,6 +6906,16 @@ internal static class RunReportWriter
             $"generic {generic.ToString(format, CultureInfo.InvariantCulture)}, tender {tender.ToString(format, CultureInfo.InvariantCulture)}, rich {rich.ToString(format, CultureInfo.InvariantCulture)}, tough {tough.ToString(format, CultureInfo.InvariantCulture)}");
     }
 
+    private static int GenericPlantTypeResourceCount(SimulationStatsSnapshot snapshot)
+    {
+        return Math.Max(
+            0,
+            snapshot.PlantResourceCount
+            - snapshot.TenderPlantTypeResourceCount
+            - snapshot.RichPlantTypeResourceCount
+            - snapshot.ToughPlantTypeResourceCount);
+    }
+
     private static float GenericPlantTypeCalories(SimulationStatsSnapshot snapshot)
     {
         return Math.Max(
@@ -6836,6 +6944,27 @@ internal static class RunReportWriter
             - snapshot.TenderPlantDigestedEnergyPerSecond
             - snapshot.RichPlantDigestedEnergyPerSecond
             - snapshot.ToughPlantDigestedEnergyPerSecond);
+    }
+
+    private static float PlantTypeShare(float plantTypeCaloriesPerSecond, float totalPlantCaloriesPerSecond)
+    {
+        return totalPlantCaloriesPerSecond > 0f
+            ? Math.Clamp(plantTypeCaloriesPerSecond / totalPlantCaloriesPerSecond, 0f, 1f)
+            : 0f;
+    }
+
+    private static float PlantTypeIntakePerResource(float plantTypeCaloriesPerSecond, int resourceCount)
+    {
+        return resourceCount > 0
+            ? plantTypeCaloriesPerSecond / resourceCount
+            : 0f;
+    }
+
+    private static string FormatPlantTypeIntakePerResource(float plantTypeCaloriesPerSecond, int resourceCount)
+    {
+        return resourceCount > 0
+            ? PlantTypeIntakePerResource(plantTypeCaloriesPerSecond, resourceCount).ToString("0.###", CultureInfo.InvariantCulture)
+            : "n/a";
     }
 
     private static string FormatBrainWeight(float value)

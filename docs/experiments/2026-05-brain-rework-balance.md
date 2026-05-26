@@ -1368,7 +1368,8 @@ Readout:
 - Faster plant recovery gives the plant-diversity preset enough breathing room to observe behavior instead of mostly selecting for immediate starvation avoidance.
 - Rich-plant intake now separates from tender/tough intake more clearly, including after normalizing roughly by available resources.
 - Genetic plant-type adaptation is still weak and noisy at 150k ticks. Do not treat this as a solved preference system yet; it is better described as the first observable payoff/intake separation.
-- Future work should track type-specific intake and adaptation trends in reports/probes, then run longer or higher-replication checks before drawing conclusions about evolved plant preference.
+- Follow-up reporting work now adds a `Plant Type Diagnostics` table plus HTML graphs for plant-type intake share, intake per available resource, and tender/rich/tough adaptation trends in CLI and Godot exported reports.
+- Future work should run longer or higher-replication checks before drawing conclusions about evolved plant preference.
 
 ## Open Questions
 
