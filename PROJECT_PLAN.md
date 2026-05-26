@@ -149,10 +149,12 @@ Performance-pass notes from 2026-05-20:
   - likely medium hit: `EatingSystem` checks food/egg contact for every creature even when the brain does not want to eat
   - likely medium hit: `CreatureAttackSystem` checks nearby creature contact for every creature even when the brain does not want to attack
   - likely medium hit: stats snapshots scan all creatures/resources/eggs when snapshot intervals are very frequent
+  - likely long-run hit: historical genomes, brains, lineage records, and stats snapshots keep accumulating even when the living world stays small
   - likely small cleanup: cache per-creature vision cone cosine instead of recomputing it during candidate checks
   - likely small cleanup: avoid recomputing distance/direction when applying selected senses after best targets were already found
   - likely small cleanup: avoid repeated `CreatureGrowth.Effective*` growth-factor calculations in metabolism/stats
   - likely small cleanup: remove unnecessary `HashSet` dedupe for creature candidate queries if creatures remain indexed in only one cell
+  - add a compact extinct genome/brain mechanism that keeps live/egg-referenced genomes and brains reloadable while preserving dead-branch lineage summaries without carrying every historical brain payload
   - chunked or active-region simulation for very large maps
   - make world size cheap and active ecology expensive, rather than scaling cost directly with total area
   - support archipelago-style experiments with resource islands separated by large voids so isolated populations can diverge before later bridge/corridor events connect them

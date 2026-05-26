@@ -143,10 +143,12 @@ Status: always relevant
 - Multicore may help per-creature sensing and brain evaluation, but current design should first keep sensing/query work efficient.
 - Consider lazy or active-region spatial indexing for huge maps with sparse active populations; avoid this for small fully inhabited worlds unless profiling supports it.
 - Revisit spatial cell size after new large-world baselines.
+- Add a compact extinct genome/brain mechanism for long-running evolution runs: retain full genome/brain payloads for living creatures and eggs, preserve lineage records and aggregate extinct-branch summaries, and remap IDs safely so checkpoints remain reloadable without carrying every dead branch's brain forever.
 - Future performance ideas:
   - chunk-level resource/plant summaries
   - active-region updates for dormant/far ecology
   - field/patch plant models
+  - stats/reporting paths that summarize living brain complexity without rescanning every historical brain each snapshot
   - better report/export streaming
   - Godot graphics/rendering polish after core behavior work
 
