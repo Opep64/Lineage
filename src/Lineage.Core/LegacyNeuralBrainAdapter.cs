@@ -71,6 +71,9 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.RecentPlantRawYieldInput] = frame.Internal.RecentPlantRawYield;
         inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput] = frame.Internal.RecentPlantEnergyYield;
         inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput] = frame.Internal.RecentFoodEnergyYield;
+        inputs[NeuralBrainSchema.RecentTenderPlantEnergyYieldInput] = frame.Internal.RecentTenderPlantEnergyYield;
+        inputs[NeuralBrainSchema.RecentRichPlantEnergyYieldInput] = frame.Internal.RecentRichPlantEnergyYield;
+        inputs[NeuralBrainSchema.RecentToughPlantEnergyYieldInput] = frame.Internal.RecentToughPlantEnergyYield;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;

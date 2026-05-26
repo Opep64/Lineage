@@ -209,6 +209,21 @@ public struct CreatureSenseState
     public float RecentPlantEnergyYield { get; set; }
 
     /// <summary>
+    /// Recent usable energy released from tender plant gut contents, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentTenderPlantEnergyYield { get; set; }
+
+    /// <summary>
+    /// Recent usable energy released from rich plant gut contents, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentRichPlantEnergyYield { get; set; }
+
+    /// <summary>
+    /// Recent usable energy released from tough plant gut contents, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentToughPlantEnergyYield { get; set; }
+
+    /// <summary>
     /// Recent usable energy released from any gut contents, normalized to expected digestion capacity.
     /// </summary>
     public float RecentFoodEnergyYield { get; set; }

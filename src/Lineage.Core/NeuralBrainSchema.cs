@@ -41,7 +41,13 @@ public static class NeuralBrainSchema
 
     public const int RecentFoodEnergyYieldInput = RecentPlantEnergyYieldInput + 1;
 
-    public const int InputCount = RecentFoodEnergyYieldInput + 1;
+    public const int RecentTenderPlantEnergyYieldInput = RecentFoodEnergyYieldInput + 1;
+
+    public const int RecentRichPlantEnergyYieldInput = RecentTenderPlantEnergyYieldInput + 1;
+
+    public const int RecentToughPlantEnergyYieldInput = RecentRichPlantEnergyYieldInput + 1;
+
+    public const int InputCount = RecentToughPlantEnergyYieldInput + 1;
 
     public const int OutputCount = 7;
 

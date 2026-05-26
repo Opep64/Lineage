@@ -90,6 +90,9 @@ public readonly record struct BrainInputFrame(
                 senses.RecentFoodSuccess,
                 senses.RecentPlantRawYield,
                 senses.RecentPlantEnergyYield,
+                senses.RecentTenderPlantEnergyYield,
+                senses.RecentRichPlantEnergyYield,
+                senses.RecentToughPlantEnergyYield,
                 senses.RecentFoodEnergyYield));
     }
 }
@@ -171,6 +174,9 @@ public readonly record struct InternalInputFrame(
     float RecentFoodSuccess,
     float RecentPlantRawYield,
     float RecentPlantEnergyYield,
+    float RecentTenderPlantEnergyYield,
+    float RecentRichPlantEnergyYield,
+    float RecentToughPlantEnergyYield,
     float RecentFoodEnergyYield);
 
 /// <summary>

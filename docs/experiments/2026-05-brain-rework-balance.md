@@ -1474,6 +1474,56 @@ Readout:
 - Rich adaptation became the strongest plant adaptation signal at 300k (`0.041` tail average), which aligns better with observed rich-plant intake.
 - This is still early selection signal, not proof of stable long-term plant specialization. Larger replicate counts or longer runs are still needed before treating the plant-preference system as tuned.
 
+## 2026-05-25 Typed Plant Payoff Inputs
+
+The brain already had general recent food feedback:
+
+- `RecentFoodSuccess`
+- `RecentPlantRawYield`
+- `RecentPlantEnergyYield`
+- `RecentFoodEnergyYield`
+
+Added three type-specific internal payoff inputs so plant-category vision can eventually connect to recent nutritional outcomes:
+
+- `RecentTenderPlantEnergyYield`
+- `RecentRichPlantEnergyYield`
+- `RecentToughPlantEnergyYield`
+
+These are normalized against expected digestion capacity, use the already tracked per-type plant digestion energy, and are appended to the neural input schema so existing input indices stay stable. Existing saved/starter brains migrate with the new inputs neutral.
+
+Validation:
+
+- Full solution build passed.
+- Core tests passed: `170 test(s) passed`.
+- Added coverage for sensing, adapter wiring, and old-brain migration with neutral new typed payoff inputs.
+
+150k plant-diversity comparison across seeds 42-44:
+
+| Run set | Final pop | Tail pop | Births | Max gen | Plant seen | Eating | Meal gap | Food yield |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 150k tradeoff before payoff inputs | 38.0 | 36.5 | 623.3 | 11.7 | 24.1% | 17.2% | 81.0s | 0.215 |
+| 150k typed payoff inputs | 47.3 | 38.0 | 619.7 | 12.3 | 26.3% | 18.5% | 78.7s | 0.236 |
+
+Tail plant-type intake share:
+
+| Run set | Generic | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: | ---: |
+| 150k tradeoff before payoff inputs | 17.3% | 21.0% | 52.9% | 8.7% |
+| 150k typed payoff inputs | 19.5% | 21.8% | 48.3% | 10.4% |
+
+Tail plant adaptation:
+
+| Run set | Tender | Rich | Tough |
+| --- | ---: | ---: | ---: |
+| 150k tradeoff before payoff inputs | 0.017 | 0.015 | 0.009 |
+| 150k typed payoff inputs | 0.013 | 0.008 | 0.012 |
+
+Readout:
+
+- Adding the typed payoff inputs did not destabilize the plant-diversity preset at 150k.
+- The new inputs are a wiring/selection affordance, not an immediate behavior change, because existing starter weights for them are neutral and any useful wiring must mutate in.
+- The next meaningful read is a longer `300k+` comparison after descendants have enough time to mutate onto the new feedback channels.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

@@ -116,6 +116,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates plant quality inputs", NeuralBrainMigratesPlantQualityInputs),
     ("Neural brain migrates recent food energy yield input", NeuralBrainMigratesRecentFoodEnergyYieldInput),
     ("Neural brain migrates sector plant quality inputs", NeuralBrainMigratesSectorPlantQualityInputs),
+    ("Neural brain migrates typed plant energy yield inputs", NeuralBrainMigratesTypedPlantEnergyYieldInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2964,6 +2965,10 @@ static void CreatureSensingReportsReproductiveContext()
     var creature = simulation.State.Creatures[0];
     creature.LastCaloriesEaten = 0.25f;
     creature.LastCaloriesDigested = 0.5f;
+    creature.LastPlantDigestedEnergy = 0.5f;
+    creature.LastTenderPlantDigestedEnergy = 0.1f;
+    creature.LastRichPlantDigestedEnergy = 0.25f;
+    creature.LastToughPlantDigestedEnergy = 0.15f;
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
@@ -2973,6 +2978,9 @@ static void CreatureSensingReportsReproductiveContext()
     AssertClose(0.75f, senses.EnergySurplusRatio, 0.000001, "Energy surplus ratio");
     AssertClose(0.75f, senses.RecentFoodSuccess, 0.000001, "Recent food success");
     AssertClose(1f, senses.RecentFoodEnergyYield, 0.000001, "Recent food energy yield");
+    AssertClose(0.2f, senses.RecentTenderPlantEnergyYield, 0.000001, "Recent tender plant energy yield");
+    AssertClose(0.5f, senses.RecentRichPlantEnergyYield, 0.000001, "Recent rich plant energy yield");
+    AssertClose(0.3f, senses.RecentToughPlantEnergyYield, 0.000001, "Recent tough plant energy yield");
 }
 
 static void CreatureVisionConeHidesFoodBehindIt()
@@ -3163,6 +3171,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         RecentPlantRawYield = 0.36f,
         RecentPlantEnergyYield = 0.46f,
         RecentFoodEnergyYield = 0.56f,
+        RecentTenderPlantEnergyYield = 0.16f,
+        RecentRichPlantEnergyYield = 0.26f,
+        RecentToughPlantEnergyYield = 0.36f,
         CreatureProximity = 0.52f,
         CreatureDirectionForward = -0.62f,
         CreatureDirectionRight = 0.72f,
@@ -3235,6 +3246,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentPlantRawYieldInput], 0.000001, "Recent plant raw yield input");
     AssertClose(0.46f, inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput], 0.000001, "Recent plant energy yield input");
     AssertClose(0.56f, inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput], 0.000001, "Recent food energy yield input");
+    AssertClose(0.16f, inputs[NeuralBrainSchema.RecentTenderPlantEnergyYieldInput], 0.000001, "Recent tender plant energy yield input");
+    AssertClose(0.26f, inputs[NeuralBrainSchema.RecentRichPlantEnergyYieldInput], 0.000001, "Recent rich plant energy yield input");
+    AssertClose(0.36f, inputs[NeuralBrainSchema.RecentToughPlantEnergyYieldInput], 0.000001, "Recent tough plant energy yield input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
@@ -4587,6 +4601,57 @@ static void NeuralBrainMigratesSectorPlantQualityInputs()
         brain.GetHiddenInputWeight(0, NeuralBrainSchema.VisionSectorPlantBiteEaseInput(VisionSectorSet.CenterSectorIndex)),
         0.000001,
         "New sector plant bite ease hidden input starts neutral");
+}
+
+static void NeuralBrainMigratesTypedPlantEnergyYieldInputs()
+{
+    const int legacyInputCount = 221;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int oldRecentFoodEnergyYieldInput = 220;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.TurnOutput * legacyInputCount + oldRecentFoodEnergyYieldInput] = -0.9f;
+    legacyWeights[legacyHiddenInputOffset + oldRecentFoodEnergyYieldInput] = 1.1f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 1.5f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Typed plant yield migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Typed plant yield migrated weight count");
+    AssertClose(
+        -0.9f,
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RecentFoodEnergyYieldInput),
+        0.000001,
+        "Existing recent food energy yield direct input remains in place");
+    AssertClose(
+        1.1f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentFoodEnergyYieldInput),
+        0.000001,
+        "Existing recent food energy yield hidden input remains in place");
+    AssertClose(
+        1.5f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden movement output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RecentTenderPlantEnergyYieldInput),
+        0.000001,
+        "New recent tender plant yield input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentRichPlantEnergyYieldInput),
+        0.000001,
+        "New recent rich plant yield hidden input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentToughPlantEnergyYieldInput),
+        0.000001,
+        "New recent tough plant yield hidden input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()

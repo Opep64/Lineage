@@ -642,6 +642,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creature.LastPlantDigestedEnergy / expectedPlantDigestiveYield,
             0f,
             1f);
+        var recentTenderPlantEnergyYield = Math.Clamp(
+            creature.LastTenderPlantDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
+        var recentRichPlantEnergyYield = Math.Clamp(
+            creature.LastRichPlantDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
+        var recentToughPlantEnergyYield = Math.Clamp(
+            creature.LastToughPlantDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
         var recentFoodEnergyYield = Math.Clamp(
             creature.LastCaloriesDigested / expectedPlantDigestiveYield,
             0f,
@@ -659,6 +671,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.RecentFoodSuccess = recentFoodSuccess;
         senses.RecentPlantRawYield = recentPlantRawYield;
         senses.RecentPlantEnergyYield = recentPlantEnergyYield;
+        senses.RecentTenderPlantEnergyYield = recentTenderPlantEnergyYield;
+        senses.RecentRichPlantEnergyYield = recentRichPlantEnergyYield;
+        senses.RecentToughPlantEnergyYield = recentToughPlantEnergyYield;
         senses.RecentFoodEnergyYield = recentFoodEnergyYield;
         senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
     }
