@@ -93,6 +93,7 @@ var tests = new (string Name, Action Body)[]
     ("Opportunistic forager samples meat on contact", OpportunisticForagerSamplesMeatOnContact),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
+    ("Behavior assay reports plant choice probes", BehaviorAssayReportsPlantChoiceProbes),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
@@ -3841,16 +3842,52 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(30, summary.Results.Count, "Assay result count");
+    AssertEqual(41, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
+    AssertTrue(summary.RichPlantRight.Turn > 0.5f, "Rich plant right should turn right");
+    AssertTrue(summary.TenderPlantContact.EatShare > 0.9f, "Tender plant contact should trigger eating");
+    AssertTrue(summary.RichPlantContact.EatShare > 0.9f, "Rich plant contact should trigger eating");
+    AssertTrue(summary.ToughPlantContact.EatShare > 0.9f, "Tough plant contact should trigger eating");
+    AssertClose(
+        summary.RichPlantRight.Turn,
+        summary.RichTraceRichRight.Turn,
+        0.000001,
+        "Seed forager should not have built-in recent rich payoff steering");
     AssertTrue(summary.ReproductionReady.ReproduceShare > 0.9f, "Ready creatures should lay eggs");
     AssertTrue(summary.CreatureAhead.AttackShare < 0.1f, "Seed forager should not arrive with built-in attack behavior");
     AssertEqual("little terrain differentiation", summary.TerrainResponse, "Seed forager should not arrive with built-in terrain response");
     AssertClose(0f, summary.FreshMeatPreferenceScore, 0.000001, "Seed forager fresh meat score");
     AssertClose(0f, summary.RottenScentAvoidanceScore, 0.000001, "Seed forager rot scent score");
     AssertEqual("little freshness differentiation", summary.RottenMeatResponse, "Seed forager should not arrive with built-in rot response");
+}
+
+static void BehaviorAssayReportsPlantChoiceProbes()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 409, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisiblePlantBiteEaseInput] = 3.5f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.PlantFoodContactBiteEaseInput] = 3.5f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(
+        summary.TenderPlantAhead.MoveForward > summary.ToughPlantAhead.MoveForward + 0.8f,
+        "Plant-choice probe should expose bite-ease differences in visible plant cues");
+    AssertTrue(
+        summary.RichPlantAhead.MoveForward > summary.ToughPlantAhead.MoveForward + 0.3f,
+        "Rich plant visual bite ease should be distinguishable from tough plant cues");
+    AssertTrue(
+        summary.TenderPlantContact.EatShare > summary.ToughPlantContact.EatShare,
+        "Plant-choice probe should expose bite-ease differences in contact cues");
 }
 
 static void BehaviorAssayDetectsFreshMeatPreference()

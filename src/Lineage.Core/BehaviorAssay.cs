@@ -30,11 +30,22 @@ public static class BehaviorAssay
         var fedNoCue = new BehaviorAssayAccumulator();
         var plantAhead = new BehaviorAssayAccumulator();
         var plantRight = new BehaviorAssayAccumulator();
+        var genericPlantAhead = new BehaviorAssayAccumulator();
+        var tenderPlantAhead = new BehaviorAssayAccumulator();
+        var richPlantAhead = new BehaviorAssayAccumulator();
+        var toughPlantAhead = new BehaviorAssayAccumulator();
+        var richPlantRight = new BehaviorAssayAccumulator();
+        var closeTenderAheadFarRichRight = new BehaviorAssayAccumulator();
+        var farRichAheadCloseTenderRight = new BehaviorAssayAccumulator();
+        var richTraceRichRight = new BehaviorAssayAccumulator();
         var meatAhead = new BehaviorAssayAccumulator();
         var meatRight = new BehaviorAssayAccumulator();
         var rottenMeatAhead = new BehaviorAssayAccumulator();
         var rottenMeatRight = new BehaviorAssayAccumulator();
         var plantContact = new BehaviorAssayAccumulator();
+        var tenderPlantContact = new BehaviorAssayAccumulator();
+        var richPlantContact = new BehaviorAssayAccumulator();
+        var toughPlantContact = new BehaviorAssayAccumulator();
         var meatContact = new BehaviorAssayAccumulator();
         var eggContact = new BehaviorAssayAccumulator();
         var meatScentAhead = new BehaviorAssayAccumulator();
@@ -71,11 +82,34 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateFedNoCueSenses(), inputs, outputs, ref fedNoCue);
             Accumulate(brain, genome, CreatePlantAheadSenses(), inputs, outputs, ref plantAhead);
             Accumulate(brain, genome, CreatePlantRightSenses(), inputs, outputs, ref plantRight);
+            Accumulate(brain, genome, CreateTypedPlantAheadSenses(PlantResourceKind.Generic), inputs, outputs, ref genericPlantAhead);
+            Accumulate(brain, genome, CreateTypedPlantAheadSenses(PlantResourceKind.Tender), inputs, outputs, ref tenderPlantAhead);
+            Accumulate(brain, genome, CreateTypedPlantAheadSenses(PlantResourceKind.Rich), inputs, outputs, ref richPlantAhead);
+            Accumulate(brain, genome, CreateTypedPlantAheadSenses(PlantResourceKind.Tough), inputs, outputs, ref toughPlantAhead);
+            Accumulate(brain, genome, CreateTypedPlantRightSenses(PlantResourceKind.Rich), inputs, outputs, ref richPlantRight);
+            Accumulate(
+                brain,
+                genome,
+                CreateCloseTenderAheadFarRichRightSenses(),
+                inputs,
+                outputs,
+                ref closeTenderAheadFarRichRight);
+            Accumulate(
+                brain,
+                genome,
+                CreateFarRichAheadCloseTenderRightSenses(),
+                inputs,
+                outputs,
+                ref farRichAheadCloseTenderRight);
+            Accumulate(brain, genome, CreateRichTraceRichRightSenses(), inputs, outputs, ref richTraceRichRight);
             Accumulate(brain, genome, CreateMeatAheadSenses(), inputs, outputs, ref meatAhead);
             Accumulate(brain, genome, CreateMeatRightSenses(), inputs, outputs, ref meatRight);
             Accumulate(brain, genome, CreateRottenMeatAheadSenses(), inputs, outputs, ref rottenMeatAhead);
             Accumulate(brain, genome, CreateRottenMeatRightSenses(), inputs, outputs, ref rottenMeatRight);
             Accumulate(brain, genome, CreatePlantContactSenses(), inputs, outputs, ref plantContact);
+            Accumulate(brain, genome, CreateTypedPlantContactSenses(PlantResourceKind.Tender), inputs, outputs, ref tenderPlantContact);
+            Accumulate(brain, genome, CreateTypedPlantContactSenses(PlantResourceKind.Rich), inputs, outputs, ref richPlantContact);
+            Accumulate(brain, genome, CreateTypedPlantContactSenses(PlantResourceKind.Tough), inputs, outputs, ref toughPlantContact);
             Accumulate(brain, genome, CreateMeatContactSenses(), inputs, outputs, ref meatContact);
             Accumulate(brain, genome, CreateEggContactSenses(), inputs, outputs, ref eggContact);
             Accumulate(brain, genome, CreateMeatScentAheadSenses(), inputs, outputs, ref meatScentAhead);
@@ -105,11 +139,22 @@ public static class BehaviorAssay
             fedNoCue.ToResult("Fed no cue"),
             plantAhead.ToResult("Plant sector ahead"),
             plantRight.ToResult("Plant sector right"),
+            genericPlantAhead.ToResult("Generic plant sector ahead"),
+            tenderPlantAhead.ToResult("Tender plant sector ahead"),
+            richPlantAhead.ToResult("Rich plant sector ahead"),
+            toughPlantAhead.ToResult("Tough plant sector ahead"),
+            richPlantRight.ToResult("Rich plant sector right"),
+            closeTenderAheadFarRichRight.ToResult("Close tender ahead, far rich right"),
+            farRichAheadCloseTenderRight.ToResult("Far rich ahead, close tender right"),
+            richTraceRichRight.ToResult("Recent rich payoff, rich right"),
             meatAhead.ToResult("Fresh meat sector ahead"),
             meatRight.ToResult("Fresh meat sector right"),
             rottenMeatAhead.ToResult("Rotten meat sector ahead"),
             rottenMeatRight.ToResult("Rotten meat sector right"),
             plantContact.ToResult("Plant contact"),
+            tenderPlantContact.ToResult("Tender plant contact"),
+            richPlantContact.ToResult("Rich plant contact"),
+            toughPlantContact.ToResult("Tough plant contact"),
             meatContact.ToResult("Meat contact"),
             eggContact.ToResult("Egg contact"),
             meatScentAhead.ToResult("Meat scent ahead"),
@@ -291,6 +336,103 @@ public static class BehaviorAssay
             proximity: 0.65f);
     }
 
+    private static CreatureSenseState CreateTypedPlantAheadSenses(PlantResourceKind plantKind)
+    {
+        return WithPlantSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.82f,
+                FoodDirectionForward = 1f,
+                VisibleFoodDensity = 0.35f,
+                PlantDetected = true,
+                PlantProximity = 0.82f,
+                PlantDirectionForward = 1f,
+                VisiblePlantDensity = 0.35f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.82f,
+            plantKind);
+    }
+
+    private static CreatureSenseState CreateTypedPlantRightSenses(PlantResourceKind plantKind)
+    {
+        return WithPlantSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.65f,
+                FoodDirectionRight = 1f,
+                VisibleFoodDensity = 0.28f,
+                PlantDetected = true,
+                PlantProximity = 0.65f,
+                PlantDirectionRight = 1f,
+                VisiblePlantDensity = 0.28f
+            },
+            sectorIndex: 8,
+            proximity: 0.65f,
+            plantKind);
+    }
+
+    private static CreatureSenseState CreateCloseTenderAheadFarRichRightSenses()
+    {
+        var senses = WithPlantSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.88f,
+                FoodDirectionForward = 1f,
+                VisibleFoodDensity = 0.25f,
+                PlantDetected = true,
+                PlantProximity = 0.88f,
+                PlantDirectionForward = 1f,
+                VisiblePlantDensity = 0.25f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.88f,
+            PlantResourceKind.Tender);
+
+        return WithPlantSector(
+            senses,
+            sectorIndex: 8,
+            proximity: 0.45f,
+            PlantResourceKind.Rich);
+    }
+
+    private static CreatureSenseState CreateFarRichAheadCloseTenderRightSenses()
+    {
+        var senses = WithPlantSector(
+            CreateBaselineSenses() with
+            {
+                FoodDetected = true,
+                FoodProximity = 0.9f,
+                FoodDirectionRight = 1f,
+                VisibleFoodDensity = 0.25f,
+                PlantDetected = true,
+                PlantProximity = 0.9f,
+                PlantDirectionRight = 1f,
+                VisiblePlantDensity = 0.25f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 0.45f,
+            PlantResourceKind.Rich);
+
+        return WithPlantSector(
+            senses,
+            sectorIndex: 8,
+            proximity: 0.9f,
+            PlantResourceKind.Tender);
+    }
+
+    private static CreatureSenseState CreateRichTraceRichRightSenses()
+    {
+        return CreateTypedPlantRightSenses(PlantResourceKind.Rich) with
+        {
+            RecentRichPlantEnergyYield = 0.65f,
+            RichPlantPayoffTrace = 0.85f
+        };
+    }
+
     private static CreatureSenseState CreateMeatAheadSenses()
     {
         return WithMeatSector(
@@ -382,6 +524,17 @@ public static class BehaviorAssay
         };
     }
 
+    private static CreatureSenseState CreateTypedPlantContactSenses(PlantResourceKind plantKind)
+    {
+        return CreateBaselineSenses() with
+        {
+            FoodContact = 1f,
+            PlantFoodContact = 1f,
+            PlantFoodContactEnergyQuality = PlantResourceTraits.EnergyQualitySense(plantKind),
+            PlantFoodContactBiteEase = PlantResourceTraits.BiteEaseSense(plantKind)
+        };
+    }
+
     private static CreatureSenseState CreateMeatContactSenses()
     {
         return CreateBaselineSenses() with
@@ -450,6 +603,42 @@ public static class BehaviorAssay
         senses.PlantDetected = true;
         senses.VisibleFoodDensity = MathF.Max(senses.VisibleFoodDensity, 0.125f);
         senses.VisiblePlantDensity = MathF.Max(senses.VisiblePlantDensity, 0.125f);
+        return senses;
+    }
+
+    private static CreatureSenseState WithPlantSector(
+        CreatureSenseState senses,
+        int sectorIndex,
+        float proximity,
+        PlantResourceKind plantKind)
+    {
+        var energyQuality = PlantResourceTraits.EnergyQualitySense(plantKind);
+        var biteEase = PlantResourceTraits.BiteEaseSense(plantKind);
+        var qualityWeight = Math.Max(0.0001f, proximity);
+        var sectors = senses.VisionSectors;
+        sectors.AddPlant(sectorIndex, proximity, energyQuality, biteEase, qualityWeight);
+        senses.VisionSectors = sectors;
+        senses.FoodDetected = true;
+        senses.PlantDetected = true;
+        senses.VisibleFoodDensity = MathF.Max(senses.VisibleFoodDensity, 0.125f);
+
+        var previousWeight = senses.VisiblePlantDensity > 0f
+            ? senses.VisiblePlantDensity
+            : 0f;
+        var nextWeight = previousWeight + qualityWeight;
+        senses.VisiblePlantEnergyQuality = WeightedAverage(
+            senses.VisiblePlantEnergyQuality,
+            previousWeight,
+            energyQuality,
+            qualityWeight,
+            nextWeight);
+        senses.VisiblePlantBiteEase = WeightedAverage(
+            senses.VisiblePlantBiteEase,
+            previousWeight,
+            biteEase,
+            qualityWeight,
+            nextWeight);
+        senses.VisiblePlantDensity = Math.Clamp(senses.VisiblePlantDensity + 0.125f, 0.125f, 1f);
         return senses;
     }
 
@@ -985,6 +1174,18 @@ public static class BehaviorAssay
             + contact.EatShare * 0.5f;
     }
 
+    private static float WeightedAverage(
+        float current,
+        float currentWeight,
+        float value,
+        float valueWeight,
+        float nextWeight)
+    {
+        return nextWeight > 0f
+            ? (current * currentWeight + value * valueWeight) / nextWeight
+            : 0f;
+    }
+
     private static LineageBehaviorAccumulator GetLineageBehaviorGroup(
         Dictionary<EntityId, LineageBehaviorAccumulator> groups,
         EntityId founderId)
@@ -1081,11 +1282,22 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult FedNoCue,
     BehaviorAssayResult PlantAhead,
     BehaviorAssayResult PlantRight,
+    BehaviorAssayResult GenericPlantAhead,
+    BehaviorAssayResult TenderPlantAhead,
+    BehaviorAssayResult RichPlantAhead,
+    BehaviorAssayResult ToughPlantAhead,
+    BehaviorAssayResult RichPlantRight,
+    BehaviorAssayResult CloseTenderAheadFarRichRight,
+    BehaviorAssayResult FarRichAheadCloseTenderRight,
+    BehaviorAssayResult RichTraceRichRight,
     BehaviorAssayResult MeatAhead,
     BehaviorAssayResult MeatRight,
     BehaviorAssayResult RottenMeatAhead,
     BehaviorAssayResult RottenMeatRight,
     BehaviorAssayResult PlantContact,
+    BehaviorAssayResult TenderPlantContact,
+    BehaviorAssayResult RichPlantContact,
+    BehaviorAssayResult ToughPlantContact,
     BehaviorAssayResult MeatContact,
     BehaviorAssayResult EggContact,
     BehaviorAssayResult MeatScentAhead,
@@ -1136,11 +1348,22 @@ public readonly record struct BehaviorAssaySummary(
         FedNoCue,
         PlantAhead,
         PlantRight,
+        GenericPlantAhead,
+        TenderPlantAhead,
+        RichPlantAhead,
+        ToughPlantAhead,
+        RichPlantRight,
+        CloseTenderAheadFarRichRight,
+        FarRichAheadCloseTenderRight,
+        RichTraceRichRight,
         MeatAhead,
         MeatRight,
         RottenMeatAhead,
         RottenMeatRight,
         PlantContact,
+        TenderPlantContact,
+        RichPlantContact,
+        ToughPlantContact,
         MeatContact,
         EggContact,
         MeatScentAhead,

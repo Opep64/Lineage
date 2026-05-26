@@ -1734,6 +1734,28 @@ Readout:
 - Generic-only behavior should not require broad retuning from this change because the generic plant trait path remains `1.0 / 1.0`.
 - The broad scenario regression did not show a generic-food collapse. Harsh and omnivore remain low-population pressure scenarios, but all sampled seeds survived through 150k ticks.
 
+## 2026-05-26 Plant Choice Behavior Assays
+
+Extended the behavior assay table with controlled plant-choice probes:
+
+- Generic/tender/rich/tough plant sectors ahead.
+- Rich plant sector right, with and without recent rich payoff trace.
+- Conflict probes for close tender vs far rich and far rich vs close tender.
+- Tender/rich/tough plant contact probes.
+
+These probes do not change simulation behavior. They replay fixed sensory situations through living brains so reports can show whether a lineage is actually using plant quality/contact/payoff cues or merely following generic plant mass.
+
+Initial readout from tests:
+
+- The seed forager follows typed plant sectors and eats typed plant contacts.
+- The seed forager does not have built-in recent-rich-payoff steering; `rich right` and `recent rich payoff, rich right` produce the same turn response.
+- A deliberately wired probe brain can distinguish tender/rich/tough through visible and contact bite-ease cues, so the assay surface is capable of detecting plant-choice behavior when it exists.
+
+Next use:
+
+- Check exported reports from long plant-diversity runs for evolved lineages whose assay rows diverge by plant type.
+- If evolved lineages still show no plant-choice differentiation despite typed plant pressure, the next likely issue is not physiology but whether the brain has enough usable plant identity/payoff association.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
