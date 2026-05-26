@@ -20,10 +20,21 @@ public partial class Main : Node2D
     private const string StartupScenarioFileName = "balanced-foraging.json";
     private const string SpeciesProfileDirectoryName = "species";
     private const float LauncherPanelWidth = 520f;
-    private const float CollapsedLauncherPanelWidth = 230f;
-    private const float RightPanelWidth = 300f;
+    private const float RightPanelWidth = 640f;
     private const float ViewMargin = 24f;
+    private const float SelectionPanelWidth = 430f;
+    private const float SelectionPanelHeight = 460f;
+    private const float CompactStatsHeight = 184f;
+    private const float InstructionsPanelHeight = 88f;
+    private const float MiniGraphGap = 12f;
+    private const float MiniGraphPreferredSingleColumnHeight = 125f;
+    private const float DeathRateSmoothingGraphShare = 0.08f;
+    private const int MinDeathRateSmoothingSamples = 8;
+    private const int MaxDeathRateSmoothingSamples = 40;
     private const int GraphSampleCount = 240;
+    private const int MiniGraphCount = 4;
+    private const int MiniGraphCompactColumnCount = 2;
+    private const int MaxGraphSamplesDrawn = 8_000;
     private const float MinZoom = 0.25f;
     private const float MaxZoom = 80f;
     private const float KeyboardPanPixelsPerSecond = 650f;
@@ -66,6 +77,7 @@ public partial class Main : Node2D
     private readonly Color _graphPopulationColor = new(0.96f, 0.78f, 0.34f);
     private readonly Color _graphResourceColor = new(0.31f, 0.82f, 0.48f);
     private readonly Color _graphDeathColor = new(0.96f, 0.32f, 0.28f);
+    private readonly Color _graphSeasonColor = new(0.48f, 0.66f, 1.0f);
 
     private Simulation _simulation = null!;
     private SimulationScenario _scenario = new();
@@ -76,9 +88,18 @@ public partial class Main : Node2D
     private FileDialog _loadSpeciesProfileDialog = null!;
     private FileDialog _saveSpeciesProfileDialog = null!;
     private Label _hud = null!;
+    private Label _hudSecondary = null!;
+    private PanelContainer _selectionPanel = null!;
+    private Label _selectionTitle = null!;
     private ScrollContainer _inspectorScroll = null!;
     private Label _inspector = null!;
     private Label _graphLegend = null!;
+    private Label _graphDetails = null!;
+    private readonly Label[] _miniGraphLabels = new Label[MiniGraphCount];
+    private Button _runtimeStatsButton = null!;
+    private PanelContainer _runtimeStatsPanel = null!;
+    private ScrollContainer _runtimeStatsScroll = null!;
+    private Label _runtimeStatsLabel = null!;
     private Label _scaleBarLabel = null!;
     private bool _paused;
     private float _speedMultiplier = 1f;
@@ -86,10 +107,13 @@ public partial class Main : Node2D
     private double _stepAccumulator;
     private EntityId _selectedCreatureId;
     private EntityId _selectedEggId;
+    private SelectedInspectorView _selectedInspectorView = SelectedInspectorView.State;
+    private readonly Dictionary<SelectedInspectorView, Button> _selectionViewButtons = [];
     private ulong _currentSeed = SimulationScenario.DefaultSeed;
     private string? _currentScenarioPath;
     private bool _cliRunInProgress;
     private bool _runExportInProgress;
+    private bool _runtimeStatsVisible;
     private readonly ConcurrentQueue<Action> _mainThreadActions = new();
     private IReadOnlyList<SpeciesInjectionResult> _scenarioSpeciesInjections = Array.Empty<SpeciesInjectionResult>();
     private SpeciesProfile? _loadedSpeciesProfile;
@@ -123,7 +147,9 @@ public partial class Main : Node2D
     private float _measuredFrameMilliseconds;
 
     private Rect2 _worldRect;
-    private Rect2 _graphRect;
+    private Rect2 _rightPanelRect;
+    private Rect2 _graphPanelRect;
+    private readonly Rect2[] _miniGraphRects = new Rect2[MiniGraphCount];
     private Rect2 _scaleBarRect;
     private SimVector2 _viewCenter;
     private float _fitWorldScale = 1f;
@@ -134,28 +160,184 @@ public partial class Main : Node2D
     public override void _Ready()
     {
         _hud = CreateLabel(new Vector2(16f, 12f), Colors.White);
-        _inspectorScroll = new ScrollContainer
-        {
-            MouseFilter = Control.MouseFilterEnum.Stop
-        };
-        _inspector = CreateLabel(Vector2.Zero, new Color(0.9f, 0.92f, 0.88f));
-        _inspector.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _hudSecondary = CreateLabel(Vector2.Zero, Colors.White);
+        _selectionPanel = BuildSelectionPanel();
         _graphLegend = CreateLabel(Vector2.Zero, new Color(0.9f, 0.92f, 0.88f));
+        _graphLegend.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _graphDetails = CreateLabel(Vector2.Zero, new Color(0.9f, 0.92f, 0.88f));
+        _graphDetails.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _graphDetails.Visible = false;
+        for (var i = 0; i < _miniGraphLabels.Length; i++)
+        {
+            _miniGraphLabels[i] = CreateLabel(Vector2.Zero, Colors.White);
+            _miniGraphLabels[i].AutowrapMode = TextServer.AutowrapMode.Off;
+        }
+
+        _runtimeStatsButton = new Button
+        {
+            Text = "Full Stats",
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            ZIndex = 3
+        };
+        _runtimeStatsButton.Pressed += ToggleRuntimeStatsOverlay;
+        _runtimeStatsPanel = BuildRuntimeStatsPanel();
+        _runtimeStatsPanel.ZIndex = 10;
         _scaleBarLabel = CreateLabel(Vector2.Zero, Colors.White);
         _scaleBarLabel.HorizontalAlignment = HorizontalAlignment.Center;
         LoadStartupScenario();
         _currentSeed = _scenario.Seed;
 
         AddChild(_hud);
-        AddChild(_inspectorScroll);
-        _inspectorScroll.AddChild(_inspector);
+        AddChild(_hudSecondary);
+        AddChild(_selectionPanel);
         AddChild(_graphLegend);
+        AddChild(_graphDetails);
+        for (var i = 0; i < _miniGraphLabels.Length; i++)
+        {
+            AddChild(_miniGraphLabels[i]);
+        }
+
+        AddChild(_runtimeStatsButton);
+        AddChild(_runtimeStatsPanel);
         AddChild(_scaleBarLabel);
         CreateScenarioLauncher();
         _scenarioEditor.SetScenario(_scenario);
-        _scenarioEditor.SetMapVisible(_renderMap);
 
         ResetSimulation(resetView: true);
+    }
+
+    private PanelContainer BuildSelectionPanel()
+    {
+        var panel = new PanelContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            Visible = false
+        };
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 10);
+        margin.AddThemeConstantOverride("margin_top", 10);
+        margin.AddThemeConstantOverride("margin_right", 10);
+        margin.AddThemeConstantOverride("margin_bottom", 10);
+        panel.AddChild(margin);
+
+        var root = new VBoxContainer();
+        root.AddThemeConstantOverride("separation", 8);
+        margin.AddChild(root);
+
+        _selectionTitle = new Label
+        {
+            Text = "Selected",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        root.AddChild(_selectionTitle);
+
+        var buttonRow = new HBoxContainer();
+        buttonRow.AddThemeConstantOverride("separation", 6);
+        root.AddChild(buttonRow);
+        buttonRow.AddChild(CreateInspectorViewButton("State", SelectedInspectorView.State));
+        buttonRow.AddChild(CreateInspectorViewButton("Body", SelectedInspectorView.Body));
+        buttonRow.AddChild(CreateInspectorViewButton("Senses", SelectedInspectorView.Senses));
+        buttonRow.AddChild(CreateInspectorViewButton("Brain", SelectedInspectorView.Brain));
+
+        _inspectorScroll = new ScrollContainer
+        {
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Stop
+        };
+        _inspector = CreateLabel(Vector2.Zero, new Color(0.9f, 0.92f, 0.88f));
+        _inspector.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _inspector.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _inspectorScroll.AddChild(_inspector);
+        root.AddChild(_inspectorScroll);
+
+        RefreshSelectionViewButtons();
+        return panel;
+    }
+
+    private PanelContainer BuildRuntimeStatsPanel()
+    {
+        var panel = new PanelContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            Visible = false
+        };
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 10);
+        margin.AddThemeConstantOverride("margin_top", 10);
+        margin.AddThemeConstantOverride("margin_right", 10);
+        margin.AddThemeConstantOverride("margin_bottom", 10);
+        panel.AddChild(margin);
+
+        var root = new VBoxContainer();
+        root.AddThemeConstantOverride("separation", 8);
+        margin.AddChild(root);
+
+        var header = new HBoxContainer();
+        header.AddThemeConstantOverride("separation", 8);
+        root.AddChild(header);
+
+        header.AddChild(new Label
+        {
+            Text = "Runtime Stats",
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        });
+
+        var closeButton = new Button
+        {
+            Text = "Close",
+            MouseFilter = Control.MouseFilterEnum.Stop
+        };
+        closeButton.Pressed += ToggleRuntimeStatsOverlay;
+        header.AddChild(closeButton);
+
+        _runtimeStatsScroll = new ScrollContainer
+        {
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            MouseFilter = Control.MouseFilterEnum.Stop
+        };
+        _runtimeStatsLabel = CreateLabel(Vector2.Zero, new Color(0.9f, 0.92f, 0.88f));
+        _runtimeStatsLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _runtimeStatsLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _runtimeStatsScroll.AddChild(_runtimeStatsLabel);
+        root.AddChild(_runtimeStatsScroll);
+
+        return panel;
+    }
+
+    private void ToggleRuntimeStatsOverlay()
+    {
+        _runtimeStatsVisible = !_runtimeStatsVisible;
+        _runtimeStatsPanel.Visible = _runtimeStatsVisible;
+        _runtimeStatsButton.Text = _runtimeStatsVisible ? "Hide Stats" : "Full Stats";
+        UpdateLabels();
+    }
+
+    private Button CreateInspectorViewButton(string text, SelectedInspectorView view)
+    {
+        var button = new Button
+        {
+            Text = text,
+            ToggleMode = true,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        button.Pressed += () =>
+        {
+            _selectedInspectorView = view;
+            RefreshSelectionViewButtons();
+            UpdateLabels();
+        };
+        _selectionViewButtons[view] = button;
+        return button;
+    }
+
+    private void RefreshSelectionViewButtons()
+    {
+        foreach (var (view, button) in _selectionViewButtons)
+        {
+            button.ButtonPressed = view == _selectedInspectorView;
+        }
     }
 
     public override void _Process(double delta)
@@ -198,7 +380,7 @@ public partial class Main : Node2D
     {
         DrawRect(GetViewportRect(), _backgroundColor, filled: true);
 
-        DrawRect(new Rect2(_worldRect.Position + new Vector2(_worldRect.Size.X + 12f, 0f), new Vector2(RightPanelWidth, _worldRect.Size.Y)), _panelColor, filled: true);
+        DrawRect(_rightPanelRect, _panelColor, filled: true);
 
         if (_renderMap)
         {
@@ -358,7 +540,6 @@ public partial class Main : Node2D
     private void SetMapVisible(bool renderMap)
     {
         _renderMap = renderMap;
-        _scenarioEditor.SetMapVisible(_renderMap);
         _scaleBarLabel.Visible = _renderMap;
 
         if (!_renderMap)
@@ -669,7 +850,8 @@ public partial class Main : Node2D
     {
         var viewport = GetViewportRect();
         var launcherWidth = GetLauncherWidth();
-        var leftEdge = _scenarioEditor.Visible
+        var launcherExpanded = _scenarioEditor.Visible && !_scenarioEditor.IsCollapsed;
+        var leftEdge = launcherExpanded
             ? launcherWidth + ViewMargin * 2f
             : ViewMargin;
         var worldScreenWidth = MathF.Max(100f, viewport.Size.X - leftEdge - RightPanelWidth - ViewMargin * 2f);
@@ -681,43 +863,75 @@ public partial class Main : Node2D
 
         _worldRect = new Rect2(new Vector2(leftEdge, ViewMargin), new Vector2(worldScreenWidth, worldScreenHeight));
         var rightPanelPosition = _worldRect.Position + new Vector2(_worldRect.Size.X + 12f, 0f);
+        _rightPanelRect = new Rect2(rightPanelPosition, new Vector2(RightPanelWidth, _worldRect.Size.Y));
         var rightPanelContentX = rightPanelPosition.X + 12f;
         var rightPanelContentWidth = RightPanelWidth - 24f;
-        var graphHeight = 150f;
-        var graphLegendHeight = 54f;
-        var graphBottomMargin = 10f;
-        _graphRect = new Rect2(
-            new Vector2(rightPanelContentX, rightPanelPosition.Y + _worldRect.Size.Y - graphHeight - graphBottomMargin),
-            new Vector2(rightPanelContentWidth, graphHeight));
-        _graphLegend.Position = new Vector2(rightPanelContentX, _graphRect.Position.Y - graphLegendHeight);
-        _graphLegend.Size = new Vector2(rightPanelContentWidth, graphLegendHeight);
+        var rightPanelTop = rightPanelPosition.Y + 8f;
+        var statsColumnGap = 18f;
+        var statsColumnWidth = (rightPanelContentWidth - statsColumnGap) * 0.5f;
 
-        _inspectorScroll.Position = new Vector2(rightPanelContentX, rightPanelPosition.Y + 8f);
-        _inspectorScroll.Size = new Vector2(
-            rightPanelContentWidth,
-            MathF.Max(120f, _graphLegend.Position.Y - _inspectorScroll.Position.Y - 10f));
-        _inspector.Size = new Vector2(rightPanelContentWidth - 18f, 900f);
-        _inspector.CustomMinimumSize = new Vector2(rightPanelContentWidth - 18f, 0f);
+        _hud.Position = new Vector2(rightPanelContentX, rightPanelTop);
+        _hud.Size = new Vector2(statsColumnWidth, CompactStatsHeight);
+        _hudSecondary.Position = new Vector2(rightPanelContentX + statsColumnWidth + statsColumnGap, rightPanelTop + 34f);
+        _hudSecondary.Size = new Vector2(statsColumnWidth, CompactStatsHeight - 34f);
 
-        if (_scenarioEditor.Visible && _scenarioEditor.IsCollapsed)
+        _runtimeStatsButton.Position = new Vector2(rightPanelPosition.X + RightPanelWidth - 116f, rightPanelTop);
+        _runtimeStatsButton.Size = new Vector2(104f, 30f);
+
+        var instructionsTop = rightPanelTop + CompactStatsHeight + 8f;
+        _graphLegend.Position = new Vector2(rightPanelContentX, instructionsTop);
+        _graphLegend.Size = new Vector2(rightPanelContentWidth, InstructionsPanelHeight);
+        _graphDetails.Visible = false;
+
+        var graphTop = instructionsTop + InstructionsPanelHeight + 10f;
+        var graphAreaHeight = MathF.Max(240f, _worldRect.End.Y - graphTop - 12f);
+        _graphPanelRect = new Rect2(
+            new Vector2(rightPanelContentX, graphTop),
+            new Vector2(rightPanelContentWidth, graphAreaHeight));
+        var singleColumnHeight = (_graphPanelRect.Size.Y - MiniGraphGap * (MiniGraphCount - 1)) / MiniGraphCount;
+        var graphColumnCount = singleColumnHeight >= MiniGraphPreferredSingleColumnHeight
+            ? 1
+            : MiniGraphCompactColumnCount;
+        var graphRows = Math.Max(1, (int)Math.Ceiling(MiniGraphCount / (float)graphColumnCount));
+        var miniGraphWidth = MathF.Max(
+            120f,
+            (_graphPanelRect.Size.X - MiniGraphGap * (graphColumnCount - 1)) / graphColumnCount);
+        var miniGraphHeight = MathF.Max(
+            54f,
+            (_graphPanelRect.Size.Y - MiniGraphGap * (graphRows - 1)) / graphRows);
+        for (var i = 0; i < MiniGraphCount; i++)
         {
-            _hud.Position = new Vector2(16f, 84f);
-            _hud.Size = new Vector2(CollapsedLauncherPanelWidth - 24f, 340f);
+            var column = i % graphColumnCount;
+            var row = i / graphColumnCount;
+            var rect = new Rect2(
+                _graphPanelRect.Position + new Vector2(
+                    column * (miniGraphWidth + MiniGraphGap),
+                    row * (miniGraphHeight + MiniGraphGap)),
+                new Vector2(miniGraphWidth, miniGraphHeight));
+            _miniGraphRects[i] = rect;
+            _miniGraphLabels[i].Position = rect.Position + new Vector2(12f, 6f);
+            _miniGraphLabels[i].Size = new Vector2(rect.Size.X - 24f, 24f);
         }
-        else if (_scenarioEditor.Visible)
+
+        var overlayWidth = MathF.Min(460f, MathF.Max(320f, _worldRect.Size.X * 0.36f));
+        _runtimeStatsPanel.Position = new Vector2(_worldRect.End.X - overlayWidth - 12f, _worldRect.Position.Y + 12f);
+        _runtimeStatsPanel.Size = new Vector2(overlayWidth, MathF.Max(260f, _worldRect.Size.Y - 24f));
+        _runtimeStatsLabel.CustomMinimumSize = new Vector2(overlayWidth - 44f, 0f);
+
+        var hasSelection = HasSelectedEntity();
+        _selectionPanel.Visible = hasSelection;
+        if (hasSelection)
         {
-            _hud.Position = _worldRect.Position + new Vector2(12f, 12f);
-            _hud.Size = new Vector2(300f, 340f);
-        }
-        else
-        {
-            _hud.Position = new Vector2(16f, 12f);
-            _hud.Size = new Vector2(300f, 340f);
+            var selectionWidth = MathF.Min(SelectionPanelWidth, MathF.Max(280f, _worldRect.Size.X - 24f));
+            var selectionHeight = MathF.Min(SelectionPanelHeight, MathF.Max(260f, _worldRect.Size.Y - 24f));
+            _selectionPanel.Position = _worldRect.Position + new Vector2(12f, 12f);
+            _selectionPanel.Size = new Vector2(selectionWidth, selectionHeight);
+            _inspector.CustomMinimumSize = new Vector2(selectionWidth - 44f, 0f);
         }
 
         _scenarioEditor.Position = new Vector2(12f, 12f);
         _scenarioEditor.Size = _scenarioEditor.IsCollapsed
-            ? new Vector2(CollapsedLauncherPanelWidth, 56f)
+            ? Vector2.Zero
             : new Vector2(LauncherPanelWidth, MathF.Max(240f, viewport.Size.Y - 24f));
         ClampViewCenter();
         UpdateScaleBarLayout();
@@ -784,11 +998,24 @@ public partial class Main : Node2D
             ? $"Season {season.Phase * 100f:0}%  Here {season.FertilityMultiplier:0.00}x  Biome {biomeSeason:0.00}x\n"
             : string.Empty;
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
-        var launcherHint = _scenarioEditor.IsCollapsed
-            ? "S expands launcher"
-            : "S collapses launcher";
 
         _hud.Text =
+            $"Lineage\n" +
+            $"{(_paused ? "Paused" : "Running")}  {FormatSpeed(_speedMultiplier)}\n" +
+            $"TPS {_measuredTicksPerSecond:0.0}  Frame {_measuredFrameMilliseconds:0.0}ms\n" +
+            $"Seed {_currentSeed}\n" +
+            $"Tick {state.Tick}  Time {state.ElapsedSeconds:0.0}s\n" +
+            $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}";
+
+        _hudSecondary.Text =
+            $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
+            $"Max gen {snapshot.MaxGeneration}\n" +
+            $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
+            $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
+            $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
+            (seasonText.Length > 0 ? seasonText.TrimEnd() : "Season off");
+
+        _runtimeStatsLabel.Text =
             $"Lineage\n" +
             $"{(_paused ? "Paused" : "Running")}  {FormatSpeed(_speedMultiplier)}\n" +
             $"TPS {_measuredTicksPerSecond:0.0}  Frame {_measuredFrameMilliseconds:0.0}ms\n" +
@@ -826,26 +1053,30 @@ public partial class Main : Node2D
             $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}  fwd {snapshot.AverageForwardObstacle:0.00}\n" +
             $"Biome pop B {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} S {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} R {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
             $"Biome move {snapshot.AverageBiomeMovementCostMultiplier:0.00}x basal {snapshot.AverageBiomeBasalCostMultiplier:0.00}x speed {snapshot.AverageBiomeSpeedMultiplier:0.00}x\n" +
-            $"Color {FormatColorMode(_colorMode)}\n" +
-            $"Arrows pan  G follows\n" +
-            $"B toggles biomes\n" +
-            $"C changes color mode\n" +
-            $"V sectors {(_showVisionSectorDebug ? "shown" : "hidden")}\n" +
-            $"M toggles map\n" +
-            $"{launcherHint}";
+            $"Color {FormatColorMode(_colorMode)}";
 
+        _selectionTitle.Text = BuildSelectionTitle();
         _inspector.Text = BuildInspectorText();
+        RefreshSelectionViewButtons();
         _graphLegend.Text =
-            $"Population {state.Creatures.Count}\n" +
-            $"Food kcal {snapshot.TotalResourceCalories:0}\n" +
-            $"Plant kcal {snapshot.TotalPlantCalories:0}  Meat kcal {snapshot.TotalMeatCalories:0}\n" +
-            $"Digested {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s  Gut {snapshot.AverageGutFillRatio * 100f:0}%\n" +
-            $"Seen F {FormatPercent(Share(snapshot.FoodDetectedCreatureCount, snapshot.CreatureCount))}  C {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Attack intent {FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount))}  contact {FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Attack dmg {snapshot.TotalAttackDamagePerSecond:0.0}/s  raw {snapshot.AverageAttackOutput:0.00}\n" +
-            $"Eat {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Fresh kill {snapshot.TotalLivePreyCaloriesEatenPerSecond:0.0}/s\n" +
-            $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}\n" +
-            $"Deaths {state.Stats.CreatureDeathCount}";
+            $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Population)}\n" +
+            $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Season)}\n" +
+            "Keys: Space/P pause  +/- speed  R restart  N seed  S scenario\n" +
+            $"Move: Arrows/Wheel/Drag  Click select  G follow  F reset  B/C/V/M toggles";
+
+        _miniGraphLabels[0].Text = $"Population {state.Creatures.Count}";
+        _miniGraphLabels[0].AddThemeColorOverride("font_color", _graphPopulationColor);
+        _miniGraphLabels[1].Text = $"Food {snapshot.TotalResourceCalories:0} kcal";
+        _miniGraphLabels[1].AddThemeColorOverride("font_color", _graphResourceColor);
+        var deathRate = state.Stats.Snapshots.Count > 1
+            ? GetGraphMetricValue(state.Stats.Snapshots[^1], state.Stats.Snapshots.Count - 1, GraphMetric.Deaths)
+            : 0f;
+        _miniGraphLabels[2].Text = $"Deaths {deathRate:0.00}/s avg";
+        _miniGraphLabels[2].AddThemeColorOverride("font_color", _graphDeathColor);
+        _miniGraphLabels[3].Text = _scenario.EnableSeasons
+            ? $"Season {snapshot.SeasonPhase * 100f:0}%  {snapshot.SeasonFertilityMultiplier:0.00}x"
+            : "Season off";
+        _miniGraphLabels[3].AddThemeColorOverride("font_color", _graphSeasonColor);
     }
 
     private static int CountActiveResources(IReadOnlyList<ResourcePatchState> resources)
@@ -862,11 +1093,71 @@ public partial class Main : Node2D
         return count;
     }
 
+    private string FormatGraphTickSpan(IReadOnlyList<SimulationStatsSnapshot> snapshots, GraphMetric metric)
+    {
+        if (snapshots.Count < 2)
+        {
+            return $"Graph: waiting for samples, records every {_scenario.StatsSnapshotIntervalTicks} ticks";
+        }
+
+        var sampleCount = GetGraphSampleCount(metric, snapshots.Count);
+        var first = snapshots[^sampleCount];
+        var last = snapshots[^1];
+        var tickSpan = Math.Max(0L, last.Tick - first.Tick);
+        return metric == GraphMetric.Season && _scenario.EnableSeasons
+            ? $"Season graph: last {tickSpan:N0} ticks ({sampleCount} samples, 1 season target)"
+            : $"Graphs: last {tickSpan:N0} ticks ({sampleCount} samples)";
+    }
+
+    private int GetGraphSampleCount(GraphMetric metric, int availableSnapshotCount)
+    {
+        if (availableSnapshotCount < 2)
+        {
+            return availableSnapshotCount;
+        }
+
+        var sampleCount = GraphSampleCount;
+        if (metric == GraphMetric.Season && _scenario.EnableSeasons)
+        {
+            var fixedDeltaSeconds = MathF.Max(0.0001f, _scenario.FixedDeltaSeconds);
+            var snapshotIntervalTicks = Math.Max(1, _scenario.StatsSnapshotIntervalTicks);
+            var seasonTicks = Math.Max(1.0, _scenario.SeasonLengthSeconds / (double)fixedDeltaSeconds);
+            var seasonSnapshots = Math.Ceiling(seasonTicks / snapshotIntervalTicks) + 1.0;
+            var seasonSnapshotCount = seasonSnapshots >= int.MaxValue
+                ? int.MaxValue
+                : (int)seasonSnapshots;
+            sampleCount = Math.Max(sampleCount, seasonSnapshotCount);
+        }
+
+        var maxAllowed = Math.Min(availableSnapshotCount, MaxGraphSamplesDrawn);
+        return Math.Clamp(sampleCount, 2, maxAllowed);
+    }
+
+    private bool HasSelectedEntity()
+    {
+        return _selectedCreatureId != default || _selectedEggId != default;
+    }
+
+    private string BuildSelectionTitle()
+    {
+        if (_selectedCreatureId != default && TryGetSelectedCreature(out var creature))
+        {
+            return $"Creature #{creature.Id.Value} - {_selectedInspectorView}";
+        }
+
+        if (_selectedEggId != default && TryGetSelectedEgg(out var egg))
+        {
+            return $"Egg #{egg.Id.Value}";
+        }
+
+        return "Selected";
+    }
+
     private string BuildInspectorText()
     {
         if (_selectedCreatureId == default && _selectedEggId == default)
         {
-            return "Selected\nNone";
+            return "None";
         }
 
         if (_selectedCreatureId != default)
@@ -883,7 +1174,7 @@ public partial class Main : Node2D
             }
 
             ClearSelection();
-            return "Selected\nNone";
+            return "None";
         }
 
         if (_selectedEggId != default && TryGetSelectedEgg(out var egg))
@@ -892,11 +1183,31 @@ public partial class Main : Node2D
         }
 
         ClearSelection();
-        return "Selected\nNone";
+        return "None";
     }
 
     private string BuildCreatureInspectorText(CreatureState creature)
     {
+        if (_selectedInspectorView == SelectedInspectorView.State)
+        {
+            return BuildCreatureStateInspectorText(creature);
+        }
+
+        if (_selectedInspectorView == SelectedInspectorView.Body)
+        {
+            return BuildCreatureBodyInspectorText(creature);
+        }
+
+        if (_selectedInspectorView == SelectedInspectorView.Senses)
+        {
+            return BuildCreatureSensesInspectorText(creature);
+        }
+
+        if (_selectedInspectorView == SelectedInspectorView.Brain)
+        {
+            return BuildCreatureBrainInspectorText(creature);
+        }
+
         var genome = _simulation.State.GetGenome(creature.GenomeId);
         var senses = creature.Senses;
         var maturityProgress = CreatureGrowth.MaturityProgress(creature, genome);
@@ -1019,6 +1330,171 @@ public partial class Main : Node2D
             $"Eat intent {creature.Actions.WantsEat}\n" +
             $"Attack intent {creature.Actions.WantsAttack}\n" +
             $"Reproduce {creature.Actions.WantsReproduce}";
+    }
+
+    private string BuildCreatureStateInspectorText(CreatureState creature)
+    {
+        var genome = _simulation.State.GetGenome(creature.GenomeId);
+        var senses = creature.Senses;
+        var maturityProgress = CreatureGrowth.MaturityProgress(creature, genome);
+        var growthFactor = CreatureGrowth.GrowthFactor(creature, genome);
+        var maturityText = CreatureGrowth.IsMature(creature, genome)
+            ? "adult"
+            : $"juvenile {maturityProgress:P0}";
+        _simulation.State.TryGetLineageRecord(creature.Id, out var lineage);
+        var parentText = lineage.IsFounder ? "founder" : $"parent #{lineage.ParentId.Value}";
+        var biome = _simulation.State.Biomes.GetKindAt(creature.Position);
+        var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
+        var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
+        var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
+        var seasonalFertility = SeasonalFertility.CalculateBiomeMultiplierAt(
+            _scenario.EnableSeasons,
+            _simulation.State.ElapsedSeconds,
+            _scenario.SeasonLengthSeconds,
+            _scenario.SeasonFertilityAmplitude,
+            _scenario.SeasonPhaseOffsetSeconds,
+            _scenario.SeasonPhaseMode,
+            _simulation.State.Bounds,
+            creature.Position,
+            biome,
+            _scenario.CreateBiomeSeasonalAmplitudeProfile());
+
+        return
+            $"Identity\n" +
+            $"Lineage {parentText}   Gen {creature.Generation}\n" +
+            $"Genome {creature.GenomeId}   Brain {FormatBrainText(creature.BrainId)}\n\n" +
+            $"Vitals\n" +
+            $"Energy {creature.Energy:0.0}   Health {creature.Health:0.00} ({senses.HealthRatio:P0})\n" +
+            $"Age {creature.AgeSeconds:0.0}s   Growth {maturityText} ({growthFactor:P0})\n" +
+            $"Birth investment {creature.BirthInvestmentRatio:0.00}x\n\n" +
+            $"Place\n" +
+            $"Biome {FormatBiomeKind(biome)}   season {seasonalFertility:0.00}x\n" +
+            $"Move {movementCostMultiplier:0.00}x   basal {basalCostMultiplier:0.00}x   speed {speedMultiplier:0.00}x\n" +
+            $"Position {creature.Position.X:0}, {creature.Position.Y:0}\n\n" +
+            $"Movement\n" +
+            $"Actual speed {creature.Velocity.Length:0.0}   desired {creature.DesiredVelocity.Length:0.0}\n" +
+            $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
+            $"Speed cost {MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, _scenario.MovementSpeedCostExponent):0.00}x\n\n" +
+            $"Food\n" +
+            $"Last meal {BuildLastMealSourceText(creature)}\n" +
+            $"Since meal {creature.SecondsSinceLastMeal:0.0}s   distance {creature.DistanceSinceLastMeal:0.0}u\n" +
+            $"Touching food {(creature.IsTouchingFood ? "yes" : "no")}\n" +
+            BuildFoodContactText(creature, genome) +
+            $"Swallowed {creature.LastCaloriesEaten:0.00} raw ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
+            $"Digested {creature.LastCaloriesDigested:0.00} energy ({FormatPerSecond(creature.LastCaloriesDigested)}/s)\n\n" +
+            $"Reproduction\n" +
+            $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
+            $"Ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}   cooldown {creature.ReproductionCooldownSeconds:0.0}s\n";
+    }
+
+    private string BuildCreatureBodyInspectorText(CreatureState creature)
+    {
+        var genome = _simulation.State.GetGenome(creature.GenomeId);
+        var gutCapacity = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome);
+        var gutTotal = creature.GutPlantCalories + creature.GutMeatCalories;
+        var gutFillRatio = gutCapacity > 0f
+            ? Math.Clamp(gutTotal / gutCapacity, 0f, 1f)
+            : 0f;
+
+        return
+            $"Body\n" +
+            $"Radius {CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}/{genome.BodyRadius:0.0}\n" +
+            $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
+            $"Turn {CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome):0.0}/{genome.MaxTurnRadiansPerSecond:0.0}\n" +
+            $"Vision range {CreatureGrowth.EffectiveSenseRadius(creature, genome):0.0}/{genome.SenseRadius:0.0}\n" +
+            $"Vision angle {ToDegrees(CreatureGrowth.EffectiveVisionAngleRadians(creature, genome)):0}deg/{ToDegrees(genome.VisionAngleRadians):0}deg\n\n" +
+            $"Diet & Digestion\n" +
+            $"Diet meat bias {genome.DietaryAdaptation:0.00}   carrion {genome.CarrionAdaptation:0.00}\n" +
+            $"Plant efficiency {CreatureDigestion.PlantEfficiency(genome):P0}   meat {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
+            $"Fresh meat {CreatureDigestion.FreshMeatEnergyEfficiency(genome):P0}   stale {CreatureDigestion.StaleMeatEnergyEfficiency(genome):P0}\n" +
+            $"Eat rate {CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome):0.0}/{genome.EatCaloriesPerSecond:0.0}\n" +
+            $"Digest rate {CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome):0.0}/{genome.DigestionCaloriesPerSecond:0.0}\n" +
+            $"Gut {gutTotal:0.0}/{gutCapacity:0.0} ({gutFillRatio:P0})\n" +
+            $"Gut plant {creature.GutPlantCalories:0.0}   meat {creature.GutMeatCalories:0.0}\n\n" +
+            $"Plant Specialization\n" +
+            $"Adapt T {genome.TenderPlantAdaptation:0.00}   R {genome.RichPlantAdaptation:0.00}   Tough {genome.ToughPlantAdaptation:0.00}\n" +
+            $"Yield T {CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tender):P0}   R {CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Rich):P0}   Tough {CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tough):P0}\n\n" +
+            $"Combat\n" +
+            $"Bite strength {CreatureGrowth.EffectiveBiteStrength(creature, genome):0.00}/{genome.BiteStrength:0.00}\n" +
+            $"Damage resistance {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
+            $"Creature contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
+            $"Attack damage last tick {creature.LastAttackDamageDealt:0.000}\n\n" +
+            $"Development & Mutation\n" +
+            $"Mature at {genome.MaturityAgeSeconds:0.0}s   egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
+            $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s   repro threshold {genome.ReproductionEnergyThreshold:0.0}\n" +
+            $"Mutation strength {genome.MutationStrength:0.000}\n" +
+            $"Trait mutation {genome.TraitMutationRate:P0}   brain mutation {genome.BrainMutationRate:P0}\n";
+    }
+
+    private string BuildCreatureSensesInspectorText(CreatureState creature)
+    {
+        var genome = _simulation.State.GetGenome(creature.GenomeId);
+        var senses = creature.Senses;
+
+        return
+            $"Vision\n" +
+            $"Sector hits {BuildVisionSectorHitSummary(senses.VisionSectors)}\n" +
+            $"Food {(senses.FoodDetected ? "yes" : "no")}   density {senses.VisibleFoodDensity:0.00}\n" +
+            $"Food prox {senses.FoodProximity:0.00}   fwd {senses.FoodDirectionForward:0.00}   right {senses.FoodDirectionRight:0.00}\n" +
+            $"Plants {(senses.PlantDetected ? "yes" : "no")}   density {senses.VisiblePlantDensity:0.00}\n" +
+            $"Plant prox {senses.PlantProximity:0.00}   fwd {senses.PlantDirectionForward:0.00}   right {senses.PlantDirectionRight:0.00}\n" +
+            $"Plant quality {senses.VisiblePlantEnergyQuality:0.00}   bite ease {senses.VisiblePlantBiteEase:0.00}\n" +
+            $"Meat {(senses.MeatDetected ? "yes" : "no")}   density {senses.VisibleMeatDensity:0.00}\n" +
+            $"Meat prox {senses.MeatProximity:0.00}   fwd {senses.MeatDirectionForward:0.00}   right {senses.MeatDirectionRight:0.00}\n" +
+            $"Visible meat fresh {senses.VisibleMeatFreshness:P0}\n\n" +
+            $"Scent\n" +
+            $"Meat scent {(senses.MeatScentDetected ? "yes" : "no")}   density {senses.MeatScentDensity:0.00}\n" +
+            $"Meat scent fwd {senses.MeatScentDirectionForward:0.00}   right {senses.MeatScentDirectionRight:0.00}\n" +
+            $"Rot scent {(senses.RottenMeatScentDetected ? "yes" : "no")}   density {senses.RottenMeatScentDensity:0.00}\n" +
+            $"Rot fwd {senses.RottenMeatScentDirectionForward:0.00}   right {senses.RottenMeatScentDirectionRight:0.00}\n\n" +
+            $"Creatures\n" +
+            $"Seen {(senses.CreatureDetected ? "yes" : "no")}   density {senses.VisibleCreatureDensity:0.00}\n" +
+            $"Prox {senses.CreatureProximity:0.00}   fwd {senses.CreatureDirectionForward:0.00}   right {senses.CreatureDirectionRight:0.00}\n" +
+            $"Size {senses.CreatureRelativeBodySize:0.00}   speed {senses.CreatureRelativeSpeed:0.00}\n" +
+            $"Approach {senses.CreatureApproachRate:0.00}   facing {senses.CreatureFacingAlignment:0.00}\n\n" +
+            $"Touch & Terrain\n" +
+            $"Food contact {(creature.IsTouchingFood ? "yes" : "no")}\n" +
+            BuildFoodContactText(creature, genome) +
+            $"Plant taste energy {senses.PlantFoodContactEnergyQuality:0.00}   bite {senses.PlantFoodContactBiteEase:0.00}\n" +
+            $"Terrain now {senses.CurrentTerrainDrag:0.00}   ahead {senses.ForwardTerrainDrag:0.00}   L {senses.LeftTerrainDrag:0.00}   R {senses.RightTerrainDrag:0.00}\n" +
+            $"Obstacle fwd {senses.ForwardObstacle:0.00}   L {senses.LeftObstacle:0.00}   R {senses.RightObstacle:0.00}   blocked {senses.MovementBlocked:0.00}\n\n" +
+            $"Internal Feedback\n" +
+            $"Energy surplus {senses.EnergySurplusRatio:0.00}   food success {senses.RecentFoodSuccess:0.00}\n" +
+            $"Food yield {senses.RecentFoodEnergyYield:0.00}   plant energy {senses.RecentPlantEnergyYield:0.00}   raw {senses.RecentPlantRawYield:0.00}\n" +
+            $"Payoff trace T {senses.TenderPlantPayoffTrace:0.00}   R {senses.RichPlantPayoffTrace:0.00}   Tough {senses.ToughPlantPayoffTrace:0.00}\n" +
+            $"Memory {senses.MemoryStrength:0.00}   fwd {senses.MemoryDirectionForward:0.00}   right {senses.MemoryDirectionRight:0.00}\n";
+    }
+
+    private string BuildCreatureBrainInspectorText(CreatureState creature)
+    {
+        var senses = creature.Senses;
+        var architecture = creature.BrainId < 0
+            ? "none"
+            : FormatBrainArchitectureKind(_simulation.State.GetBrainArchitectureKind(creature.BrainId));
+
+        return
+            $"Brain\n" +
+            $"{FormatBrainText(creature.BrainId)}\n" +
+            $"Architecture {architecture}\n\n" +
+            $"Outputs\n" +
+            $"Move {creature.Actions.MoveForward:0.00}   turn {creature.Actions.Turn:0.00}\n" +
+            $"Eat output {creature.Actions.EatOutput:0.00}   intent {creature.Actions.WantsEat}\n" +
+            $"Repro output {creature.Actions.ReproduceOutput:0.00}   intent {creature.Actions.WantsReproduce}\n" +
+            $"Attack output {creature.Actions.AttackOutput:0.00}   intent {creature.Actions.WantsAttack}\n" +
+            $"Memory write fwd {creature.Actions.MemoryForward:0.00}   right {creature.Actions.MemoryRight:0.00}\n\n" +
+            $"Action Context\n" +
+            $"Touching food {(creature.IsTouchingFood ? "yes" : "no")}   touching creature {(creature.IsTouchingCreature ? "yes" : "no")}\n" +
+            $"Repro ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}   egg reserve {senses.EggReserveRatio:P0}\n" +
+            $"Attack near gate {creature.Actions.AttackOutput:0.00}   last damage {creature.LastAttackDamageDealt:0.000}\n\n" +
+            $"Recent Reward Signals\n" +
+            $"Food success {senses.RecentFoodSuccess:0.00}   food energy {senses.RecentFoodEnergyYield:0.00}\n" +
+            $"Plant energy {senses.RecentPlantEnergyYield:0.00}   raw plant {senses.RecentPlantRawYield:0.00}\n" +
+            $"Typed payoff T {senses.RecentTenderPlantEnergyYield:0.00}   R {senses.RecentRichPlantEnergyYield:0.00}   Tough {senses.RecentToughPlantEnergyYield:0.00}\n" +
+            $"Trace T {senses.TenderPlantPayoffTrace:0.00}   R {senses.RichPlantPayoffTrace:0.00}   Tough {senses.ToughPlantPayoffTrace:0.00}\n\n" +
+            $"Memory\n" +
+            $"Stored vector strength {senses.MemoryStrength:0.00}\n" +
+            $"Input fwd {senses.MemoryDirectionForward:0.00}   right {senses.MemoryDirectionRight:0.00}\n" +
+            $"Output fwd {creature.Actions.MemoryForward:0.00}   right {creature.Actions.MemoryRight:0.00}\n";
     }
 
     private static string BuildVisionSectorHitSummary(VisionSectorSet sectors)
@@ -2193,8 +2669,39 @@ public partial class Main : Node2D
 
     private void DrawStatsGraph()
     {
-        DrawRect(_graphRect, new Color(0.035f, 0.04f, 0.038f), filled: true);
-        DrawRect(_graphRect, new Color(0.22f, 0.25f, 0.23f), filled: false, width: 1f);
+        var instructionsRect = new Rect2(_graphLegend.Position - new Vector2(6f, 4f), _graphLegend.Size + new Vector2(12f, 8f));
+        DrawRect(instructionsRect, new Color(0.035f, 0.04f, 0.038f), filled: true);
+        DrawRect(instructionsRect, new Color(0.18f, 0.21f, 0.19f), filled: false, width: 1f);
+
+        DrawMiniGraph(0, GraphMetric.Population, _graphPopulationColor);
+        DrawMiniGraph(1, GraphMetric.ResourceCalories, _graphResourceColor);
+        DrawMiniGraph(2, GraphMetric.Deaths, _graphDeathColor);
+        DrawMiniGraph(3, GraphMetric.Season, _graphSeasonColor);
+    }
+
+    private void DrawMiniGraph(int graphIndex, GraphMetric metric, Color color)
+    {
+        var graphRect = _miniGraphRects[graphIndex];
+        if (graphRect.Size.X <= 0f || graphRect.Size.Y <= 0f)
+        {
+            return;
+        }
+
+        DrawRect(graphRect, new Color(0.018f, 0.022f, 0.020f), filled: true);
+        DrawRect(graphRect, new Color(color.R, color.G, color.B, 0.82f), filled: false, width: 2f);
+
+        var plotRect = GraphPlotRect(graphRect);
+        for (var i = 1; i < 4; i++)
+        {
+            var y = plotRect.Position.Y + plotRect.Size.Y * i / 4f;
+            DrawLine(new Vector2(plotRect.Position.X, y), new Vector2(plotRect.End.X, y), new Color(0.16f, 0.18f, 0.17f, 0.75f), width: 1f);
+        }
+
+        for (var i = 1; i < 6; i++)
+        {
+            var x = plotRect.Position.X + plotRect.Size.X * i / 6f;
+            DrawLine(new Vector2(x, plotRect.Position.Y), new Vector2(x, plotRect.End.Y), new Color(0.11f, 0.13f, 0.12f, 0.7f), width: 1f);
+        }
 
         var snapshots = _simulation.State.Stats.Snapshots;
         if (snapshots.Count < 2)
@@ -2202,59 +2709,102 @@ public partial class Main : Node2D
             return;
         }
 
-        var sampleCount = Math.Min(GraphSampleCount, snapshots.Count);
+        var sampleCount = GetGraphSampleCount(metric, snapshots.Count);
         var startIndex = snapshots.Count - sampleCount;
-        var maxPopulation = 1f;
-        var maxResourceCalories = 1f;
-        var maxDeaths = 1f;
-
-        for (var i = startIndex; i < snapshots.Count; i++)
-        {
-            var snapshot = snapshots[i];
-            maxPopulation = MathF.Max(maxPopulation, snapshot.CreatureCount);
-            maxResourceCalories = MathF.Max(maxResourceCalories, snapshot.TotalResourceCalories);
-            maxDeaths = MathF.Max(maxDeaths, snapshot.CreatureDeathCount);
-        }
-
-        DrawGraphSeries(startIndex, sampleCount, maxResourceCalories, _graphResourceColor, GraphMetric.ResourceCalories);
-        DrawGraphSeries(startIndex, sampleCount, maxPopulation, _graphPopulationColor, GraphMetric.Population);
-        DrawGraphSeries(startIndex, sampleCount, maxDeaths, _graphDeathColor, GraphMetric.Deaths);
+        var maxValue = GetGraphMaxValue(startIndex, snapshots.Count, metric);
+        DrawGraphSeries(plotRect, startIndex, sampleCount, maxValue, color, metric);
     }
 
-    private void DrawGraphSeries(int startIndex, int sampleCount, float maxValue, Color color, GraphMetric metric)
+    private static Rect2 GraphPlotRect(Rect2 graphRect)
+    {
+        return new Rect2(graphRect.Position + new Vector2(10f, 30f), graphRect.Size - new Vector2(20f, 40f));
+    }
+
+    private float GetGraphMaxValue(int startIndex, int endIndex, GraphMetric metric)
+    {
+        var maxValue = metric == GraphMetric.Season
+            ? MathF.Max(1f, 1f + _scenario.SeasonFertilityAmplitude)
+            : 1f;
+        var snapshots = _simulation.State.Stats.Snapshots;
+        for (var i = startIndex; i < endIndex; i++)
+        {
+            maxValue = MathF.Max(maxValue, GetGraphMetricValue(snapshots[i], i, metric));
+        }
+
+        return maxValue;
+    }
+
+    private void DrawGraphSeries(Rect2 plotRect, int startIndex, int sampleCount, float maxValue, Color color, GraphMetric metric)
     {
         if (sampleCount < 2 || maxValue <= 0f)
         {
             return;
         }
 
-        var previous = GetGraphPoint(startIndex, startIndex, sampleCount, maxValue, metric);
+        var previous = GetGraphPoint(plotRect, startIndex, startIndex, sampleCount, maxValue, metric);
         for (var sample = 1; sample < sampleCount; sample++)
         {
             var index = startIndex + sample;
-            var current = GetGraphPoint(index, startIndex, sampleCount, maxValue, metric);
+            var current = GetGraphPoint(plotRect, index, startIndex, sampleCount, maxValue, metric);
             DrawLine(previous, current, color, width: 2f);
             previous = current;
         }
     }
 
-    private Vector2 GetGraphPoint(int snapshotIndex, int startIndex, int sampleCount, float maxValue, GraphMetric metric)
+    private Vector2 GetGraphPoint(Rect2 plotRect, int snapshotIndex, int startIndex, int sampleCount, float maxValue, GraphMetric metric)
     {
         var snapshot = _simulation.State.Stats.Snapshots[snapshotIndex];
         var sampleOffset = snapshotIndex - startIndex;
         var xRatio = sampleCount <= 1 ? 0f : sampleOffset / (float)(sampleCount - 1);
-        var value = metric switch
-        {
-            GraphMetric.Population => snapshot.CreatureCount,
-            GraphMetric.ResourceCalories => snapshot.TotalResourceCalories,
-            GraphMetric.Deaths => snapshot.CreatureDeathCount,
-            _ => 0f
-        };
+        var value = GetGraphMetricValue(snapshot, snapshotIndex, metric);
 
         var yRatio = Math.Clamp(value / maxValue, 0f, 1f);
         return new Vector2(
-            _graphRect.Position.X + xRatio * _graphRect.Size.X,
-            _graphRect.Position.Y + _graphRect.Size.Y - yRatio * _graphRect.Size.Y);
+            plotRect.Position.X + xRatio * plotRect.Size.X,
+            plotRect.Position.Y + plotRect.Size.Y - yRatio * plotRect.Size.Y);
+    }
+
+    private float GetGraphMetricValue(SimulationStatsSnapshot snapshot, int snapshotIndex, GraphMetric metric)
+    {
+        return metric switch
+        {
+            GraphMetric.Population => snapshot.CreatureCount,
+            GraphMetric.ResourceCalories => snapshot.TotalResourceCalories,
+            GraphMetric.Deaths => GetDeathRatePerSecond(snapshot, snapshotIndex),
+            GraphMetric.Season => _scenario.EnableSeasons ? snapshot.SeasonFertilityMultiplier : 1f,
+            _ => 0f
+        };
+    }
+
+    private float GetDeathRatePerSecond(SimulationStatsSnapshot snapshot, int snapshotIndex)
+    {
+        var snapshots = _simulation.State.Stats.Snapshots;
+        if (snapshotIndex <= 0 || snapshotIndex >= snapshots.Count)
+        {
+            return 0f;
+        }
+
+        var windowSamples = GetDeathRateSmoothingSampleCount(snapshots.Count);
+        var previousIndex = Math.Max(0, snapshotIndex - windowSamples);
+        var previous = snapshots[previousIndex];
+        var elapsedSeconds = Math.Max(0.0001, snapshot.ElapsedSeconds - previous.ElapsedSeconds);
+        var deaths = Math.Max(0, snapshot.CreatureDeathCount - previous.CreatureDeathCount);
+        return (float)(deaths / elapsedSeconds);
+    }
+
+    private int GetDeathRateSmoothingSampleCount(int availableSnapshotCount)
+    {
+        if (availableSnapshotCount < 2)
+        {
+            return 1;
+        }
+
+        var graphSamples = GetGraphSampleCount(GraphMetric.Deaths, availableSnapshotCount);
+        var smoothingSamples = (int)MathF.Round(graphSamples * DeathRateSmoothingGraphShare);
+        return Math.Clamp(
+            smoothingSamples,
+            Math.Min(MinDeathRateSmoothingSamples, availableSnapshotCount - 1),
+            Math.Min(MaxDeathRateSmoothingSamples, availableSnapshotCount - 1));
     }
 
     private void SelectEntityAt(Vector2 screenPosition)
@@ -2666,8 +3216,6 @@ public partial class Main : Node2D
         _scenarioEditor.ExportSelectedSpeciesClusterRequested += OpenExportSelectedSpeciesClusterDialog;
         _scenarioEditor.LoadSpeciesProfileRequested += OpenLoadSpeciesProfileDialog;
         _scenarioEditor.InjectSpeciesRequested += InjectLoadedSpeciesProfile;
-        _scenarioEditor.MapToggleRequested += () => SetMapVisible(!_renderMap);
-        _scenarioEditor.CloseRequested += _scenarioEditor.ToggleCollapsed;
         AddChild(_scenarioEditor);
 
         var repositoryRoot = GetRepositoryRoot();
@@ -3027,14 +3575,12 @@ public partial class Main : Node2D
 
     private float GetLauncherWidth()
     {
-        if (!_scenarioEditor.Visible)
+        if (!_scenarioEditor.Visible || _scenarioEditor.IsCollapsed)
         {
             return 0f;
         }
 
-        return _scenarioEditor.IsCollapsed
-            ? CollapsedLauncherPanelWidth
-            : LauncherPanelWidth;
+        return LauncherPanelWidth;
     }
 
     private static string ResolveWorkspacePath(string path, string workspaceRoot)
@@ -3648,11 +4194,20 @@ public partial class Main : Node2D
         Age
     }
 
+    private enum SelectedInspectorView
+    {
+        State,
+        Body,
+        Senses,
+        Brain
+    }
+
     private enum GraphMetric
     {
         Population,
         ResourceCalories,
-        Deaths
+        Deaths,
+        Season
     }
 
     private enum ResourceRenderMode

@@ -17,8 +17,22 @@ namespace Lineage.Viewer;
 public sealed partial class ScenarioEditorPanel : PanelContainer
 {
     private const float ExpandedPanelWidth = 520f;
-    private const float CollapsedPanelWidth = 230f;
-    private const float FieldLabelWidth = 250f;
+    private const float FieldLabelWidth = 205f;
+
+    private static readonly string[] ScenarioGroupOrder =
+    [
+        "Basics",
+        "Mutation",
+        "Brain & Vision",
+        "World & Terrain",
+        "Plants",
+        "Seasons",
+        "Energy & Movement",
+        "Reproduction",
+        "Diet & Combat",
+        "Species",
+        "Advanced"
+    ];
 
     private static readonly PropertyInfo[] ScenarioProperties = typeof(SimulationScenario)
         .GetProperties(BindingFlags.Instance | BindingFlags.Public)
@@ -29,16 +43,21 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         .ToArray();
 
     private readonly List<ScenarioFieldBinding> _bindings = [];
+    private readonly Dictionary<string, Label> _scenarioGroupEmptyLabels = [];
     private readonly List<SpeciesScenarioSeed> _speciesSeedEntries = [];
 
     private MarginContainer _expandedRoot = null!;
     private MarginContainer _collapsedRoot = null!;
+    private TabContainer _scenarioGroupTabs = null!;
+    private ScrollContainer _scenarioSearchScroll = null!;
+    private VBoxContainer _scenarioSearchResults = null!;
+    private Label _scenarioSearchEmptyLabel = null!;
     private Label _statusLabel = null!;
+    private LineEdit _scenarioSearchInput = null!;
+    private OptionButton _scenarioScopeInput = null!;
     private Label _lastReportLabel = null!;
     private Label _lastSnapshotLabel = null!;
     private Label _lastCheckpointLabel = null!;
-    private Button _mapToggleButton = null!;
-    private Button _collapsedMapToggleButton = null!;
     private Button _openReportButton = null!;
     private Button _loadSnapshotButton = null!;
     private Button _loadCheckpointButton = null!;
@@ -77,8 +96,6 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
     public event Action? ReportRequested;
 
-    public event Action? MapToggleRequested;
-
     public event Action<string>? OpenReportRequested;
 
     public event Action? LoadSnapshotFileRequested;
@@ -94,8 +111,6 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     public event Action? LoadSpeciesProfileRequested;
 
     public event Action? InjectSpeciesRequested;
-
-    public event Action? CloseRequested;
 
     public override void _Ready()
     {
@@ -218,20 +233,6 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _lastSpeciesExportLabel.Text = _lastSpeciesExportPath ?? "No species profile exported yet.";
     }
 
-    public void SetMapVisible(bool isVisible)
-    {
-        if (_mapToggleButton is not null)
-        {
-            _mapToggleButton.Text = isVisible ? "Hide Map" : "Show Map";
-        }
-
-        if (_collapsedMapToggleButton is not null)
-        {
-            _collapsedMapToggleButton.Text = "Map";
-            _collapsedMapToggleButton.TooltipText = isVisible ? "Hide map drawing" : "Show map drawing";
-        }
-    }
-
     public void ToggleCollapsed()
     {
         SetCollapsed(!IsCollapsed);
@@ -248,11 +249,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         if (_collapsedRoot is not null)
         {
-            _collapsedRoot.Visible = isCollapsed;
+            _collapsedRoot.Visible = false;
         }
 
         CustomMinimumSize = isCollapsed
-            ? new Vector2(CollapsedPanelWidth, 56f)
+            ? Vector2.Zero
             : new Vector2(ExpandedPanelWidth, 620f);
     }
 
@@ -271,19 +272,6 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private MarginContainer BuildCollapsedRoot()
     {
         var margin = CreateMargin();
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        margin.AddChild(row);
-
-        row.AddChild(new Label
-        {
-            Text = "Launcher",
-            SizeFlagsHorizontal = SizeFlags.ExpandFill
-        });
-        row.AddChild(CreateButton("Expand", () => SetCollapsed(isCollapsed: false)));
-        _collapsedMapToggleButton = CreateButton("Map", () => MapToggleRequested?.Invoke());
-        _collapsedMapToggleButton.TooltipText = "Show or hide map drawing";
-        row.AddChild(_collapsedMapToggleButton);
         return margin;
     }
 
@@ -306,12 +294,9 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             CreateButton("Save", () => SaveRequested?.Invoke()),
             CreateButton("Save As", () => SaveAsRequested?.Invoke())));
 
-        _mapToggleButton = CreateButton("Hide Map", () => MapToggleRequested?.Invoke());
         root.AddChild(BuildButtonRow(
             CreateButton("Run CLI", () => CliRunRequested?.Invoke()),
-            CreateButton("Export Current", () => ReportRequested?.Invoke()),
-            _mapToggleButton,
-            CreateButton("Collapse", () => CloseRequested?.Invoke())));
+            CreateButton("Export Current", () => ReportRequested?.Invoke())));
 
         _statusLabel = new Label
         {
@@ -344,24 +329,190 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
     private Control BuildScenarioTab()
     {
-        var scroll = new ScrollContainer
+        var root = new VBoxContainer
         {
             Name = "Scenario",
             SizeFlagsVertical = SizeFlags.ExpandFill
         };
+        root.AddThemeConstantOverride("separation", 8);
 
-        var fields = new VBoxContainer();
-        fields.AddThemeConstantOverride("separation", 6);
-        scroll.AddChild(fields);
-
-        foreach (var property in ScenarioProperties)
+        _scenarioSearchInput = new LineEdit
         {
-            var editor = CreateEditor(property);
-            _bindings.Add(new ScenarioFieldBinding(property, editor));
-            fields.AddChild(CreateFieldRow(ToDisplayName(property.Name), editor));
+            PlaceholderText = "Find setting, group, or help text"
+        };
+        _scenarioSearchInput.TextChanged += _ => RefreshScenarioFieldVisibility();
+        root.AddChild(CreateFieldRow("Find", _scenarioSearchInput));
+
+        _scenarioScopeInput = new OptionButton();
+        _scenarioScopeInput.AddItem("All");
+        _scenarioScopeInput.AddItem("Basic");
+        _scenarioScopeInput.Selected = 0;
+        _scenarioScopeInput.ItemSelected += _ => RefreshScenarioFieldVisibility();
+        root.AddChild(CreateFieldRow("Scope", _scenarioScopeInput));
+
+        _scenarioSearchScroll = new ScrollContainer
+        {
+            Visible = false,
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        _scenarioSearchResults = new VBoxContainer();
+        _scenarioSearchResults.AddThemeConstantOverride("separation", 6);
+        _scenarioSearchScroll.AddChild(_scenarioSearchResults);
+        _scenarioSearchEmptyLabel = new Label
+        {
+            Text = "No matching settings.",
+            Visible = false,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            CustomMinimumSize = new Vector2(320f, 0f)
+        };
+        _scenarioSearchResults.AddChild(_scenarioSearchEmptyLabel);
+        root.AddChild(_scenarioSearchScroll);
+
+        _scenarioGroupTabs = new TabContainer
+        {
+            SizeFlagsVertical = SizeFlags.ExpandFill
+        };
+        root.AddChild(_scenarioGroupTabs);
+
+        var editableFields = ScenarioProperties
+            .Select(property => new ScenarioFieldDescriptor(property, MetadataFor(property)))
+            .OrderBy(field => ScenarioGroupSortKey(field.Metadata.Group))
+            .ThenBy(field => field.Property.MetadataToken)
+            .GroupBy(field => field.Metadata.Group);
+
+        foreach (var group in editableFields)
+        {
+            var scroll = new ScrollContainer
+            {
+                Name = group.Key,
+                SizeFlagsVertical = SizeFlags.ExpandFill
+            };
+
+            var fields = new VBoxContainer();
+            fields.AddThemeConstantOverride("separation", 6);
+            scroll.AddChild(fields);
+
+            var emptyLabel = new Label
+            {
+                Text = "No matching settings in this group.",
+                Visible = false,
+                AutowrapMode = TextServer.AutowrapMode.WordSmart,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                CustomMinimumSize = new Vector2(320f, 0f)
+            };
+            _scenarioGroupEmptyLabels[group.Key] = emptyLabel;
+            fields.AddChild(emptyLabel);
+
+            foreach (var field in group)
+            {
+                var editor = CreateEditor(field.Property, field.Metadata);
+                var row = CreateFieldRow(FieldLabelText(field.Metadata), editor);
+                row.TooltipText = FieldTooltip(field.Metadata);
+                editor.TooltipText = row.TooltipText;
+                var groupRowIndex = fields.GetChildCount();
+                _bindings.Add(new ScenarioFieldBinding(field.Property, editor, field.Metadata, row, fields, groupRowIndex));
+                fields.AddChild(row);
+            }
+
+            _scenarioGroupTabs.AddChild(scroll);
         }
 
-        return scroll;
+        RefreshScenarioFieldVisibility();
+        return root;
+    }
+
+    private void RefreshScenarioFieldVisibility()
+    {
+        if (_bindings.Count == 0)
+        {
+            return;
+        }
+
+        var query = _scenarioSearchInput?.Text.Trim() ?? string.Empty;
+        var showAll = _scenarioScopeInput is null || _scenarioScopeInput.Selected == 0;
+        var isSearching = !string.IsNullOrWhiteSpace(query);
+
+        if (_scenarioGroupTabs is not null)
+        {
+            _scenarioGroupTabs.Visible = !isSearching;
+        }
+
+        if (_scenarioSearchScroll is not null)
+        {
+            _scenarioSearchScroll.Visible = isSearching;
+        }
+
+        if (isSearching)
+        {
+            RefreshScenarioSearchResults(query, showAll);
+            return;
+        }
+
+        var visibleCounts = _scenarioGroupEmptyLabels.Keys.ToDictionary(group => group, _ => 0);
+
+        foreach (var binding in _bindings)
+        {
+            MoveScenarioRow(binding.Row, binding.GroupContainer);
+            binding.GroupContainer.MoveChild(binding.Row, binding.GroupRowIndex);
+            var visible = (showAll || !binding.Metadata.Advanced)
+                && FieldMatches(binding.Metadata, query);
+            binding.Row.Visible = visible;
+
+            if (visible)
+            {
+                visibleCounts[binding.Metadata.Group] = visibleCounts.GetValueOrDefault(binding.Metadata.Group) + 1;
+            }
+        }
+
+        foreach (var (group, label) in _scenarioGroupEmptyLabels)
+        {
+            label.Visible = visibleCounts.GetValueOrDefault(group) == 0;
+        }
+    }
+
+    private void RefreshScenarioSearchResults(string query, bool showAll)
+    {
+        var matchCount = 0;
+
+        foreach (var label in _scenarioGroupEmptyLabels.Values)
+        {
+            label.Visible = false;
+        }
+
+        foreach (var binding in _bindings)
+        {
+            var matches = (showAll || !binding.Metadata.Advanced)
+                && FieldMatches(binding.Metadata, query);
+
+            if (!matches)
+            {
+                MoveScenarioRow(binding.Row, binding.GroupContainer);
+                binding.GroupContainer.MoveChild(binding.Row, binding.GroupRowIndex);
+                binding.Row.Visible = false;
+                continue;
+            }
+
+            MoveScenarioRow(binding.Row, _scenarioSearchResults);
+            binding.Row.Visible = true;
+            _scenarioSearchResults.MoveChild(binding.Row, matchCount);
+            matchCount++;
+        }
+
+        _scenarioSearchEmptyLabel.Text = $"No settings match \"{query}\".";
+        _scenarioSearchEmptyLabel.Visible = matchCount == 0;
+        _scenarioSearchResults.MoveChild(_scenarioSearchEmptyLabel, matchCount);
+    }
+
+    private static void MoveScenarioRow(Control row, Container target)
+    {
+        if (row.GetParent() == target)
+        {
+            return;
+        }
+
+        row.GetParent()?.RemoveChild(row);
+        target.AddChild(row);
     }
 
     private Control BuildCliTab()
@@ -646,7 +797,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             || type.IsEnum;
     }
 
-    private static Control CreateEditor(PropertyInfo property)
+    private static Control CreateEditor(PropertyInfo property, SimulationScenarioFieldMetadata metadata)
     {
         if (property.PropertyType == typeof(string) || property.PropertyType == typeof(ulong))
         {
@@ -666,12 +817,20 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         if (property.PropertyType == typeof(int))
         {
-            return CreateSpinBox(0, 10_000_000, step: 1, rounded: true);
+            return CreateSpinBox(
+                metadata.Minimum ?? 0,
+                metadata.Maximum ?? 10_000_000,
+                metadata.Step ?? 1,
+                rounded: true);
         }
 
         if (property.PropertyType == typeof(float))
         {
-            return CreateSpinBox(0, 100_000, step: 0.01, rounded: false);
+            return CreateSpinBox(
+                metadata.Minimum ?? 0,
+                metadata.Maximum ?? 100_000,
+                metadata.Step ?? 0.01,
+                rounded: false);
         }
 
         if (property.PropertyType == typeof(bool))
@@ -781,22 +940,73 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         optionButton.Selected = 0;
     }
 
-    private static string ToDisplayName(string name)
+    private static SimulationScenarioFieldMetadata MetadataFor(PropertyInfo property)
     {
-        var words = new List<string>();
-        var start = 0;
+        return SimulationScenarioMetadata.Fields.FirstOrDefault(field => field.Name == property.Name)
+            ?? new SimulationScenarioFieldMetadata(
+                property.Name,
+                property.Name,
+                property.Name,
+                "Advanced",
+                "text",
+                [],
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
 
-        for (var i = 1; i < name.Length; i++)
+    private static int ScenarioGroupSortKey(string group)
+    {
+        var index = Array.IndexOf(ScenarioGroupOrder, group);
+        return index >= 0 ? index : ScenarioGroupOrder.Length;
+    }
+
+    private static string FieldLabelText(SimulationScenarioFieldMetadata metadata)
+    {
+        return metadata.Units is null
+            ? metadata.Label
+            : $"{metadata.Label} ({metadata.Units})";
+    }
+
+    private static string FieldTooltip(SimulationScenarioFieldMetadata metadata)
+    {
+        var details = new List<string>();
+        if (!string.IsNullOrWhiteSpace(metadata.Description))
         {
-            if (char.IsUpper(name[i]))
-            {
-                words.Add(name[start..i]);
-                start = i;
-            }
+            details.Add(metadata.Description);
         }
 
-        words.Add(name[start..]);
-        return string.Join(' ', words);
+        details.Add($"Group: {metadata.Group}");
+        details.Add($"JSON: {metadata.JsonName}");
+        if (metadata.Advanced)
+        {
+            details.Add("Advanced setting");
+        }
+
+        return string.Join("\n", details);
+    }
+
+    private static bool FieldMatches(SimulationScenarioFieldMetadata metadata, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        return Contains(metadata.Label, query)
+            || Contains(metadata.Group, query)
+            || Contains(metadata.JsonName, query)
+            || Contains(metadata.Name, query)
+            || Contains(metadata.Description, query)
+            || Contains(metadata.Units, query);
+    }
+
+    private static bool Contains(string? value, string query)
+    {
+        return value?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static string SanitizeExperimentName(string? value)
@@ -814,7 +1024,15 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             : sanitized;
     }
 
-    private sealed record ScenarioFieldBinding(PropertyInfo Property, Control Editor);
+    private sealed record ScenarioFieldDescriptor(PropertyInfo Property, SimulationScenarioFieldMetadata Metadata);
+
+    private sealed record ScenarioFieldBinding(
+        PropertyInfo Property,
+        Control Editor,
+        SimulationScenarioFieldMetadata Metadata,
+        Control Row,
+        VBoxContainer GroupContainer,
+        int GroupRowIndex);
 }
 
 public readonly record struct CliRunRequest(

@@ -267,6 +267,11 @@ public static class SimulationScenarioMetadata
             return "Basics";
         }
 
+        if (name.Contains("Mutation", StringComparison.Ordinal))
+        {
+            return "Mutation";
+        }
+
         if (name.Contains("Brain", StringComparison.Ordinal)
             || name.Contains("Vision", StringComparison.Ordinal)
             || name.Contains("Sense", StringComparison.Ordinal)
@@ -329,11 +334,6 @@ public static class SimulationScenarioMetadata
             || name.Contains("Basal", StringComparison.Ordinal))
         {
             return "Energy & Movement";
-        }
-
-        if (name.Contains("Mutation", StringComparison.Ordinal))
-        {
-            return "Mutation";
         }
 
         if (name.Contains("Species", StringComparison.Ordinal))
