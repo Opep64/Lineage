@@ -239,6 +239,26 @@ public struct CreatureSenseState
     public float ToughPlantPayoffTrace { get; set; }
 
     /// <summary>
+    /// Fuzzy visible-plant cue combining current plant quality with recent typed plant payoff.
+    /// </summary>
+    public float PlantPreferenceDensity { get; set; }
+
+    /// <summary>
+    /// Forward component of the visible plant preference cue.
+    /// </summary>
+    public float PlantPreferenceDirectionForward { get; set; }
+
+    /// <summary>
+    /// Right component of the visible plant preference cue.
+    /// </summary>
+    public float PlantPreferenceDirectionRight { get; set; }
+
+    /// <summary>
+    /// Contact/taste cue combining the touched plant type with recent typed plant payoff.
+    /// </summary>
+    public float PlantFoodContactPreference { get; set; }
+
+    /// <summary>
     /// Recent usable energy released from any gut contents, normalized to expected digestion capacity.
     /// </summary>
     public float RecentFoodEnergyYield { get; set; }

@@ -53,7 +53,15 @@ public static class NeuralBrainSchema
 
     public const int ToughPlantPayoffTraceInput = RichPlantPayoffTraceInput + 1;
 
-    public const int InputCount = ToughPlantPayoffTraceInput + 1;
+    public const int PlantPreferenceDensityInput = ToughPlantPayoffTraceInput + 1;
+
+    public const int PlantPreferenceForwardInput = PlantPreferenceDensityInput + 1;
+
+    public const int PlantPreferenceRightInput = PlantPreferenceForwardInput + 1;
+
+    public const int PlantFoodContactPreferenceInput = PlantPreferenceRightInput + 1;
+
+    public const int InputCount = PlantFoodContactPreferenceInput + 1;
 
     public const int OutputCount = 7;
 

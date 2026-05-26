@@ -46,6 +46,7 @@ public sealed class NeuralBrainGenome
     private const int LegacySectorPlantQualityFoodContactInput =
         NeuralBrainSchema.VisionSectorInputStart + VisionSectorSet.SectorCount * LegacyVisionSectorChannelCountWithoutPlantQuality;
     private const int LegacyInputCountWithoutSectorPlantQuality = LegacySectorPlantQualityFoodContactInput + 13;
+    private const int LegacyInputCountWithoutPlantPreferenceBridge = 227;
     private const int LegacyInputCountWithoutPlantPayoffTrace = 224;
     private const int LegacyInputCountWithoutTypedPlantEnergyYield = 221;
     private const int LegacyOutputCountWithoutAttack = 4;
@@ -884,6 +885,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutPlantPreferenceBridge,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutPlantPreferenceBridge,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
+                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutPlantPayoffTrace,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -1316,7 +1332,8 @@ public sealed class NeuralBrainGenome
             return NeuralBrainSchema.ReproductionReadinessInput;
         }
 
-        if (legacyInputCount == LegacyInputCountWithoutPlantPayoffTrace
+        if (legacyInputCount == LegacyInputCountWithoutPlantPreferenceBridge
+            || legacyInputCount == LegacyInputCountWithoutPlantPayoffTrace
             || legacyInputCount == LegacyInputCountWithoutTypedPlantEnergyYield)
         {
             return input;

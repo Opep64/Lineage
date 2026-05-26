@@ -1809,6 +1809,29 @@ Readout:
 - The 500k adaptation genes were still noisy: rich adaptation averaged `0.064`, while tough adaptation averaged `0.071`. That suggests plant choice pressure is visible in behavior/intake and payoff traces, but the trait response is not yet cleanly specialized.
 - Behavior assays still show weak explicit steering differences between plant types, so the next question is whether selection over longer/more varied runs strengthens brain use of plant identity or whether we need more direct taste/association mechanics.
 
+## 2026-05-26 Plant Preference Bridge
+
+Added a small taste/association bridge so brains receive easier-to-use cues that combine current plant signals with recent typed plant payoff:
+
+- `PlantPreferenceDensity`
+- `PlantPreferenceDirectionForward`
+- `PlantPreferenceDirectionRight`
+- `PlantFoodContactPreference`
+
+This is not lifetime learning and does not edit brain weights. It is a sensory/internal-state preprocessing layer: if a creature has a recent rich-plant payoff trace and currently sees or touches a plant whose visible/taste profile resembles rich plants, the brain receives a stronger preference cue for that plant. The brain still has to evolve wiring that uses these cues.
+
+Implementation notes:
+
+- The bridge uses fuzzy matches against plant energy-quality and bite-ease cues, weighted by tender/rich/tough payoff traces.
+- Sector vision is preferred when available, so the brain can receive a direction toward preferred visible plant sectors rather than only one nearest plant.
+- Legacy neural brains with the previous `227` input schema migrate with the new bridge inputs neutral.
+
+Validation:
+
+- `dotnet build .\Lineage.slnx -c Release -v:minimal`
+- `dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release --no-build`
+- 20k `plant-diversity-pressure` smoke, seed `42`: final creatures `68`, eggs `1`, births `182`, deaths `114`, max generation `2`.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

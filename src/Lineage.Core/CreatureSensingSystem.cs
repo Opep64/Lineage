@@ -177,6 +177,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 var skippedFinalizationStartedAt = sensingProfile is not null
                     ? Stopwatch.GetTimestamp()
                     : 0L;
+                ApplyPlantPreferenceBridge(ref senses);
                 creature.Senses = senses;
                 state.Creatures[i] = creature;
                 sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - skippedFinalizationStartedAt);
@@ -574,6 +575,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     effectiveSenseRadius);
             }
 
+            ApplyPlantPreferenceBridge(ref senses);
             creature.Senses = senses;
             state.Creatures[i] = creature;
             sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - senseFinalizationStartedAt);
@@ -715,6 +717,73 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var safeDeltaSeconds = Math.Max(0f, deltaSeconds);
         var decay = MathF.Pow(0.5f, safeDeltaSeconds / halfLifeSeconds);
         return Math.Clamp(Math.Max(currentTrace * decay, immediateYield), 0f, 1f);
+    }
+
+    private static void ApplyPlantPreferenceBridge(ref CreatureSenseState senses)
+    {
+        senses.PlantFoodContactPreference = senses.PlantFoodContact > 0f
+            ? PlantResourceTraits.PayoffPreferenceCue(
+                senses.PlantFoodContactEnergyQuality,
+                senses.PlantFoodContactBiteEase,
+                senses.TenderPlantPayoffTrace,
+                senses.RichPlantPayoffTrace,
+                senses.ToughPlantPayoffTrace)
+            : 0f;
+
+        var preferenceDensity = 0f;
+        var preferenceForward = 0f;
+        var preferenceRight = 0f;
+        if (senses.VisionSectors.HasAnySignal)
+        {
+            for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
+            {
+                var sector = senses.VisionSectors.Get(sectorIndex);
+                if (sector.PlantDensity <= 0f
+                    || (sector.PlantEnergyQuality <= 0f && sector.PlantBiteEase <= 0f))
+                {
+                    continue;
+                }
+
+                var preference = PlantResourceTraits.PayoffPreferenceCue(
+                        sector.PlantEnergyQuality,
+                        sector.PlantBiteEase,
+                        senses.TenderPlantPayoffTrace,
+                        senses.RichPlantPayoffTrace,
+                        senses.ToughPlantPayoffTrace)
+                    * sector.PlantProximity;
+                if (preference <= 0f)
+                {
+                    continue;
+                }
+
+                var right = (sectorIndex - VisionSectorSet.CenterSectorIndex)
+                    / (float)VisionSectorSet.CenterSectorIndex;
+                var forward = 1f - Math.Abs(right);
+                preferenceDensity += preference;
+                preferenceForward += preference * forward;
+                preferenceRight += preference * right;
+            }
+        }
+
+        if (preferenceDensity <= 0f
+            && senses.VisiblePlantDensity > 0f
+            && (senses.VisiblePlantEnergyQuality > 0f || senses.VisiblePlantBiteEase > 0f))
+        {
+            var preference = PlantResourceTraits.PayoffPreferenceCue(
+                    senses.VisiblePlantEnergyQuality,
+                    senses.VisiblePlantBiteEase,
+                    senses.TenderPlantPayoffTrace,
+                    senses.RichPlantPayoffTrace,
+                    senses.ToughPlantPayoffTrace)
+                * senses.PlantProximity;
+            preferenceDensity = preference;
+            preferenceForward = preference * senses.PlantDirectionForward;
+            preferenceRight = preference * senses.PlantDirectionRight;
+        }
+
+        senses.PlantPreferenceDensity = Math.Clamp(preferenceDensity, 0f, 1f);
+        senses.PlantPreferenceDirectionForward = Math.Clamp(preferenceForward, -1f, 1f);
+        senses.PlantPreferenceDirectionRight = Math.Clamp(preferenceRight, -1f, 1f);
     }
 
     private void ApplyTerrainDragSense(

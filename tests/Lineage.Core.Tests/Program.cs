@@ -68,6 +68,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports local food direction", CreatureSensingReportsFoodDirection),
     ("Creature sensing splits plant and meat cues", CreatureSensingSplitsPlantAndMeatCues),
     ("Creature sensing reports plant quality cues", CreatureSensingReportsPlantQualityCues),
+    ("Creature sensing reports plant preference bridge", CreatureSensingReportsPlantPreferenceBridge),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
@@ -119,6 +120,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates sector plant quality inputs", NeuralBrainMigratesSectorPlantQualityInputs),
     ("Neural brain migrates typed plant energy yield inputs", NeuralBrainMigratesTypedPlantEnergyYieldInputs),
     ("Neural brain migrates plant payoff trace inputs", NeuralBrainMigratesPlantPayoffTraceInputs),
+    ("Neural brain migrates plant preference bridge inputs", NeuralBrainMigratesPlantPreferenceBridgeInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2617,6 +2619,59 @@ static void CreatureSensingReportsPlantQualityCues()
     AssertClose(0f, farSenses.VisiblePlantBiteEase, 0.000001, "Far plant should not reveal close bite ease");
 }
 
+static void CreatureSensingReportsPlantPreferenceBridge()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 240f,
+            WorldHeight = 160f,
+            FixedDeltaSeconds = 0.1f
+        },
+        seed: 1306,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1, enableSectorVision: true)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 80f,
+        VisionAngleRadians = MathF.Tau,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 40f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    creature.RichPlantPayoffTrace = 1f;
+    creature.IsTouchingFood = true;
+    creature.FoodContactKind = FoodContactKind.Resource;
+    creature.FoodContactResourceKind = ResourceKind.Plant;
+    creature.FoodContactPlantKind = PlantResourceKind.Rich;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Rich,
+        Position = new SimVector2(52f, 60f),
+        Radius = 2f,
+        Calories = 20f,
+        MaxCalories = 20f
+    });
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(senses.PlantPreferenceDensity > 0.5f, "Preferred plant should contribute a visible preference cue");
+    AssertTrue(senses.PlantPreferenceDirectionForward > 0f, "Preferred plant should be ahead");
+    AssertTrue(senses.PlantPreferenceDirectionRight > 0f, "Preferred plant should be to the right");
+    AssertTrue(senses.PlantFoodContactPreference > 0.9f, "Touched rich plant should match recent rich payoff");
+}
+
 static void CreatureSensingReportsVisibleCreatureCues()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -3201,6 +3256,10 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         TenderPlantPayoffTrace = 0.06f,
         RichPlantPayoffTrace = 0.07f,
         ToughPlantPayoffTrace = 0.08f,
+        PlantPreferenceDensity = 0.17f,
+        PlantPreferenceDirectionForward = 0.27f,
+        PlantPreferenceDirectionRight = -0.37f,
+        PlantFoodContactPreference = 0.47f,
         CreatureProximity = 0.52f,
         CreatureDirectionForward = -0.62f,
         CreatureDirectionRight = 0.72f,
@@ -3279,6 +3338,10 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.06f, inputs[NeuralBrainSchema.TenderPlantPayoffTraceInput], 0.000001, "Tender plant payoff trace input");
     AssertClose(0.07f, inputs[NeuralBrainSchema.RichPlantPayoffTraceInput], 0.000001, "Rich plant payoff trace input");
     AssertClose(0.08f, inputs[NeuralBrainSchema.ToughPlantPayoffTraceInput], 0.000001, "Tough plant payoff trace input");
+    AssertClose(0.17f, inputs[NeuralBrainSchema.PlantPreferenceDensityInput], 0.000001, "Plant preference density input");
+    AssertClose(0.27f, inputs[NeuralBrainSchema.PlantPreferenceForwardInput], 0.000001, "Plant preference forward input");
+    AssertClose(-0.37f, inputs[NeuralBrainSchema.PlantPreferenceRightInput], 0.000001, "Plant preference right input");
+    AssertClose(0.47f, inputs[NeuralBrainSchema.PlantFoodContactPreferenceInput], 0.000001, "Plant contact preference input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
     AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
@@ -4769,6 +4832,57 @@ static void NeuralBrainMigratesPlantPayoffTraceInputs()
         brain.GetHiddenInputWeight(0, NeuralBrainSchema.ToughPlantPayoffTraceInput),
         0.000001,
         "New tough plant payoff trace hidden input starts neutral");
+}
+
+static void NeuralBrainMigratesPlantPreferenceBridgeInputs()
+{
+    const int legacyInputCount = 227;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int oldRichPlantPayoffTraceInput = 225;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldRichPlantPayoffTraceInput] = 0.8f;
+    legacyWeights[legacyHiddenInputOffset + oldRichPlantPayoffTraceInput] = -1.2f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.TurnOutput * hiddenNodeCount] = 1.7f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Plant preference bridge migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Plant preference bridge migrated weight count");
+    AssertClose(
+        0.8f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RichPlantPayoffTraceInput),
+        0.000001,
+        "Existing rich plant payoff trace direct input remains in place");
+    AssertClose(
+        -1.2f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RichPlantPayoffTraceInput),
+        0.000001,
+        "Existing rich plant payoff trace hidden input remains in place");
+    AssertClose(
+        1.7f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.TurnOutput, 0),
+        0.000001,
+        "Existing hidden turn output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.PlantPreferenceDensityInput),
+        0.000001,
+        "New plant preference density direct input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.PlantPreferenceRightInput),
+        0.000001,
+        "New plant preference right hidden input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.PlantFoodContactPreferenceInput),
+        0.000001,
+        "New plant contact preference hidden input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()

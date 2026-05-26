@@ -122,8 +122,38 @@ public static class PlantResourceTraits
             MaximumBiteEaseMultiplier);
     }
 
+    /// <summary>
+    /// Fuzzy association cue between an observed plant profile and recent typed plant payoff.
+    /// </summary>
+    public static float PayoffPreferenceCue(
+        float energyQualitySense,
+        float biteEaseSense,
+        float tenderPayoffTrace,
+        float richPayoffTrace,
+        float toughPayoffTrace)
+    {
+        var energyQuality = Math.Clamp(energyQualitySense, 0f, 1f);
+        var biteEase = Math.Clamp(biteEaseSense, 0f, 1f);
+        var tender = PlantKindProfileMatch(energyQuality, biteEase, PlantResourceKind.Tender)
+            * Math.Clamp(tenderPayoffTrace, 0f, 1f);
+        var rich = PlantKindProfileMatch(energyQuality, biteEase, PlantResourceKind.Rich)
+            * Math.Clamp(richPayoffTrace, 0f, 1f);
+        var tough = PlantKindProfileMatch(energyQuality, biteEase, PlantResourceKind.Tough)
+            * Math.Clamp(toughPayoffTrace, 0f, 1f);
+
+        return Math.Clamp(tender + rich + tough, 0f, 1f);
+    }
+
     private static float NormalizeSense(float value, float minimum, float maximum)
     {
         return Math.Clamp((value - minimum) / (maximum - minimum), 0f, 1f);
+    }
+
+    private static float PlantKindProfileMatch(float energyQuality, float biteEase, PlantResourceKind kind)
+    {
+        var energyMatch = 1f - Math.Abs(energyQuality - EnergyQualitySense(kind));
+        var biteMatch = 1f - Math.Abs(biteEase - BiteEaseSense(kind));
+        var match = Math.Clamp(energyMatch, 0f, 1f) * Math.Clamp(biteMatch, 0f, 1f);
+        return match * match;
     }
 }
