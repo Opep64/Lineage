@@ -46,6 +46,8 @@ public sealed class SimulationStats
 
     public int HighlandDeathCount { get; private set; }
 
+    public BiomeDeathCauseCounts CreatureDeathCausesByBiome { get; private set; }
+
     public int PlantDepletionCount { get; private set; }
 
     public int PlantLocalDispersalCount { get; private set; }
@@ -109,6 +111,7 @@ public sealed class SimulationStats
     {
         CreatureDeathCount++;
         AddDeadCreatureLifespan(lifespanSeconds);
+        CreatureDeathCausesByBiome = CreatureDeathCausesByBiome.Add(biome, reason);
 
         switch (reason)
         {
@@ -267,7 +270,8 @@ public sealed class SimulationStats
         int forestDeathCount = 0,
         int wetlandDeathCount = 0,
         int tundraDeathCount = 0,
-        int highlandDeathCount = 0)
+        int highlandDeathCount = 0,
+        BiomeDeathCauseCounts creatureDeathCausesByBiome = default)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
@@ -288,6 +292,7 @@ public sealed class SimulationStats
         WetlandDeathCount = wetlandDeathCount;
         TundraDeathCount = tundraDeathCount;
         HighlandDeathCount = highlandDeathCount;
+        CreatureDeathCausesByBiome = creatureDeathCausesByBiome;
         PlantDepletionCount = plantDepletionCount;
         PlantLocalDispersalCount = plantLocalDispersalCount;
         PlantClusterRelocationCount = plantClusterRelocationCount;

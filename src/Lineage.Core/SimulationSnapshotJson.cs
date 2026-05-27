@@ -127,7 +127,8 @@ public static class SimulationSnapshotJson
             snapshot.ForestDeathCount,
             snapshot.WetlandDeathCount,
             snapshot.TundraDeathCount,
-            snapshot.HighlandDeathCount);
+            snapshot.HighlandDeathCount,
+            snapshot.CreatureDeathCausesByBiome);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 

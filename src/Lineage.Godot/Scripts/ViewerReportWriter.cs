@@ -463,6 +463,8 @@ public static class ViewerReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
+        WriteDeathCausesByBiomeSection(writer, state.Stats.CreatureDeathCausesByBiome);
+
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
         WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
@@ -1995,6 +1997,54 @@ public static class ViewerReportWriter
             BiomeKind.Highland => snapshot.HighlandCreatureCount,
             _ => 0
         };
+    }
+
+    private static void WriteDeathCausesByBiomeSection(TextWriter writer, BiomeDeathCauseCounts counts)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Deaths by Biome and Cause</h2>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Total</th><th>Share</th><th>Starvation</th><th>Injury</th><th>Rotten Meat</th><th>Unknown</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+
+        foreach (var biome in BiomeKinds.All)
+        {
+            var row = counts.For(biome);
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(BiomeKinds.Canonicalize(biome))}</td>" +
+                $"<td>{Html(row.Total)}</td>" +
+                $"<td>{Html(FormatPercent(Share(row.Total, counts.Total)))}</td>" +
+                $"<td>{Html(row.Starvation)}</td>" +
+                $"<td>{Html(row.Injury)}</td>" +
+                $"<td>{Html(row.RottenMeat)}</td>" +
+                $"<td>{Html(row.Unknown)}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine(
+            "<tr>" +
+            "<td><strong>Total</strong></td>" +
+            $"<td>{Html(counts.Total)}</td>" +
+            $"<td>{Html(FormatPercent(counts.Total > 0 ? 1f : 0f))}</td>" +
+            $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.Starvation))}</td>" +
+            $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.Injury))}</td>" +
+            $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.RottenMeat))}</td>" +
+            $"<td>{Html(SumUnknownDeaths(counts))}</td>" +
+            "</tr>");
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static int SumDeathCause(BiomeDeathCauseCounts counts, CreatureDeathReason reason)
+    {
+        return BiomeKinds.All.Sum(biome => counts.For(biome).For(reason));
+    }
+
+    private static int SumUnknownDeaths(BiomeDeathCauseCounts counts)
+    {
+        return BiomeKinds.All.Sum(biome => counts.For(biome).Unknown);
     }
 
     private static string FormatChartValue(float value, string unit)

@@ -78,6 +78,8 @@ public sealed record SimulationSnapshot
 
     public int HighlandDeathCount { get; init; }
 
+    public BiomeDeathCauseCounts CreatureDeathCausesByBiome { get; init; }
+
     public int PlantDepletionCount { get; init; }
 
     public int PlantLocalDispersalCount { get; init; }
@@ -144,6 +146,7 @@ public sealed record SimulationSnapshot
             WetlandDeathCount = state.Stats.WetlandDeathCount,
             TundraDeathCount = state.Stats.TundraDeathCount,
             HighlandDeathCount = state.Stats.HighlandDeathCount,
+            CreatureDeathCausesByBiome = state.Stats.CreatureDeathCausesByBiome,
             PlantDepletionCount = state.Stats.PlantDepletionCount,
             PlantLocalDispersalCount = state.Stats.PlantLocalDispersalCount,
             PlantClusterRelocationCount = state.Stats.PlantClusterRelocationCount,

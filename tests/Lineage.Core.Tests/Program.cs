@@ -152,6 +152,7 @@ var tests = new (string Name, Action Body)[]
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
     ("Stats recording ignores extinct brain payloads", StatsRecordingIgnoresExtinctBrainPayloads),
     ("Stats recording reports biome pressure telemetry", StatsRecordingReportsBiomePressureTelemetry),
+    ("Stats recording reports biome death causes", StatsRecordingReportsBiomeDeathCauses),
     ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
     ("Stats recording honors sample interval", StatsRecordingHonorsSampleInterval),
     ("Scenario factory seeds requested world", ScenarioFactorySeedsRequestedWorld),
@@ -6691,6 +6692,72 @@ static void StatsRecordingReportsBiomePressureTelemetry()
     AssertClose(5f, snapshot.BarrenCaloriesEatenPerSecond, 0.000001, "Barren calories eaten per second");
     AssertEqual(1, snapshot.BarrenDeathCount, "Barren death count");
     AssertEqual(0, snapshot.RichDeathCount, "Rich death count");
+}
+
+static void StatsRecordingReportsBiomeDeathCauses()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 300f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 138,
+        systems: []);
+    simulation.State.SetBiomes(BiomeMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 100f,
+        cellCountX: 3,
+        cellCountY: 1,
+        [BiomeKind.Desert, BiomeKind.Forest, BiomeKind.Wetland]));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(150f, 50f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(250f, 50f), energy: 10f);
+
+    var starving = simulation.State.Creatures[0];
+    starving.Energy = 0f;
+    simulation.State.Creatures[0] = starving;
+
+    var injured = simulation.State.Creatures[1];
+    injured.Health = 0f;
+    injured.LastAttackDamageTaken = 1f;
+    injured.LastDamagingCreatureId = starving.Id;
+    simulation.State.Creatures[1] = injured;
+
+    var rotten = simulation.State.Creatures[2];
+    rotten.Health = 0f;
+    rotten.LastRottenMeatDamage = 1f;
+    simulation.State.Creatures[2] = rotten;
+
+    new DeathSystem(meatCaloriesPerBodyRadius: 0f, meatEnergyFraction: 0f).Update(simulation.State, 1f);
+
+    var counts = simulation.State.Stats.CreatureDeathCausesByBiome;
+    AssertEqual(3, counts.Total, "Biome cause death total");
+    AssertEqual(1, counts.For(BiomeKind.Desert).Starvation, "Desert starvation deaths");
+    AssertEqual(1, counts.For(BiomeKind.Forest).Injury, "Forest injury deaths");
+    AssertEqual(1, counts.For(BiomeKind.Wetland).RottenMeat, "Wetland rotten meat deaths");
+    AssertEqual(0, counts.For(BiomeKind.Grassland).Total, "Grassland cause deaths");
+
+    var snapshot = SimulationSnapshot.Capture(
+        new SimulationScenario
+        {
+            WorldWidth = 300f,
+            WorldHeight = 100f,
+            ResourceVoidBorderWidth = 0f,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f
+        },
+        simulation);
+    AssertEqual(1, snapshot.CreatureDeathCausesByBiome.For(BiomeKind.Desert).Starvation, "Snapshot desert starvation deaths");
+
+    var restored = SimulationSnapshotJson.RestoreSimulation(snapshot);
+    AssertEqual(
+        1,
+        restored.Simulation.State.Stats.CreatureDeathCausesByBiome.For(BiomeKind.Forest).Injury,
+        "Restored forest injury deaths");
 }
 
 static void StatsRecordingReportsLifespanSummary()
