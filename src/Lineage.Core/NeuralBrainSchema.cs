@@ -69,7 +69,15 @@ public static class NeuralBrainSchema
 
     public const int CreatureContactSimilarityInput = CreatureSimilarityScentRightInput + 1;
 
-    public const int InputCount = CreatureContactSimilarityInput + 1;
+    public const int CurrentHabitatQualityInput = CreatureContactSimilarityInput + 1;
+
+    public const int ForwardHabitatQualityInput = CurrentHabitatQualityInput + 1;
+
+    public const int LeftHabitatQualityInput = ForwardHabitatQualityInput + 1;
+
+    public const int RightHabitatQualityInput = LeftHabitatQualityInput + 1;
+
+    public const int InputCount = RightHabitatQualityInput + 1;
 
     public const int OutputCount = 7;
 

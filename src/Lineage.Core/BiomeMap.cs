@@ -17,6 +17,7 @@ public sealed class BiomeMap
     private const ulong ClimateDetailSalt = 0x62696F6D655F6435UL;
 
     private readonly BiomeKind[] _cells;
+    private readonly int[] _resourceSpawnCellIndices;
     private readonly float[] _resourceSpawnWeightPrefix;
     private readonly float _totalResourceSpawnWeight;
 
@@ -34,9 +35,10 @@ public sealed class BiomeMap
         CellCountY = cellCountY;
         ResourceVoidBorderWidth = resourceVoidBorderWidth;
         _cells = cells;
-        _resourceSpawnWeightPrefix = new float[_cells.Length];
 
         var totalWeight = 0f;
+        var resourceSpawnCellIndices = new List<int>();
+        var resourceSpawnWeightPrefix = new List<float>();
         for (var y = 0; y < CellCountY; y++)
         {
             for (var x = 0; x < CellCountX; x++)
@@ -44,11 +46,20 @@ public sealed class BiomeMap
                 var index = ToIndex(x, y);
                 var cell = GetCellBounds(x, y);
                 var fertileCell = GetResourceSpawnBounds(cell);
-                totalWeight += fertileCell.Area * GetResourceDensityMultiplier(_cells[index]);
-                _resourceSpawnWeightPrefix[index] = totalWeight;
+                var weight = fertileCell.Area * GetResourceDensityMultiplier(_cells[index]);
+                if (weight <= 0f)
+                {
+                    continue;
+                }
+
+                totalWeight += weight;
+                resourceSpawnCellIndices.Add(index);
+                resourceSpawnWeightPrefix.Add(totalWeight);
             }
         }
 
+        _resourceSpawnCellIndices = resourceSpawnCellIndices.ToArray();
+        _resourceSpawnWeightPrefix = resourceSpawnWeightPrefix.ToArray();
         _totalResourceSpawnWeight = totalWeight;
     }
 
@@ -148,16 +159,21 @@ public sealed class BiomeMap
         var cellCountX = Math.Max(1, (int)MathF.Ceiling(bounds.Width / cellSize));
         var cellCountY = Math.Max(1, (int)MathF.Ceiling(bounds.Height / cellSize));
         var cells = new BiomeKind[cellCountX * cellCountY];
+        var climateCells = new ClimateCell[cells.Length];
 
         for (var y = 0; y < cellCountY; y++)
         {
             for (var x = 0; x < cellCountX; x++)
             {
-                cells[y * cellCountX + x] = BiomeKindForClimateCell(x, y, cellCountX, cellCountY, seed);
+                climateCells[y * cellCountX + x] = CreateClimateCell(x, y, cellCountY, seed);
             }
         }
 
-        BufferNaturalClimateTransitions(cells, cellCountX, cellCountY);
+        ClassifyNaturalClimateCells(climateCells, cells);
+        SmoothNaturalClimateRegions(cells, cellCountX, cellCountY, passes: 2, radius: 4);
+        SmoothNaturalClimateRegions(cells, cellCountX, cellCountY, passes: 2, radius: 3);
+        SmoothNaturalClimateRegions(cells, cellCountX, cellCountY, passes: 2, radius: 2);
+        SmoothNaturalClimateRegions(cells, cellCountX, cellCountY, passes: 1, radius: 1);
         return new BiomeMap(bounds, cellSize, cellCountX, cellCountY, cells, resourceVoidBorderWidth);
     }
 
@@ -305,11 +321,12 @@ public sealed class BiomeMap
 
     public SimVector2 SampleResourcePosition(DeterministicRandom random)
     {
-        if (_totalResourceSpawnWeight <= 0f)
+        if (_totalResourceSpawnWeight <= 0f || _resourceSpawnCellIndices.Length == 0)
         {
+            var fallbackBounds = GetResourceSpawnBounds();
             return new SimVector2(
-                random.NextSingle(0f, Bounds.Width),
-                random.NextSingle(0f, Bounds.Height));
+                random.NextSingle(fallbackBounds.X, fallbackBounds.X + fallbackBounds.Width),
+                random.NextSingle(fallbackBounds.Y, fallbackBounds.Y + fallbackBounds.Height));
         }
 
         var roll = random.NextSingle(0f, _totalResourceSpawnWeight);
@@ -319,9 +336,10 @@ public sealed class BiomeMap
             index = ~index;
         }
 
-        index = Math.Clamp(index, 0, _cells.Length - 1);
-        var cellX = index % CellCountX;
-        var cellY = index / CellCountX;
+        index = Math.Clamp(index, 0, _resourceSpawnCellIndices.Length - 1);
+        var cellIndex = _resourceSpawnCellIndices[index];
+        var cellX = cellIndex % CellCountX;
+        var cellY = cellIndex / CellCountX;
         var bounds = GetResourceSpawnBounds(GetCellBounds(cellX, cellY));
         return new SimVector2(
             random.NextSingle(bounds.X, bounds.X + bounds.Width),
@@ -596,55 +614,89 @@ public sealed class BiomeMap
         };
     }
 
-    private static BiomeKind BiomeKindForClimateCell(int x, int y, int cellCountX, int cellCountY, ulong seed)
+    private static ClimateCell CreateClimateCell(int x, int y, int cellCountY, ulong seed)
     {
         var yPhase = cellCountY <= 1 ? 0.5f : (y + 0.5f) / cellCountY;
-        var elevation = FractalNoise(x * 0.052f + 17.0f, y * 0.052f - 9.0f, seed ^ ElevationSalt);
-        var moistureNoise = FractalNoise(x * 0.055f - 4.0f, y * 0.055f + 23.0f, seed ^ MoistureSalt);
-        var temperatureNoise = FractalNoise(x * 0.038f + 31.0f, y * 0.038f + 5.0f, seed ^ TemperatureSalt);
-        var detail = FractalNoise(x * 0.08f - 15.0f, y * 0.08f - 19.0f, seed ^ ClimateDetailSalt);
-        var latitudeTemperature = 0.12f + yPhase * 0.76f;
-        var temperature = Clamp01(latitudeTemperature * 0.72f + temperatureNoise * 0.34f - elevation * 0.22f + 0.08f);
-        var moisture = Clamp01(moistureNoise * 0.70f + (1f - elevation) * 0.22f + detail * 0.08f);
-        var temperateFitness = 1f - Math.Clamp(MathF.Abs(temperature - 0.58f) * 2.2f, 0f, 1f);
-        var fertility = Clamp01(moisture * 0.48f + detail * 0.30f + temperateFitness * 0.18f - elevation * 0.10f + 0.08f);
+        var elevationRegion = FractalNoise(x * 0.015f + 17.0f, y * 0.015f - 9.0f, seed ^ ElevationSalt);
+        var elevationDetail = FractalNoise(x * 0.035f + 3.0f, y * 0.035f + 13.0f, seed ^ ClimateDetailSalt);
+        var elevation = Clamp01(elevationRegion * 0.82f + elevationDetail * 0.18f);
+        var moistureRegion = FractalNoise(x * 0.014f - 4.0f, y * 0.014f + 23.0f, seed ^ MoistureSalt);
+        var moistureDetail = FractalNoise(x * 0.034f - 15.0f, y * 0.034f - 19.0f, seed ^ ClimateDetailSalt);
+        var temperatureRegion = FractalNoise(x * 0.012f + 31.0f, y * 0.012f + 5.0f, seed ^ TemperatureSalt);
+        var latitudeTemperature = 0.20f + yPhase * 0.62f;
+        var temperature = Clamp01(latitudeTemperature * 0.76f + temperatureRegion * 0.25f - elevation * 0.12f + 0.04f);
+        var rainShadow = MathF.Max(0f, elevation - 0.58f) * 0.32f;
+        var moisture = Clamp01(moistureRegion * 0.78f + moistureDetail * 0.14f + (1f - elevation) * 0.14f - rainShadow);
+        var forestFitness = moisture * 0.72f + (1f - MathF.Abs(temperature - 0.56f)) * 0.20f - elevation * 0.08f;
+        var temperateFitness = 1f - Math.Clamp(MathF.Abs(temperature - 0.58f) * 1.8f, 0f, 1f);
+        var fertility = Clamp01(
+            moisture * 0.42f
+            + temperateFitness * 0.28f
+            + (1f - elevation) * 0.18f
+            + moistureDetail * 0.08f
+            - MathF.Max(0f, moisture - 0.78f) * 0.20f);
+        return new ClimateCell(moisture, forestFitness, fertility);
+    }
 
-        if (temperature < 0.26f)
+    private static void ClassifyNaturalClimateCells(ClimateCell[] climateCells, BiomeKind[] cells)
+    {
+        Array.Fill(cells, BiomeKind.Grassland);
+        var assigned = new bool[cells.Length];
+        var indices = Enumerable.Range(0, cells.Length).ToArray();
+        var desertCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.18f));
+        var wetlandCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.16f));
+        var forestCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.28f));
+        var fertileCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.14f));
+
+        Array.Sort(indices, (left, right) => climateCells[left].Moisture.CompareTo(climateCells[right].Moisture));
+        for (var i = 0; i < desertCount && i < indices.Length; i++)
         {
-            return BiomeKind.Tundra;
+            var index = indices[i];
+            cells[index] = BiomeKind.Desert;
+            assigned[index] = true;
         }
 
-        if (elevation > 0.74f)
+        for (var i = 0; i < wetlandCount && i < indices.Length; i++)
         {
-            return BiomeKind.Highland;
+            var index = indices[indices.Length - 1 - i];
+            if (assigned[index])
+            {
+                continue;
+            }
+
+            cells[index] = BiomeKind.Wetland;
+            assigned[index] = true;
         }
 
-        if (moisture > 0.74f && elevation < 0.56f && temperature is > 0.25f and < 0.88f)
+        Array.Sort(indices, (left, right) => climateCells[right].ForestFitness.CompareTo(climateCells[left].ForestFitness));
+        var forestsAssigned = 0;
+        for (var i = 0; i < indices.Length && forestsAssigned < forestCount; i++)
         {
-            return BiomeKind.Wetland;
+            var index = indices[i];
+            if (assigned[index])
+            {
+                continue;
+            }
+
+            cells[index] = BiomeKind.Forest;
+            assigned[index] = true;
+            forestsAssigned++;
         }
 
-        if (fertility > 0.70f && moisture > 0.52f && elevation < 0.64f && temperature is > 0.26f and < 0.88f)
+        Array.Sort(indices, (left, right) => climateCells[right].Fertility.CompareTo(climateCells[left].Fertility));
+        var fertilesAssigned = 0;
+        for (var i = 0; i < indices.Length && fertilesAssigned < fertileCount; i++)
         {
-            return BiomeKind.Fertile;
-        }
+            var index = indices[i];
+            if (assigned[index])
+            {
+                continue;
+            }
 
-        if (moisture > 0.58f && temperature is > 0.28f and < 0.82f && elevation < 0.72f)
-        {
-            return BiomeKind.Forest;
+            cells[index] = BiomeKind.Fertile;
+            assigned[index] = true;
+            fertilesAssigned++;
         }
-
-        if (moisture < 0.32f && temperature > 0.42f && elevation < 0.75f)
-        {
-            return BiomeKind.Desert;
-        }
-
-        if (moisture < 0.38f || fertility < 0.36f)
-        {
-            return BiomeKind.Scrubland;
-        }
-
-        return BiomeKind.Grassland;
     }
 
     private static void BufferNaturalClimateTransitions(BiomeKind[] cells, int cellCountX, int cellCountY)
@@ -686,6 +738,131 @@ public sealed class BiomeMap
                 }
             }
         }
+    }
+
+    private static void SmoothNaturalClimateRegions(BiomeKind[] cells, int cellCountX, int cellCountY, int passes, int radius)
+    {
+        for (var pass = 0; pass < passes; pass++)
+        {
+            var source = cells.ToArray();
+            for (var y = 0; y < cellCountY; y++)
+            {
+                for (var x = 0; x < cellCountX; x++)
+                {
+                    var index = y * cellCountX + x;
+                    var current = BiomeKinds.Canonicalize(source[index]);
+                    var currentSupport = CountNeighborKind(source, cellCountX, cellCountY, x, y, current, radius);
+                    var candidate = MostCommonNeighborKind(
+                        source,
+                        cellCountX,
+                        cellCountY,
+                        x,
+                        y,
+                        radius,
+                        out var candidateSupport,
+                        out var neighborCount);
+
+                    if (candidate == current)
+                    {
+                        continue;
+                    }
+
+                    var strongCandidateSupport = Math.Max(3, (int)MathF.Ceiling(neighborCount * 0.42f));
+                    var weakCurrentSupport = Math.Max(1, (int)MathF.Floor(neighborCount * 0.20f));
+                    var replacementSupport = Math.Max(2, (int)MathF.Ceiling(neighborCount * 0.28f));
+                    if (candidateSupport >= strongCandidateSupport
+                        || currentSupport <= weakCurrentSupport && candidateSupport >= replacementSupport
+                        || candidateSupport - currentSupport >= Math.Max(2, radius * 2))
+                    {
+                        cells[index] = candidate;
+                    }
+                }
+            }
+        }
+    }
+
+    private static BiomeKind MostCommonNeighborKind(
+        BiomeKind[] cells,
+        int cellCountX,
+        int cellCountY,
+        int centerX,
+        int centerY,
+        int radius,
+        out int bestCount,
+        out int neighborCount)
+    {
+        Span<int> counts = stackalloc int[BiomeKinds.All.Count];
+        neighborCount = 0;
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                if (dx == 0 && dy == 0)
+                {
+                    continue;
+                }
+
+                var x = centerX + dx;
+                var y = centerY + dy;
+                if ((uint)x >= (uint)cellCountX || (uint)y >= (uint)cellCountY)
+                {
+                    continue;
+                }
+
+                counts[(int)BiomeKinds.Canonicalize(cells[y * cellCountX + x])]++;
+                neighborCount++;
+            }
+        }
+
+        var best = BiomeKinds.Canonicalize(cells[centerY * cellCountX + centerX]);
+        bestCount = -1;
+        foreach (var kind in BiomeKinds.All)
+        {
+            var count = counts[(int)kind];
+            if (count > bestCount)
+            {
+                best = kind;
+                bestCount = count;
+            }
+        }
+
+        return best;
+    }
+
+    private static int CountNeighborKind(
+        BiomeKind[] cells,
+        int cellCountX,
+        int cellCountY,
+        int centerX,
+        int centerY,
+        BiomeKind kind,
+        int radius)
+    {
+        var count = 0;
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                if (dx == 0 && dy == 0)
+                {
+                    continue;
+                }
+
+                var x = centerX + dx;
+                var y = centerY + dy;
+                if ((uint)x >= (uint)cellCountX || (uint)y >= (uint)cellCountY)
+                {
+                    continue;
+                }
+
+                if (BiomeKinds.Canonicalize(cells[y * cellCountX + x]) == kind)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     private static bool HasNeighbor(
@@ -837,6 +1014,8 @@ public sealed class BiomeMap
     }
 
     private readonly record struct ScoredCell(int Index, float Score);
+
+    private readonly record struct ClimateCell(float Moisture, float ForestFitness, float Fertility);
 }
 
 public readonly record struct BiomeCellBounds(float X, float Y, float Width, float Height)

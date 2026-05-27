@@ -66,6 +66,10 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.ForwardTerrainDragInput] = frame.Body.ForwardTerrainDrag;
         inputs[NeuralBrainSchema.LeftTerrainDragInput] = frame.Body.LeftTerrainDrag;
         inputs[NeuralBrainSchema.RightTerrainDragInput] = frame.Body.RightTerrainDrag;
+        inputs[NeuralBrainSchema.CurrentHabitatQualityInput] = frame.Body.CurrentHabitatQuality;
+        inputs[NeuralBrainSchema.ForwardHabitatQualityInput] = frame.Body.ForwardHabitatQuality;
+        inputs[NeuralBrainSchema.LeftHabitatQualityInput] = frame.Body.LeftHabitatQuality;
+        inputs[NeuralBrainSchema.RightHabitatQualityInput] = frame.Body.RightHabitatQuality;
         inputs[NeuralBrainSchema.EnergySurplusInput] = frame.Internal.EnergySurplusRatio;
         inputs[NeuralBrainSchema.RecentFoodSuccessInput] = frame.Internal.RecentFoodSuccess;
         inputs[NeuralBrainSchema.RecentPlantRawYieldInput] = frame.Internal.RecentPlantRawYield;

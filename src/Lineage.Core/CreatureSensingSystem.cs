@@ -12,6 +12,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumScentStrength = 0.001f;
     private const float MinimumTerrainProbeDistance = 24f;
     private const float MaximumTerrainProbeDistance = 160f;
+    private const float MinimumHabitatProbeDistance = 16f;
+    private const float MaximumHabitatProbeDistance = 80f;
     private const int ObstacleProbeSteps = 4;
     private const float MinimumExpectedFoodTransfer = 0.001f;
     private const float MinimumExpectedPlantDigestiveYield = 0.001f;
@@ -22,9 +24,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const bool DefaultEnableSectorVision = false;
     public const float DefaultPlantPayoffTraceHalfLifeSeconds = 45f;
+    private static readonly float MaximumHabitatDensityMultiplier =
+        BiomeKinds.All.Max(BiomeMap.GetResourceDensityMultiplier);
+    private static readonly float MaximumHabitatRegrowthMultiplier =
+        BiomeKinds.All.Max(BiomeMap.GetResourceRegrowthMultiplier);
 
     private readonly UniformSpatialIndex _spatialIndex;
     private readonly BiomePressureProfile _biomeSpeedProfile;
+    private readonly BiomePressureProfile _biomeVisionRangeProfile;
     private readonly bool _hasUniformBiomeSpeedProfile;
     private readonly float _uniformBiomeDrag;
     private readonly float _meatScentRangeMultiplier;
@@ -34,7 +41,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly float _closeSenseRefreshProximity;
     private readonly bool _enableSectorVision;
     private readonly float _plantPayoffTraceHalfLifeSeconds;
-    private readonly float _treeMovementSpeedMultiplierAtFullCover;
 
     private readonly List<int> _plantResourceCandidates = [];
     private readonly IndexStampSet _seenPlantResourceCandidates = new();
@@ -54,11 +60,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float meatScentCaloriesForFullStrength = 60f,
         float meatScentDensitySaturation = 1f,
         BiomePressureProfile? biomeSpeedProfile = null,
+        BiomePressureProfile? biomeVisionRangeProfile = null,
         int worldSenseIntervalTicks = DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity,
         bool enableSectorVision = DefaultEnableSectorVision,
-        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds,
-        float treeMovementSpeedMultiplierAtFullCover = TreeMap.DefaultMovementSpeedMultiplierAtFullCover)
+        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -94,6 +100,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _biomeSpeedProfile = BiomePressureProfile.Validate(
             biomeSpeedProfile ?? BiomePressureProfile.Neutral,
             nameof(biomeSpeedProfile));
+        _biomeVisionRangeProfile = BiomePressureProfile.Validate(
+            biomeVisionRangeProfile ?? BiomePressureProfile.Neutral,
+            nameof(biomeVisionRangeProfile));
         _hasUniformBiomeSpeedProfile = HasUniformMultipliers(_biomeSpeedProfile);
         _uniformBiomeDrag = SpeedMultiplierToDrag(_biomeSpeedProfile.Barren);
         _meatScentRangeMultiplier = meatScentRangeMultiplier;
@@ -103,10 +112,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _closeSenseRefreshProximity = closeSenseRefreshProximity;
         _enableSectorVision = enableSectorVision;
         _plantPayoffTraceHalfLifeSeconds = plantPayoffTraceHalfLifeSeconds;
-        TreeMap.ValidateFullCoverMovementSpeedMultiplier(
-            treeMovementSpeedMultiplierAtFullCover,
-            nameof(treeMovementSpeedMultiplierAtFullCover));
-        _treeMovementSpeedMultiplierAtFullCover = treeMovementSpeedMultiplierAtFullCover;
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -129,6 +134,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var creature = state.Creatures[i];
             var genome = state.GetGenome(creature.GenomeId);
             var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
+            var effectiveVisionRadius = MathF.Max(
+                0.001f,
+                effectiveSenseRadius * _biomeVisionRangeProfile.For(state.Biomes.GetKindAt(creature.Position)));
             var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
             var forward = SimVector2.FromAngle(creature.HeadingRadians);
             var right = new SimVector2(-forward.Y, forward.X);
@@ -204,7 +212,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             _spatialIndex.AddPlantAndMeatResourceCandidatesWithCalories(
                 state,
                 creature.Position,
-                effectiveSenseRadius,
+                effectiveVisionRadius,
                 meatScentRadius,
                 0f,
                 _plantResourceCandidates,
@@ -222,7 +230,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             _spatialIndex.AddEggCandidatesWithEnergy(
                 state,
                 creature.Position,
-                effectiveSenseRadius,
+                effectiveVisionRadius,
                 minimumEnergy: 0f,
                 _eggCandidates,
                 _seenEggCandidates);
@@ -239,8 +247,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 i,
                 creature.Id,
                 creature.Position,
-                effectiveSenseRadius + 12f,
-                effectiveSenseRadius,
+                effectiveVisionRadius + 12f,
+                effectiveVisionRadius,
                 forward,
                 hasLimitedVision,
                 visionCosThreshold,
@@ -267,7 +275,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var terrainSenseStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
-            ApplyTerrainDragSense(ref senses, state, creature, forward, right, effectiveSenseRadius);
+            ApplyTerrainDragSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
             sensingProfile?.RecordTerrainSense(Stopwatch.GetTimestamp() - terrainSenseStartedAt);
 
             var obstacleSenseStartedAt = sensingProfile is not null
@@ -314,7 +322,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 var toResource = resource.Position - creature.Position;
                 var distanceSquared = toResource.LengthSquared;
 
-                if (!IsWithinEdgeRange(distanceSquared, resource.Radius, effectiveSenseRadius)
+                if (!IsWithinEdgeRange(distanceSquared, resource.Radius, effectiveVisionRadius)
                     || !IsInsideVisionCone(toResource, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
                 {
                     continue;
@@ -333,7 +341,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     nearestVisiblePlantIndex = resourceIndex;
                 }
 
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
                 var qualityClarity = PlantQualityClarity(proximity);
                 var qualityWeight = qualityClarity >= MinimumPlantQualityClarity
                     ? qualityClarity * Math.Clamp(resource.Calories / Math.Max(1f, resource.MaxCalories), 0f, 1f)
@@ -401,7 +409,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     }
                 }
 
-                if (edgeDistance > effectiveSenseRadius
+                if (edgeDistance > effectiveVisionRadius
                     || !IsInsideVisionCone(toResource, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
                 {
                     continue;
@@ -419,7 +427,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     nearestVisibleMeatFreshness = MeatQuality.Freshness(resource);
                 }
 
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
                 if (_enableSectorVision
                     && VisionSectorSet.TryGetSectorIndex(
                         toResource,
@@ -463,7 +471,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 var toEgg = egg.Position - creature.Position;
                 var distanceSquared = toEgg.LengthSquared;
 
-                if (!IsWithinEdgeRange(distanceSquared, eggRadius, effectiveSenseRadius)
+                if (!IsWithinEdgeRange(distanceSquared, eggRadius, effectiveVisionRadius)
                     || !IsInsideVisionCone(toEgg, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
                 {
                     continue;
@@ -484,7 +492,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     nearestVisibleMeatFreshness = 1f;
                 }
 
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+                var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
                 if (_enableSectorVision
                     && VisionSectorSet.TryGetSectorIndex(
                         toEgg,
@@ -546,7 +554,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     creature,
                     forward,
                     right,
-                    effectiveSenseRadius);
+                    effectiveVisionRadius);
             }
             else if (bestVisibleFoodKind == FoodContactKind.Egg && bestVisibleFoodIndex >= 0)
             {
@@ -556,7 +564,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     creature,
                     forward,
                     right,
-                    effectiveSenseRadius);
+                    effectiveVisionRadius);
             }
             if (nearestVisiblePlantIndex >= 0)
             {
@@ -566,7 +574,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     creature,
                     forward,
                     right,
-                    effectiveSenseRadius);
+                    effectiveVisionRadius);
             }
 
             if (nearestVisibleMeatKind == FoodContactKind.Resource && nearestVisibleMeatIndex >= 0)
@@ -578,7 +586,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     creature,
                     forward,
                     right,
-                    effectiveSenseRadius);
+                    effectiveVisionRadius);
             }
             else if (nearestVisibleMeatKind == FoodContactKind.Egg && nearestVisibleMeatIndex >= 0)
             {
@@ -589,7 +597,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     creature,
                     forward,
                     right,
-                    effectiveSenseRadius);
+                    effectiveVisionRadius);
             }
             if (nearestVisibleCreatureIndex >= 0)
             {
@@ -601,7 +609,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                     creature,
                     forward,
                     right,
-                    effectiveSenseRadius);
+                    effectiveVisionRadius);
             }
 
             ApplyPlantPreferenceBridge(ref senses);
@@ -819,11 +827,34 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         ref CreatureSenseState senses,
         WorldState state,
         CreatureState creature,
+        CreatureGenome genome,
         SimVector2 forward,
         SimVector2 right,
         float effectiveSenseRadius)
     {
-        if (_hasUniformBiomeSpeedProfile && !state.Trees.HasTrees)
+        var terrainProbeDistance = Math.Clamp(
+            effectiveSenseRadius * 0.5f,
+            MinimumTerrainProbeDistance,
+            MaximumTerrainProbeDistance);
+        var terrainForwardPosition = state.Bounds.Clamp(creature.Position + forward * terrainProbeDistance);
+        var terrainLeftPosition = state.Bounds.Clamp(creature.Position - right * terrainProbeDistance);
+        var terrainRightPosition = state.Bounds.Clamp(creature.Position + right * terrainProbeDistance);
+
+        var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+        var habitatProbeDistance = Math.Clamp(
+            MathF.Min(effectiveSenseRadius * 0.25f, bodyRadius * 8f),
+            MinimumHabitatProbeDistance,
+            MaximumHabitatProbeDistance);
+        var habitatForwardPosition = state.Bounds.Clamp(creature.Position + forward * habitatProbeDistance);
+        var habitatLeftPosition = state.Bounds.Clamp(creature.Position - right * habitatProbeDistance);
+        var habitatRightPosition = state.Bounds.Clamp(creature.Position + right * habitatProbeDistance);
+
+        senses.CurrentHabitatQuality = HabitatQualityAt(state, creature.Position);
+        senses.ForwardHabitatQuality = HabitatQualityAt(state, habitatForwardPosition);
+        senses.LeftHabitatQuality = HabitatQualityAt(state, habitatLeftPosition);
+        senses.RightHabitatQuality = HabitatQualityAt(state, habitatRightPosition);
+
+        if (_hasUniformBiomeSpeedProfile)
         {
             if (_uniformBiomeDrag != 0f)
             {
@@ -836,29 +867,27 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             return;
         }
 
-        var probeDistance = Math.Clamp(
-            effectiveSenseRadius * 0.5f,
-            MinimumTerrainProbeDistance,
-            MaximumTerrainProbeDistance);
-        var forwardPosition = state.Bounds.Clamp(creature.Position + forward * probeDistance);
-        var leftPosition = state.Bounds.Clamp(creature.Position - right * probeDistance);
-        var rightPosition = state.Bounds.Clamp(creature.Position + right * probeDistance);
-
         senses.CurrentTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, creature.Position));
-        senses.ForwardTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, forwardPosition));
-        senses.LeftTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, leftPosition));
-        senses.RightTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, rightPosition));
+        senses.ForwardTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, terrainForwardPosition));
+        senses.LeftTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, terrainLeftPosition));
+        senses.RightTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, terrainRightPosition));
     }
 
     private float TerrainSpeedMultiplierAt(WorldState state, SimVector2 position)
     {
-        return _biomeSpeedProfile.For(state.Biomes.GetKindAt(position))
-            * TreeSpeedMultiplier(state.Trees.GetCoverAt(position));
+        return _biomeSpeedProfile.For(state.Biomes.GetKindAt(position));
     }
 
-    private float TreeSpeedMultiplier(float cover)
+    private static float HabitatQualityAt(WorldState state, SimVector2 position)
     {
-        return 1f - cover * (1f - _treeMovementSpeedMultiplierAtFullCover);
+        var densityQuality = MaximumHabitatDensityMultiplier > 0f
+            ? state.Biomes.GetResourceDensityMultiplierAt(position) / MaximumHabitatDensityMultiplier
+            : 0f;
+        var regrowthQuality = MaximumHabitatRegrowthMultiplier > 0f
+            ? state.Biomes.GetResourceRegrowthMultiplierAt(position) / MaximumHabitatRegrowthMultiplier
+            : 0f;
+        var longTermQuality = densityQuality * 0.65f + regrowthQuality * 0.35f;
+        return Math.Clamp(longTermQuality * state.LocalFertility.GetMultiplierAt(position), 0f, 1f);
     }
 
     private static void ApplyObstacleSense(

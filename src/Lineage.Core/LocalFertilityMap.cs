@@ -7,8 +7,8 @@ namespace Lineage.Core;
 /// <remarks>
 /// This is deliberately separate from biome fertility. Biomes describe the long-term
 /// ecology of an area; local fertility is short-lived pressure from recent feeding.
-/// Creatures do not sense this map directly, but they can experience its effect through
-/// plant density and regrowth.
+/// Creatures do not sense this map by name, but it contributes to local habitat quality
+/// and they experience its effect through plant density and regrowth.
 /// </remarks>
 public sealed class LocalFertilityMap
 {

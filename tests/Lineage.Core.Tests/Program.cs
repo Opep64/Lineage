@@ -17,7 +17,6 @@ var tests = new (string Name, Action Body)[]
     ("Movement slides along obstacle edges", MovementSlidesAlongObstacleEdges),
     ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
     ("Movement speed follows biome multiplier", MovementSpeedFollowsBiomeMultiplier),
-    ("Movement speed follows tree cover", MovementSpeedFollowsTreeCover),
     ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
@@ -76,7 +75,8 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
-    ("Creature sensing reports tree drag", CreatureSensingReportsTreeDrag),
+    ("Creature sensing reports habitat quality", CreatureSensingReportsHabitatQuality),
+    ("Creature sensing applies biome vision range penalty", CreatureSensingAppliesBiomeVisionRangePenalty),
     ("Creature sensing reports local obstacles", CreatureSensingReportsLocalObstacles),
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
@@ -129,6 +129,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates plant payoff trace inputs", NeuralBrainMigratesPlantPayoffTraceInputs),
     ("Neural brain migrates plant preference bridge inputs", NeuralBrainMigratesPlantPreferenceBridgeInputs),
     ("Neural brain migrates creature similarity inputs", NeuralBrainMigratesCreatureSimilarityInputs),
+    ("Neural brain migrates habitat quality inputs", NeuralBrainMigratesHabitatQualityInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -160,8 +161,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
-    ("Natural climate biome maps create grouped buffered regions", NaturalClimateBiomeMapsCreateGroupedBufferedRegions),
-    ("Tree maps follow biome tree density", TreeMapsFollowBiomeTreeDensity),
+    ("Natural climate biome maps create broad five-biome regions", NaturalClimateBiomeMapsCreateBroadFiveBiomeRegions),
     ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
@@ -169,13 +169,13 @@ var tests = new (string Name, Action Body)[]
     ("Obstacle maps create barriers and scattered rocks", ObstacleMapsCreateBarriersAndScatteredRocks),
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
+    ("Resource void clipped biome cells are skipped during sampling", ResourceVoidClippedBiomeCellsAreSkippedDuringSampling),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
     ("Persistent spatial rebuild removes decayed resources", PersistentSpatialRebuildRemovesDecayedResources),
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
     ("Scenario factory honors natural climate biome map kind", ScenarioFactoryHonorsNaturalClimateBiomeMapKind),
-    ("Scenario factory honors tree layer", ScenarioFactoryHonorsTreeLayer),
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
@@ -634,42 +634,6 @@ static void MovementSpeedFollowsBiomeMultiplier()
     AssertClose(26f, moved.Position.X, 0.000001, "Biome speed x position");
     AssertClose(6f, moved.Velocity.Length, 0.000001, "Biome speed actual velocity");
     AssertClose(6f, moved.LastDistanceTraveled, 0.000001, "Biome speed distance");
-}
-
-static void MovementSpeedFollowsTreeCover()
-{
-    var simulation = new Simulation(
-        new SimulationConfig
-        {
-            WorldWidth = 100f,
-            WorldHeight = 100f,
-            FixedDeltaSeconds = 1f
-        },
-        seed: 25,
-        systems: [new MovementSystem(treeMovementSpeedMultiplierAtFullCover: 0.5f)]);
-    simulation.State.SetTrees(TreeMap.CreateFromCells(
-        simulation.State.Bounds,
-        cellSize: 100f,
-        cellCountX: 1,
-        cellCountY: 1,
-        [0.5f]));
-
-    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
-    {
-        MaxSpeed = 24f,
-        MaturityAgeSeconds = 0f
-    });
-    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
-    var creature = simulation.State.Creatures[0];
-    creature.DesiredVelocity = new SimVector2(12f, 0f);
-    simulation.State.Creatures[0] = creature;
-
-    simulation.Step();
-
-    var moved = simulation.State.Creatures[0];
-    AssertClose(29f, moved.Position.X, 0.000001, "Tree speed x position");
-    AssertClose(9f, moved.Velocity.Length, 0.000001, "Tree speed actual velocity");
-    AssertClose(9f, moved.LastDistanceTraveled, 0.000001, "Tree speed distance");
 }
 
 static void MovementSpeedCostIsNonlinear()
@@ -2245,6 +2209,7 @@ static void EggEnvironmentalDamageFollowsVoidAndBiomePressure()
     {
         Seed = 18,
         PipelineKind = SimulationPipelineKind.SimpleForaging,
+        BiomeMapKind = BiomeMapKind.GeneratedNoise,
         WorldWidth = 1_500f,
         WorldHeight = 1_000f,
         BiomeCellSize = 250f,
@@ -2972,6 +2937,7 @@ static void CreatureSensingReportsLocalTerrainDrag()
     var scenario = new SimulationScenario
     {
         Seed = 407,
+        BiomeMapKind = BiomeMapKind.GeneratedNoise,
         WorldWidth = 1_000f,
         WorldHeight = 700f,
         BiomeCellSize = 100f,
@@ -3024,13 +2990,13 @@ static void CreatureSensingReportsLocalTerrainDrag()
     AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.ForwardBiome)), senses.LeftTerrainDrag, 0.000001, "Left terrain drag");
 }
 
-static void CreatureSensingReportsTreeDrag()
+static void CreatureSensingReportsHabitatQuality()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
     var simulation = new Simulation(
         new SimulationConfig
         {
-            WorldWidth = 100f,
+            WorldWidth = 200f,
             WorldHeight = 100f,
             FixedDeltaSeconds = 0.1f
         },
@@ -3038,25 +3004,34 @@ static void CreatureSensingReportsTreeDrag()
         systems:
         [
             new SpatialIndexRebuildSystem(spatialIndex),
-            new CreatureSensingSystem(
-                spatialIndex,
-                worldSenseIntervalTicks: 1,
-                treeMovementSpeedMultiplierAtFullCover: 0.5f)
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
         ]);
-    simulation.State.SetTrees(TreeMap.CreateFromCells(
+    simulation.State.SetBiomes(BiomeMap.CreateFromCells(
         simulation.State.Bounds,
-        cellSize: 50f,
+        cellSize: 100f,
         cellCountX: 2,
         cellCountY: 1,
-        [0.5f, 0f]));
+        [BiomeKind.Grassland, BiomeKind.Fertile]));
+    simulation.State.SetLocalFertility(LocalFertilityMap.CreateFromCells(
+        simulation.State.Bounds,
+        enabled: true,
+        cellSize: 100f,
+        cellCountX: 2,
+        cellCountY: 1,
+        minimumMultiplier: 0.25f,
+        recoveryPerSecond: 0f,
+        depletionPerPlant: 0f,
+        neighborDepletionShare: 0f,
+        [0.5f, 1f]));
 
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
     {
+        BodyRadius = 3f,
         SenseRadius = 100f,
         MaturityAgeSeconds = 0f
     });
 
-    simulation.State.SpawnCreature(genomeId, new SimVector2(25f, 50f), energy: 25f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(85f, 50f), energy: 25f);
     var creature = simulation.State.Creatures[0];
     creature.HeadingRadians = 0f;
     simulation.State.Creatures[0] = creature;
@@ -3064,8 +3039,75 @@ static void CreatureSensingReportsTreeDrag()
     simulation.Step();
 
     var senses = simulation.State.Creatures[0].Senses;
-    AssertClose(0.25f, senses.CurrentTerrainDrag, 0.000001, "Current tree drag");
-    AssertClose(0f, senses.ForwardTerrainDrag, 0.000001, "Forward tree drag");
+    AssertClose(ExpectedHabitatQuality(BiomeKind.Grassland, localFertility: 0.5f), senses.CurrentHabitatQuality, 0.000001, "Current habitat quality");
+    AssertClose(ExpectedHabitatQuality(BiomeKind.Fertile, localFertility: 1f), senses.ForwardHabitatQuality, 0.000001, "Forward habitat quality");
+    AssertClose(senses.CurrentHabitatQuality, senses.LeftHabitatQuality, 0.000001, "Left habitat quality");
+    AssertClose(senses.CurrentHabitatQuality, senses.RightHabitatQuality, 0.000001, "Right habitat quality");
+    AssertTrue(senses.ForwardHabitatQuality > senses.CurrentHabitatQuality, "Forward fertile habitat should be better than locally depleted grassland");
+}
+
+static void CreatureSensingAppliesBiomeVisionRangePenalty()
+{
+    var visionProfile = new BiomePressureProfile(
+        desert: 1f,
+        scrubland: 1f,
+        grassland: 1f,
+        fertile: 1f,
+        forest: 0.5f,
+        wetland: 1f,
+        tundra: 1f,
+        highland: 1f);
+
+    AssertTrue(CanSeeForwardPlant(BiomeKind.Grassland, visionProfile), "Grassland should keep full visual range");
+    AssertTrue(!CanSeeForwardPlant(BiomeKind.Forest, visionProfile), "Forest should shorten visual range");
+}
+
+static bool CanSeeForwardPlant(BiomeKind biome, BiomePressureProfile visionProfile)
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 160f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 0.1f
+        },
+        seed: 409,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                biomeVisionRangeProfile: visionProfile,
+                worldSenseIntervalTicks: 1)
+        ]);
+    simulation.State.SetBiomes(BiomeMap.CreateUniform(simulation.State.Bounds, cellSize: 100f, biome));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 50f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Generic,
+        Position = new SimVector2(95f, 50f),
+        Radius = 2f,
+        Calories = 20f,
+        MaxCalories = 20f
+    });
+
+    simulation.Step();
+
+    return simulation.State.Creatures[0].Senses.PlantDetected;
 }
 
 static void CreatureSensingReportsMemoryDirection()
@@ -3470,6 +3512,10 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         ForwardTerrainDrag = 0.54f,
         LeftTerrainDrag = 0.64f,
         RightTerrainDrag = 0.74f,
+        CurrentHabitatQuality = 0.15f,
+        ForwardHabitatQuality = 0.25f,
+        LeftHabitatQuality = 0.35f,
+        RightHabitatQuality = 0.45f,
         ForwardObstacle = 0.84f,
         LeftObstacle = 0.14f,
         RightObstacle = 0.24f,
@@ -3517,6 +3563,10 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(-0.53f, inputs[NeuralBrainSchema.CreatureSimilarityScentForwardInput], 0.000001, "Creature similarity scent forward input");
     AssertClose(0.63f, inputs[NeuralBrainSchema.CreatureSimilarityScentRightInput], 0.000001, "Creature similarity scent right input");
     AssertClose(0.54f, inputs[NeuralBrainSchema.ForwardTerrainDragInput], 0.000001, "Terrain input");
+    AssertClose(0.15f, inputs[NeuralBrainSchema.CurrentHabitatQualityInput], 0.000001, "Current habitat input");
+    AssertClose(0.25f, inputs[NeuralBrainSchema.ForwardHabitatQualityInput], 0.000001, "Forward habitat input");
+    AssertClose(0.35f, inputs[NeuralBrainSchema.LeftHabitatQualityInput], 0.000001, "Left habitat input");
+    AssertClose(0.45f, inputs[NeuralBrainSchema.RightHabitatQualityInput], 0.000001, "Right habitat input");
     AssertClose(0.84f, inputs[NeuralBrainSchema.ForwardObstacleInput], 0.000001, "Obstacle input");
     AssertClose(0.93f, inputs[NeuralBrainSchema.FoodContactInput], 0.000001, "Food contact input");
     AssertClose(1f, inputs[NeuralBrainSchema.PlantFoodContactInput], 0.000001, "Plant food contact input");
@@ -5257,6 +5307,52 @@ static void NeuralBrainMigratesCreatureSimilarityInputs()
         "New creature contact similarity hidden input starts neutral");
 }
 
+static void NeuralBrainMigratesHabitatQualityInputs()
+{
+    const int legacyInputCount = NeuralBrainSchema.CurrentHabitatQualityInput;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 2;
+    const int oldCreatureContactSimilarityInput = NeuralBrainSchema.CreatureContactSimilarityInput;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.EatOutput * legacyInputCount + oldCreatureContactSimilarityInput] = 1.2f;
+    legacyWeights[legacyHiddenInputOffset + oldCreatureContactSimilarityInput] = -0.8f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 1.5f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Habitat quality migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Habitat quality migrated weight count");
+    AssertClose(
+        1.2f,
+        brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.CreatureContactSimilarityInput),
+        0.000001,
+        "Existing creature contact similarity direct input remains in place");
+    AssertClose(
+        -0.8f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactSimilarityInput),
+        0.000001,
+        "Existing creature contact similarity hidden input remains in place");
+    AssertClose(
+        1.5f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden movement output remains in place");
+    AssertClose(
+        0f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.ForwardHabitatQualityInput),
+        0.000001,
+        "New forward habitat quality direct input starts neutral");
+    AssertClose(
+        0f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RightHabitatQualityInput),
+        0.000001,
+        "New right habitat quality hidden input starts neutral");
+}
+
 static void NeuralBrainSupportsHiddenNodes()
 {
     const int hiddenNodeCount = 4;
@@ -6718,6 +6814,8 @@ static void PlantTypeHabitatAffinityBiasesBiomeSampling()
     var barrenCounts = SamplePlantTypeCounts(scenario, BiomeKind.Barren, seed: 91);
     var grasslandCounts = SamplePlantTypeCounts(scenario, BiomeKind.Grassland, seed: 91);
     var richCounts = SamplePlantTypeCounts(scenario, BiomeKind.Rich, seed: 91);
+    var forestCounts = SamplePlantTypeCounts(scenario, BiomeKind.Forest, seed: 91);
+    var wetlandCounts = SamplePlantTypeCounts(scenario, BiomeKind.Wetland, seed: 91);
 
     AssertTrue(
         barrenCounts[(int)PlantResourceKind.Tough] > barrenCounts[(int)PlantResourceKind.Generic],
@@ -6728,6 +6826,21 @@ static void PlantTypeHabitatAffinityBiasesBiomeSampling()
     AssertTrue(
         richCounts[(int)PlantResourceKind.Rich] > richCounts[(int)PlantResourceKind.Generic],
         "Rich biomes should favor rich plants over generic plants");
+    AssertTrue(
+        forestCounts[(int)PlantResourceKind.Rich] > forestCounts[(int)PlantResourceKind.Generic],
+        "Forest biomes should favor rich plants over generic plants");
+    AssertTrue(
+        wetlandCounts[(int)PlantResourceKind.Rich] > wetlandCounts[(int)PlantResourceKind.Generic],
+        "Wetland biomes should favor rich plants over generic plants");
+
+    foreach (var biome in new[] { BiomeKind.Desert, BiomeKind.Grassland, BiomeKind.Forest, BiomeKind.Wetland })
+    {
+        var counts = SamplePlantTypeCounts(scenario, biome, seed: 117);
+        foreach (var plantKind in Enum.GetValues<PlantResourceKind>())
+        {
+            AssertTrue(counts[(int)plantKind] > 0, $"{plantKind} plants should be able to spawn in {biome}");
+        }
+    }
 }
 
 static int[] SamplePlantTypeCounts(SimulationScenario scenario, BiomeKind biomeKind, ulong seed)
@@ -6843,7 +6956,7 @@ static void GeneratedSmallBiomeMapsContainVisibleVariety()
     AssertTrue(kinds.Contains(BiomeKind.Rich), "Small generated biome maps should include a high-fertility biome");
 }
 
-static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
+static void NaturalClimateBiomeMapsCreateBroadFiveBiomeRegions()
 {
     var first = BiomeMap.GenerateNaturalClimate(
         new WorldBounds(4_000f, 4_000f),
@@ -6856,6 +6969,7 @@ static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
     var kinds = new HashSet<BiomeKind>();
     var sameNeighborEdges = 0;
     var totalNeighborEdges = 0;
+    var isolatedCells = 0;
 
     for (var y = 0; y < first.CellCountY; y++)
     {
@@ -6864,6 +6978,7 @@ static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
             var kind = first.GetKind(x, y);
             AssertEqual(kind, second.GetKind(x, y), $"Natural climate biome kind {x},{y}");
             kinds.Add(kind);
+            var hasSameCardinalNeighbor = false;
 
             if (x + 1 < first.CellCountX)
             {
@@ -6871,6 +6986,7 @@ static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
                 if (kind == first.GetKind(x + 1, y))
                 {
                     sameNeighborEdges++;
+                    hasSameCardinalNeighbor = true;
                 }
             }
 
@@ -6880,95 +6996,40 @@ static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
                 if (kind == first.GetKind(x, y + 1))
                 {
                     sameNeighborEdges++;
+                    hasSameCardinalNeighbor = true;
                 }
             }
 
-            if (kind != BiomeKind.Desert)
+            if (x > 0 && kind == first.GetKind(x - 1, y))
             {
-                continue;
+                hasSameCardinalNeighbor = true;
             }
 
-            for (var dy = -1; dy <= 1; dy++)
+            if (y > 0 && kind == first.GetKind(x, y - 1))
             {
-                for (var dx = -1; dx <= 1; dx++)
-                {
-                    if (dx == 0 && dy == 0)
-                    {
-                        continue;
-                    }
+                hasSameCardinalNeighbor = true;
+            }
 
-                    var neighborX = x + dx;
-                    var neighborY = y + dy;
-                    if ((uint)neighborX >= (uint)first.CellCountX || (uint)neighborY >= (uint)first.CellCountY)
-                    {
-                        continue;
-                    }
-
-                    var neighbor = first.GetKind(neighborX, neighborY);
-                    AssertTrue(
-                        neighbor is not BiomeKind.Grassland
-                            and not BiomeKind.Fertile
-                            and not BiomeKind.Forest
-                            and not BiomeKind.Wetland,
-                        $"Desert should be buffered from productive biome at {x},{y} near {neighborX},{neighborY}");
-                }
+            if (!hasSameCardinalNeighbor)
+            {
+                isolatedCells++;
             }
         }
     }
 
     var groupingShare = sameNeighborEdges / (float)Math.Max(1, totalNeighborEdges);
-    AssertTrue(kinds.Count >= 5, $"Natural climate maps should include broad biome variety, saw {kinds.Count}");
+    var isolatedShare = isolatedCells / (float)Math.Max(1, first.CellCountX * first.CellCountY);
+    AssertEqual(
+        5,
+        kinds.Count,
+        $"Natural climate maps should use the five readable biomes, saw {kinds.Count}: {string.Join(", ", kinds.OrderBy(kind => kind))}");
     AssertTrue(kinds.Contains(BiomeKind.Desert), "Natural climate maps should include desert");
-    AssertTrue(kinds.Contains(BiomeKind.Scrubland), "Natural climate maps should include scrubland transition");
+    AssertTrue(kinds.Contains(BiomeKind.Grassland), "Natural climate maps should include grassland");
+    AssertTrue(kinds.Contains(BiomeKind.Fertile), "Natural climate maps should include fertile");
     AssertTrue(kinds.Contains(BiomeKind.Forest), "Natural climate maps should include forest");
-    AssertTrue(groupingShare > 0.55f, $"Natural climate maps should be regionally grouped, saw {groupingShare:0.00}");
-}
-
-static void TreeMapsFollowBiomeTreeDensity()
-{
-    var cells = new List<BiomeKind>();
-    for (var y = 0; y < 20; y++)
-    {
-        cells.Add(BiomeKind.Forest);
-        cells.Add(BiomeKind.Wetland);
-        cells.Add(BiomeKind.Scrubland);
-        cells.Add(BiomeKind.Grassland);
-    }
-
-    var biomes = BiomeMap.CreateFromCells(
-        new WorldBounds(400f, 2_000f),
-        cellSize: 100f,
-        cellCountX: 4,
-        cellCountY: 20,
-        cells);
-    var first = TreeMap.GenerateFromBiomes(biomes, cellSize: 100f, seed: SimulationScenario.DefaultSeed);
-    var second = TreeMap.GenerateFromBiomes(biomes, cellSize: 100f, seed: SimulationScenario.DefaultSeed);
-    var summaries = first
-        .SummarizeByBiome(biomes, TreeMap.DefaultMovementSpeedMultiplierAtFullCover)
-        .ToDictionary(summary => summary.Kind);
-
-    for (var y = 0; y < first.CellCountY; y++)
-    {
-        for (var x = 0; x < first.CellCountX; x++)
-        {
-            AssertClose(first.GetCover(x, y), second.GetCover(x, y), 0.000001, $"Tree cover {x},{y}");
-        }
-    }
-
-    AssertTrue(first.HasTrees, "Generated tree map should contain tree cover");
-    AssertTrue(summaries[BiomeKind.Forest].AverageCover > 0.5f, "Forest should have dense tree cover");
-    AssertTrue(
-        summaries[BiomeKind.Forest].AverageCover > summaries[BiomeKind.Wetland].AverageCover,
-        "Forest should be denser than wetland");
-    AssertTrue(
-        summaries[BiomeKind.Wetland].AverageCover > summaries[BiomeKind.Grassland].AverageCover,
-        "Wetland should be denser than grassland");
-    AssertTrue(
-        summaries[BiomeKind.Scrubland].AverageCover > summaries[BiomeKind.Grassland].AverageCover,
-        "Scrubland should be denser than grassland");
-    AssertTrue(
-        summaries[BiomeKind.Forest].AverageMovementSpeedMultiplier < summaries[BiomeKind.Grassland].AverageMovementSpeedMultiplier,
-        "Dense forest should be slower than grassland");
+    AssertTrue(kinds.Contains(BiomeKind.Wetland), "Natural climate maps should include wetland");
+    AssertTrue(groupingShare > 0.78f, $"Natural climate maps should be regionally grouped, saw {groupingShare:0.00}");
+    AssertTrue(isolatedShare < 0.04f, $"Natural climate maps should avoid isolated cell noise, saw {isolatedShare:0.00}");
 }
 
 static void BandedBiomeMapsCreateBroadRegions()
@@ -7182,6 +7243,44 @@ static void ResourceVoidBorderExcludesPlantGrowth()
     }
 }
 
+static void ResourceVoidClippedBiomeCellsAreSkippedDuringSampling()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 42,
+        BiomeMapKind = BiomeMapKind.NaturalClimate,
+        WorldWidth = 4_000f,
+        WorldHeight = 4_000f,
+        BiomeCellSize = 100f,
+        ResourceVoidBorderWidth = 160f,
+        InitialCreatureCount = 80,
+        InitialResourcesPerMillionArea = 19.5f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    AssertTrue(simulation.State.Resources.Count > 0, "Seed 42 scenario should create starting plants");
+
+    for (var i = 0; i < simulation.State.Resources.Count; i++)
+    {
+        AssertTrue(
+            !simulation.State.Biomes.IsInResourceVoid(simulation.State.Resources[i].Position),
+            $"Seed 42 starting plant {i} should spawn outside the resource void");
+    }
+
+    var map = BiomeMap.GenerateNaturalClimate(
+        new WorldBounds(4_000f, 4_000f),
+        cellSize: 100f,
+        seed: 42,
+        resourceVoidBorderWidth: 160f);
+    var random = new DeterministicRandom(42);
+
+    for (var i = 0; i < 2_000; i++)
+    {
+        var position = map.SampleResourcePosition(random);
+        AssertTrue(!map.IsInResourceVoid(position), $"Sample {i} should be inside the resource area");
+    }
+}
+
 static void CreatureOnlySpatialRebuildPreservesStaticEntities()
 {
     var simulation = new Simulation(
@@ -7303,6 +7402,7 @@ static void ScenarioFactoryCreatesDeterministicBiomes()
     var scenario = new SimulationScenario
     {
         Seed = 18,
+        BiomeMapKind = BiomeMapKind.GeneratedNoise,
         WorldWidth = 1_500f,
         WorldHeight = 1_000f,
         BiomeCellSize = 250f,
@@ -7385,37 +7485,6 @@ static void ScenarioFactoryHonorsNaturalClimateBiomeMapKind()
         for (var x = 0; x < simulation.State.Biomes.CellCountX; x++)
         {
             AssertEqual(expected.GetKind(x, y), simulation.State.Biomes.GetKind(x, y), $"Natural climate factory biome {x},{y}");
-        }
-    }
-}
-
-static void ScenarioFactoryHonorsTreeLayer()
-{
-    var scenario = new SimulationScenario
-    {
-        Seed = 22,
-        EnableTrees = true,
-        BiomeMapKind = BiomeMapKind.NaturalClimate,
-        WorldWidth = 4_000f,
-        WorldHeight = 3_000f,
-        BiomeCellSize = 100f,
-        TreeCellSize = 100f,
-        InitialCreatureCount = 0,
-        InitialResourcesPerMillionArea = 0f
-    };
-
-    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
-    var expected = TreeMap.GenerateFromBiomes(
-        simulation.State.Biomes,
-        scenario.TreeCellSize,
-        scenario.Seed);
-
-    AssertTrue(simulation.State.Trees.HasTrees, "Scenario tree map should contain tree cover");
-    for (var y = 0; y < simulation.State.Trees.CellCountY; y++)
-    {
-        for (var x = 0; x < simulation.State.Trees.CellCountX; x++)
-        {
-            AssertClose(expected.GetCover(x, y), simulation.State.Trees.GetCover(x, y), 0.000001, $"Scenario tree cover {x},{y}");
         }
     }
 }
@@ -8178,8 +8247,6 @@ static void SimulationSnapshotsRestoreExactContinuation()
         EnableObstacles = true,
         ObstacleMapKind = ObstacleMapKind.HorizontalBarrierWithGaps,
         ObstacleCellSize = 100f,
-        EnableTrees = true,
-        TreeCellSize = 100f,
         InitialCreatureCount = 8,
         InitialResourcesPerMillionArea = 80f,
         StatsSnapshotIntervalTicks = 1
@@ -8205,8 +8272,6 @@ static void SimulationSnapshotsRestoreExactContinuation()
     AssertEqual(original.State.LineageRecords.Count, restored.State.LineageRecords.Count, "Restored lineage count");
     AssertEqual(original.State.Stats.Snapshots.Count, restored.State.Stats.Snapshots.Count, "Restored snapshot count");
     AssertEqual(original.State.Obstacles.BlockedCellCount, restored.State.Obstacles.BlockedCellCount, "Restored obstacle count");
-    AssertEqual(original.State.Trees.CoveredCellCount, restored.State.Trees.CoveredCellCount, "Restored tree count");
-    AssertClose(original.State.Trees.AverageCover, restored.State.Trees.AverageCover, 0.000001, "Restored average tree cover");
     AssertEqual(original.State.Brains.Count, restored.State.Brains.Count, "Restored brain count");
     AssertEqual(original.State.Brains.Count, roundTrippedSnapshot.BrainArchitectureKinds.Length, "Snapshot brain architecture count");
     for (var brainId = 0; brainId < original.State.Brains.Count; brainId++)
@@ -8506,9 +8571,6 @@ static void ScenarioJsonRoundTrips()
         EnableObstacles = true,
         ObstacleMapKind = ObstacleMapKind.ScatteredRocks,
         ObstacleCellSize = 150f,
-        EnableTrees = true,
-        TreeCellSize = 75f,
-        TreeMovementSpeedMultiplierAtFullCover = 0.66f,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
         WorldWidth = 500f,
@@ -8562,20 +8624,34 @@ static void ScenarioJsonRoundTrips()
         SparseBiomeSeasonalAmplitudeMultiplier = 0.8f,
         GrasslandBiomeSeasonalAmplitudeMultiplier = 1.1f,
         RichBiomeSeasonalAmplitudeMultiplier = 1.4f,
+        ForestBiomeSeasonalAmplitudeMultiplier = 1.05f,
+        WetlandBiomeSeasonalAmplitudeMultiplier = 1.15f,
         ResourceClusterStrength = 0.33f,
         ResourceClusterRadius = 123f,
         BarrenBiomeMovementCostMultiplier = 1.4f,
         SparseBiomeMovementCostMultiplier = 1.2f,
         GrasslandBiomeMovementCostMultiplier = 1.05f,
         RichBiomeMovementCostMultiplier = 0.85f,
+        ForestBiomeMovementCostMultiplier = 1.15f,
+        WetlandBiomeMovementCostMultiplier = 1.45f,
         BarrenBiomeSpeedMultiplier = 0.7f,
         SparseBiomeSpeedMultiplier = 0.85f,
         GrasslandBiomeSpeedMultiplier = 1f,
         RichBiomeSpeedMultiplier = 1.05f,
+        ForestBiomeSpeedMultiplier = 0.82f,
+        WetlandBiomeSpeedMultiplier = 0.62f,
+        BarrenBiomeVisionRangeMultiplier = 1.08f,
+        SparseBiomeVisionRangeMultiplier = 0.95f,
+        GrasslandBiomeVisionRangeMultiplier = 1.02f,
+        RichBiomeVisionRangeMultiplier = 1.06f,
+        ForestBiomeVisionRangeMultiplier = 0.55f,
+        WetlandBiomeVisionRangeMultiplier = 0.78f,
         BarrenBiomeBasalCostMultiplier = 1.3f,
         SparseBiomeBasalCostMultiplier = 1.1f,
         GrasslandBiomeBasalCostMultiplier = 1.02f,
         RichBiomeBasalCostMultiplier = 0.9f,
+        ForestBiomeBasalCostMultiplier = 0.88f,
+        WetlandBiomeBasalCostMultiplier = 1.08f,
         BasalEnergyPerSecond = 0.31f,
         BodyRadiusEnergyCostPerSecond = 0.04f,
         MaxSpeedEnergyCostPerSecond = 0.003f,
@@ -8640,8 +8716,6 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
     AssertTrue(json.Contains("\"obstacleMapKind\": \"scatteredRocks\""), "JSON should serialize obstacle map kind as a string");
-    AssertTrue(json.Contains("\"enableTrees\""), "JSON should serialize tree toggle");
-    AssertTrue(json.Contains("\"treeMovementSpeedMultiplierAtFullCover\""), "JSON should serialize tree speed pressure");
     AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
     AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
@@ -8660,6 +8734,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
+    AssertTrue(json.Contains("\"barrenBiomeVisionRangeMultiplier\""), "JSON should serialize biome vision range");
     AssertTrue(json.Contains("\"worldSenseIntervalTicks\""), "JSON should serialize world sense interval");
     AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
     AssertTrue(json.Contains("\"plantPayoffTraceHalfLifeSeconds\""), "JSON should serialize plant payoff trace half-life");
@@ -8678,9 +8753,6 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.EnableObstacles, roundTripped.EnableObstacles, "Scenario obstacle mode");
     AssertEqual(scenario.ObstacleMapKind, roundTripped.ObstacleMapKind, "Scenario obstacle map kind");
     AssertClose(scenario.ObstacleCellSize, roundTripped.ObstacleCellSize, 0.000001, "Scenario obstacle cell size");
-    AssertEqual(scenario.EnableTrees, roundTripped.EnableTrees, "Scenario tree mode");
-    AssertClose(scenario.TreeCellSize, roundTripped.TreeCellSize, 0.000001, "Scenario tree cell size");
-    AssertClose(scenario.TreeMovementSpeedMultiplierAtFullCover, roundTripped.TreeMovementSpeedMultiplierAtFullCover, 0.000001, "Scenario tree full-cover speed");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");
     AssertClose(scenario.WorldWidth, roundTripped.WorldWidth, 0.000001, "Scenario world width");
@@ -8723,20 +8795,34 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.SparseBiomeSeasonalAmplitudeMultiplier, roundTripped.SparseBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario sparse biome seasonal response");
     AssertClose(scenario.GrasslandBiomeSeasonalAmplitudeMultiplier, roundTripped.GrasslandBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario grassland biome seasonal response");
     AssertClose(scenario.RichBiomeSeasonalAmplitudeMultiplier, roundTripped.RichBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario rich biome seasonal response");
+    AssertClose(scenario.ForestBiomeSeasonalAmplitudeMultiplier, roundTripped.ForestBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario forest biome seasonal response");
+    AssertClose(scenario.WetlandBiomeSeasonalAmplitudeMultiplier, roundTripped.WetlandBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario wetland biome seasonal response");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");
     AssertClose(scenario.SparseBiomeMovementCostMultiplier, roundTripped.SparseBiomeMovementCostMultiplier, 0.000001, "Scenario sparse movement biome cost");
     AssertClose(scenario.GrasslandBiomeMovementCostMultiplier, roundTripped.GrasslandBiomeMovementCostMultiplier, 0.000001, "Scenario grassland movement biome cost");
     AssertClose(scenario.RichBiomeMovementCostMultiplier, roundTripped.RichBiomeMovementCostMultiplier, 0.000001, "Scenario rich movement biome cost");
+    AssertClose(scenario.ForestBiomeMovementCostMultiplier, roundTripped.ForestBiomeMovementCostMultiplier, 0.000001, "Scenario forest movement biome cost");
+    AssertClose(scenario.WetlandBiomeMovementCostMultiplier, roundTripped.WetlandBiomeMovementCostMultiplier, 0.000001, "Scenario wetland movement biome cost");
     AssertClose(scenario.BarrenBiomeSpeedMultiplier, roundTripped.BarrenBiomeSpeedMultiplier, 0.000001, "Scenario barren biome speed");
     AssertClose(scenario.SparseBiomeSpeedMultiplier, roundTripped.SparseBiomeSpeedMultiplier, 0.000001, "Scenario sparse biome speed");
     AssertClose(scenario.GrasslandBiomeSpeedMultiplier, roundTripped.GrasslandBiomeSpeedMultiplier, 0.000001, "Scenario grassland biome speed");
     AssertClose(scenario.RichBiomeSpeedMultiplier, roundTripped.RichBiomeSpeedMultiplier, 0.000001, "Scenario rich biome speed");
+    AssertClose(scenario.ForestBiomeSpeedMultiplier, roundTripped.ForestBiomeSpeedMultiplier, 0.000001, "Scenario forest biome speed");
+    AssertClose(scenario.WetlandBiomeSpeedMultiplier, roundTripped.WetlandBiomeSpeedMultiplier, 0.000001, "Scenario wetland biome speed");
+    AssertClose(scenario.BarrenBiomeVisionRangeMultiplier, roundTripped.BarrenBiomeVisionRangeMultiplier, 0.000001, "Scenario barren biome vision range");
+    AssertClose(scenario.SparseBiomeVisionRangeMultiplier, roundTripped.SparseBiomeVisionRangeMultiplier, 0.000001, "Scenario sparse biome vision range");
+    AssertClose(scenario.GrasslandBiomeVisionRangeMultiplier, roundTripped.GrasslandBiomeVisionRangeMultiplier, 0.000001, "Scenario grassland biome vision range");
+    AssertClose(scenario.RichBiomeVisionRangeMultiplier, roundTripped.RichBiomeVisionRangeMultiplier, 0.000001, "Scenario rich biome vision range");
+    AssertClose(scenario.ForestBiomeVisionRangeMultiplier, roundTripped.ForestBiomeVisionRangeMultiplier, 0.000001, "Scenario forest biome vision range");
+    AssertClose(scenario.WetlandBiomeVisionRangeMultiplier, roundTripped.WetlandBiomeVisionRangeMultiplier, 0.000001, "Scenario wetland biome vision range");
     AssertClose(scenario.BarrenBiomeBasalCostMultiplier, roundTripped.BarrenBiomeBasalCostMultiplier, 0.000001, "Scenario barren basal biome cost");
     AssertClose(scenario.SparseBiomeBasalCostMultiplier, roundTripped.SparseBiomeBasalCostMultiplier, 0.000001, "Scenario sparse basal biome cost");
     AssertClose(scenario.GrasslandBiomeBasalCostMultiplier, roundTripped.GrasslandBiomeBasalCostMultiplier, 0.000001, "Scenario grassland basal biome cost");
     AssertClose(scenario.RichBiomeBasalCostMultiplier, roundTripped.RichBiomeBasalCostMultiplier, 0.000001, "Scenario rich basal biome cost");
+    AssertClose(scenario.ForestBiomeBasalCostMultiplier, roundTripped.ForestBiomeBasalCostMultiplier, 0.000001, "Scenario forest basal biome cost");
+    AssertClose(scenario.WetlandBiomeBasalCostMultiplier, roundTripped.WetlandBiomeBasalCostMultiplier, 0.000001, "Scenario wetland basal biome cost");
     AssertClose(scenario.BasalEnergyPerSecond, roundTripped.BasalEnergyPerSecond, 0.000001, "Scenario basal energy");
     AssertClose(scenario.BodyRadiusEnergyCostPerSecond, roundTripped.BodyRadiusEnergyCostPerSecond, 0.000001, "Scenario body-size energy");
     AssertClose(scenario.MaxSpeedEnergyCostPerSecond, roundTripped.MaxSpeedEnergyCostPerSecond, 0.000001, "Scenario max-speed energy");
@@ -8922,6 +9008,15 @@ static (SimVector2 Position, float HeadingRadians, BiomeKind CurrentBiome, Biome
 static float SpeedMultiplierToDrag(float speedMultiplier)
 {
     return Math.Clamp(1f - speedMultiplier, -1f, 1f);
+}
+
+static float ExpectedHabitatQuality(BiomeKind biome, float localFertility)
+{
+    var maximumDensity = BiomeKinds.All.Max(BiomeMap.GetResourceDensityMultiplier);
+    var maximumRegrowth = BiomeKinds.All.Max(BiomeMap.GetResourceRegrowthMultiplier);
+    var densityQuality = BiomeMap.GetResourceDensityMultiplier(biome) / maximumDensity;
+    var regrowthQuality = BiomeMap.GetResourceRegrowthMultiplier(biome) / maximumRegrowth;
+    return Math.Clamp((densityQuality * 0.65f + regrowthQuality * 0.35f) * localFertility, 0f, 1f);
 }
 
 /// <summary>

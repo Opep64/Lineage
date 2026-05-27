@@ -100,8 +100,6 @@ public sealed record SimulationSnapshot
 
     public ObstacleSnapshot Obstacles { get; init; } = new();
 
-    public TreeSnapshot Trees { get; init; } = new();
-
     public LocalFertilitySnapshot LocalFertility { get; init; } = new();
 
     public static SimulationSnapshot Capture(
@@ -157,7 +155,6 @@ public sealed record SimulationSnapshot
             MaxCreatureXReached = state.Stats.MaxCreatureXReached,
             Biomes = BiomeSnapshot.Capture(state.Biomes),
             Obstacles = ObstacleSnapshot.Capture(state.Obstacles),
-            Trees = TreeSnapshot.Capture(state.Trees),
             LocalFertility = LocalFertilitySnapshot.Capture(state.LocalFertility)
         };
     }
@@ -248,35 +245,6 @@ public sealed record ObstacleSnapshot
         return BlockedCells.Length == CellCountX * CellCountY
             ? ObstacleMap.CreateFromCells(bounds, CellSize, CellCountX, CellCountY, BlockedCells)
             : ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
-    }
-}
-
-public sealed record TreeSnapshot
-{
-    public float CellSize { get; init; } = 1f;
-
-    public int CellCountX { get; init; } = 1;
-
-    public int CellCountY { get; init; } = 1;
-
-    public float[] CoverCells { get; init; } = [];
-
-    public static TreeSnapshot Capture(TreeMap map)
-    {
-        return new TreeSnapshot
-        {
-            CellSize = map.CellSize,
-            CellCountX = map.CellCountX,
-            CellCountY = map.CellCountY,
-            CoverCells = map.GetCellsCopy()
-        };
-    }
-
-    public TreeMap ToMap(WorldBounds bounds)
-    {
-        return CoverCells.Length == CellCountX * CellCountY
-            ? TreeMap.CreateFromCells(bounds, CellSize, CellCountX, CellCountY, CoverCells)
-            : TreeMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
     }
 }
 

@@ -71,6 +71,7 @@ public partial class Main : Node2D
     private const float MinSpeedMultiplier = 0.125f;
     private const float MaxSpeedMultiplier = 32f;
     private const int MaxSimulationStepsPerFrame = 80;
+    private const double HudRefreshIntervalSeconds = 0.20;
 
     private readonly Color _backgroundColor = new(0.07f, 0.08f, 0.075f);
     private readonly Color _worldColor = new(0.11f, 0.13f, 0.11f);
@@ -154,6 +155,8 @@ public partial class Main : Node2D
     private CreatureRenderCache _creatureRenderCache = new();
     private ulong _creatureCacheLastRefreshMilliseconds;
     private CreatureRenderMode _creatureRenderMode = CreatureRenderMode.Individual;
+    private ImageTexture? _biomeOverlayTexture;
+    private BiomeMap? _biomeOverlaySource;
     private int _visibleCreatureEstimate;
     private int _drawnResourceCount;
     private int _drawnResourceAggregateCount;
@@ -162,6 +165,10 @@ public partial class Main : Node2D
     private double _telemetryWindowSeconds;
     private int _telemetryFrameCount;
     private int _telemetryStepCount;
+    private double _visualRefreshAccumulator;
+    private double _hudRefreshAccumulator;
+    private bool _forceVisualRefresh = true;
+    private bool _forceHudRefresh = true;
     private float _measuredTicksPerSecond;
     private float _measuredFrameMilliseconds;
 
@@ -178,6 +185,7 @@ public partial class Main : Node2D
 
     public override void _Ready()
     {
+        TextureFilter = TextureFilterEnum.Nearest;
         _hud = CreateLabel(new Vector2(16f, 12f), Colors.White);
         _hudSecondary = CreateLabel(Vector2.Zero, Colors.White);
         _selectionPanel = BuildSelectionPanel();
@@ -431,11 +439,29 @@ public partial class Main : Node2D
         }
 
         UpdateTelemetry(delta, stepsThisFrame);
+        _visualRefreshAccumulator += delta;
+        _hudRefreshAccumulator += delta;
+
+        var previousViewCenter = _viewCenter;
+        var previousViewZoom = _viewZoom;
         HandleKeyboardCamera((float)delta);
         UpdateLayout();
         UpdateFollowCamera();
-        UpdateLabels();
-        QueueRedraw();
+        var cameraChanged = ViewChanged(previousViewCenter, previousViewZoom);
+
+        if (ShouldRefreshHud(cameraChanged))
+        {
+            UpdateLabels();
+            _hudRefreshAccumulator = 0.0;
+            _forceHudRefresh = false;
+        }
+
+        if (ShouldRedrawVisuals(stepsThisFrame, cameraChanged))
+        {
+            QueueRedraw();
+            _visualRefreshAccumulator = 0.0;
+            _forceVisualRefresh = false;
+        }
     }
 
     private void DrainMainThreadActions()
@@ -443,6 +469,66 @@ public partial class Main : Node2D
         while (_mainThreadActions.TryDequeue(out var action))
         {
             action();
+        }
+    }
+
+    private bool ShouldRefreshHud(bool cameraChanged)
+    {
+        return _forceHudRefresh
+            || cameraChanged
+            || _speedMultiplier <= 4f
+            || _hudRefreshAccumulator >= HudRefreshIntervalSeconds;
+    }
+
+    private bool ShouldRedrawVisuals(int stepsThisFrame, bool cameraChanged)
+    {
+        if (_forceVisualRefresh || cameraChanged)
+        {
+            return true;
+        }
+
+        if (_paused || stepsThisFrame <= 0)
+        {
+            return false;
+        }
+
+        var interval = GetVisualRefreshIntervalSeconds();
+        return interval <= 0.0 || _visualRefreshAccumulator >= interval;
+    }
+
+    private double GetVisualRefreshIntervalSeconds()
+    {
+        if (_speedMultiplier <= 4f)
+        {
+            return 0.0;
+        }
+
+        if (_speedMultiplier <= 8f)
+        {
+            return 1.0 / 30.0;
+        }
+
+        if (_speedMultiplier <= 16f)
+        {
+            return 1.0 / 20.0;
+        }
+
+        return 1.0 / 12.0;
+    }
+
+    private bool ViewChanged(SimVector2 previousCenter, float previousZoom)
+    {
+        return MathF.Abs(previousCenter.X - _viewCenter.X) > 0.001f
+            || MathF.Abs(previousCenter.Y - _viewCenter.Y) > 0.001f
+            || MathF.Abs(previousZoom - _viewZoom) > 0.0001f;
+    }
+
+    private void RequestVisualRefresh(bool refreshHud = true)
+    {
+        _forceVisualRefresh = true;
+        if (refreshHud)
+        {
+            _forceHudRefresh = true;
         }
     }
 
@@ -458,7 +544,6 @@ public partial class Main : Node2D
             if (_showBiomeOverlay)
             {
                 DrawBiomeOverlay();
-                DrawTreeOverlay();
             }
 
             DrawObstacleOverlay();
@@ -537,6 +622,8 @@ public partial class Main : Node2D
                     SetSpeedMultiplier(_speedMultiplier * 0.5f);
                     break;
             }
+
+            RequestVisualRefresh();
         }
 
         if (@event is InputEventMouseButton mouseButton)
@@ -545,6 +632,7 @@ public partial class Main : Node2D
             {
                 case MouseButton.Left when mouseButton.Pressed:
                     SelectEntityAt(mouseButton.Position);
+                    RequestVisualRefresh();
                     break;
                 case MouseButton.Right:
                 case MouseButton.Middle:
@@ -557,9 +645,11 @@ public partial class Main : Node2D
                     break;
                 case MouseButton.WheelUp when mouseButton.Pressed:
                     ZoomAt(mouseButton.Position, 1.2f);
+                    RequestVisualRefresh();
                     break;
                 case MouseButton.WheelDown when mouseButton.Pressed:
                     ZoomAt(mouseButton.Position, 1f / 1.2f);
+                    RequestVisualRefresh();
                     break;
             }
         }
@@ -570,6 +660,7 @@ public partial class Main : Node2D
             _viewCenter -= ToWorldDelta(delta);
             ClampViewCenter();
             _lastPanPosition = mouseMotion.Position;
+            RequestVisualRefresh();
         }
     }
 
@@ -586,6 +677,7 @@ public partial class Main : Node2D
         ClearSelection();
         _followSelected = false;
         _stepAccumulator = 0;
+        InvalidateTerrainOverlayCache();
         InvalidateResourceRenderCache();
         InvalidateCreatureRenderCache();
         ResetTelemetry();
@@ -598,6 +690,8 @@ public partial class Main : Node2D
         {
             ClampViewCenter();
         }
+
+        RequestVisualRefresh();
     }
 
     private void SetSpeedMultiplier(float speedMultiplier)
@@ -609,6 +703,8 @@ public partial class Main : Node2D
         {
             _stepAccumulator = Math.Min(_stepAccumulator, _simulation.Config.FixedDeltaSeconds);
         }
+
+        RequestVisualRefresh();
     }
 
     private void SetMapVisible(bool renderMap)
@@ -620,6 +716,8 @@ public partial class Main : Node2D
         {
             ClearMapRenderStats();
         }
+
+        RequestVisualRefresh();
     }
 
     private void CycleVisualRenderMode()
@@ -1059,6 +1157,9 @@ public partial class Main : Node2D
         _telemetryStepCount = 0;
         _measuredTicksPerSecond = 0f;
         _measuredFrameMilliseconds = 0f;
+        _visualRefreshAccumulator = 0.0;
+        _hudRefreshAccumulator = 0.0;
+        RequestVisualRefresh();
     }
 
     private void UpdateLabels()
@@ -1071,10 +1172,6 @@ public partial class Main : Node2D
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
-        var centerTreeCover = state.Trees.GetCoverAt(_viewCenter);
-        var centerTreeSpeed = state.Trees.GetMovementSpeedMultiplierAt(
-            _viewCenter,
-            _scenario.TreeMovementSpeedMultiplierAtFullCover);
         var season = SeasonalFertility.CalculateAt(
             _scenario.EnableSeasons,
             state.ElapsedSeconds,
@@ -1154,7 +1251,6 @@ public partial class Main : Node2D
             $"Plant colors generic/tender/rich/tough\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
-            $"Trees {(_scenario.EnableTrees ? "on" : "off")} cover {FormatPercent(centerTreeCover)} avg {FormatPercent(state.Trees.AverageCover)} speed {centerTreeSpeed:0.00}x\n" +
             $"Obstacles {FormatObstacleMapKind(_scenario.ObstacleMapKind)} cells {_simulation.State.Obstacles.BlockedCellCount}\n" +
             $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}  fwd {snapshot.AverageForwardObstacle:0.00}\n" +
             $"Biome pop D {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} Sc {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} F {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
@@ -1347,6 +1443,7 @@ public partial class Main : Node2D
         var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
+        var visionMultiplier = _scenario.CreateBiomeVisionRangeProfile().For(biome);
         var seasonalFertility = SeasonalFertility.CalculateBiomeMultiplierAt(
             _scenario.EnableSeasons,
             _simulation.State.ElapsedSeconds,
@@ -1370,7 +1467,7 @@ public partial class Main : Node2D
             $"Age {creature.AgeSeconds:0.0}s\n" +
             $"Growth {maturityText} ({growthFactor:P0})\n" +
             $"Birth inv {creature.BirthInvestmentRatio:0.00}x\n" +
-            $"Biome {FormatBiomeKind(biome)}  move {movementCostMultiplier:0.00}x basal {basalCostMultiplier:0.00}x speed {speedMultiplier:0.00}x season {seasonalFertility:0.00}x\n" +
+            $"Biome {FormatBiomeKind(biome)}  move {movementCostMultiplier:0.00}x basal {basalCostMultiplier:0.00}x speed {speedMultiplier:0.00}x vision {visionMultiplier:0.00}x season {seasonalFertility:0.00}x\n" +
             $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
             $"Actual speed {creature.Velocity.Length:0.0}\n" +
             $"Desired speed {creature.DesiredVelocity.Length:0.0}\n" +
@@ -1381,6 +1478,7 @@ public partial class Main : Node2D
             $"Sector hits {BuildVisionSectorHitSummary(senses.VisionSectors)}\n" +
             $"Body {CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}/{genome.BodyRadius:0.0}\n" +
             $"Terrain drag now {senses.CurrentTerrainDrag:0.00}  ahead {senses.ForwardTerrainDrag:0.00}  L {senses.LeftTerrainDrag:0.00}  R {senses.RightTerrainDrag:0.00}\n" +
+            $"Habitat now {senses.CurrentHabitatQuality:0.00}  ahead {senses.ForwardHabitatQuality:0.00}  L {senses.LeftHabitatQuality:0.00}  R {senses.RightHabitatQuality:0.00}\n" +
             $"Obstacle fwd {senses.ForwardObstacle:0.00}  L {senses.LeftObstacle:0.00}  R {senses.RightObstacle:0.00}  blocked {senses.MovementBlocked:0.00}\n" +
             $"Eat rate {CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome):0.0}/{genome.EatCaloriesPerSecond:0.0}\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}\n" +
@@ -1468,6 +1566,7 @@ public partial class Main : Node2D
         var movementCostMultiplier = _scenario.CreateBiomeMovementCostProfile().For(biome);
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
+        var visionMultiplier = _scenario.CreateBiomeVisionRangeProfile().For(biome);
         var seasonalFertility = SeasonalFertility.CalculateBiomeMultiplierAt(
             _scenario.EnableSeasons,
             _simulation.State.ElapsedSeconds,
@@ -1490,7 +1589,7 @@ public partial class Main : Node2D
             $"Birth investment {creature.BirthInvestmentRatio:0.00}x\n\n" +
             $"Place\n" +
             $"Biome {FormatBiomeKind(biome)}   season {seasonalFertility:0.00}x\n" +
-            $"Move {movementCostMultiplier:0.00}x   basal {basalCostMultiplier:0.00}x   speed {speedMultiplier:0.00}x\n" +
+            $"Move {movementCostMultiplier:0.00}x   basal {basalCostMultiplier:0.00}x   speed {speedMultiplier:0.00}x   vision {visionMultiplier:0.00}x\n" +
             $"Position {creature.Position.X:0}, {creature.Position.Y:0}\n\n" +
             $"Movement\n" +
             $"Actual speed {creature.Velocity.Length:0.0}   desired {creature.DesiredVelocity.Length:0.0}\n" +
@@ -1578,6 +1677,7 @@ public partial class Main : Node2D
             BuildFoodContactText(creature, genome) +
             $"Plant taste energy {senses.PlantFoodContactEnergyQuality:0.00}   bite {senses.PlantFoodContactBiteEase:0.00}\n" +
             $"Terrain now {senses.CurrentTerrainDrag:0.00}   ahead {senses.ForwardTerrainDrag:0.00}   L {senses.LeftTerrainDrag:0.00}   R {senses.RightTerrainDrag:0.00}\n" +
+            $"Habitat now {senses.CurrentHabitatQuality:0.00}   ahead {senses.ForwardHabitatQuality:0.00}   L {senses.LeftHabitatQuality:0.00}   R {senses.RightHabitatQuality:0.00}\n" +
             $"Obstacle fwd {senses.ForwardObstacle:0.00}   L {senses.LeftObstacle:0.00}   R {senses.RightObstacle:0.00}   blocked {senses.MovementBlocked:0.00}\n\n" +
             $"Internal Feedback\n" +
             $"Energy surplus {senses.EnergySurplusRatio:0.00}   food success {senses.RecentFoodSuccess:0.00}\n" +
@@ -2050,6 +2150,12 @@ public partial class Main : Node2D
         _drawnResourceCount = 0;
         _drawnResourceAggregateCount = 0;
         _resourceRenderMode = ResourceRenderMode.Individual;
+    }
+
+    private void InvalidateTerrainOverlayCache()
+    {
+        _biomeOverlayTexture = null;
+        _biomeOverlaySource = null;
     }
 
     private void DrawIndividualResources(Rect2 visibleWorldRect)
@@ -2862,28 +2968,15 @@ public partial class Main : Node2D
     private void DrawBiomeOverlay()
     {
         var map = _simulation.State.Biomes;
-        for (var y = 0; y < map.CellCountY; y++)
-        {
-            for (var x = 0; x < map.CellCountX; x++)
-            {
-                var cell = map.GetCellBounds(x, y);
-                var topLeft = ToScreen(new SimVector2(cell.X, cell.Y));
-                var bottomRight = ToScreen(new SimVector2(cell.X + cell.Width, cell.Y + cell.Height));
-                var rect = RectFromPoints(topLeft, bottomRight);
-                if (!TryClipRect(rect, _worldRect, out var clipped))
-                {
-                    continue;
-                }
+        DrawMapTexture(GetBiomeOverlayTexture(map), map.CellSize);
+        DrawResourceVoidOverlay(map);
 
-                DrawRect(clipped, ColorForBiome(map.GetKind(x, y)), filled: true);
-                if (clipped.Size.X > 14f && clipped.Size.Y > 14f)
-                {
-                    DrawRect(clipped, new Color(0f, 0f, 0f, 0.055f), filled: false, width: 1f);
-                }
-            }
+        if (map.CellSize * _worldScale <= 54f)
+        {
+            return;
         }
 
-        DrawResourceVoidOverlay(map);
+        DrawBiomeCellOutlines(map);
     }
 
     private void DrawResourceVoidOverlay(BiomeMap map)
@@ -2902,53 +2995,58 @@ public partial class Main : Node2D
         DrawWorldRect(new BiomeCellBounds(map.Bounds.Width - width, width, width, middleHeight), color);
     }
 
-    private void DrawTreeOverlay()
+    private void DrawMapTexture(Texture2D texture, float cellSize)
     {
-        var map = _simulation.State.Trees;
-        if (!map.HasTrees)
+        var visible = GetVisibleWorldRect();
+        if (visible.Size.X <= 0f || visible.Size.Y <= 0f)
         {
             return;
         }
 
+        var destination = WorldRectToScreenRect(visible);
+        var source = new Rect2(
+            new Vector2(visible.Position.X / cellSize, visible.Position.Y / cellSize),
+            new Vector2(visible.Size.X / cellSize, visible.Size.Y / cellSize));
+        DrawTextureRectRegion(texture, destination, source);
+    }
+
+    private ImageTexture GetBiomeOverlayTexture(BiomeMap map)
+    {
+        if (_biomeOverlayTexture is not null && ReferenceEquals(_biomeOverlaySource, map))
+        {
+            return _biomeOverlayTexture;
+        }
+
+        var image = Image.CreateEmpty(map.CellCountX, map.CellCountY, false, Image.Format.Rgba8);
         for (var y = 0; y < map.CellCountY; y++)
         {
             for (var x = 0; x < map.CellCountX; x++)
             {
-                var cover = map.GetCover(x, y);
-                if (cover <= 0.001f)
-                {
-                    continue;
-                }
+                image.SetPixel(x, y, ColorForBiome(map.GetKind(x, y)));
+            }
+        }
 
+        _biomeOverlaySource = map;
+        _biomeOverlayTexture = ImageTexture.CreateFromImage(image);
+        return _biomeOverlayTexture;
+    }
+
+    private void DrawBiomeCellOutlines(BiomeMap map)
+    {
+        var range = GetVisibleCellRange(map.CellSize, map.CellCountX, map.CellCountY);
+        for (var y = range.MinY; y < range.MaxYExclusive; y++)
+        {
+            for (var x = range.MinX; x < range.MaxXExclusive; x++)
+            {
                 var cell = map.GetCellBounds(x, y);
                 var topLeft = ToScreen(new SimVector2(cell.X, cell.Y));
                 var bottomRight = ToScreen(new SimVector2(cell.X + cell.Width, cell.Y + cell.Height));
                 var rect = RectFromPoints(topLeft, bottomRight);
-                if (!TryClipRect(rect, _worldRect, out var clipped))
+                if (TryClipRect(rect, _worldRect, out var clipped))
                 {
-                    continue;
+                    DrawRect(clipped, new Color(0f, 0f, 0f, 0.045f), filled: false, width: 1f);
                 }
-
-                DrawRect(clipped, ColorForTreeCover(cover), filled: true);
-                DrawTreeCanopyPattern(clipped, x, y, cover);
             }
-        }
-    }
-
-    private void DrawTreeCanopyPattern(Rect2 cellRect, int cellX, int cellY, float cover)
-    {
-        if (cellRect.Size.X < 12f || cellRect.Size.Y < 12f)
-        {
-            return;
-        }
-
-        var dotCount = Math.Clamp((int)MathF.Ceiling(cover * 9f), 1, 9);
-        var radius = Math.Clamp(MathF.Min(cellRect.Size.X, cellRect.Size.Y) * (0.025f + cover * 0.025f), 1.1f, 4.2f);
-        for (var i = 0; i < dotCount; i++)
-        {
-            var x = cellRect.Position.X + cellRect.Size.X * TreePatternUnit(cellX, cellY, i, 0);
-            var y = cellRect.Position.Y + cellRect.Size.Y * TreePatternUnit(cellX, cellY, i, 1);
-            DrawCircle(new Vector2(x, y), radius, ColorForTreeCanopy(cover, i));
         }
     }
 
@@ -2960,9 +3058,10 @@ public partial class Main : Node2D
             return;
         }
 
-        for (var y = 0; y < map.CellCountY; y++)
+        var range = GetVisibleCellRange(map.CellSize, map.CellCountX, map.CellCountY);
+        for (var y = range.MinY; y < range.MaxYExclusive; y++)
         {
-            for (var x = 0; x < map.CellCountX; x++)
+            for (var x = range.MinX; x < range.MaxXExclusive; x++)
             {
                 if (!map.IsBlocked(x, y))
                 {
@@ -3035,6 +3134,31 @@ public partial class Main : Node2D
         return TryClipRect(rect, clip, out clipped);
     }
 
+    private VisibleCellRange GetVisibleCellRange(float cellSize, int cellCountX, int cellCountY)
+    {
+        var visible = GetVisibleWorldRect();
+        if (visible.Size.X <= 0f || visible.Size.Y <= 0f)
+        {
+            return new VisibleCellRange(0, 0, 0, 0);
+        }
+
+        var left = visible.Position.X;
+        var top = visible.Position.Y;
+        var right = visible.Position.X + visible.Size.X;
+        var bottom = visible.Position.Y + visible.Size.Y;
+        var minX = Math.Clamp((int)MathF.Floor(left / cellSize), 0, cellCountX - 1);
+        var minY = Math.Clamp((int)MathF.Floor(top / cellSize), 0, cellCountY - 1);
+        var maxXExclusive = Math.Clamp((int)MathF.Ceiling(right / cellSize), 0, cellCountX);
+        var maxYExclusive = Math.Clamp((int)MathF.Ceiling(bottom / cellSize), 0, cellCountY);
+        return new VisibleCellRange(minX, maxXExclusive, minY, maxYExclusive);
+    }
+
+    private readonly record struct VisibleCellRange(
+        int MinX,
+        int MaxXExclusive,
+        int MinY,
+        int MaxYExclusive);
+
     private static bool TryClipRect(Rect2 rect, Rect2 clip, out Rect2 clipped)
     {
         var left = MathF.Max(rect.Position.X, clip.Position.X);
@@ -3064,45 +3188,15 @@ public partial class Main : Node2D
     {
         return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Desert => new Color(0.57f, 0.43f, 0.18f, 0.30f),
-            BiomeKind.Scrubland => new Color(0.41f, 0.47f, 0.20f, 0.26f),
-            BiomeKind.Fertile => new Color(0.05f, 0.48f, 0.23f, 0.30f),
-            BiomeKind.Forest => new Color(0.02f, 0.32f, 0.15f, 0.34f),
-            BiomeKind.Wetland => new Color(0.05f, 0.36f, 0.35f, 0.32f),
-            BiomeKind.Tundra => new Color(0.57f, 0.66f, 0.68f, 0.28f),
-            BiomeKind.Highland => new Color(0.42f, 0.39f, 0.34f, 0.30f),
-            _ => new Color(0.12f, 0.34f, 0.17f, 0.22f)
+            BiomeKind.Desert => new Color(0.72f, 0.65f, 0.42f, 0.60f),
+            BiomeKind.Forest => new Color(0.00f, 0.20f, 0.08f, 0.64f),
+            BiomeKind.Wetland => new Color(0.00f, 0.40f, 0.58f, 0.58f),
+            BiomeKind.Scrubland => new Color(0.52f, 0.50f, 0.24f, 0.44f),
+            BiomeKind.Fertile => new Color(0.08f, 0.54f, 0.20f, 0.44f),
+            BiomeKind.Tundra => new Color(0.62f, 0.70f, 0.74f, 0.44f),
+            BiomeKind.Highland => new Color(0.50f, 0.45f, 0.36f, 0.44f),
+            _ => new Color(0.24f, 0.50f, 0.18f, 0.50f)
         };
-    }
-
-    private static Color ColorForTreeCover(float cover)
-    {
-        var alpha = Mathf.Clamp(cover, 0f, 1f) * 0.28f;
-        return new Color(0.015f, 0.20f, 0.055f, alpha);
-    }
-
-    private static Color ColorForTreeCanopy(float cover, int index)
-    {
-        var variation = index % 2 == 0 ? 0.0f : 0.045f;
-        var alpha = 0.08f + Mathf.Clamp(cover, 0f, 1f) * 0.22f;
-        return new Color(0.025f + variation, 0.30f + variation, 0.08f + variation * 0.5f, alpha);
-    }
-
-    private static float TreePatternUnit(int cellX, int cellY, int index, int salt)
-    {
-        unchecked
-        {
-            var h = (uint)cellX * 0x9E3779B9u;
-            h ^= (uint)cellY * 0x85EBCA6Bu;
-            h ^= (uint)index * 0xC2B2AE35u;
-            h ^= (uint)salt * 0x27D4EB2Fu;
-            h ^= h >> 16;
-            h *= 0x7FEB352Du;
-            h ^= h >> 15;
-            h *= 0x846CA68Bu;
-            h ^= h >> 16;
-            return (h & 0x00FFFFFFu) * (1f / 0x01000000u);
-        }
     }
 
     private void DrawStatsGraph()
@@ -3709,6 +3803,7 @@ public partial class Main : Node2D
             ClearSelection();
             _followSelected = false;
             _stepAccumulator = 0;
+            InvalidateTerrainOverlayCache();
             InvalidateResourceRenderCache();
             InvalidateCreatureRenderCache();
             ResetTelemetry();

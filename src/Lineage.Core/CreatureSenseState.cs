@@ -133,6 +133,26 @@ public struct CreatureSenseState
     public float RightTerrainDrag { get; set; }
 
     /// <summary>
+    /// Local productive habitat quality at the creature's current body position. Poor or depleted ground is near 0; rich ground is near 1.
+    /// </summary>
+    public float CurrentHabitatQuality { get; set; }
+
+    /// <summary>
+    /// Productive habitat quality sampled a short distance in front of the creature's heading.
+    /// </summary>
+    public float ForwardHabitatQuality { get; set; }
+
+    /// <summary>
+    /// Productive habitat quality sampled a short distance to the creature's left.
+    /// </summary>
+    public float LeftHabitatQuality { get; set; }
+
+    /// <summary>
+    /// Productive habitat quality sampled a short distance to the creature's right.
+    /// </summary>
+    public float RightHabitatQuality { get; set; }
+
+    /// <summary>
     /// Hard obstacle proximity sampled a short distance in front of the creature.
     /// </summary>
     public float ForwardObstacle { get; set; }
