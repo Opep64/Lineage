@@ -465,6 +465,8 @@ public static class ViewerReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
+        WriteBiomePreferenceSection(writer, snapshots, biomeSummaries, worldArea);
+
         WriteDeathCausesByBiomeSection(writer, state.Stats.CreatureDeathCausesByBiome);
 
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
@@ -2288,6 +2290,138 @@ public static class ViewerReportWriter
             BiomeKind.Wetland => snapshot.WetlandCreatureCount,
             BiomeKind.Tundra => snapshot.TundraCreatureCount,
             BiomeKind.Highland => snapshot.HighlandCreatureCount,
+            _ => 0
+        };
+    }
+
+    private static void WriteBiomePreferenceSection(
+        TextWriter writer,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyList<BiomeSummary> biomeSummaries,
+        float worldArea)
+    {
+        const int TailSnapshotCount = 100;
+
+        var tailCount = Math.Min(TailSnapshotCount, snapshots.Count);
+        var tailSnapshots = tailCount > 0
+            ? snapshots.Skip(snapshots.Count - tailCount).ToArray()
+            : Array.Empty<SimulationStatsSnapshot>();
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Biome Preference</h2>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Living Share</th><th>Preference</th><th>Plant kcal Share</th><th>Eaten Share</th><th>Death Share</th><th>Late Deaths</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+
+        if (tailSnapshots.Length == 0)
+        {
+            writer.WriteLine("<tr><td colspan=\"8\" class=\"empty\">No stat snapshots were recorded.</td></tr>");
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        var first = tailSnapshots[0];
+        var last = tailSnapshots[^1];
+        var averageCreatures = Average(tailSnapshots, snapshot => snapshot.CreatureCount);
+        var averagePlantCalories = Average(tailSnapshots, snapshot => snapshot.TotalPlantCalories);
+        var averageCaloriesEaten = Average(tailSnapshots, snapshot => snapshot.TotalCaloriesEatenPerSecond);
+        var lateDeaths = Math.Max(0, last.CreatureDeathCount - first.CreatureDeathCount);
+
+        foreach (var summary in biomeSummaries)
+        {
+            var areaShare = summary.Area / worldArea;
+            var averageLiving = Average(tailSnapshots, snapshot => CreatureCountForBiome(snapshot, summary.Kind));
+            var livingShare = averageCreatures > 0f ? averageLiving / averageCreatures : 0f;
+            var preference = areaShare > 0f ? livingShare / areaShare : 0f;
+            var plantCaloriesShare = averagePlantCalories > 0f
+                ? Average(tailSnapshots, snapshot => PlantCaloriesForBiome(snapshot, summary.Kind)) / averagePlantCalories
+                : 0f;
+            var eatenShare = averageCaloriesEaten > 0f
+                ? Average(tailSnapshots, snapshot => CaloriesEatenForBiome(snapshot, summary.Kind)) / averageCaloriesEaten
+                : 0f;
+            var biomeLateDeaths = Math.Max(
+                0,
+                DeathCountForBiome(last, summary.Kind) - DeathCountForBiome(first, summary.Kind));
+            var deathShare = lateDeaths > 0 ? Share(biomeLateDeaths, lateDeaths) : 0f;
+
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(FormatBiomeKind(summary.Kind))}</td>" +
+                $"<td>{Html(FormatPercent(areaShare))}</td>" +
+                $"<td>{Html(FormatPercent(livingShare))}</td>" +
+                $"<td>{Html(preference.ToString("0.##", CultureInfo.InvariantCulture))}x</td>" +
+                $"<td>{Html(FormatPercent(plantCaloriesShare))}</td>" +
+                $"<td>{Html(FormatPercent(eatenShare))}</td>" +
+                $"<td>{Html(FormatPercent(deathShare))}</td>" +
+                $"<td>{Html(biomeLateDeaths)}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static float Average(IReadOnlyList<SimulationStatsSnapshot> snapshots, Func<SimulationStatsSnapshot, float> selector)
+    {
+        if (snapshots.Count == 0)
+        {
+            return 0f;
+        }
+
+        var total = 0f;
+        foreach (var snapshot in snapshots)
+        {
+            total += selector(snapshot);
+        }
+
+        return total / snapshots.Count;
+    }
+
+    private static float PlantCaloriesForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome) switch
+        {
+            BiomeKind.Desert => snapshot.BarrenPlantCalories,
+            BiomeKind.Scrubland => snapshot.SparsePlantCalories,
+            BiomeKind.Grassland => snapshot.GrasslandPlantCalories,
+            BiomeKind.Fertile => snapshot.RichPlantCalories,
+            BiomeKind.Forest => snapshot.ForestPlantCalories,
+            BiomeKind.Wetland => snapshot.WetlandPlantCalories,
+            BiomeKind.Tundra => snapshot.TundraPlantCalories,
+            BiomeKind.Highland => snapshot.HighlandPlantCalories,
+            _ => 0f
+        };
+    }
+
+    private static float CaloriesEatenForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome) switch
+        {
+            BiomeKind.Desert => snapshot.BarrenCaloriesEatenPerSecond,
+            BiomeKind.Scrubland => snapshot.SparseCaloriesEatenPerSecond,
+            BiomeKind.Grassland => snapshot.GrasslandCaloriesEatenPerSecond,
+            BiomeKind.Fertile => snapshot.RichCaloriesEatenPerSecond,
+            BiomeKind.Forest => snapshot.ForestCaloriesEatenPerSecond,
+            BiomeKind.Wetland => snapshot.WetlandCaloriesEatenPerSecond,
+            BiomeKind.Tundra => snapshot.TundraCaloriesEatenPerSecond,
+            BiomeKind.Highland => snapshot.HighlandCaloriesEatenPerSecond,
+            _ => 0f
+        };
+    }
+
+    private static int DeathCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome) switch
+        {
+            BiomeKind.Desert => snapshot.BarrenDeathCount,
+            BiomeKind.Scrubland => snapshot.SparseDeathCount,
+            BiomeKind.Grassland => snapshot.GrasslandDeathCount,
+            BiomeKind.Fertile => snapshot.RichDeathCount,
+            BiomeKind.Forest => snapshot.ForestDeathCount,
+            BiomeKind.Wetland => snapshot.WetlandDeathCount,
+            BiomeKind.Tundra => snapshot.TundraDeathCount,
+            BiomeKind.Highland => snapshot.HighlandDeathCount,
             _ => 0
         };
     }
