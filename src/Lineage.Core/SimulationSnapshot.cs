@@ -70,6 +70,14 @@ public sealed record SimulationSnapshot
 
     public int RichDeathCount { get; init; }
 
+    public int ForestDeathCount { get; init; }
+
+    public int WetlandDeathCount { get; init; }
+
+    public int TundraDeathCount { get; init; }
+
+    public int HighlandDeathCount { get; init; }
+
     public int PlantDepletionCount { get; init; }
 
     public int PlantLocalDispersalCount { get; init; }
@@ -132,6 +140,10 @@ public sealed record SimulationSnapshot
             SparseDeathCount = state.Stats.SparseDeathCount,
             GrasslandDeathCount = state.Stats.GrasslandDeathCount,
             RichDeathCount = state.Stats.RichDeathCount,
+            ForestDeathCount = state.Stats.ForestDeathCount,
+            WetlandDeathCount = state.Stats.WetlandDeathCount,
+            TundraDeathCount = state.Stats.TundraDeathCount,
+            HighlandDeathCount = state.Stats.HighlandDeathCount,
             PlantDepletionCount = state.Stats.PlantDepletionCount,
             PlantLocalDispersalCount = state.Stats.PlantLocalDispersalCount,
             PlantClusterRelocationCount = state.Stats.PlantClusterRelocationCount,

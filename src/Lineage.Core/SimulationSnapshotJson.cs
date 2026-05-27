@@ -123,7 +123,11 @@ public static class SimulationSnapshotJson
             snapshot.PlantDormancyStartedCount,
             snapshot.PlantDormancyCompletedCount,
             snapshot.PlantDormancyScheduledSecondsTotal,
-            snapshot.PlantDormancyCompletedSecondsTotal);
+            snapshot.PlantDormancyCompletedSecondsTotal,
+            snapshot.ForestDeathCount,
+            snapshot.WetlandDeathCount,
+            snapshot.TundraDeathCount,
+            snapshot.HighlandDeathCount);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 
@@ -326,6 +330,7 @@ public static class SimulationSnapshotJson
             PropertyNameCaseInsensitive = true,
             WriteIndented = true
         };
+        options.Converters.Add(new BiomeKindJsonConverter());
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         return options;
     }

@@ -380,7 +380,7 @@ public sealed class BiomeMap
 
     public IReadOnlyList<BiomeSummary> SummarizeResources(IReadOnlyList<ResourcePatchState> resources)
     {
-        var summaries = Enum.GetValues<BiomeKind>()
+        var summaries = BiomeKinds.All
             .Select(kind => new MutableBiomeSummary(kind))
             .ToArray();
 
@@ -426,10 +426,14 @@ public sealed class BiomeMap
     {
         return kind switch
         {
-            BiomeKind.Barren => 0.05f,
-            BiomeKind.Sparse => 0.35f,
+            BiomeKind.Desert => 0.05f,
+            BiomeKind.Scrubland => 0.35f,
             BiomeKind.Grassland => 1f,
-            BiomeKind.Rich => 2.4f,
+            BiomeKind.Fertile => 2.4f,
+            BiomeKind.Forest => 1.25f,
+            BiomeKind.Wetland => 1.6f,
+            BiomeKind.Tundra => 0.2f,
+            BiomeKind.Highland => 0.45f,
             _ => 1f
         };
     }
@@ -438,10 +442,14 @@ public sealed class BiomeMap
     {
         return kind switch
         {
-            BiomeKind.Barren => 0.25f,
-            BiomeKind.Sparse => 0.65f,
+            BiomeKind.Desert => 0.25f,
+            BiomeKind.Scrubland => 0.65f,
             BiomeKind.Grassland => 1f,
-            BiomeKind.Rich => 1.5f,
+            BiomeKind.Fertile => 1.5f,
+            BiomeKind.Forest => 1.1f,
+            BiomeKind.Wetland => 1.25f,
+            BiomeKind.Tundra => 0.45f,
+            BiomeKind.Highland => 0.7f,
             _ => 1f
         };
     }
@@ -461,9 +469,9 @@ public sealed class BiomeMap
         var percentile = (rank + 0.5f) / count;
         return percentile switch
         {
-            < 0.16f => BiomeKind.Barren,
-            < 0.42f => BiomeKind.Sparse,
-            > 0.82f => BiomeKind.Rich,
+            < 0.16f => BiomeKind.Desert,
+            < 0.42f => BiomeKind.Scrubland,
+            > 0.82f => BiomeKind.Fertile,
             _ => BiomeKind.Grassland
         };
     }
@@ -479,10 +487,10 @@ public sealed class BiomeMap
         var distanceFromCenter = MathF.Abs(phase - 0.5f) * 2f;
         return distanceFromCenter switch
         {
-            > 0.84f => BiomeKind.Barren,
-            > 0.58f => BiomeKind.Sparse,
+            > 0.84f => BiomeKind.Desert,
+            > 0.58f => BiomeKind.Scrubland,
             > 0.28f => BiomeKind.Grassland,
-            _ => BiomeKind.Rich
+            _ => BiomeKind.Fertile
         };
     }
 
@@ -497,10 +505,10 @@ public sealed class BiomeMap
         var distanceFromNearestEdge = MathF.Min(phase, 1f - phase) * 2f;
         return distanceFromNearestEdge switch
         {
-            < 0.18f => BiomeKind.Rich,
+            < 0.18f => BiomeKind.Fertile,
             < 0.40f => BiomeKind.Grassland,
-            < 0.70f => BiomeKind.Sparse,
-            _ => BiomeKind.Barren
+            < 0.70f => BiomeKind.Scrubland,
+            _ => BiomeKind.Desert
         };
     }
 
@@ -515,9 +523,9 @@ public sealed class BiomeMap
         var distanceFromNearestEdge = MathF.Min(phase, 1f - phase) * 2f;
         return distanceFromNearestEdge switch
         {
-            < 0.18f => BiomeKind.Rich,
+            < 0.18f => BiomeKind.Fertile,
             < 0.44f => BiomeKind.Grassland,
-            _ => BiomeKind.Sparse
+            _ => BiomeKind.Scrubland
         };
     }
 
@@ -529,14 +537,14 @@ public sealed class BiomeMap
         bool wide)
     {
         var band = BiomeKindForEdgeBand(x, cellCountX);
-        if (band != BiomeKind.Barren)
+        if (band != BiomeKind.Desert)
         {
             return band;
         }
 
         if (cellCountY <= 2)
         {
-            return BiomeKind.Sparse;
+            return BiomeKind.Scrubland;
         }
 
         var yPhase = (y + 0.5f) / cellCountY;
@@ -546,16 +554,16 @@ public sealed class BiomeMap
             return corridorDistance switch
             {
                 < 0.20f => BiomeKind.Grassland,
-                < 0.34f => BiomeKind.Sparse,
-                _ => BiomeKind.Barren
+                < 0.34f => BiomeKind.Scrubland,
+                _ => BiomeKind.Desert
             };
         }
 
         return corridorDistance switch
         {
             < 0.14f => BiomeKind.Grassland,
-            < 0.25f => BiomeKind.Sparse,
-            _ => BiomeKind.Barren
+            < 0.25f => BiomeKind.Scrubland,
+            _ => BiomeKind.Desert
         };
     }
 

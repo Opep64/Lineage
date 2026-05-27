@@ -188,6 +188,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario metadata describes editable JSON fields", ScenarioMetadataDescribesEditableJsonFields),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
+    ("Biome JSON migrates legacy names", BiomeJsonMigratesLegacyNames),
     ("Scenario JSON round trips", ScenarioJsonRoundTrips)
 };
 
@@ -8154,6 +8155,19 @@ static void ScenarioJsonMigratesLegacyResourceCount()
     AssertClose(200f, scenario.InitialResourcesPerMillionArea, 0.0001, "Migrated resource density");
     AssertEqual(140, scenario.CalculateInitialResourceCount(), "Migrated resource count");
     AssertEqual(InitialBrainKind.RandomPerFounder, scenario.InitialBrainKind, "Migrated legacy random brain mode");
+}
+
+static void BiomeJsonMigratesLegacyNames()
+{
+    var options = new JsonSerializerOptions();
+    options.Converters.Add(new BiomeKindJsonConverter());
+
+    AssertEqual(BiomeKind.Desert, JsonSerializer.Deserialize<BiomeKind>("\"barren\"", options), "Legacy barren biome");
+    AssertEqual(BiomeKind.Scrubland, JsonSerializer.Deserialize<BiomeKind>("\"sparse\"", options), "Legacy sparse biome");
+    AssertEqual(BiomeKind.Fertile, JsonSerializer.Deserialize<BiomeKind>("\"rich\"", options), "Legacy rich biome");
+    AssertEqual("\"desert\"", JsonSerializer.Serialize(BiomeKind.Barren, options), "Legacy barren writes canonical desert");
+    AssertEqual("\"scrubland\"", JsonSerializer.Serialize(BiomeKind.Sparse, options), "Legacy sparse writes canonical scrubland");
+    AssertEqual("\"fertile\"", JsonSerializer.Serialize(BiomeKind.Rich, options), "Legacy rich writes canonical fertile");
 }
 
 static void ScenarioMetadataDescribesEditableJsonFields()

@@ -120,6 +120,10 @@ public sealed class StatsRecordingSystem(
         var sparseCaloriesEaten = 0f;
         var grasslandCaloriesEaten = 0f;
         var richCaloriesEaten = 0f;
+        var forestCaloriesEaten = 0f;
+        var wetlandCaloriesEaten = 0f;
+        var tundraCaloriesEaten = 0f;
+        var highlandCaloriesEaten = 0f;
         var attackerTotalDietaryAdaptation = 0f;
         var attackerTotalBiteStrength = 0f;
         var attackerTotalDamageResistance = 0f;
@@ -169,6 +173,10 @@ public sealed class StatsRecordingSystem(
         var sparseCreatureCount = 0;
         var grasslandCreatureCount = 0;
         var richCreatureCount = 0;
+        var forestCreatureCount = 0;
+        var wetlandCreatureCount = 0;
+        var tundraCreatureCount = 0;
+        var highlandCreatureCount = 0;
         var leftRegionCreatureCount = 0;
         var middleRegionCreatureCount = 0;
         var rightRegionCreatureCount = 0;
@@ -319,17 +327,33 @@ public sealed class StatsRecordingSystem(
                 ref barrenCaloriesEaten,
                 ref sparseCaloriesEaten,
                 ref grasslandCaloriesEaten,
-                ref richCaloriesEaten);
-            switch (biome)
+                ref richCaloriesEaten,
+                ref forestCaloriesEaten,
+                ref wetlandCaloriesEaten,
+                ref tundraCaloriesEaten,
+                ref highlandCaloriesEaten);
+            switch (BiomeKinds.Canonicalize(biome))
             {
-                case BiomeKind.Barren:
+                case BiomeKind.Desert:
                     barrenCreatureCount++;
                     break;
-                case BiomeKind.Sparse:
+                case BiomeKind.Scrubland:
                     sparseCreatureCount++;
                     break;
-                case BiomeKind.Rich:
+                case BiomeKind.Fertile:
                     richCreatureCount++;
+                    break;
+                case BiomeKind.Forest:
+                    forestCreatureCount++;
+                    break;
+                case BiomeKind.Wetland:
+                    wetlandCreatureCount++;
+                    break;
+                case BiomeKind.Tundra:
+                    tundraCreatureCount++;
+                    break;
+                case BiomeKind.Highland:
+                    highlandCreatureCount++;
                     break;
                 default:
                     grasslandCreatureCount++;
@@ -519,6 +543,10 @@ public sealed class StatsRecordingSystem(
         var sparsePlantCalories = 0f;
         var grasslandPlantCalories = 0f;
         var richPlantCalories = 0f;
+        var forestPlantCalories = 0f;
+        var wetlandPlantCalories = 0f;
+        var tundraPlantCalories = 0f;
+        var highlandPlantCalories = 0f;
         var tenderPlantTypeCalories = 0f;
         var richPlantTypeCalories = 0f;
         var toughPlantTypeCalories = 0f;
@@ -526,6 +554,10 @@ public sealed class StatsRecordingSystem(
         var sparseMeatCalories = 0f;
         var grasslandMeatCalories = 0f;
         var richMeatCalories = 0f;
+        var forestMeatCalories = 0f;
+        var wetlandMeatCalories = 0f;
+        var tundraMeatCalories = 0f;
+        var highlandMeatCalories = 0f;
         Span<float> plantCaloriesByPatchCell = stackalloc float[PlantPatchinessGridCellCount];
         for (var i = 0; i < state.Resources.Count; i++)
         {
@@ -557,7 +589,11 @@ public sealed class StatsRecordingSystem(
                     ref barrenMeatCalories,
                     ref sparseMeatCalories,
                     ref grasslandMeatCalories,
-                    ref richMeatCalories);
+                    ref richMeatCalories,
+                    ref forestMeatCalories,
+                    ref wetlandMeatCalories,
+                    ref tundraMeatCalories,
+                    ref highlandMeatCalories);
             }
             else
             {
@@ -587,7 +623,11 @@ public sealed class StatsRecordingSystem(
                     ref barrenPlantCalories,
                     ref sparsePlantCalories,
                     ref grasslandPlantCalories,
-                    ref richPlantCalories);
+                    ref richPlantCalories,
+                    ref forestPlantCalories,
+                    ref wetlandPlantCalories,
+                    ref tundraPlantCalories,
+                    ref highlandPlantCalories);
             }
         }
         var plantPatchSummary = CalculatePlantPatchSummary(plantCaloriesByPatchCell, totalPlantCalories);
@@ -838,6 +878,10 @@ public sealed class StatsRecordingSystem(
             sparseCreatureCount,
             grasslandCreatureCount,
             richCreatureCount,
+            forestCreatureCount,
+            wetlandCreatureCount,
+            tundraCreatureCount,
+            highlandCreatureCount,
             totalBiomeMovementCostMultiplier / divisor,
             totalBiomeBasalCostMultiplier / divisor,
             totalBiomeSpeedMultiplier / divisor,
@@ -850,18 +894,34 @@ public sealed class StatsRecordingSystem(
             sparsePlantCalories,
             grasslandPlantCalories,
             richPlantCalories,
+            forestPlantCalories,
+            wetlandPlantCalories,
+            tundraPlantCalories,
+            highlandPlantCalories,
             barrenMeatCalories,
             sparseMeatCalories,
             grasslandMeatCalories,
             richMeatCalories,
+            forestMeatCalories,
+            wetlandMeatCalories,
+            tundraMeatCalories,
+            highlandMeatCalories,
             Rate(barrenCaloriesEaten, deltaSeconds),
             Rate(sparseCaloriesEaten, deltaSeconds),
             Rate(grasslandCaloriesEaten, deltaSeconds),
             Rate(richCaloriesEaten, deltaSeconds),
+            Rate(forestCaloriesEaten, deltaSeconds),
+            Rate(wetlandCaloriesEaten, deltaSeconds),
+            Rate(tundraCaloriesEaten, deltaSeconds),
+            Rate(highlandCaloriesEaten, deltaSeconds),
             state.Stats.BarrenDeathCount,
             state.Stats.SparseDeathCount,
             state.Stats.GrasslandDeathCount,
             state.Stats.RichDeathCount,
+            state.Stats.ForestDeathCount,
+            state.Stats.WetlandDeathCount,
+            state.Stats.TundraDeathCount,
+            state.Stats.HighlandDeathCount,
             totalCreatureX / divisor,
             maxCreatureX,
             totalMaxCreatureXReached / divisor,
@@ -1085,18 +1145,34 @@ public sealed class StatsRecordingSystem(
         ref float barren,
         ref float sparse,
         ref float grassland,
-        ref float rich)
+        ref float rich,
+        ref float forest,
+        ref float wetland,
+        ref float tundra,
+        ref float highland)
     {
-        switch (biome)
+        switch (BiomeKinds.Canonicalize(biome))
         {
-            case BiomeKind.Barren:
+            case BiomeKind.Desert:
                 barren += value;
                 break;
-            case BiomeKind.Sparse:
+            case BiomeKind.Scrubland:
                 sparse += value;
                 break;
-            case BiomeKind.Rich:
+            case BiomeKind.Fertile:
                 rich += value;
+                break;
+            case BiomeKind.Forest:
+                forest += value;
+                break;
+            case BiomeKind.Wetland:
+                wetland += value;
+                break;
+            case BiomeKind.Tundra:
+                tundra += value;
+                break;
+            case BiomeKind.Highland:
+                highland += value;
                 break;
             default:
                 grassland += value;

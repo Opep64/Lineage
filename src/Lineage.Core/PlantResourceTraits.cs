@@ -76,23 +76,35 @@ public static class PlantResourceTraits
         {
             PlantResourceKind.Tender => biome switch
             {
-                BiomeKind.Barren => 0.2f,
-                BiomeKind.Sparse => 1.25f,
-                BiomeKind.Rich => 0.8f,
+                BiomeKind.Desert => 0.2f,
+                BiomeKind.Scrubland => 1.25f,
+                BiomeKind.Fertile => 0.8f,
+                BiomeKind.Forest => 1.3f,
+                BiomeKind.Wetland => 1.2f,
+                BiomeKind.Tundra => 0.5f,
+                BiomeKind.Highland => 0.9f,
                 _ => 1.8f
             },
             PlantResourceKind.Rich => biome switch
             {
-                BiomeKind.Barren => 0.05f,
-                BiomeKind.Sparse => 0.3f,
-                BiomeKind.Rich => 2.8f,
+                BiomeKind.Desert => 0.05f,
+                BiomeKind.Scrubland => 0.3f,
+                BiomeKind.Fertile => 2.8f,
+                BiomeKind.Forest => 1.5f,
+                BiomeKind.Wetland => 1.2f,
+                BiomeKind.Tundra => 0.15f,
+                BiomeKind.Highland => 0.4f,
                 _ => 0.8f
             },
             PlantResourceKind.Tough => biome switch
             {
-                BiomeKind.Barren => 3f,
-                BiomeKind.Sparse => 1.8f,
-                BiomeKind.Rich => 0.2f,
+                BiomeKind.Desert => 3f,
+                BiomeKind.Scrubland => 1.8f,
+                BiomeKind.Fertile => 0.2f,
+                BiomeKind.Forest => 0.7f,
+                BiomeKind.Wetland => 0.6f,
+                BiomeKind.Tundra => 1.6f,
+                BiomeKind.Highland => 1.4f,
                 _ => 0.55f
             },
             _ => 1f

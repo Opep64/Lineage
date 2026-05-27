@@ -162,6 +162,14 @@ public sealed record SimulationScenario
 
     public float RichBiomeSeasonalAmplitudeMultiplier { get; init; } = 1.2f;
 
+    public float ForestBiomeSeasonalAmplitudeMultiplier { get; init; } = 1.05f;
+
+    public float WetlandBiomeSeasonalAmplitudeMultiplier { get; init; } = 1.15f;
+
+    public float TundraBiomeSeasonalAmplitudeMultiplier { get; init; } = 0.65f;
+
+    public float HighlandBiomeSeasonalAmplitudeMultiplier { get; init; } = 0.8f;
+
     public float BarrenBiomeMovementCostMultiplier { get; init; } = 1.3f;
 
     public float SparseBiomeMovementCostMultiplier { get; init; } = 1.12f;
@@ -169,6 +177,14 @@ public sealed record SimulationScenario
     public float GrasslandBiomeMovementCostMultiplier { get; init; } = 1f;
 
     public float RichBiomeMovementCostMultiplier { get; init; } = 0.92f;
+
+    public float ForestBiomeMovementCostMultiplier { get; init; } = 1.08f;
+
+    public float WetlandBiomeMovementCostMultiplier { get; init; } = 1.18f;
+
+    public float TundraBiomeMovementCostMultiplier { get; init; } = 1.15f;
+
+    public float HighlandBiomeMovementCostMultiplier { get; init; } = 1.22f;
 
     public float BarrenBiomeSpeedMultiplier { get; init; } = 1f;
 
@@ -178,6 +194,14 @@ public sealed record SimulationScenario
 
     public float RichBiomeSpeedMultiplier { get; init; } = 1f;
 
+    public float ForestBiomeSpeedMultiplier { get; init; } = 1f;
+
+    public float WetlandBiomeSpeedMultiplier { get; init; } = 1f;
+
+    public float TundraBiomeSpeedMultiplier { get; init; } = 1f;
+
+    public float HighlandBiomeSpeedMultiplier { get; init; } = 1f;
+
     public float BarrenBiomeBasalCostMultiplier { get; init; } = 1.18f;
 
     public float SparseBiomeBasalCostMultiplier { get; init; } = 1.06f;
@@ -185,6 +209,14 @@ public sealed record SimulationScenario
     public float GrasslandBiomeBasalCostMultiplier { get; init; } = 1f;
 
     public float RichBiomeBasalCostMultiplier { get; init; } = 0.96f;
+
+    public float ForestBiomeBasalCostMultiplier { get; init; } = 1.02f;
+
+    public float WetlandBiomeBasalCostMultiplier { get; init; } = 1.04f;
+
+    public float TundraBiomeBasalCostMultiplier { get; init; } = 1.14f;
+
+    public float HighlandBiomeBasalCostMultiplier { get; init; } = 1.08f;
 
     public float BasalEnergyPerSecond { get; init; } = 0.18f;
 
@@ -373,6 +405,10 @@ public sealed record SimulationScenario
         EnsureRange(SparseBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(SparseBiomeSeasonalAmplitudeMultiplier));
         EnsureRange(GrasslandBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(GrasslandBiomeSeasonalAmplitudeMultiplier));
         EnsureRange(RichBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(RichBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(ForestBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(ForestBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(WetlandBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(WetlandBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(TundraBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(TundraBiomeSeasonalAmplitudeMultiplier));
+        EnsureRange(HighlandBiomeSeasonalAmplitudeMultiplier, 0f, 2f, nameof(HighlandBiomeSeasonalAmplitudeMultiplier));
         _ = BiomePressureProfile.Validate(CreateBiomeMovementCostProfile(), "BiomeMovementCostProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeSpeedProfile(), "BiomeSpeedProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
@@ -464,7 +500,11 @@ public sealed record SimulationScenario
             BarrenBiomeMovementCostMultiplier,
             SparseBiomeMovementCostMultiplier,
             GrasslandBiomeMovementCostMultiplier,
-            RichBiomeMovementCostMultiplier);
+            RichBiomeMovementCostMultiplier,
+            ForestBiomeMovementCostMultiplier,
+            WetlandBiomeMovementCostMultiplier,
+            TundraBiomeMovementCostMultiplier,
+            HighlandBiomeMovementCostMultiplier);
     }
 
     public BiomePressureProfile CreateBiomeBasalCostProfile()
@@ -473,7 +513,11 @@ public sealed record SimulationScenario
             BarrenBiomeBasalCostMultiplier,
             SparseBiomeBasalCostMultiplier,
             GrasslandBiomeBasalCostMultiplier,
-            RichBiomeBasalCostMultiplier);
+            RichBiomeBasalCostMultiplier,
+            ForestBiomeBasalCostMultiplier,
+            WetlandBiomeBasalCostMultiplier,
+            TundraBiomeBasalCostMultiplier,
+            HighlandBiomeBasalCostMultiplier);
     }
 
     public BiomePressureProfile CreateBiomeSpeedProfile()
@@ -482,7 +526,11 @@ public sealed record SimulationScenario
             BarrenBiomeSpeedMultiplier,
             SparseBiomeSpeedMultiplier,
             GrasslandBiomeSpeedMultiplier,
-            RichBiomeSpeedMultiplier);
+            RichBiomeSpeedMultiplier,
+            ForestBiomeSpeedMultiplier,
+            WetlandBiomeSpeedMultiplier,
+            TundraBiomeSpeedMultiplier,
+            HighlandBiomeSpeedMultiplier);
     }
 
     public BiomePressureProfile CreateBiomeSeasonalAmplitudeProfile()
@@ -491,7 +539,11 @@ public sealed record SimulationScenario
             BarrenBiomeSeasonalAmplitudeMultiplier,
             SparseBiomeSeasonalAmplitudeMultiplier,
             GrasslandBiomeSeasonalAmplitudeMultiplier,
-            RichBiomeSeasonalAmplitudeMultiplier);
+            RichBiomeSeasonalAmplitudeMultiplier,
+            ForestBiomeSeasonalAmplitudeMultiplier,
+            WetlandBiomeSeasonalAmplitudeMultiplier,
+            TundraBiomeSeasonalAmplitudeMultiplier,
+            HighlandBiomeSeasonalAmplitudeMultiplier);
     }
 
     public int CalculateInitialResourceCount()

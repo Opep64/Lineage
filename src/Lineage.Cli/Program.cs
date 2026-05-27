@@ -5647,10 +5647,14 @@ internal static class RunReportWriter
             "Biome occupancy",
             "%",
             snapshots,
-            new ChartSeries("Barren", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Sparse", "#7f8f3a", snapshots.Select(snapshot => Share(snapshot.SparseCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Desert", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Scrubland", "#7f8f3a", snapshots.Select(snapshot => Share(snapshot.SparseCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Grassland", "#35a862", snapshots.Select(snapshot => Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => Share(snapshot.RichCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+            new ChartSeries("Fertile", "#178a4a", snapshots.Select(snapshot => Share(snapshot.RichCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Forest", "#0b5f2a", snapshots.Select(snapshot => Share(snapshot.ForestCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Wetland", "#15807b", snapshots.Select(snapshot => Share(snapshot.WetlandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Tundra", "#9ab1b6", snapshots.Select(snapshot => Share(snapshot.TundraCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Highland", "#817565", snapshots.Select(snapshot => Share(snapshot.HighlandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Biome pressure",
@@ -5664,19 +5668,27 @@ internal static class RunReportWriter
             "Biome foraging",
             " kcal/s",
             snapshots,
-            new ChartSeries("Barren", "#9a6b3b", snapshots.Select(snapshot => snapshot.BarrenCaloriesEatenPerSecond).ToArray()),
-            new ChartSeries("Sparse", "#7f8f3a", snapshots.Select(snapshot => snapshot.SparseCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Desert", "#9a6b3b", snapshots.Select(snapshot => snapshot.BarrenCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Scrubland", "#7f8f3a", snapshots.Select(snapshot => snapshot.SparseCaloriesEatenPerSecond).ToArray()),
             new ChartSeries("Grassland", "#35a862", snapshots.Select(snapshot => snapshot.GrasslandCaloriesEatenPerSecond).ToArray()),
-            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => snapshot.RichCaloriesEatenPerSecond).ToArray()));
+            new ChartSeries("Fertile", "#178a4a", snapshots.Select(snapshot => snapshot.RichCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Forest", "#0b5f2a", snapshots.Select(snapshot => snapshot.ForestCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Wetland", "#15807b", snapshots.Select(snapshot => snapshot.WetlandCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Tundra", "#9ab1b6", snapshots.Select(snapshot => snapshot.TundraCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Highland", "#817565", snapshots.Select(snapshot => snapshot.HighlandCaloriesEatenPerSecond).ToArray()));
         WriteLineChart(
             writer,
             "Biome deaths",
             "",
             snapshots,
-            new ChartSeries("Barren", "#9a6b3b", snapshots.Select(snapshot => (float)snapshot.BarrenDeathCount).ToArray()),
-            new ChartSeries("Sparse", "#7f8f3a", snapshots.Select(snapshot => (float)snapshot.SparseDeathCount).ToArray()),
+            new ChartSeries("Desert", "#9a6b3b", snapshots.Select(snapshot => (float)snapshot.BarrenDeathCount).ToArray()),
+            new ChartSeries("Scrubland", "#7f8f3a", snapshots.Select(snapshot => (float)snapshot.SparseDeathCount).ToArray()),
             new ChartSeries("Grassland", "#35a862", snapshots.Select(snapshot => (float)snapshot.GrasslandDeathCount).ToArray()),
-            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => (float)snapshot.RichDeathCount).ToArray()));
+            new ChartSeries("Fertile", "#178a4a", snapshots.Select(snapshot => (float)snapshot.RichDeathCount).ToArray()),
+            new ChartSeries("Forest", "#0b5f2a", snapshots.Select(snapshot => (float)snapshot.ForestDeathCount).ToArray()),
+            new ChartSeries("Wetland", "#15807b", snapshots.Select(snapshot => (float)snapshot.WetlandDeathCount).ToArray()),
+            new ChartSeries("Tundra", "#9ab1b6", snapshots.Select(snapshot => (float)snapshot.TundraDeathCount).ToArray()),
+            new ChartSeries("Highland", "#817565", snapshots.Select(snapshot => (float)snapshot.HighlandDeathCount).ToArray()));
         WriteLineChart(
             writer,
             "Foraging signals",
@@ -7097,14 +7109,14 @@ internal static class RunReportWriter
 
     private static string FormatBiomeKind(BiomeKind biome)
     {
-        return biome.ToString();
+        return BiomeKinds.Canonicalize(biome).ToString();
     }
 
     private static string FormatBiomePressureProfile(BiomePressureProfile profile)
     {
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"Barren {profile.Barren:0.###}x, Sparse {profile.Sparse:0.###}x, Grassland {profile.Grassland:0.###}x, Rich {profile.Rich:0.###}x");
+            $"Desert {profile.Desert:0.###}x, Scrubland {profile.Scrubland:0.###}x, Grassland {profile.Grassland:0.###}x, Fertile {profile.Fertile:0.###}x, Forest {profile.Forest:0.###}x, Wetland {profile.Wetland:0.###}x, Tundra {profile.Tundra:0.###}x, Highland {profile.Highland:0.###}x");
     }
 
     private static string FormatRegionCounts(int left, int middle, int right)
@@ -7123,45 +7135,65 @@ internal static class RunReportWriter
 
     private static int CreatureCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
     {
-        return biome switch
+        return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Barren => snapshot.BarrenCreatureCount,
-            BiomeKind.Sparse => snapshot.SparseCreatureCount,
-            BiomeKind.Rich => snapshot.RichCreatureCount,
-            _ => snapshot.GrasslandCreatureCount
+            BiomeKind.Desert => snapshot.BarrenCreatureCount,
+            BiomeKind.Scrubland => snapshot.SparseCreatureCount,
+            BiomeKind.Grassland => snapshot.GrasslandCreatureCount,
+            BiomeKind.Fertile => snapshot.RichCreatureCount,
+            BiomeKind.Forest => snapshot.ForestCreatureCount,
+            BiomeKind.Wetland => snapshot.WetlandCreatureCount,
+            BiomeKind.Tundra => snapshot.TundraCreatureCount,
+            BiomeKind.Highland => snapshot.HighlandCreatureCount,
+            _ => 0
         };
     }
 
     private static float MeatCaloriesForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
     {
-        return biome switch
+        return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Barren => snapshot.BarrenMeatCalories,
-            BiomeKind.Sparse => snapshot.SparseMeatCalories,
-            BiomeKind.Rich => snapshot.RichMeatCalories,
-            _ => snapshot.GrasslandMeatCalories
+            BiomeKind.Desert => snapshot.BarrenMeatCalories,
+            BiomeKind.Scrubland => snapshot.SparseMeatCalories,
+            BiomeKind.Grassland => snapshot.GrasslandMeatCalories,
+            BiomeKind.Fertile => snapshot.RichMeatCalories,
+            BiomeKind.Forest => snapshot.ForestMeatCalories,
+            BiomeKind.Wetland => snapshot.WetlandMeatCalories,
+            BiomeKind.Tundra => snapshot.TundraMeatCalories,
+            BiomeKind.Highland => snapshot.HighlandMeatCalories,
+            _ => 0f
         };
     }
 
     private static float CaloriesEatenForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
     {
-        return biome switch
+        return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Barren => snapshot.BarrenCaloriesEatenPerSecond,
-            BiomeKind.Sparse => snapshot.SparseCaloriesEatenPerSecond,
-            BiomeKind.Rich => snapshot.RichCaloriesEatenPerSecond,
-            _ => snapshot.GrasslandCaloriesEatenPerSecond
+            BiomeKind.Desert => snapshot.BarrenCaloriesEatenPerSecond,
+            BiomeKind.Scrubland => snapshot.SparseCaloriesEatenPerSecond,
+            BiomeKind.Grassland => snapshot.GrasslandCaloriesEatenPerSecond,
+            BiomeKind.Fertile => snapshot.RichCaloriesEatenPerSecond,
+            BiomeKind.Forest => snapshot.ForestCaloriesEatenPerSecond,
+            BiomeKind.Wetland => snapshot.WetlandCaloriesEatenPerSecond,
+            BiomeKind.Tundra => snapshot.TundraCaloriesEatenPerSecond,
+            BiomeKind.Highland => snapshot.HighlandCaloriesEatenPerSecond,
+            _ => 0f
         };
     }
 
     private static int DeathCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
     {
-        return biome switch
+        return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Barren => snapshot.BarrenDeathCount,
-            BiomeKind.Sparse => snapshot.SparseDeathCount,
-            BiomeKind.Rich => snapshot.RichDeathCount,
-            _ => snapshot.GrasslandDeathCount
+            BiomeKind.Desert => snapshot.BarrenDeathCount,
+            BiomeKind.Scrubland => snapshot.SparseDeathCount,
+            BiomeKind.Grassland => snapshot.GrasslandDeathCount,
+            BiomeKind.Fertile => snapshot.RichDeathCount,
+            BiomeKind.Forest => snapshot.ForestDeathCount,
+            BiomeKind.Wetland => snapshot.WetlandDeathCount,
+            BiomeKind.Tundra => snapshot.TundraDeathCount,
+            BiomeKind.Highland => snapshot.HighlandDeathCount,
+            _ => 0
         };
     }
 

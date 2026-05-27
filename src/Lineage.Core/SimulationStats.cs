@@ -38,6 +38,14 @@ public sealed class SimulationStats
 
     public int RichDeathCount { get; private set; }
 
+    public int ForestDeathCount { get; private set; }
+
+    public int WetlandDeathCount { get; private set; }
+
+    public int TundraDeathCount { get; private set; }
+
+    public int HighlandDeathCount { get; private set; }
+
     public int PlantDepletionCount { get; private set; }
 
     public int PlantLocalDispersalCount { get; private set; }
@@ -115,16 +123,28 @@ public sealed class SimulationStats
                 break;
         }
 
-        switch (biome)
+        switch (BiomeKinds.Canonicalize(biome))
         {
-            case BiomeKind.Barren:
+            case BiomeKind.Desert:
                 BarrenDeathCount++;
                 break;
-            case BiomeKind.Sparse:
+            case BiomeKind.Scrubland:
                 SparseDeathCount++;
                 break;
-            case BiomeKind.Rich:
+            case BiomeKind.Fertile:
                 RichDeathCount++;
+                break;
+            case BiomeKind.Forest:
+                ForestDeathCount++;
+                break;
+            case BiomeKind.Wetland:
+                WetlandDeathCount++;
+                break;
+            case BiomeKind.Tundra:
+                TundraDeathCount++;
+                break;
+            case BiomeKind.Highland:
+                HighlandDeathCount++;
                 break;
             default:
                 GrasslandDeathCount++;
@@ -243,7 +263,11 @@ public sealed class SimulationStats
         int plantDormancyStartedCount = 0,
         int plantDormancyCompletedCount = 0,
         float plantDormancyScheduledSecondsTotal = 0f,
-        float plantDormancyCompletedSecondsTotal = 0f)
+        float plantDormancyCompletedSecondsTotal = 0f,
+        int forestDeathCount = 0,
+        int wetlandDeathCount = 0,
+        int tundraDeathCount = 0,
+        int highlandDeathCount = 0)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
@@ -260,6 +284,10 @@ public sealed class SimulationStats
         SparseDeathCount = sparseDeathCount;
         GrasslandDeathCount = grasslandDeathCount;
         RichDeathCount = richDeathCount;
+        ForestDeathCount = forestDeathCount;
+        WetlandDeathCount = wetlandDeathCount;
+        TundraDeathCount = tundraDeathCount;
+        HighlandDeathCount = highlandDeathCount;
         PlantDepletionCount = plantDepletionCount;
         PlantLocalDispersalCount = plantLocalDispersalCount;
         PlantClusterRelocationCount = plantClusterRelocationCount;

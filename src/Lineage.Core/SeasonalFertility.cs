@@ -68,10 +68,14 @@ public static class SeasonalFertility
 
         return new BiomeSeasonalFertilityMultipliers(
             phase,
-            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Barren),
-            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Sparse),
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Desert),
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Scrubland),
             CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Grassland),
-            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Rich));
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Fertile),
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Forest),
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Wetland),
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Tundra),
+            CalculateBiomeMultiplier(enabled, elapsedSeconds, seasonLengthSeconds, fertilityAmplitude, phaseOffsetSeconds, biomeAmplitudeProfile.Highland));
     }
 
     public static float CalculateBiomeMultiplierAt(
@@ -149,18 +153,32 @@ public readonly record struct SeasonalFertilityState(
 
 public readonly record struct BiomeSeasonalFertilityMultipliers(
     float Phase,
-    float Barren,
-    float Sparse,
+    float Desert,
+    float Scrubland,
     float Grassland,
-    float Rich)
+    float Fertile,
+    float Forest,
+    float Wetland,
+    float Tundra,
+    float Highland)
 {
+    public float Barren => Desert;
+
+    public float Sparse => Scrubland;
+
+    public float Rich => Fertile;
+
     public float For(BiomeKind kind)
     {
-        return kind switch
+        return BiomeKinds.Canonicalize(kind) switch
         {
-            BiomeKind.Barren => Barren,
-            BiomeKind.Sparse => Sparse,
-            BiomeKind.Rich => Rich,
+            BiomeKind.Desert => Desert,
+            BiomeKind.Scrubland => Scrubland,
+            BiomeKind.Fertile => Fertile,
+            BiomeKind.Forest => Forest,
+            BiomeKind.Wetland => Wetland,
+            BiomeKind.Tundra => Tundra,
+            BiomeKind.Highland => Highland,
             _ => Grassland
         };
     }

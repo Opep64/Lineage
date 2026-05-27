@@ -440,7 +440,7 @@ public static class ViewerReportWriter
             var seasonalAmplitude = seasonalAmplitudeProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             writer.WriteLine(
                 "<tr>" +
-                $"<td>{Html(summary.Kind)}</td>" +
+                $"<td>{Html(BiomeKinds.Canonicalize(summary.Kind))}</td>" +
                 $"<td>{Html(FormatPercent(summary.Area / worldArea))}</td>" +
                 $"<td>{Html(summary.ResourceDensityMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.ResourceRegrowthMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
@@ -1040,10 +1040,14 @@ public static class ViewerReportWriter
             "Biome occupancy",
             "%",
             snapshots,
-            new ChartSeries("Barren", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Sparse", "#7f8f3a", snapshots.Select(snapshot => Share(snapshot.SparseCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Desert", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Scrubland", "#7f8f3a", snapshots.Select(snapshot => Share(snapshot.SparseCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Grassland", "#35a862", snapshots.Select(snapshot => Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => Share(snapshot.RichCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+            new ChartSeries("Fertile", "#178a4a", snapshots.Select(snapshot => Share(snapshot.RichCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Forest", "#0b5f2a", snapshots.Select(snapshot => Share(snapshot.ForestCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Wetland", "#15807b", snapshots.Select(snapshot => Share(snapshot.WetlandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Tundra", "#9ab1b6", snapshots.Select(snapshot => Share(snapshot.TundraCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Highland", "#817565", snapshots.Select(snapshot => Share(snapshot.HighlandCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Biome pressure",
@@ -1956,7 +1960,7 @@ public static class ViewerReportWriter
     {
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"Barren {profile.Barren:0.###}x, Sparse {profile.Sparse:0.###}x, Grassland {profile.Grassland:0.###}x, Rich {profile.Rich:0.###}x");
+            $"Desert {profile.Desert:0.###}x, Scrubland {profile.Scrubland:0.###}x, Grassland {profile.Grassland:0.###}x, Fertile {profile.Fertile:0.###}x, Forest {profile.Forest:0.###}x, Wetland {profile.Wetland:0.###}x, Tundra {profile.Tundra:0.###}x, Highland {profile.Highland:0.###}x");
     }
 
     private static string FormatRegionCounts(int left, int middle, int right)
@@ -1975,12 +1979,17 @@ public static class ViewerReportWriter
 
     private static int CreatureCountForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
     {
-        return biome switch
+        return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Barren => snapshot.BarrenCreatureCount,
-            BiomeKind.Sparse => snapshot.SparseCreatureCount,
-            BiomeKind.Rich => snapshot.RichCreatureCount,
-            _ => snapshot.GrasslandCreatureCount
+            BiomeKind.Desert => snapshot.BarrenCreatureCount,
+            BiomeKind.Scrubland => snapshot.SparseCreatureCount,
+            BiomeKind.Grassland => snapshot.GrasslandCreatureCount,
+            BiomeKind.Fertile => snapshot.RichCreatureCount,
+            BiomeKind.Forest => snapshot.ForestCreatureCount,
+            BiomeKind.Wetland => snapshot.WetlandCreatureCount,
+            BiomeKind.Tundra => snapshot.TundraCreatureCount,
+            BiomeKind.Highland => snapshot.HighlandCreatureCount,
+            _ => 0
         };
     }
 

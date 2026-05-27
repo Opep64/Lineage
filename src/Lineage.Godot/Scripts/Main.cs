@@ -1151,7 +1151,8 @@ public partial class Main : Node2D
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
             $"Obstacles {FormatObstacleMapKind(_scenario.ObstacleMapKind)} cells {_simulation.State.Obstacles.BlockedCellCount}\n" +
             $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}  fwd {snapshot.AverageForwardObstacle:0.00}\n" +
-            $"Biome pop B {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} S {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} R {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Biome pop D {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} Sc {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} F {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
+            $"Biome pop Fo {FormatPercent(Share(snapshot.ForestCreatureCount, snapshot.CreatureCount))} W {FormatPercent(Share(snapshot.WetlandCreatureCount, snapshot.CreatureCount))} T {FormatPercent(Share(snapshot.TundraCreatureCount, snapshot.CreatureCount))} H {FormatPercent(Share(snapshot.HighlandCreatureCount, snapshot.CreatureCount))}\n" +
             $"Biome move {snapshot.AverageBiomeMovementCostMultiplier:0.00}x basal {snapshot.AverageBiomeBasalCostMultiplier:0.00}x speed {snapshot.AverageBiomeSpeedMultiplier:0.00}x\n" +
             $"Color {FormatColorMode(_colorMode)}";
 
@@ -3005,11 +3006,15 @@ public partial class Main : Node2D
 
     private static Color ColorForBiome(BiomeKind biome)
     {
-        return biome switch
+        return BiomeKinds.Canonicalize(biome) switch
         {
-            BiomeKind.Barren => new Color(0.42f, 0.29f, 0.16f, 0.30f),
-            BiomeKind.Sparse => new Color(0.34f, 0.39f, 0.17f, 0.26f),
-            BiomeKind.Rich => new Color(0.05f, 0.48f, 0.23f, 0.30f),
+            BiomeKind.Desert => new Color(0.57f, 0.43f, 0.18f, 0.30f),
+            BiomeKind.Scrubland => new Color(0.41f, 0.47f, 0.20f, 0.26f),
+            BiomeKind.Fertile => new Color(0.05f, 0.48f, 0.23f, 0.30f),
+            BiomeKind.Forest => new Color(0.02f, 0.32f, 0.15f, 0.34f),
+            BiomeKind.Wetland => new Color(0.05f, 0.36f, 0.35f, 0.32f),
+            BiomeKind.Tundra => new Color(0.57f, 0.66f, 0.68f, 0.28f),
+            BiomeKind.Highland => new Color(0.42f, 0.39f, 0.34f, 0.30f),
             _ => new Color(0.12f, 0.34f, 0.17f, 0.22f)
         };
     }
@@ -4094,7 +4099,7 @@ public partial class Main : Node2D
 
     private static string FormatBiomeKind(BiomeKind biome)
     {
-        return biome.ToString().ToLowerInvariant();
+        return BiomeKinds.Canonicalize(biome).ToString().ToLowerInvariant();
     }
 
     private static string FormatBiomeMapKind(BiomeMapKind mapKind)

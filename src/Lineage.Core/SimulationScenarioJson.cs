@@ -46,6 +46,7 @@ public static class SimulationScenarioJson
             PropertyNameCaseInsensitive = true,
             WriteIndented = true
         };
+        options.Converters.Add(new BiomeKindJsonConverter());
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         return options;
     }

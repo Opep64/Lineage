@@ -47,10 +47,12 @@ public sealed class EggEnvironmentalDamageSystem(float damagePerSecond = 0f) : I
             return 1f;
         }
 
-        return biomes.GetKindAt(position) switch
+        return BiomeKinds.Canonicalize(biomes.GetKindAt(position)) switch
         {
-            BiomeKind.Barren => 0.5f,
-            BiomeKind.Sparse => 0.2f,
+            BiomeKind.Desert => 0.5f,
+            BiomeKind.Scrubland => 0.2f,
+            BiomeKind.Tundra => 0.35f,
+            BiomeKind.Highland => 0.15f,
             _ => 0f
         };
     }
