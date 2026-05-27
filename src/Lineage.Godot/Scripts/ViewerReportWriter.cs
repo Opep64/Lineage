@@ -420,6 +420,8 @@ public static class ViewerReportWriter
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
+        WriteBiomeMapSection(writer, state.Biomes);
+
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -743,6 +745,39 @@ public static class ViewerReportWriter
               overflow-wrap: anywhere;
               font-weight: 650;
             }
+            .biome-map-note {
+              margin: 0 0 12px;
+              color: var(--muted);
+              font-size: 0.9rem;
+            }
+            .biome-map-frame {
+              overflow: auto;
+              padding: 10px;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #eef3e8;
+            }
+            .biome-map {
+              display: block;
+              width: 100%;
+              max-height: 620px;
+              height: auto;
+            }
+            .biome-map-void {
+              fill: none;
+              stroke: rgba(23, 32, 21, 0.68);
+              stroke-width: 8;
+              stroke-dasharray: 26 18;
+              vector-effect: non-scaling-stroke;
+            }
+            .biome-legend {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px 14px;
+              margin-top: 10px;
+              color: var(--muted);
+              font-size: 0.86rem;
+            }
             .chart-grid {
               display: grid;
               grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -753,6 +788,11 @@ public static class ViewerReportWriter
               border: 1px solid var(--line);
               border-radius: 6px;
               background: #fbfcf8;
+              cursor: zoom-in;
+            }
+            .chart-card:focus-visible {
+              outline: 2px solid var(--accent);
+              outline-offset: 3px;
             }
             .chart-card h3 {
               margin: 0 0 8px;
@@ -779,6 +819,30 @@ public static class ViewerReportWriter
               color: var(--muted);
               font-size: 0.82rem;
             }
+            .chart-series-line {
+              transition: opacity 0.12s ease, stroke-width 0.12s ease;
+            }
+            .chart-legend-item {
+              padding: 1px 3px;
+              border-radius: 4px;
+              transition: opacity 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+            }
+            .chart-card.is-series-highlighted .chart-series-line {
+              opacity: 0.18;
+              stroke-width: 1.6;
+            }
+            .chart-card.is-series-highlighted .chart-series-line.is-highlighted {
+              opacity: 1;
+              stroke-width: 4.8;
+            }
+            .chart-card.is-series-highlighted .chart-legend-item {
+              opacity: 0.48;
+            }
+            .chart-card.is-series-highlighted .chart-legend-item.is-highlighted {
+              opacity: 1;
+              color: var(--accent);
+              background: #eef2e9;
+            }
             .legend-swatch {
               display: inline-block;
               width: 0.8em;
@@ -786,6 +850,49 @@ public static class ViewerReportWriter
               margin-right: 5px;
               border-radius: 999px;
               vertical-align: -0.05em;
+            }
+            body.chart-lightbox-open { overflow: hidden; }
+            .chart-lightbox[hidden] { display: none; }
+            .chart-lightbox {
+              position: fixed;
+              inset: 0;
+              z-index: 1000;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: clamp(16px, 3vw, 36px);
+              background: rgba(22, 32, 21, 0.72);
+            }
+            .chart-lightbox-panel {
+              width: min(1180px, 100%);
+              max-height: calc(100vh - 48px);
+              overflow: auto;
+              padding: 16px;
+              border: 1px solid var(--line);
+              border-radius: 8px;
+              background: var(--panel);
+              box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+            }
+            .chart-lightbox-close {
+              display: block;
+              margin: 0 0 12px auto;
+              padding: 6px 10px;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #fbfcf8;
+              color: var(--text);
+              font: inherit;
+              cursor: pointer;
+            }
+            .chart-lightbox-content .chart-card {
+              padding: 0;
+              border: 0;
+              background: transparent;
+              cursor: default;
+            }
+            .chart-lightbox-content .chart-card svg {
+              width: 100%;
+              max-height: 72vh;
             }
             .table-wrap { overflow-x: auto; }
             table {
@@ -814,6 +921,116 @@ public static class ViewerReportWriter
 
     private static void WriteDocumentEnd(StreamWriter writer)
     {
+        writer.WriteLine(
+            """
+            <script>
+            (() => {
+              const cards = Array.from(document.querySelectorAll(".chart-card"));
+              if (cards.length === 0) {
+                return;
+              }
+
+              const overlay = document.createElement("div");
+              overlay.className = "chart-lightbox";
+              overlay.hidden = true;
+              overlay.setAttribute("role", "dialog");
+              overlay.setAttribute("aria-modal", "true");
+              overlay.innerHTML = "<div class=\"chart-lightbox-panel\"><button class=\"chart-lightbox-close\" type=\"button\" aria-label=\"Close enlarged chart\">Close</button><div class=\"chart-lightbox-content\"></div></div>";
+              document.body.appendChild(overlay);
+
+              const content = overlay.querySelector(".chart-lightbox-content");
+              const closeButton = overlay.querySelector(".chart-lightbox-close");
+              let previousFocus = null;
+
+              function setSeriesHighlight(legendItem) {
+                const card = legendItem.closest(".chart-card");
+                if (!card) {
+                  return;
+                }
+
+                const seriesIndex = legendItem.getAttribute("data-series-index");
+                card.classList.add("is-series-highlighted");
+                for (const line of card.querySelectorAll(".chart-series-line")) {
+                  line.classList.toggle("is-highlighted", line.getAttribute("data-series-index") === seriesIndex);
+                }
+
+                for (const item of card.querySelectorAll(".chart-legend-item")) {
+                  item.classList.toggle("is-highlighted", item.getAttribute("data-series-index") === seriesIndex);
+                }
+              }
+
+              function clearSeriesHighlight(legendItem) {
+                const card = legendItem.closest(".chart-card");
+                if (!card) {
+                  return;
+                }
+
+                card.classList.remove("is-series-highlighted");
+                for (const active of card.querySelectorAll(".is-highlighted")) {
+                  active.classList.remove("is-highlighted");
+                }
+              }
+
+              function openChart(card) {
+                previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                content.replaceChildren(card.cloneNode(true));
+                const clone = content.querySelector(".chart-card");
+                if (clone) {
+                  clone.removeAttribute("role");
+                  clone.removeAttribute("tabindex");
+                  clone.removeAttribute("aria-label");
+                }
+
+                overlay.hidden = false;
+                document.body.classList.add("chart-lightbox-open");
+                closeButton.focus();
+              }
+
+              function closeChart() {
+                overlay.hidden = true;
+                content.replaceChildren();
+                document.body.classList.remove("chart-lightbox-open");
+                if (previousFocus) {
+                  previousFocus.focus();
+                }
+              }
+
+              for (const card of cards) {
+                card.addEventListener("click", () => openChart(card));
+                card.addEventListener("keydown", event => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openChart(card);
+                  }
+                });
+              }
+
+              document.addEventListener("pointerover", event => {
+                const item = event.target.closest(".chart-legend-item");
+                if (item) {
+                  setSeriesHighlight(item);
+                }
+              });
+              document.addEventListener("pointerout", event => {
+                const item = event.target.closest(".chart-legend-item");
+                if (item && !item.contains(event.relatedTarget)) {
+                  clearSeriesHighlight(item);
+                }
+              });
+              closeButton.addEventListener("click", closeChart);
+              overlay.addEventListener("click", event => {
+                if (event.target === overlay) {
+                  closeChart();
+                }
+              });
+              document.addEventListener("keydown", event => {
+                if (!overlay.hidden && event.key === "Escape") {
+                  closeChart();
+                }
+              });
+            })();
+            </script>
+            """);
         writer.WriteLine("</body>");
         writer.WriteLine("</html>");
     }
@@ -824,6 +1041,54 @@ public static class ViewerReportWriter
         writer.WriteLine($"<span class=\"metric-label\">{Html(label)}</span>");
         writer.WriteLine($"<span class=\"metric-value\">{Html(value)}</span>");
         writer.WriteLine("</div>");
+    }
+
+    private static void WriteBiomeMapSection(TextWriter writer, BiomeMap map)
+    {
+        var width = MathF.Max(1f, map.Bounds.Width);
+        var height = MathF.Max(1f, map.Bounds.Height);
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Biome Layout</h2>");
+        writer.WriteLine(
+            $"<p class=\"biome-map-note\">{Html(map.CellCountX)} x {Html(map.CellCountY)} cells at {Html(map.CellSize.ToString("0.###", CultureInfo.InvariantCulture))} world units per cell. Dashed outline marks the resource spawn area when a void border is configured.</p>");
+        writer.WriteLine("<div class=\"biome-map-frame\">");
+        writer.WriteLine($"<svg class=\"biome-map\" viewBox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" role=\"img\" aria-label=\"Biome map layout\" preserveAspectRatio=\"xMidYMid meet\" shape-rendering=\"crispEdges\">");
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                var cell = map.GetCellBounds(x, y);
+                if (cell.Width <= 0f || cell.Height <= 0f)
+                {
+                    continue;
+                }
+
+                var kind = map.GetKind(x, y);
+                writer.WriteLine(
+                    $"<rect x=\"{SvgNumber(cell.X)}\" y=\"{SvgNumber(cell.Y)}\" width=\"{SvgNumber(cell.Width)}\" height=\"{SvgNumber(cell.Height)}\" fill=\"{Html(BiomeColor(kind))}\" />");
+            }
+        }
+
+        if (map.ResourceVoidBorderWidth > 0f
+            && map.ResourceVoidBorderWidth * 2f < width
+            && map.ResourceVoidBorderWidth * 2f < height)
+        {
+            var border = map.ResourceVoidBorderWidth;
+            writer.WriteLine(
+                $"<rect class=\"biome-map-void\" x=\"{SvgNumber(border)}\" y=\"{SvgNumber(border)}\" width=\"{SvgNumber(width - border * 2f)}\" height=\"{SvgNumber(height - border * 2f)}\" />");
+        }
+
+        writer.WriteLine("</svg>");
+        writer.WriteLine("</div>");
+        writer.WriteLine("<div class=\"biome-legend\">");
+        foreach (var biome in BiomeKinds.All)
+        {
+            writer.WriteLine(
+                $"<span><span class=\"legend-swatch\" style=\"background:{Html(BiomeColor(biome))}\"></span>{Html(FormatBiomeKind(biome))}</span>");
+        }
+
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
     }
 
     private static void WriteSeasonPressureSection(
@@ -1264,7 +1529,7 @@ public static class ViewerReportWriter
             max = min + 1f;
         }
 
-        writer.WriteLine("<div class=\"chart-card\">");
+        writer.WriteLine($"<div class=\"chart-card\" role=\"button\" tabindex=\"0\" aria-label=\"Open larger {Html(title)} chart\">");
         writer.WriteLine($"<h3>{Html(title)}</h3>");
         writer.WriteLine($"<svg viewBox=\"0 0 {width:0} {height:0}\" role=\"img\" aria-label=\"{Html(title)} chart\">");
         writer.WriteLine($"<line class=\"chart-axis\" x1=\"{left:0}\" y1=\"{top:0}\" x2=\"{left:0}\" y2=\"{height - bottom:0}\" />");
@@ -1272,8 +1537,9 @@ public static class ViewerReportWriter
         writer.WriteLine($"<text class=\"chart-label\" x=\"4\" y=\"{top + 4:0}\">{Html(FormatChartValue(max, unit))}</text>");
         writer.WriteLine($"<text class=\"chart-label\" x=\"4\" y=\"{height - bottom:0}\">{Html(FormatChartValue(min, unit))}</text>");
 
-        foreach (var chartSeries in series)
+        for (var seriesIndex = 0; seriesIndex < series.Length; seriesIndex++)
         {
+            var chartSeries = series[seriesIndex];
             if (chartSeries.Values.Length == 0)
             {
                 continue;
@@ -1289,16 +1555,17 @@ public static class ViewerReportWriter
                 points[i] = $"{x.ToString("0.###", CultureInfo.InvariantCulture)},{y.ToString("0.###", CultureInfo.InvariantCulture)}";
             }
 
-            writer.WriteLine($"<polyline points=\"{Html(string.Join(' ', points))}\" fill=\"none\" stroke=\"{Html(chartSeries.Color)}\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\" />");
+            writer.WriteLine($"<polyline class=\"chart-series-line\" data-series-index=\"{seriesIndex}\" points=\"{Html(string.Join(' ', points))}\" fill=\"none\" stroke=\"{Html(chartSeries.Color)}\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\" />");
         }
 
         writer.WriteLine("</svg>");
         writer.WriteLine("<div class=\"chart-legend\">");
-        foreach (var chartSeries in series)
+        for (var seriesIndex = 0; seriesIndex < series.Length; seriesIndex++)
         {
+            var chartSeries = series[seriesIndex];
             var final = chartSeries.Values.Length > 0 ? chartSeries.Values[^1] : 0f;
             writer.WriteLine(
-                $"<span><span class=\"legend-swatch\" style=\"background:{Html(chartSeries.Color)}\"></span>{Html(chartSeries.Label)} {Html(FormatChartValue(final, unit))}</span>");
+                $"<span class=\"chart-legend-item\" data-series-index=\"{seriesIndex}\" title=\"Highlight {Html(chartSeries.Label)}\"><span class=\"legend-swatch\" style=\"background:{Html(chartSeries.Color)}\"></span>{Html(chartSeries.Label)} {Html(FormatChartValue(final, unit))}</span>");
         }
 
         writer.WriteLine("</div>");
@@ -1967,6 +2234,32 @@ public static class ViewerReportWriter
         return string.Create(
             CultureInfo.InvariantCulture,
             $"Desert {profile.Desert:0.###}x, Scrubland {profile.Scrubland:0.###}x, Grassland {profile.Grassland:0.###}x, Fertile {profile.Fertile:0.###}x, Forest {profile.Forest:0.###}x, Wetland {profile.Wetland:0.###}x, Tundra {profile.Tundra:0.###}x, Highland {profile.Highland:0.###}x");
+    }
+
+    private static string FormatBiomeKind(BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome).ToString();
+    }
+
+    private static string BiomeColor(BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome) switch
+        {
+            BiomeKind.Desert => "#c7b56f",
+            BiomeKind.Scrubland => "#8d8d49",
+            BiomeKind.Grassland => "#58ad57",
+            BiomeKind.Fertile => "#2f8f43",
+            BiomeKind.Forest => "#123d22",
+            BiomeKind.Wetland => "#2e8a8a",
+            BiomeKind.Tundra => "#b4c2c5",
+            BiomeKind.Highland => "#887b68",
+            _ => "#58ad57"
+        };
+    }
+
+    private static string SvgNumber(float value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
     private static string FormatRegionCounts(int left, int middle, int right)
