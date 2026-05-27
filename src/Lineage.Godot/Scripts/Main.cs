@@ -4106,6 +4106,7 @@ public partial class Main : Node2D
     {
         return mapKind switch
         {
+            BiomeMapKind.NaturalClimate => "natural climate",
             BiomeMapKind.HorizontalBands => "horizontal bands",
             BiomeMapKind.VerticalBands => "vertical bands",
             BiomeMapKind.HorizontalEdgeBands => "horizontal edge bands",

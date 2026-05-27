@@ -257,6 +257,11 @@ public static class SimulationScenarioFactory
 
         return scenario.BiomeMapKind switch
         {
+            BiomeMapKind.NaturalClimate => BiomeMap.GenerateNaturalClimate(
+                bounds,
+                scenario.BiomeCellSize,
+                scenario.Seed,
+                scenario.ResourceVoidBorderWidth),
             BiomeMapKind.HorizontalBands
                 or BiomeMapKind.VerticalBands
                 or BiomeMapKind.HorizontalEdgeBands

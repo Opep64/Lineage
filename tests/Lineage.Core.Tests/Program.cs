@@ -158,6 +158,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario resource density scales with world area", ScenarioResourceDensityScalesWithWorldArea),
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
+    ("Natural climate biome maps create grouped buffered regions", NaturalClimateBiomeMapsCreateGroupedBufferedRegions),
     ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
@@ -170,6 +171,7 @@ var tests = new (string Name, Action Body)[]
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
+    ("Scenario factory honors natural climate biome map kind", ScenarioFactoryHonorsNaturalClimateBiomeMapKind),
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
@@ -6757,6 +6759,87 @@ static void GeneratedSmallBiomeMapsContainVisibleVariety()
     AssertTrue(kinds.Contains(BiomeKind.Rich), "Small generated biome maps should include a high-fertility biome");
 }
 
+static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
+{
+    var first = BiomeMap.GenerateNaturalClimate(
+        new WorldBounds(4_000f, 4_000f),
+        cellSize: 100f,
+        seed: SimulationScenario.DefaultSeed);
+    var second = BiomeMap.GenerateNaturalClimate(
+        new WorldBounds(4_000f, 4_000f),
+        cellSize: 100f,
+        seed: SimulationScenario.DefaultSeed);
+    var kinds = new HashSet<BiomeKind>();
+    var sameNeighborEdges = 0;
+    var totalNeighborEdges = 0;
+
+    for (var y = 0; y < first.CellCountY; y++)
+    {
+        for (var x = 0; x < first.CellCountX; x++)
+        {
+            var kind = first.GetKind(x, y);
+            AssertEqual(kind, second.GetKind(x, y), $"Natural climate biome kind {x},{y}");
+            kinds.Add(kind);
+
+            if (x + 1 < first.CellCountX)
+            {
+                totalNeighborEdges++;
+                if (kind == first.GetKind(x + 1, y))
+                {
+                    sameNeighborEdges++;
+                }
+            }
+
+            if (y + 1 < first.CellCountY)
+            {
+                totalNeighborEdges++;
+                if (kind == first.GetKind(x, y + 1))
+                {
+                    sameNeighborEdges++;
+                }
+            }
+
+            if (kind != BiomeKind.Desert)
+            {
+                continue;
+            }
+
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+
+                    var neighborX = x + dx;
+                    var neighborY = y + dy;
+                    if ((uint)neighborX >= (uint)first.CellCountX || (uint)neighborY >= (uint)first.CellCountY)
+                    {
+                        continue;
+                    }
+
+                    var neighbor = first.GetKind(neighborX, neighborY);
+                    AssertTrue(
+                        neighbor is not BiomeKind.Grassland
+                            and not BiomeKind.Fertile
+                            and not BiomeKind.Forest
+                            and not BiomeKind.Wetland,
+                        $"Desert should be buffered from productive biome at {x},{y} near {neighborX},{neighborY}");
+                }
+            }
+        }
+    }
+
+    var groupingShare = sameNeighborEdges / (float)Math.Max(1, totalNeighborEdges);
+    AssertTrue(kinds.Count >= 5, $"Natural climate maps should include broad biome variety, saw {kinds.Count}");
+    AssertTrue(kinds.Contains(BiomeKind.Desert), "Natural climate maps should include desert");
+    AssertTrue(kinds.Contains(BiomeKind.Scrubland), "Natural climate maps should include scrubland transition");
+    AssertTrue(kinds.Contains(BiomeKind.Forest), "Natural climate maps should include forest");
+    AssertTrue(groupingShare > 0.55f, $"Natural climate maps should be regionally grouped, saw {groupingShare:0.00}");
+}
+
 static void BandedBiomeMapsCreateBroadRegions()
 {
     var vertical = BiomeMap.GenerateBands(
@@ -7144,6 +7227,35 @@ static void ScenarioFactoryHonorsBiomeMapKind()
     AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(0, 0), "Vertical band left edge");
     AssertEqual(BiomeKind.Rich, simulation.State.Biomes.GetKind(3, 0), "Vertical band rich center");
     AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(7, 0), "Vertical band right edge");
+}
+
+static void ScenarioFactoryHonorsNaturalClimateBiomeMapKind()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 21,
+        BiomeMapKind = BiomeMapKind.NaturalClimate,
+        WorldWidth = 4_000f,
+        WorldHeight = 3_000f,
+        BiomeCellSize = 100f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var expected = BiomeMap.GenerateNaturalClimate(
+        new WorldBounds(scenario.WorldWidth, scenario.WorldHeight),
+        scenario.BiomeCellSize,
+        scenario.Seed,
+        scenario.ResourceVoidBorderWidth);
+
+    for (var y = 0; y < simulation.State.Biomes.CellCountY; y++)
+    {
+        for (var x = 0; x < simulation.State.Biomes.CellCountX; x++)
+        {
+            AssertEqual(expected.GetKind(x, y), simulation.State.Biomes.GetKind(x, y), $"Natural climate factory biome {x},{y}");
+        }
+    }
 }
 
 static void ScenarioFactoryHonorsObstacleMapKind()

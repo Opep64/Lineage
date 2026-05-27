@@ -12,6 +12,9 @@ public sealed class BiomeMap
 {
     private const ulong FertilitySalt = 0x62696F6D655F6631UL;
     private const ulong MoistureSalt = 0x62696F6D655F6D32UL;
+    private const ulong ElevationSalt = 0x62696F6D655F6533UL;
+    private const ulong TemperatureSalt = 0x62696F6D655F7434UL;
+    private const ulong ClimateDetailSalt = 0x62696F6D655F6435UL;
 
     private readonly BiomeKind[] _cells;
     private readonly float[] _resourceSpawnWeightPrefix;
@@ -129,6 +132,32 @@ public sealed class BiomeMap
             cells[scoredCells[rank].Index] = BiomeKindForRank(rank, scoredCells.Length);
         }
 
+        return new BiomeMap(bounds, cellSize, cellCountX, cellCountY, cells, resourceVoidBorderWidth);
+    }
+
+    public static BiomeMap GenerateNaturalClimate(
+        WorldBounds bounds,
+        float cellSize,
+        ulong seed,
+        float resourceVoidBorderWidth = 0f)
+    {
+        ValidateBounds(bounds);
+        ValidateCellSize(cellSize);
+        ValidateResourceVoidBorderWidth(bounds, resourceVoidBorderWidth);
+
+        var cellCountX = Math.Max(1, (int)MathF.Ceiling(bounds.Width / cellSize));
+        var cellCountY = Math.Max(1, (int)MathF.Ceiling(bounds.Height / cellSize));
+        var cells = new BiomeKind[cellCountX * cellCountY];
+
+        for (var y = 0; y < cellCountY; y++)
+        {
+            for (var x = 0; x < cellCountX; x++)
+            {
+                cells[y * cellCountX + x] = BiomeKindForClimateCell(x, y, cellCountX, cellCountY, seed);
+            }
+        }
+
+        BufferNaturalClimateTransitions(cells, cellCountX, cellCountY);
         return new BiomeMap(bounds, cellSize, cellCountX, cellCountY, cells, resourceVoidBorderWidth);
     }
 
@@ -567,6 +596,132 @@ public sealed class BiomeMap
         };
     }
 
+    private static BiomeKind BiomeKindForClimateCell(int x, int y, int cellCountX, int cellCountY, ulong seed)
+    {
+        var yPhase = cellCountY <= 1 ? 0.5f : (y + 0.5f) / cellCountY;
+        var elevation = FractalNoise(x * 0.052f + 17.0f, y * 0.052f - 9.0f, seed ^ ElevationSalt);
+        var moistureNoise = FractalNoise(x * 0.055f - 4.0f, y * 0.055f + 23.0f, seed ^ MoistureSalt);
+        var temperatureNoise = FractalNoise(x * 0.038f + 31.0f, y * 0.038f + 5.0f, seed ^ TemperatureSalt);
+        var detail = FractalNoise(x * 0.08f - 15.0f, y * 0.08f - 19.0f, seed ^ ClimateDetailSalt);
+        var latitudeTemperature = 0.12f + yPhase * 0.76f;
+        var temperature = Clamp01(latitudeTemperature * 0.72f + temperatureNoise * 0.34f - elevation * 0.22f + 0.08f);
+        var moisture = Clamp01(moistureNoise * 0.70f + (1f - elevation) * 0.22f + detail * 0.08f);
+        var temperateFitness = 1f - Math.Clamp(MathF.Abs(temperature - 0.58f) * 2.2f, 0f, 1f);
+        var fertility = Clamp01(moisture * 0.48f + detail * 0.30f + temperateFitness * 0.18f - elevation * 0.10f + 0.08f);
+
+        if (temperature < 0.26f)
+        {
+            return BiomeKind.Tundra;
+        }
+
+        if (elevation > 0.74f)
+        {
+            return BiomeKind.Highland;
+        }
+
+        if (moisture > 0.74f && elevation < 0.56f && temperature is > 0.25f and < 0.88f)
+        {
+            return BiomeKind.Wetland;
+        }
+
+        if (fertility > 0.70f && moisture > 0.52f && elevation < 0.64f && temperature is > 0.26f and < 0.88f)
+        {
+            return BiomeKind.Fertile;
+        }
+
+        if (moisture > 0.58f && temperature is > 0.28f and < 0.82f && elevation < 0.72f)
+        {
+            return BiomeKind.Forest;
+        }
+
+        if (moisture < 0.32f && temperature > 0.42f && elevation < 0.75f)
+        {
+            return BiomeKind.Desert;
+        }
+
+        if (moisture < 0.38f || fertility < 0.36f)
+        {
+            return BiomeKind.Scrubland;
+        }
+
+        return BiomeKind.Grassland;
+    }
+
+    private static void BufferNaturalClimateTransitions(BiomeKind[] cells, int cellCountX, int cellCountY)
+    {
+        for (var pass = 0; pass < 2; pass++)
+        {
+            var source = cells.ToArray();
+            for (var y = 0; y < cellCountY; y++)
+            {
+                for (var x = 0; x < cellCountX; x++)
+                {
+                    var index = y * cellCountX + x;
+                    var kind = source[index];
+                    if (kind == BiomeKind.Desert
+                        && HasNeighbor(
+                            source,
+                            cellCountX,
+                            cellCountY,
+                            x,
+                            y,
+                            static neighbor => neighbor is BiomeKind.Grassland
+                                or BiomeKind.Fertile
+                                or BiomeKind.Forest
+                                or BiomeKind.Wetland))
+                    {
+                        cells[index] = BiomeKind.Scrubland;
+                    }
+                    else if (kind == BiomeKind.Tundra
+                        && HasNeighbor(
+                            source,
+                            cellCountX,
+                            cellCountY,
+                            x,
+                            y,
+                            static neighbor => neighbor is BiomeKind.Fertile or BiomeKind.Wetland))
+                    {
+                        cells[index] = BiomeKind.Highland;
+                    }
+                }
+            }
+        }
+    }
+
+    private static bool HasNeighbor(
+        BiomeKind[] cells,
+        int cellCountX,
+        int cellCountY,
+        int centerX,
+        int centerY,
+        Func<BiomeKind, bool> predicate)
+    {
+        for (var dy = -1; dy <= 1; dy++)
+        {
+            for (var dx = -1; dx <= 1; dx++)
+            {
+                if (dx == 0 && dy == 0)
+                {
+                    continue;
+                }
+
+                var x = centerX + dx;
+                var y = centerY + dy;
+                if ((uint)x >= (uint)cellCountX || (uint)y >= (uint)cellCountY)
+                {
+                    continue;
+                }
+
+                if (predicate(cells[y * cellCountX + x]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static float FractalNoise(float x, float y, ulong seed)
     {
         var total = 0f;
@@ -630,6 +785,11 @@ public sealed class BiomeMap
     private static float Lerp(float from, float to, float amount)
     {
         return from + (to - from) * amount;
+    }
+
+    private static float Clamp01(float value)
+    {
+        return Math.Clamp(value, 0f, 1f);
     }
 
     private static void ValidateBounds(WorldBounds bounds)

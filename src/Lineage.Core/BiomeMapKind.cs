@@ -6,6 +6,7 @@ namespace Lineage.Core;
 public enum BiomeMapKind
 {
     GeneratedNoise,
+    NaturalClimate,
     HorizontalBands,
     VerticalBands,
     HorizontalEdgeBands,
