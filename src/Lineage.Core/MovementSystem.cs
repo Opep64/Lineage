@@ -6,7 +6,8 @@ namespace Lineage.Core;
 public sealed class MovementSystem(
     BiomePressureProfile? biomeMovementCostProfile = null,
     BiomePressureProfile? biomeSpeedProfile = null,
-    float movementSpeedCostExponent = 1f) : ISimulationSystem
+    float movementSpeedCostExponent = 1f,
+    float treeMovementSpeedMultiplierAtFullCover = TreeMap.DefaultMovementSpeedMultiplierAtFullCover) : ISimulationSystem
 {
     private readonly BiomePressureProfile _biomeMovementCostProfile =
         BiomePressureProfile.Validate(biomeMovementCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeMovementCostProfile));
@@ -15,6 +16,9 @@ public sealed class MovementSystem(
     private readonly float _movementSpeedCostExponent = ValidateExponent(
         movementSpeedCostExponent,
         nameof(movementSpeedCostExponent));
+    private readonly float _treeMovementSpeedMultiplierAtFullCover = ValidateTreeSpeedMultiplier(
+        treeMovementSpeedMultiplierAtFullCover,
+        nameof(treeMovementSpeedMultiplierAtFullCover));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -27,7 +31,8 @@ public sealed class MovementSystem(
             var biome = state.Biomes.GetKindAt(previousPosition);
             var desiredVelocity = creature.DesiredVelocity.ClampedLength(effectiveMaxSpeed);
             var biomeSpeedMultiplier = _biomeSpeedProfile.For(biome);
-            var terrainAdjustedVelocity = desiredVelocity * biomeSpeedMultiplier;
+            var treeSpeedMultiplier = TreeSpeedMultiplier(state.Trees.GetCoverAt(previousPosition));
+            var terrainAdjustedVelocity = desiredVelocity * biomeSpeedMultiplier * treeSpeedMultiplier;
             var intendedPosition = state.Bounds.Clamp(previousPosition + terrainAdjustedVelocity * deltaSeconds);
             var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
             var nextPosition = ResolveObstacleMovement(
@@ -108,5 +113,16 @@ public sealed class MovementSystem(
         return float.IsFinite(value) && value > 0f
             ? value
             : throw new ArgumentOutOfRangeException(name, "Movement speed cost exponent must be finite and positive.");
+    }
+
+    private float TreeSpeedMultiplier(float cover)
+    {
+        return 1f - cover * (1f - _treeMovementSpeedMultiplierAtFullCover);
+    }
+
+    private static float ValidateTreeSpeedMultiplier(float value, string name)
+    {
+        TreeMap.ValidateFullCoverMovementSpeedMultiplier(value, name);
+        return value;
     }
 }

@@ -337,6 +337,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");
         WriteMetric(writer, "Biome map", scenario.BiomeMapKind.ToString());
         WriteMetric(writer, "Biome cell size", scenario.BiomeCellSize.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Trees", scenario.EnableTrees ? "Enabled" : "Disabled");
+        WriteMetric(writer, "Tree cell size", scenario.TreeCellSize.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Tree full-cover speed", $"{scenario.TreeMovementSpeedMultiplierAtFullCover:0.###}x");
         WriteMetric(writer, "Obstacles", scenario.EnableObstacles ? "Enabled" : "Disabled");
         WriteMetric(writer, "Obstacle map", scenario.ObstacleMapKind.ToString());
         WriteMetric(writer, "Obstacle cell size", scenario.ObstacleCellSize.ToString("0.###", CultureInfo.InvariantCulture));
@@ -422,12 +425,15 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Season Amp</th><th>Move Cost</th><th>Basal Cost</th><th>Speed</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Tree Cover</th><th>Tree Speed</th><th>Season Amp</th><th>Move Cost</th><th>Basal Cost</th><th>Speed</th><th>Resources</th><th>Resources/M</th><th>Calories</th><th>Living</th><th>Living Share</th></tr></thead>");
         writer.WriteLine("<tbody>");
         var movementCostProfile = scenario.CreateBiomeMovementCostProfile();
         var basalCostProfile = scenario.CreateBiomeBasalCostProfile();
         var speedProfile = scenario.CreateBiomeSpeedProfile();
         var seasonalAmplitudeProfile = scenario.CreateBiomeSeasonalAmplitudeProfile();
+        var treeSummariesByBiome = state.Trees
+            .SummarizeByBiome(state.Biomes, scenario.TreeMovementSpeedMultiplierAtFullCover)
+            .ToDictionary(summary => summary.Kind);
         foreach (var summary in biomeSummaries)
         {
             var resourcesPerMillion = summary.Area > 0f
@@ -438,12 +444,15 @@ public static class ViewerReportWriter
             var basalCost = basalCostProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             var speed = speedProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
             var seasonalAmplitude = seasonalAmplitudeProfile.For(summary.Kind).ToString("0.###", CultureInfo.InvariantCulture);
+            var treeSummary = treeSummariesByBiome[BiomeKinds.Canonicalize(summary.Kind)];
             writer.WriteLine(
                 "<tr>" +
                 $"<td>{Html(BiomeKinds.Canonicalize(summary.Kind))}</td>" +
                 $"<td>{Html(FormatPercent(summary.Area / worldArea))}</td>" +
                 $"<td>{Html(summary.ResourceDensityMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.ResourceRegrowthMultiplier.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(treeSummary.AverageCover))}</td>" +
+                $"<td>{Html($"{treeSummary.AverageMovementSpeedMultiplier:0.###}x")}</td>" +
                 $"<td>{Html($"{seasonalAmplitude}x")}</td>" +
                 $"<td>{Html($"{movementCost}x")}</td>" +
                 $"<td>{Html($"{basalCost}x")}</td>" +

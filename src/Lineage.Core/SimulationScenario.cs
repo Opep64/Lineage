@@ -44,6 +44,12 @@ public sealed record SimulationScenario
 
     public float ObstacleCellSize { get; init; } = 128f;
 
+    public bool EnableTrees { get; init; }
+
+    public float TreeCellSize { get; init; } = 100f;
+
+    public float TreeMovementSpeedMultiplierAtFullCover { get; init; } = TreeMap.DefaultMovementSpeedMultiplierAtFullCover;
+
     public float WorldWidth { get; init; } = 4_000f;
 
     public float WorldHeight { get; init; } = 4_000f;
@@ -342,6 +348,10 @@ public sealed record SimulationScenario
         EnsureHiddenNodeCount(BrainHiddenNodeCount, nameof(BrainHiddenNodeCount));
         EnsurePositive(BiomeCellSize, nameof(BiomeCellSize));
         EnsurePositive(ObstacleCellSize, nameof(ObstacleCellSize));
+        EnsurePositive(TreeCellSize, nameof(TreeCellSize));
+        TreeMap.ValidateFullCoverMovementSpeedMultiplier(
+            TreeMovementSpeedMultiplierAtFullCover,
+            nameof(TreeMovementSpeedMultiplierAtFullCover));
         EnsureNonNegative(ResourceVoidBorderWidth, nameof(ResourceVoidBorderWidth));
         EnsurePositive(FixedDeltaSeconds, nameof(FixedDeltaSeconds));
         EnsurePositive(SpatialCellSize, nameof(SpatialCellSize));

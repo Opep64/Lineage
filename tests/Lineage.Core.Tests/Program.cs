@@ -17,6 +17,7 @@ var tests = new (string Name, Action Body)[]
     ("Movement slides along obstacle edges", MovementSlidesAlongObstacleEdges),
     ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
     ("Movement speed follows biome multiplier", MovementSpeedFollowsBiomeMultiplier),
+    ("Movement speed follows tree cover", MovementSpeedFollowsTreeCover),
     ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
     ("Invalid configuration is rejected", InvalidConfigurationIsRejected),
     ("Resource regrowth is capped", ResourceRegrowthIsCapped),
@@ -75,6 +76,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
+    ("Creature sensing reports tree drag", CreatureSensingReportsTreeDrag),
     ("Creature sensing reports local obstacles", CreatureSensingReportsLocalObstacles),
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
@@ -159,6 +161,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
     ("Natural climate biome maps create grouped buffered regions", NaturalClimateBiomeMapsCreateGroupedBufferedRegions),
+    ("Tree maps follow biome tree density", TreeMapsFollowBiomeTreeDensity),
     ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
@@ -172,6 +175,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
     ("Scenario factory honors natural climate biome map kind", ScenarioFactoryHonorsNaturalClimateBiomeMapKind),
+    ("Scenario factory honors tree layer", ScenarioFactoryHonorsTreeLayer),
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
@@ -630,6 +634,42 @@ static void MovementSpeedFollowsBiomeMultiplier()
     AssertClose(26f, moved.Position.X, 0.000001, "Biome speed x position");
     AssertClose(6f, moved.Velocity.Length, 0.000001, "Biome speed actual velocity");
     AssertClose(6f, moved.LastDistanceTraveled, 0.000001, "Biome speed distance");
+}
+
+static void MovementSpeedFollowsTreeCover()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 25,
+        systems: [new MovementSystem(treeMovementSpeedMultiplierAtFullCover: 0.5f)]);
+    simulation.State.SetTrees(TreeMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 100f,
+        cellCountX: 1,
+        cellCountY: 1,
+        [0.5f]));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 24f,
+        MaturityAgeSeconds = 0f
+    });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(12f, 0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var moved = simulation.State.Creatures[0];
+    AssertClose(29f, moved.Position.X, 0.000001, "Tree speed x position");
+    AssertClose(9f, moved.Velocity.Length, 0.000001, "Tree speed actual velocity");
+    AssertClose(9f, moved.LastDistanceTraveled, 0.000001, "Tree speed distance");
 }
 
 static void MovementSpeedCostIsNonlinear()
@@ -2982,6 +3022,50 @@ static void CreatureSensingReportsLocalTerrainDrag()
 
     senses = simulation.State.Creatures[0].Senses;
     AssertClose(SpeedMultiplierToDrag(speedProfile.For(probe.ForwardBiome)), senses.LeftTerrainDrag, 0.000001, "Left terrain drag");
+}
+
+static void CreatureSensingReportsTreeDrag()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 0.1f
+        },
+        seed: 408,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 1,
+                treeMovementSpeedMultiplierAtFullCover: 0.5f)
+        ]);
+    simulation.State.SetTrees(TreeMap.CreateFromCells(
+        simulation.State.Bounds,
+        cellSize: 50f,
+        cellCountX: 2,
+        cellCountY: 1,
+        [0.5f, 0f]));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(25f, 50f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertClose(0.25f, senses.CurrentTerrainDrag, 0.000001, "Current tree drag");
+    AssertClose(0f, senses.ForwardTerrainDrag, 0.000001, "Forward tree drag");
 }
 
 static void CreatureSensingReportsMemoryDirection()
@@ -6840,6 +6924,53 @@ static void NaturalClimateBiomeMapsCreateGroupedBufferedRegions()
     AssertTrue(groupingShare > 0.55f, $"Natural climate maps should be regionally grouped, saw {groupingShare:0.00}");
 }
 
+static void TreeMapsFollowBiomeTreeDensity()
+{
+    var cells = new List<BiomeKind>();
+    for (var y = 0; y < 20; y++)
+    {
+        cells.Add(BiomeKind.Forest);
+        cells.Add(BiomeKind.Wetland);
+        cells.Add(BiomeKind.Scrubland);
+        cells.Add(BiomeKind.Grassland);
+    }
+
+    var biomes = BiomeMap.CreateFromCells(
+        new WorldBounds(400f, 2_000f),
+        cellSize: 100f,
+        cellCountX: 4,
+        cellCountY: 20,
+        cells);
+    var first = TreeMap.GenerateFromBiomes(biomes, cellSize: 100f, seed: SimulationScenario.DefaultSeed);
+    var second = TreeMap.GenerateFromBiomes(biomes, cellSize: 100f, seed: SimulationScenario.DefaultSeed);
+    var summaries = first
+        .SummarizeByBiome(biomes, TreeMap.DefaultMovementSpeedMultiplierAtFullCover)
+        .ToDictionary(summary => summary.Kind);
+
+    for (var y = 0; y < first.CellCountY; y++)
+    {
+        for (var x = 0; x < first.CellCountX; x++)
+        {
+            AssertClose(first.GetCover(x, y), second.GetCover(x, y), 0.000001, $"Tree cover {x},{y}");
+        }
+    }
+
+    AssertTrue(first.HasTrees, "Generated tree map should contain tree cover");
+    AssertTrue(summaries[BiomeKind.Forest].AverageCover > 0.5f, "Forest should have dense tree cover");
+    AssertTrue(
+        summaries[BiomeKind.Forest].AverageCover > summaries[BiomeKind.Wetland].AverageCover,
+        "Forest should be denser than wetland");
+    AssertTrue(
+        summaries[BiomeKind.Wetland].AverageCover > summaries[BiomeKind.Grassland].AverageCover,
+        "Wetland should be denser than grassland");
+    AssertTrue(
+        summaries[BiomeKind.Scrubland].AverageCover > summaries[BiomeKind.Grassland].AverageCover,
+        "Scrubland should be denser than grassland");
+    AssertTrue(
+        summaries[BiomeKind.Forest].AverageMovementSpeedMultiplier < summaries[BiomeKind.Grassland].AverageMovementSpeedMultiplier,
+        "Dense forest should be slower than grassland");
+}
+
 static void BandedBiomeMapsCreateBroadRegions()
 {
     var vertical = BiomeMap.GenerateBands(
@@ -7254,6 +7385,37 @@ static void ScenarioFactoryHonorsNaturalClimateBiomeMapKind()
         for (var x = 0; x < simulation.State.Biomes.CellCountX; x++)
         {
             AssertEqual(expected.GetKind(x, y), simulation.State.Biomes.GetKind(x, y), $"Natural climate factory biome {x},{y}");
+        }
+    }
+}
+
+static void ScenarioFactoryHonorsTreeLayer()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 22,
+        EnableTrees = true,
+        BiomeMapKind = BiomeMapKind.NaturalClimate,
+        WorldWidth = 4_000f,
+        WorldHeight = 3_000f,
+        BiomeCellSize = 100f,
+        TreeCellSize = 100f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var expected = TreeMap.GenerateFromBiomes(
+        simulation.State.Biomes,
+        scenario.TreeCellSize,
+        scenario.Seed);
+
+    AssertTrue(simulation.State.Trees.HasTrees, "Scenario tree map should contain tree cover");
+    for (var y = 0; y < simulation.State.Trees.CellCountY; y++)
+    {
+        for (var x = 0; x < simulation.State.Trees.CellCountX; x++)
+        {
+            AssertClose(expected.GetCover(x, y), simulation.State.Trees.GetCover(x, y), 0.000001, $"Scenario tree cover {x},{y}");
         }
     }
 }
@@ -8016,6 +8178,8 @@ static void SimulationSnapshotsRestoreExactContinuation()
         EnableObstacles = true,
         ObstacleMapKind = ObstacleMapKind.HorizontalBarrierWithGaps,
         ObstacleCellSize = 100f,
+        EnableTrees = true,
+        TreeCellSize = 100f,
         InitialCreatureCount = 8,
         InitialResourcesPerMillionArea = 80f,
         StatsSnapshotIntervalTicks = 1
@@ -8041,6 +8205,8 @@ static void SimulationSnapshotsRestoreExactContinuation()
     AssertEqual(original.State.LineageRecords.Count, restored.State.LineageRecords.Count, "Restored lineage count");
     AssertEqual(original.State.Stats.Snapshots.Count, restored.State.Stats.Snapshots.Count, "Restored snapshot count");
     AssertEqual(original.State.Obstacles.BlockedCellCount, restored.State.Obstacles.BlockedCellCount, "Restored obstacle count");
+    AssertEqual(original.State.Trees.CoveredCellCount, restored.State.Trees.CoveredCellCount, "Restored tree count");
+    AssertClose(original.State.Trees.AverageCover, restored.State.Trees.AverageCover, 0.000001, "Restored average tree cover");
     AssertEqual(original.State.Brains.Count, restored.State.Brains.Count, "Restored brain count");
     AssertEqual(original.State.Brains.Count, roundTrippedSnapshot.BrainArchitectureKinds.Length, "Snapshot brain architecture count");
     for (var brainId = 0; brainId < original.State.Brains.Count; brainId++)
@@ -8340,6 +8506,9 @@ static void ScenarioJsonRoundTrips()
         EnableObstacles = true,
         ObstacleMapKind = ObstacleMapKind.ScatteredRocks,
         ObstacleCellSize = 150f,
+        EnableTrees = true,
+        TreeCellSize = 75f,
+        TreeMovementSpeedMultiplierAtFullCover = 0.66f,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
         WorldWidth = 500f,
@@ -8471,6 +8640,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
     AssertTrue(json.Contains("\"obstacleMapKind\": \"scatteredRocks\""), "JSON should serialize obstacle map kind as a string");
+    AssertTrue(json.Contains("\"enableTrees\""), "JSON should serialize tree toggle");
+    AssertTrue(json.Contains("\"treeMovementSpeedMultiplierAtFullCover\""), "JSON should serialize tree speed pressure");
     AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
     AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
@@ -8507,6 +8678,9 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.EnableObstacles, roundTripped.EnableObstacles, "Scenario obstacle mode");
     AssertEqual(scenario.ObstacleMapKind, roundTripped.ObstacleMapKind, "Scenario obstacle map kind");
     AssertClose(scenario.ObstacleCellSize, roundTripped.ObstacleCellSize, 0.000001, "Scenario obstacle cell size");
+    AssertEqual(scenario.EnableTrees, roundTripped.EnableTrees, "Scenario tree mode");
+    AssertClose(scenario.TreeCellSize, roundTripped.TreeCellSize, 0.000001, "Scenario tree cell size");
+    AssertClose(scenario.TreeMovementSpeedMultiplierAtFullCover, roundTripped.TreeMovementSpeedMultiplierAtFullCover, 0.000001, "Scenario tree full-cover speed");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");
     AssertClose(scenario.WorldWidth, roundTripped.WorldWidth, 0.000001, "Scenario world width");

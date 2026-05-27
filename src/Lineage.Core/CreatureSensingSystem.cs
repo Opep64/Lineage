@@ -34,6 +34,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly float _closeSenseRefreshProximity;
     private readonly bool _enableSectorVision;
     private readonly float _plantPayoffTraceHalfLifeSeconds;
+    private readonly float _treeMovementSpeedMultiplierAtFullCover;
 
     private readonly List<int> _plantResourceCandidates = [];
     private readonly IndexStampSet _seenPlantResourceCandidates = new();
@@ -56,7 +57,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         int worldSenseIntervalTicks = DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity,
         bool enableSectorVision = DefaultEnableSectorVision,
-        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds)
+        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds,
+        float treeMovementSpeedMultiplierAtFullCover = TreeMap.DefaultMovementSpeedMultiplierAtFullCover)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -101,6 +103,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _closeSenseRefreshProximity = closeSenseRefreshProximity;
         _enableSectorVision = enableSectorVision;
         _plantPayoffTraceHalfLifeSeconds = plantPayoffTraceHalfLifeSeconds;
+        TreeMap.ValidateFullCoverMovementSpeedMultiplier(
+            treeMovementSpeedMultiplierAtFullCover,
+            nameof(treeMovementSpeedMultiplierAtFullCover));
+        _treeMovementSpeedMultiplierAtFullCover = treeMovementSpeedMultiplierAtFullCover;
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -817,7 +823,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         SimVector2 right,
         float effectiveSenseRadius)
     {
-        if (_hasUniformBiomeSpeedProfile)
+        if (_hasUniformBiomeSpeedProfile && !state.Trees.HasTrees)
         {
             if (_uniformBiomeDrag != 0f)
             {
@@ -830,7 +836,6 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             return;
         }
 
-        var currentSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(creature.Position));
         var probeDistance = Math.Clamp(
             effectiveSenseRadius * 0.5f,
             MinimumTerrainProbeDistance,
@@ -838,14 +843,22 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var forwardPosition = state.Bounds.Clamp(creature.Position + forward * probeDistance);
         var leftPosition = state.Bounds.Clamp(creature.Position - right * probeDistance);
         var rightPosition = state.Bounds.Clamp(creature.Position + right * probeDistance);
-        var forwardSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(forwardPosition));
-        var leftSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(leftPosition));
-        var rightSpeedMultiplier = _biomeSpeedProfile.For(state.Biomes.GetKindAt(rightPosition));
 
-        senses.CurrentTerrainDrag = SpeedMultiplierToDrag(currentSpeedMultiplier);
-        senses.ForwardTerrainDrag = SpeedMultiplierToDrag(forwardSpeedMultiplier);
-        senses.LeftTerrainDrag = SpeedMultiplierToDrag(leftSpeedMultiplier);
-        senses.RightTerrainDrag = SpeedMultiplierToDrag(rightSpeedMultiplier);
+        senses.CurrentTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, creature.Position));
+        senses.ForwardTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, forwardPosition));
+        senses.LeftTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, leftPosition));
+        senses.RightTerrainDrag = SpeedMultiplierToDrag(TerrainSpeedMultiplierAt(state, rightPosition));
+    }
+
+    private float TerrainSpeedMultiplierAt(WorldState state, SimVector2 position)
+    {
+        return _biomeSpeedProfile.For(state.Biomes.GetKindAt(position))
+            * TreeSpeedMultiplier(state.Trees.GetCoverAt(position));
+    }
+
+    private float TreeSpeedMultiplier(float cover)
+    {
+        return 1f - cover * (1f - _treeMovementSpeedMultiplierAtFullCover);
     }
 
     private static void ApplyObstacleSense(
@@ -946,7 +959,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         const float epsilon = 0.000001f;
         return Math.Abs(profile.Barren - profile.Sparse) <= epsilon
             && Math.Abs(profile.Barren - profile.Grassland) <= epsilon
-            && Math.Abs(profile.Barren - profile.Rich) <= epsilon;
+            && Math.Abs(profile.Barren - profile.Rich) <= epsilon
+            && Math.Abs(profile.Barren - profile.Forest) <= epsilon
+            && Math.Abs(profile.Barren - profile.Wetland) <= epsilon
+            && Math.Abs(profile.Barren - profile.Tundra) <= epsilon
+            && Math.Abs(profile.Barren - profile.Highland) <= epsilon;
     }
 
     private void ApplyMeatScentSense(

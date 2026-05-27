@@ -23,6 +23,7 @@ public static class SimulationScenarioFactory
 
         simulation.State.Biomes = CreateBiomeMap(scenario);
         simulation.State.SetObstacles(CreateObstacleMap(scenario));
+        simulation.State.SetTrees(CreateTreeMap(scenario, simulation.State.Biomes));
         simulation.State.SetLocalFertility(CreateLocalFertilityMap(scenario));
         SeedWorld(simulation, scenario);
         return simulation;
@@ -84,6 +85,7 @@ public static class SimulationScenarioFactory
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
                 scenario.CreateBiomeSpeedProfile(),
+                scenario.TreeMovementSpeedMultiplierAtFullCover,
                 scenario.MovementSpeedCostExponent,
                 scenario.RequireReproductionIntent,
                 scenario.ReproductivePrimeAgeSeconds,
@@ -137,6 +139,7 @@ public static class SimulationScenarioFactory
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
                 scenario.CreateBiomeSpeedProfile(),
+                scenario.TreeMovementSpeedMultiplierAtFullCover,
                 scenario.MovementSpeedCostExponent,
                 scenario.RequireReproductionIntent,
                 scenario.ReproductivePrimeAgeSeconds,
@@ -284,6 +287,13 @@ public static class SimulationScenarioFactory
         return scenario.EnableObstacles && scenario.ObstacleMapKind != ObstacleMapKind.None
             ? ObstacleMap.Generate(bounds, scenario.ObstacleCellSize, scenario.ObstacleMapKind, scenario.Seed)
             : ObstacleMap.CreateEmpty(bounds, scenario.ObstacleCellSize);
+    }
+
+    private static TreeMap CreateTreeMap(SimulationScenario scenario, BiomeMap biomes)
+    {
+        return scenario.EnableTrees
+            ? TreeMap.GenerateFromBiomes(biomes, scenario.TreeCellSize, scenario.Seed)
+            : TreeMap.CreateEmpty(biomes.Bounds, scenario.TreeCellSize);
     }
 
     private static LocalFertilityMap CreateLocalFertilityMap(SimulationScenario scenario)

@@ -285,6 +285,7 @@ public static class SimulationScenarioMetadata
         if (name.Contains("World", StringComparison.Ordinal)
             || name.Contains("Biome", StringComparison.Ordinal)
             || name.Contains("Obstacle", StringComparison.Ordinal)
+            || name.Contains("Tree", StringComparison.Ordinal)
             || name.Contains("Terrain", StringComparison.Ordinal)
             || name.Contains("Spatial", StringComparison.Ordinal)
             || name is "FixedDeltaSeconds")

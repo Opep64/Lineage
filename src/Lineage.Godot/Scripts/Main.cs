@@ -458,6 +458,7 @@ public partial class Main : Node2D
             if (_showBiomeOverlay)
             {
                 DrawBiomeOverlay();
+                DrawTreeOverlay();
             }
 
             DrawObstacleOverlay();
@@ -1070,6 +1071,10 @@ public partial class Main : Node2D
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
+        var centerTreeCover = state.Trees.GetCoverAt(_viewCenter);
+        var centerTreeSpeed = state.Trees.GetMovementSpeedMultiplierAt(
+            _viewCenter,
+            _scenario.TreeMovementSpeedMultiplierAtFullCover);
         var season = SeasonalFertility.CalculateAt(
             _scenario.EnableSeasons,
             state.ElapsedSeconds,
@@ -1149,6 +1154,7 @@ public partial class Main : Node2D
             $"Plant colors generic/tender/rich/tough\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
             $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
+            $"Trees {(_scenario.EnableTrees ? "on" : "off")} cover {FormatPercent(centerTreeCover)} avg {FormatPercent(state.Trees.AverageCover)} speed {centerTreeSpeed:0.00}x\n" +
             $"Obstacles {FormatObstacleMapKind(_scenario.ObstacleMapKind)} cells {_simulation.State.Obstacles.BlockedCellCount}\n" +
             $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}  fwd {snapshot.AverageForwardObstacle:0.00}\n" +
             $"Biome pop D {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} Sc {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} F {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
@@ -2896,6 +2902,56 @@ public partial class Main : Node2D
         DrawWorldRect(new BiomeCellBounds(map.Bounds.Width - width, width, width, middleHeight), color);
     }
 
+    private void DrawTreeOverlay()
+    {
+        var map = _simulation.State.Trees;
+        if (!map.HasTrees)
+        {
+            return;
+        }
+
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                var cover = map.GetCover(x, y);
+                if (cover <= 0.001f)
+                {
+                    continue;
+                }
+
+                var cell = map.GetCellBounds(x, y);
+                var topLeft = ToScreen(new SimVector2(cell.X, cell.Y));
+                var bottomRight = ToScreen(new SimVector2(cell.X + cell.Width, cell.Y + cell.Height));
+                var rect = RectFromPoints(topLeft, bottomRight);
+                if (!TryClipRect(rect, _worldRect, out var clipped))
+                {
+                    continue;
+                }
+
+                DrawRect(clipped, ColorForTreeCover(cover), filled: true);
+                DrawTreeCanopyPattern(clipped, x, y, cover);
+            }
+        }
+    }
+
+    private void DrawTreeCanopyPattern(Rect2 cellRect, int cellX, int cellY, float cover)
+    {
+        if (cellRect.Size.X < 12f || cellRect.Size.Y < 12f)
+        {
+            return;
+        }
+
+        var dotCount = Math.Clamp((int)MathF.Ceiling(cover * 9f), 1, 9);
+        var radius = Math.Clamp(MathF.Min(cellRect.Size.X, cellRect.Size.Y) * (0.025f + cover * 0.025f), 1.1f, 4.2f);
+        for (var i = 0; i < dotCount; i++)
+        {
+            var x = cellRect.Position.X + cellRect.Size.X * TreePatternUnit(cellX, cellY, i, 0);
+            var y = cellRect.Position.Y + cellRect.Size.Y * TreePatternUnit(cellX, cellY, i, 1);
+            DrawCircle(new Vector2(x, y), radius, ColorForTreeCanopy(cover, i));
+        }
+    }
+
     private void DrawObstacleOverlay()
     {
         var map = _simulation.State.Obstacles;
@@ -3017,6 +3073,36 @@ public partial class Main : Node2D
             BiomeKind.Highland => new Color(0.42f, 0.39f, 0.34f, 0.30f),
             _ => new Color(0.12f, 0.34f, 0.17f, 0.22f)
         };
+    }
+
+    private static Color ColorForTreeCover(float cover)
+    {
+        var alpha = Mathf.Clamp(cover, 0f, 1f) * 0.28f;
+        return new Color(0.015f, 0.20f, 0.055f, alpha);
+    }
+
+    private static Color ColorForTreeCanopy(float cover, int index)
+    {
+        var variation = index % 2 == 0 ? 0.0f : 0.045f;
+        var alpha = 0.08f + Mathf.Clamp(cover, 0f, 1f) * 0.22f;
+        return new Color(0.025f + variation, 0.30f + variation, 0.08f + variation * 0.5f, alpha);
+    }
+
+    private static float TreePatternUnit(int cellX, int cellY, int index, int salt)
+    {
+        unchecked
+        {
+            var h = (uint)cellX * 0x9E3779B9u;
+            h ^= (uint)cellY * 0x85EBCA6Bu;
+            h ^= (uint)index * 0xC2B2AE35u;
+            h ^= (uint)salt * 0x27D4EB2Fu;
+            h ^= h >> 16;
+            h *= 0x7FEB352Du;
+            h ^= h >> 15;
+            h *= 0x846CA68Bu;
+            h ^= h >> 16;
+            return (h & 0x00FFFFFFu) * (1f / 0x01000000u);
+        }
     }
 
     private void DrawStatsGraph()

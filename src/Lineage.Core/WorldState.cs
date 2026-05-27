@@ -21,6 +21,7 @@ public sealed class WorldState
         Random = new DeterministicRandom(seed);
         Biomes = BiomeMap.CreateUniform(bounds, MathF.Max(bounds.Width, bounds.Height), BiomeKind.Grassland);
         Obstacles = ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
+        Trees = TreeMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
         LocalFertility = LocalFertilityMap.CreateDisabled(bounds);
     }
 
@@ -35,6 +36,8 @@ public sealed class WorldState
     public BiomeMap Biomes { get; internal set; }
 
     public ObstacleMap Obstacles { get; internal set; }
+
+    public TreeMap Trees { get; internal set; }
 
     public LocalFertilityMap LocalFertility { get; internal set; }
 
@@ -180,6 +183,16 @@ public sealed class WorldState
         }
 
         Obstacles = obstacles;
+    }
+
+    public void SetTrees(TreeMap trees)
+    {
+        if (trees.Bounds.Width != Bounds.Width || trees.Bounds.Height != Bounds.Height)
+        {
+            throw new ArgumentException("Tree map bounds must match the world bounds.", nameof(trees));
+        }
+
+        Trees = trees;
     }
 
     public void SetLocalFertility(LocalFertilityMap localFertility)
