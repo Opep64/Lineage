@@ -36,6 +36,8 @@ public partial class Main : Node2D
     private const int MiniGraphCount = 4;
     private const int MiniGraphCompactColumnCount = 2;
     private const int MaxGraphSamplesDrawn = 8_000;
+    private const int PreferredBiomeTexturePixelsPerCell = 16;
+    private const int MaxBiomeTextureDimension = 2048;
     private const int SpriteAtlasColumns = 4;
     private const int SpriteAtlasRows = 5;
     private const float MinCreatureSpriteRadiusPixels = 0.5f;
@@ -157,6 +159,7 @@ public partial class Main : Node2D
     private CreatureRenderMode _creatureRenderMode = CreatureRenderMode.Individual;
     private ImageTexture? _biomeOverlayTexture;
     private BiomeMap? _biomeOverlaySource;
+    private int _biomeOverlayPixelsPerCell = 1;
     private int _visibleCreatureEstimate;
     private int _drawnResourceCount;
     private int _drawnResourceAggregateCount;
@@ -561,19 +564,25 @@ public partial class Main : Node2D
         DrawStatsGraph();
     }
 
+    public override void _Input(InputEvent @event)
+    {
+        if (@event is InputEventKey { Pressed: true, Echo: false } keyEvent)
+        {
+            if (keyEvent.Keycode is Key.P or Key.Space && !IsTextInputFocused())
+            {
+                _paused = !_paused;
+                RequestVisualRefresh();
+                GetViewport().SetInputAsHandled();
+            }
+        }
+    }
+
     public override void _UnhandledInput(InputEvent @event)
     {
         if (@event is InputEventKey { Pressed: true, Echo: false } keyEvent)
         {
             switch (keyEvent.Keycode)
             {
-                case Key.P:
-                case Key.Space:
-                    _paused = !_paused;
-                    break;
-                case Key.R:
-                    ResetSimulation(resetView: false);
-                    break;
                 case Key.N:
                     _currentSeed = CreateNewSeed();
                     _scenario = _scenario with { Seed = _currentSeed };
@@ -589,10 +598,6 @@ public partial class Main : Node2D
                     {
                         _scenarioEditor.ToggleCollapsed();
                     }
-                    break;
-                case Key.F:
-                    _followSelected = false;
-                    ResetView();
                     break;
                 case Key.G:
                     ToggleFollowSelected();
@@ -1264,8 +1269,8 @@ public partial class Main : Node2D
         _graphLegend.Text =
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Population)}\n" +
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Season)}\n" +
-            "Keys: Space/P pause  +/- speed  R restart  N seed  S scenario\n" +
-            $"Move: Arrows/Wheel/Drag  Click select  G follow  F reset  T visual  B/C/V/M toggles";
+            "Keys: Space/P pause  +/- speed  N seed  S scenario\n" +
+            $"Move: Arrows/Wheel/Drag  Click select  G follow  T visual  B/C/V/M toggles";
 
         _miniGraphLabels[0].Text = $"Population {state.Creatures.Count}";
         _miniGraphLabels[0].AddThemeColorOverride("font_color", _graphPopulationColor);
@@ -2968,7 +2973,7 @@ public partial class Main : Node2D
     private void DrawBiomeOverlay()
     {
         var map = _simulation.State.Biomes;
-        DrawMapTexture(GetBiomeOverlayTexture(map), map.CellSize);
+        DrawMapTexture(GetBiomeOverlayTexture(map), map.CellSize / Math.Max(1, _biomeOverlayPixelsPerCell));
         DrawResourceVoidOverlay(map);
 
         if (map.CellSize * _worldScale <= 54f)
@@ -2995,18 +3000,18 @@ public partial class Main : Node2D
         DrawWorldRect(new BiomeCellBounds(map.Bounds.Width - width, width, width, middleHeight), color);
     }
 
-    private void DrawMapTexture(Texture2D texture, float cellSize)
+    private void DrawMapTexture(Texture2D texture, float worldUnitsPerTexturePixel)
     {
         var visible = GetVisibleWorldRect();
-        if (visible.Size.X <= 0f || visible.Size.Y <= 0f)
+        if (visible.Size.X <= 0f || visible.Size.Y <= 0f || worldUnitsPerTexturePixel <= 0f)
         {
             return;
         }
 
         var destination = WorldRectToScreenRect(visible);
         var source = new Rect2(
-            new Vector2(visible.Position.X / cellSize, visible.Position.Y / cellSize),
-            new Vector2(visible.Size.X / cellSize, visible.Size.Y / cellSize));
+            new Vector2(visible.Position.X / worldUnitsPerTexturePixel, visible.Position.Y / worldUnitsPerTexturePixel),
+            new Vector2(visible.Size.X / worldUnitsPerTexturePixel, visible.Size.Y / worldUnitsPerTexturePixel));
         DrawTextureRectRegion(texture, destination, source);
     }
 
@@ -3017,18 +3022,41 @@ public partial class Main : Node2D
             return _biomeOverlayTexture;
         }
 
-        var image = Image.CreateEmpty(map.CellCountX, map.CellCountY, false, Image.Format.Rgba8);
+        var pixelsPerCell = CalculateBiomeTexturePixelsPerCell(map);
+        var image = Image.CreateEmpty(map.CellCountX * pixelsPerCell, map.CellCountY * pixelsPerCell, false, Image.Format.Rgba8);
         for (var y = 0; y < map.CellCountY; y++)
         {
             for (var x = 0; x < map.CellCountX; x++)
             {
-                image.SetPixel(x, y, ColorForBiome(map.GetKind(x, y)));
+                var biome = map.GetKind(x, y);
+                for (var localY = 0; localY < pixelsPerCell; localY++)
+                {
+                    for (var localX = 0; localX < pixelsPerCell; localX++)
+                    {
+                        image.SetPixel(
+                            x * pixelsPerCell + localX,
+                            y * pixelsPerCell + localY,
+                            ColorForBiomeTexture(biome, x, y, localX, localY, pixelsPerCell));
+                    }
+                }
             }
         }
 
         _biomeOverlaySource = map;
+        _biomeOverlayPixelsPerCell = pixelsPerCell;
         _biomeOverlayTexture = ImageTexture.CreateFromImage(image);
         return _biomeOverlayTexture;
+    }
+
+    private static int CalculateBiomeTexturePixelsPerCell(BiomeMap map)
+    {
+        var maxCells = Math.Max(map.CellCountX, map.CellCountY);
+        if (maxCells <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Clamp(MaxBiomeTextureDimension / maxCells, 1, PreferredBiomeTexturePixelsPerCell);
     }
 
     private void DrawBiomeCellOutlines(BiomeMap map)
@@ -3197,6 +3225,333 @@ public partial class Main : Node2D
             BiomeKind.Highland => new Color(0.50f, 0.45f, 0.36f, 0.44f),
             _ => new Color(0.24f, 0.50f, 0.18f, 0.50f)
         };
+    }
+
+    private static Color ColorForBiomeTexture(
+        BiomeKind biome,
+        int cellX,
+        int cellY,
+        int localX,
+        int localY,
+        int pixelsPerCell)
+    {
+        var canonical = BiomeKinds.Canonicalize(biome);
+        var baseColor = ColorForBiome(canonical);
+        if (pixelsPerCell <= 1)
+        {
+            return baseColor;
+        }
+
+        if (canonical == BiomeKind.Forest)
+        {
+            return ColorForForestBiomeTexture(cellX, cellY, localX, localY, pixelsPerCell, baseColor);
+        }
+
+        var u = (localX + 0.5f) / pixelsPerCell;
+        var v = (localY + 0.5f) / pixelsPerCell;
+        var cellHash = Hash01(cellX, cellY, 0x9e3779b9u + (uint)canonical * 101u);
+        var fine = Hash01(cellX * pixelsPerCell + localX, cellY * pixelsPerCell + localY, 0x85ebca6bu);
+        var coarse = Hash01(cellX * 5 + localX / 4, cellY * 5 + localY / 4, 0xc2b2ae35u + (uint)canonical * 17u);
+        var angle = cellHash * MathF.Tau;
+        var waveAxis = u * MathF.Cos(angle) + v * MathF.Sin(angle);
+        var wave = MathF.Sin((waveAxis * (2.5f + cellHash * 2.0f) + cellHash) * MathF.Tau);
+        var variation = (fine - 0.5f) * 0.045f
+            + (coarse - 0.5f) * 0.055f
+            + wave * BiomeTextureWaveStrength(canonical);
+
+        var edge = MathF.Min(MathF.Min(u, 1f - u), MathF.Min(v, 1f - v));
+        if (edge < 0.08f)
+        {
+            variation -= (0.08f - edge) * 0.28f;
+        }
+
+        var color = AdjustColorValue(baseColor, variation);
+        var fleck = BiomeTextureFleckAmount(canonical, fine, coarse, u, v, cellHash);
+        if (fleck > 0f)
+        {
+            color = color.Lerp(BiomeTextureAccentColor(canonical, baseColor), fleck);
+        }
+
+        return new Color(color.R, color.G, color.B, baseColor.A);
+    }
+
+    private static Color ColorForForestBiomeTexture(
+        int cellX,
+        int cellY,
+        int localX,
+        int localY,
+        int pixelsPerCell,
+        Color baseColor)
+    {
+        var u = (localX + 0.5f) / pixelsPerCell;
+        var v = (localY + 0.5f) / pixelsPerCell;
+        var cellHash = Hash01(cellX, cellY, 0x46a3f17du);
+        var variant = Math.Min(5, (int)(cellHash * 6f));
+        var fine = Hash01(cellX * pixelsPerCell + localX, cellY * pixelsPerCell + localY, 0x4cf5ad43u);
+        var coarse = Hash01(cellX * 7 + localX / 3, cellY * 7 + localY / 3, 0x7f4a7c15u);
+        var color = AdjustColorValue(baseColor, (fine - 0.5f) * 0.035f + (coarse - 0.5f) * 0.045f);
+
+        color = variant switch
+        {
+            0 => ApplyForestSparseCanopyDots(color, cellX, cellY, u, v, baseColor),
+            1 => ApplyForestClusteredLeafBlobs(color, cellX, cellY, u, v, baseColor),
+            2 => ApplyForestBranchStrokes(color, cellX, cellY, u, v, baseColor, fine),
+            3 => ApplyForestMossyPatches(color, cellX, cellY, u, v, baseColor, fine, coarse),
+            4 => ApplyForestDenseCenterCanopy(color, cellX, cellY, u, v, baseColor, fine),
+            _ => ApplyForestEdgeCanopy(color, cellX, cellY, u, v, baseColor, fine)
+        };
+
+        if (fine > 0.91f)
+        {
+            color = color.Lerp(new Color(0.12f, 0.46f, 0.16f, baseColor.A), 0.16f);
+        }
+
+        return new Color(color.R, color.G, color.B, baseColor.A);
+    }
+
+    private static Color ApplyForestSparseCanopyDots(Color color, int cellX, int cellY, float u, float v, Color baseColor)
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            var cx = Hash01(cellX, cellY, 0x1001u + (uint)i * 73u) * 0.82f + 0.09f;
+            var cy = Hash01(cellX, cellY, 0x2003u + (uint)i * 97u) * 0.82f + 0.09f;
+            var radius = 0.055f + Hash01(cellX, cellY, 0x3005u + (uint)i * 37u) * 0.045f;
+            var distance = Distance01(u, v, cx, cy);
+            if (distance < radius)
+            {
+                var amount = 1f - distance / radius;
+                color = color.Lerp(new Color(0.00f, 0.12f, 0.045f, baseColor.A), 0.18f + amount * 0.20f);
+            }
+        }
+
+        return color;
+    }
+
+    private static Color ApplyForestClusteredLeafBlobs(Color color, int cellX, int cellY, float u, float v, Color baseColor)
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            var cx = Hash01(cellX, cellY, 0x4211u + (uint)i * 107u) * 0.62f + 0.19f;
+            var cy = Hash01(cellX, cellY, 0x5321u + (uint)i * 83u) * 0.62f + 0.19f;
+            var radius = 0.13f + Hash01(cellX, cellY, 0x6431u + (uint)i * 53u) * 0.08f;
+            var distance = Distance01(u, v, cx, cy);
+            if (distance < radius)
+            {
+                var amount = 1f - distance / radius;
+                var blobColor = i % 2 == 0
+                    ? new Color(0.03f, 0.30f, 0.10f, baseColor.A)
+                    : new Color(0.08f, 0.38f, 0.13f, baseColor.A);
+                color = color.Lerp(blobColor, 0.18f + amount * 0.22f);
+            }
+        }
+
+        return color;
+    }
+
+    private static Color ApplyForestBranchStrokes(Color color, int cellX, int cellY, float u, float v, Color baseColor, float fine)
+    {
+        var branchColor = new Color(0.18f, 0.105f, 0.045f, baseColor.A);
+        var mainAngle = Hash01(cellX, cellY, 0x7801u) * MathF.Tau;
+        var mainAxis = SignedLineDistance(u, v, 0.5f, 0.5f, mainAngle);
+        var mainAlong = AlongLineDistance(u, v, 0.5f, 0.5f, mainAngle);
+        if (MathF.Abs(mainAxis) < 0.035f && MathF.Abs(mainAlong) < 0.42f)
+        {
+            color = color.Lerp(branchColor, 0.26f);
+        }
+
+        for (var i = 0; i < 2; i++)
+        {
+            var bx = 0.36f + i * 0.22f;
+            var by = 0.36f + Hash01(cellX, cellY, 0x7b21u + (uint)i * 29u) * 0.28f;
+            var angle = mainAngle + (i == 0 ? 0.72f : -0.82f);
+            var axis = SignedLineDistance(u, v, bx, by, angle);
+            var along = AlongLineDistance(u, v, bx, by, angle);
+            if (MathF.Abs(axis) < 0.028f && along is > 0f and < 0.25f)
+            {
+                color = color.Lerp(branchColor, 0.22f);
+            }
+        }
+
+        if (fine > 0.84f)
+        {
+            color = color.Lerp(new Color(0.07f, 0.34f, 0.12f, baseColor.A), 0.14f);
+        }
+
+        return color;
+    }
+
+    private static Color ApplyForestMossyPatches(Color color, int cellX, int cellY, float u, float v, Color baseColor, float fine, float coarse)
+    {
+        var moss = new Color(0.10f, 0.42f, 0.11f, baseColor.A);
+        for (var i = 0; i < 4; i++)
+        {
+            var cx = Hash01(cellX, cellY, 0x8141u + (uint)i * 47u) * 0.76f + 0.12f;
+            var cy = Hash01(cellX, cellY, 0x9151u + (uint)i * 61u) * 0.76f + 0.12f;
+            var radius = 0.11f + Hash01(cellX, cellY, 0xa161u + (uint)i * 43u) * 0.09f;
+            var distance = Distance01(u, v, cx, cy);
+            if (distance < radius && coarse > 0.40f)
+            {
+                color = color.Lerp(moss, 0.14f + (1f - distance / radius) * 0.18f);
+            }
+        }
+
+        if (fine < 0.12f)
+        {
+            color = color.Lerp(new Color(0.00f, 0.14f, 0.05f, baseColor.A), 0.14f);
+        }
+
+        return color;
+    }
+
+    private static Color ApplyForestDenseCenterCanopy(Color color, int cellX, int cellY, float u, float v, Color baseColor, float fine)
+    {
+        var distance = Distance01(u, v, 0.5f, 0.5f);
+        var canopy = Math.Clamp(1f - distance / 0.52f, 0f, 1f);
+        color = color.Lerp(new Color(0.00f, 0.13f, 0.045f, baseColor.A), canopy * 0.34f);
+
+        for (var i = 0; i < 4; i++)
+        {
+            var angle = Hash01(cellX, cellY, 0xb181u + (uint)i * 71u) * MathF.Tau;
+            var radius = 0.10f + Hash01(cellX, cellY, 0xc191u + (uint)i * 37u) * 0.24f;
+            var cx = 0.5f + MathF.Cos(angle) * radius;
+            var cy = 0.5f + MathF.Sin(angle) * radius;
+            var leafDistance = Distance01(u, v, cx, cy);
+            if (leafDistance < 0.09f)
+            {
+                color = color.Lerp(new Color(0.06f, 0.35f, 0.12f, baseColor.A), 0.18f);
+            }
+        }
+
+        if (fine > 0.82f)
+        {
+            color = color.Lerp(new Color(0.12f, 0.48f, 0.16f, baseColor.A), 0.12f);
+        }
+
+        return color;
+    }
+
+    private static Color ApplyForestEdgeCanopy(Color color, int cellX, int cellY, float u, float v, Color baseColor, float fine)
+    {
+        var edge = MathF.Min(MathF.Min(u, 1f - u), MathF.Min(v, 1f - v));
+        var edgeAmount = Math.Clamp(1f - edge / 0.28f, 0f, 1f);
+        color = color.Lerp(new Color(0.00f, 0.12f, 0.045f, baseColor.A), edgeAmount * 0.34f);
+
+        for (var i = 0; i < 5; i++)
+        {
+            var side = (int)(Hash01(cellX, cellY, 0xd1a1u + (uint)i * 43u) * 4f);
+            var along = Hash01(cellX, cellY, 0xe1b1u + (uint)i * 59u) * 0.86f + 0.07f;
+            var cx = side switch
+            {
+                0 => 0.10f,
+                1 => 0.90f,
+                _ => along
+            };
+            var cy = side switch
+            {
+                2 => 0.10f,
+                3 => 0.90f,
+                _ => along
+            };
+            if (Distance01(u, v, cx, cy) < 0.085f)
+            {
+                color = color.Lerp(new Color(0.08f, 0.36f, 0.13f, baseColor.A), 0.18f);
+            }
+        }
+
+        if (fine > 0.88f)
+        {
+            color = color.Lerp(new Color(0.12f, 0.42f, 0.14f, baseColor.A), 0.12f);
+        }
+
+        return color;
+    }
+
+    private static float BiomeTextureWaveStrength(BiomeKind biome)
+    {
+        return biome switch
+        {
+            BiomeKind.Desert => 0.055f,
+            BiomeKind.Wetland => 0.050f,
+            BiomeKind.Tundra => 0.038f,
+            BiomeKind.Highland => 0.042f,
+            _ => 0.032f
+        };
+    }
+
+    private static float BiomeTextureFleckAmount(BiomeKind biome, float fine, float coarse, float u, float v, float cellHash)
+    {
+        var diagonal = MathF.Abs(((u + v + cellHash) % 1f) - 0.5f);
+        return biome switch
+        {
+            BiomeKind.Desert => fine > 0.90f ? 0.20f : 0f,
+            BiomeKind.Scrubland => fine > 0.86f || diagonal < 0.018f && coarse > 0.72f ? 0.18f : 0f,
+            BiomeKind.Grassland => fine > 0.88f ? 0.16f : 0f,
+            BiomeKind.Fertile => fine > 0.82f ? 0.20f : 0f,
+            BiomeKind.Forest => fine > 0.80f || coarse > 0.88f ? 0.18f : 0f,
+            BiomeKind.Wetland => diagonal < 0.026f && coarse > 0.58f ? 0.22f : fine > 0.93f ? 0.14f : 0f,
+            BiomeKind.Tundra => fine > 0.87f ? 0.18f : 0f,
+            BiomeKind.Highland => fine > 0.84f ? 0.20f : 0f,
+            _ => fine > 0.88f ? 0.14f : 0f
+        };
+    }
+
+    private static Color BiomeTextureAccentColor(BiomeKind biome, Color baseColor)
+    {
+        return biome switch
+        {
+            BiomeKind.Desert => new Color(0.96f, 0.82f, 0.48f, baseColor.A),
+            BiomeKind.Scrubland => new Color(0.74f, 0.70f, 0.36f, baseColor.A),
+            BiomeKind.Grassland => new Color(0.34f, 0.64f, 0.22f, baseColor.A),
+            BiomeKind.Fertile => new Color(0.12f, 0.72f, 0.26f, baseColor.A),
+            BiomeKind.Forest => new Color(0.02f, 0.32f, 0.11f, baseColor.A),
+            BiomeKind.Wetland => new Color(0.06f, 0.58f, 0.70f, baseColor.A),
+            BiomeKind.Tundra => new Color(0.78f, 0.86f, 0.88f, baseColor.A),
+            BiomeKind.Highland => new Color(0.68f, 0.62f, 0.48f, baseColor.A),
+            _ => new Color(0.34f, 0.62f, 0.22f, baseColor.A)
+        };
+    }
+
+    private static Color AdjustColorValue(Color color, float amount)
+    {
+        return new Color(
+            Mathf.Clamp(color.R + amount, 0f, 1f),
+            Mathf.Clamp(color.G + amount, 0f, 1f),
+            Mathf.Clamp(color.B + amount, 0f, 1f),
+            color.A);
+    }
+
+    private static float Distance01(float x, float y, float centerX, float centerY)
+    {
+        var dx = x - centerX;
+        var dy = y - centerY;
+        return MathF.Sqrt(dx * dx + dy * dy);
+    }
+
+    private static float SignedLineDistance(float x, float y, float centerX, float centerY, float angle)
+    {
+        var dx = x - centerX;
+        var dy = y - centerY;
+        var normalX = -MathF.Sin(angle);
+        var normalY = MathF.Cos(angle);
+        return dx * normalX + dy * normalY;
+    }
+
+    private static float AlongLineDistance(float x, float y, float centerX, float centerY, float angle)
+    {
+        var dx = x - centerX;
+        var dy = y - centerY;
+        return dx * MathF.Cos(angle) + dy * MathF.Sin(angle);
+    }
+
+    private static float Hash01(int x, int y, uint salt)
+    {
+        unchecked
+        {
+            var hash = (uint)x * 374761393u + (uint)y * 668265263u + salt;
+            hash = (hash ^ (hash >> 13)) * 1274126177u;
+            hash ^= hash >> 16;
+            return (hash & 0x00ffffffu) / 16777215f;
+        }
     }
 
     private void DrawStatsGraph()
@@ -3559,6 +3914,12 @@ public partial class Main : Node2D
 
         var focusOwner = GetViewport().GuiGetFocusOwner();
         return focusOwner is LineEdit or SpinBox or TextEdit or OptionButton;
+    }
+
+    private bool IsTextInputFocused()
+    {
+        var focusOwner = GetViewport().GuiGetFocusOwner();
+        return focusOwner is LineEdit or SpinBox or TextEdit;
     }
 
     private void ZoomAt(Vector2 screenPosition, float factor)
