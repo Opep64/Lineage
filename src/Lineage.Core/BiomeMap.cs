@@ -478,7 +478,7 @@ public sealed class BiomeMap
             BiomeKind.Grassland => 1f,
             BiomeKind.Fertile => 2.4f,
             BiomeKind.Forest => 1.25f,
-            BiomeKind.Wetland => 1.6f,
+            BiomeKind.Wetland => 2.05f,
             BiomeKind.Tundra => 0.2f,
             BiomeKind.Highland => 0.45f,
             _ => 1f
@@ -494,7 +494,7 @@ public sealed class BiomeMap
             BiomeKind.Grassland => 1f,
             BiomeKind.Fertile => 1.5f,
             BiomeKind.Forest => 1.1f,
-            BiomeKind.Wetland => 1.25f,
+            BiomeKind.Wetland => 1.45f,
             BiomeKind.Tundra => 0.45f,
             BiomeKind.Highland => 0.7f,
             _ => 1f

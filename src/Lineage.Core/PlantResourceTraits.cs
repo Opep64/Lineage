@@ -81,7 +81,7 @@ public static class PlantResourceTraits
                 BiomeKind.Grassland => 1.7f,
                 BiomeKind.Fertile => 1.4f,
                 BiomeKind.Forest => 1.35f,
-                BiomeKind.Wetland => 1.25f,
+                BiomeKind.Wetland => 1.45f,
                 BiomeKind.Tundra => 0.5f,
                 BiomeKind.Highland => 0.9f,
                 _ => 1.0f
@@ -93,7 +93,7 @@ public static class PlantResourceTraits
                 BiomeKind.Grassland => 0.75f,
                 BiomeKind.Fertile => 2.2f,
                 BiomeKind.Forest => 1.85f,
-                BiomeKind.Wetland => 1.65f,
+                BiomeKind.Wetland => 2.05f,
                 BiomeKind.Tundra => 0.15f,
                 BiomeKind.Highland => 0.4f,
                 _ => 0.8f
@@ -105,7 +105,7 @@ public static class PlantResourceTraits
                 BiomeKind.Grassland => 0.85f,
                 BiomeKind.Fertile => 0.35f,
                 BiomeKind.Forest => 0.65f,
-                BiomeKind.Wetland => 0.55f,
+                BiomeKind.Wetland => 0.45f,
                 BiomeKind.Tundra => 1.6f,
                 BiomeKind.Highland => 1.4f,
                 _ => 0.65f
