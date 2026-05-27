@@ -17,6 +17,7 @@ public sealed partial class LineageRunManager
     private const string UserScenarioRegistryFileName = ".lineage-runner-scenarios.json";
     private const int CliStatusIntervalTicks = 100;
     private const int CliStatusDetailIntervalTicks = 5000;
+    private const int MaxBiomePreviewCells = 40_000;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -182,6 +183,76 @@ public sealed partial class LineageRunManager
         }
 
         return BuildScenarioEditor(resolvedPath);
+    }
+
+    public BiomeMapPreview GetBiomeMapPreview(BiomeMapPreviewRequest request)
+    {
+        if (request.Scenario.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            throw new ArgumentException("Scenario JSON is required.");
+        }
+
+        var scenario = SimulationScenarioJson.FromJson(request.Scenario.GetRawText());
+        if (request.Seed is { } seed)
+        {
+            scenario = scenario with { Seed = seed };
+        }
+
+        scenario = scenario.Validated();
+        var previewCellCountX = scenario.EnableBiomes
+            ? Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.BiomeCellSize))
+            : 1;
+        var previewCellCountY = scenario.EnableBiomes
+            ? Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.BiomeCellSize))
+            : 1;
+        var previewCellCount = (long)previewCellCountX * previewCellCountY;
+        if (previewCellCount > MaxBiomePreviewCells)
+        {
+            throw new ArgumentException(
+                $"Biome preview would contain {previewCellCount.ToString("N0", CultureInfo.InvariantCulture)} cells. Increase biomeCellSize or reduce world size for launcher preview.");
+        }
+
+        var map = CreatePreviewBiomeMap(scenario);
+        var cells = map.GetCellsCopy()
+            .Select(FormatBiomeKind)
+            .ToArray();
+        var areaByBiome = BiomeKinds.All.ToDictionary(
+            static biome => biome,
+            static _ => 0f);
+        var countByBiome = BiomeKinds.All.ToDictionary(
+            static biome => biome,
+            static _ => 0);
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                var kind = BiomeKinds.Canonicalize(map.GetKind(x, y));
+                countByBiome[kind]++;
+                areaByBiome[kind] += map.GetCellBounds(x, y).Area;
+            }
+        }
+
+        var worldArea = MathF.Max(1f, map.Bounds.Width * map.Bounds.Height);
+        var biomes = BiomeKinds.All
+            .Select(biome => new BiomeMapPreviewSummary(
+                FormatBiomeKind(biome),
+                BiomeColor(biome),
+                countByBiome[biome],
+                areaByBiome[biome] / worldArea))
+            .ToArray();
+
+        return new BiomeMapPreview(
+            scenario.EnableBiomes,
+            scenario.BiomeMapKind.ToString(),
+            scenario.Seed,
+            map.Bounds.Width,
+            map.Bounds.Height,
+            map.CellSize,
+            map.CellCountX,
+            map.CellCountY,
+            map.ResourceVoidBorderWidth,
+            cells,
+            biomes);
     }
 
     public ScenarioSaveResult SaveUserScenario(ScenarioSaveRequest request)
@@ -1831,6 +1902,66 @@ public sealed partial class LineageRunManager
             Path.GetRelativePath(_repoRoot, resolvedPath),
             scenarioObject,
             ScenarioFieldDefinitions);
+    }
+
+    private static BiomeMap CreatePreviewBiomeMap(SimulationScenario scenario)
+    {
+        var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
+        if (!scenario.EnableBiomes)
+        {
+            return BiomeMap.CreateUniform(
+                bounds,
+                MathF.Max(scenario.WorldWidth, scenario.WorldHeight),
+                BiomeKind.Grassland,
+                scenario.ResourceVoidBorderWidth);
+        }
+
+        return scenario.BiomeMapKind switch
+        {
+            BiomeMapKind.NaturalClimate => BiomeMap.GenerateNaturalClimate(
+                bounds,
+                scenario.BiomeCellSize,
+                scenario.Seed,
+                scenario.ResourceVoidBorderWidth),
+            BiomeMapKind.HorizontalBands
+                or BiomeMapKind.VerticalBands
+                or BiomeMapKind.HorizontalEdgeBands
+                or BiomeMapKind.VerticalEdgeBands
+                or BiomeMapKind.HorizontalEdgeLadderBands
+                or BiomeMapKind.VerticalEdgeLadderBands
+                or BiomeMapKind.VerticalEdgeCorridorBands
+                or BiomeMapKind.VerticalEdgeWideCorridorBands => BiomeMap.GenerateBands(
+                bounds,
+                scenario.BiomeCellSize,
+                scenario.BiomeMapKind,
+                scenario.ResourceVoidBorderWidth),
+            _ => BiomeMap.Generate(
+                bounds,
+                scenario.BiomeCellSize,
+                scenario.Seed,
+                scenario.ResourceVoidBorderWidth)
+        };
+    }
+
+    private static string FormatBiomeKind(BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome).ToString();
+    }
+
+    private static string BiomeColor(BiomeKind biome)
+    {
+        return BiomeKinds.Canonicalize(biome) switch
+        {
+            BiomeKind.Desert => "#c7b56f",
+            BiomeKind.Scrubland => "#8d8d49",
+            BiomeKind.Grassland => "#58ad57",
+            BiomeKind.Fertile => "#2f8f43",
+            BiomeKind.Forest => "#123d22",
+            BiomeKind.Wetland => "#2e8a8a",
+            BiomeKind.Tundra => "#b4c2c5",
+            BiomeKind.Highland => "#887b68",
+            _ => "#58ad57"
+        };
     }
 
     private string ResolveCloneScenarioPath(RunManifest manifest)

@@ -41,6 +41,29 @@ public sealed record ScenarioDeleteResult(
     string Path,
     string ArchivedPath);
 
+public sealed record BiomeMapPreviewRequest(
+    JsonElement Scenario,
+    ulong? Seed);
+
+public sealed record BiomeMapPreview(
+    bool Enabled,
+    string MapKind,
+    ulong Seed,
+    double WorldWidth,
+    double WorldHeight,
+    double CellSize,
+    int CellCountX,
+    int CellCountY,
+    double ResourceVoidBorderWidth,
+    IReadOnlyList<string> Cells,
+    IReadOnlyList<BiomeMapPreviewSummary> Biomes);
+
+public sealed record BiomeMapPreviewSummary(
+    string Name,
+    string Color,
+    int CellCount,
+    double AreaShare);
+
 public sealed record ScenarioRecipe(
     string Name,
     string Path,

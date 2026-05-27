@@ -89,6 +89,18 @@ api.MapGet("/scenario-editor", (string path, LineageRunManager manager) =>
     }
 });
 
+api.MapPost("/scenario-preview/biome-map", (BiomeMapPreviewRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.GetBiomeMapPreview(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
 
 api.MapPost("/runs/export", (RunExportRequest request, LineageRunManager manager) =>

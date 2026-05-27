@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260525-recipe-picker">
+  <link rel="stylesheet" href="/styles.css?v=20260527-biome-preview-collapse">
 </head>
 <body>
   <header class="app-header">
@@ -44,6 +44,25 @@
       <div class="scenario-options-header">
         <button id="scenarioOptionsToggle" class="secondary" type="button">Scenario Options</button>
         <span id="scenarioOptionsStatus" class="scenario-options-status"></span>
+      </div>
+      <div id="biomePreview" class="biome-preview">
+        <div class="biome-preview-header">
+          <div>
+            <h3>Biome Preview</h3>
+            <div id="biomePreviewMeta" class="biome-preview-meta"></div>
+          </div>
+          <div class="biome-preview-actions">
+            <button id="toggleBiomePreviewButton" class="secondary" type="button" aria-expanded="true" aria-controls="biomePreviewContent">Hide Map</button>
+            <button id="refreshBiomePreviewButton" class="secondary" type="button">Refresh Map</button>
+          </div>
+        </div>
+        <div id="biomePreviewContent" class="biome-preview-content">
+          <div class="biome-preview-body">
+            <canvas id="biomePreviewCanvas" aria-label="Biome map preview"></canvas>
+            <div id="biomePreviewLegend" class="biome-preview-legend"></div>
+          </div>
+          <div id="biomePreviewStatus" class="biome-preview-status">Choose a scenario to preview its biome layout.</div>
+        </div>
       </div>
       <div id="scenarioOptionsPanel" class="scenario-options-panel" hidden>
         <div class="recipe-panel">
@@ -177,6 +196,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260526-artifact-size-sort"></script>
+  <script src="/app.js?v=20260527-biome-preview-collapse"></script>
 </body>
 </html>

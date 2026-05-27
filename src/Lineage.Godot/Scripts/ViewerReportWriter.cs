@@ -466,6 +466,7 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
 
         WriteBiomePreferenceSection(writer, snapshots, biomeSummaries, worldArea);
+        WriteBiomePreferenceByGenerationSection(writer, state.Creatures, state.Biomes, biomeSummaries, worldArea);
 
         WriteDeathCausesByBiomeSection(writer, state.Stats.CreatureDeathCausesByBiome);
 
@@ -2327,8 +2328,9 @@ public static class ViewerReportWriter
         var averagePlantCalories = Average(tailSnapshots, snapshot => snapshot.TotalPlantCalories);
         var averageCaloriesEaten = Average(tailSnapshots, snapshot => snapshot.TotalCaloriesEatenPerSecond);
         var lateDeaths = Math.Max(0, last.CreatureDeathCount - first.CreatureDeathCount);
+        var activeBiomeSummaries = ActiveBiomeSummaries(biomeSummaries);
 
-        foreach (var summary in biomeSummaries)
+        foreach (var summary in activeBiomeSummaries)
         {
             var areaShare = summary.Area / worldArea;
             var averageLiving = Average(tailSnapshots, snapshot => CreatureCountForBiome(snapshot, summary.Kind));
@@ -2362,6 +2364,83 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteBiomePreferenceByGenerationSection(
+        TextWriter writer,
+        IReadOnlyList<CreatureState> creatures,
+        BiomeMap biomes,
+        IReadOnlyList<BiomeSummary> biomeSummaries,
+        float worldArea)
+    {
+        var bands = GenerationBiomePreferenceBand.Defaults;
+        var activeBiomeSummaries = ActiveBiomeSummaries(biomeSummaries);
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Biome Preference by Generation</h2>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Generation Band</th><th>Living</th><th>Biome</th><th>Band Share</th><th>Area Share</th><th>Preference</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+
+        if (creatures.Count == 0)
+        {
+            writer.WriteLine("<tr><td colspan=\"6\" class=\"empty\">No living creatures remain.</td></tr>");
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        foreach (var band in bands)
+        {
+            var bandCreatures = creatures
+                .Where(creature => band.Contains(creature.Generation))
+                .ToArray();
+
+            if (bandCreatures.Length == 0)
+            {
+                writer.WriteLine(
+                    "<tr>" +
+                    $"<td>{Html(band.Label)}</td>" +
+                    "<td>0</td>" +
+                    "<td colspan=\"4\" class=\"empty\">No living creatures in this generation band.</td>" +
+                    "</tr>");
+                continue;
+            }
+
+            foreach (var summary in activeBiomeSummaries)
+            {
+                var canonicalBiome = BiomeKinds.Canonicalize(summary.Kind);
+                var livingInBiome = bandCreatures.Count(creature =>
+                    BiomeKinds.Canonicalize(biomes.GetKindAt(creature.Position)) == canonicalBiome);
+                var bandShare = Share(livingInBiome, bandCreatures.Length);
+                var areaShare = summary.Area / worldArea;
+                var preference = areaShare > 0f ? bandShare / areaShare : 0f;
+
+                writer.WriteLine(
+                    "<tr>" +
+                    $"<td>{Html(band.Label)}</td>" +
+                    $"<td>{Html(livingInBiome)} / {Html(bandCreatures.Length)}</td>" +
+                    $"<td>{Html(FormatBiomeKind(summary.Kind))}</td>" +
+                    $"<td>{Html(FormatPercent(bandShare))}</td>" +
+                    $"<td>{Html(FormatPercent(areaShare))}</td>" +
+                    $"<td>{Html(preference.ToString("0.##", CultureInfo.InvariantCulture))}x</td>" +
+                    "</tr>");
+            }
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static BiomeSummary[] ActiveBiomeSummaries(IReadOnlyList<BiomeSummary> biomeSummaries)
+    {
+        var active = biomeSummaries
+            .Where(summary => summary.Area > 0f)
+            .ToArray();
+
+        return active.Length > 0
+            ? active
+            : biomeSummaries.ToArray();
+    }
+
     private static float Average(IReadOnlyList<SimulationStatsSnapshot> snapshots, Func<SimulationStatsSnapshot, float> selector)
     {
         if (snapshots.Count == 0)
@@ -2376,6 +2455,22 @@ public static class ViewerReportWriter
         }
 
         return total / snapshots.Count;
+    }
+
+    private readonly record struct GenerationBiomePreferenceBand(string Label, int MinGeneration, int? MaxGeneration)
+    {
+        public static readonly GenerationBiomePreferenceBand[] Defaults =
+        [
+            new("0-5", 0, 5),
+            new("6-15", 6, 15),
+            new("16+", 16, null)
+        ];
+
+        public bool Contains(int generation)
+        {
+            return generation >= MinGeneration
+                && (!MaxGeneration.HasValue || generation <= MaxGeneration.Value);
+        }
     }
 
     private static float PlantCaloriesForBiome(SimulationStatsSnapshot snapshot, BiomeKind biome)
