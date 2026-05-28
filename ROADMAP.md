@@ -172,6 +172,7 @@ Status: first pass implemented, future refinement needed
 - Improve species/cluster thresholds without implying false precision.
 - Distinguish lineage relatedness from behavioral convergence.
 - Use functional brain fingerprints for future richer brain architectures.
+- Upgrade biome risk/reward reporting to use sampled creature-hour exposure for whole-run normalized metrics: births, deaths, plant calories, meat/egg calories, and attack damage per creature-hour, plus exposure index by biome. Use this before the next serious 500k+ natural/manual map biome tuning pass.
 - Add ecosystem health metrics:
   - energy flow
   - biomass
