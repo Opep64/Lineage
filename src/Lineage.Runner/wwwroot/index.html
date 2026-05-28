@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260527-biome-preview-collapse">
+  <link rel="stylesheet" href="/styles.css?v=20260527-map-painter-walls2">
 </head>
 <body>
   <header class="app-header">
@@ -52,6 +52,26 @@
             <div id="biomePreviewMeta" class="biome-preview-meta"></div>
           </div>
           <div class="biome-preview-actions">
+            <label class="biome-brush-label">
+              Layer
+              <select id="paintLayerSelect" disabled>
+                <option value="biome">Biomes</option>
+                <option value="obstacle">Walls</option>
+              </select>
+            </label>
+            <label class="biome-brush-label">
+              Brush
+              <select id="biomeBrushSelect" disabled></select>
+            </label>
+            <label class="biome-brush-label">
+              Wall
+              <select id="obstacleBrushSelect" disabled>
+                <option value="add">Add</option>
+                <option value="erase">Erase</option>
+              </select>
+            </label>
+            <button id="paintBiomeMapButton" class="secondary" type="button" disabled>Paint Map</button>
+            <button id="saveManualBiomeMapButton" class="secondary" type="button" disabled>Save Manual Copy</button>
             <button id="toggleBiomePreviewButton" class="secondary" type="button" aria-expanded="true" aria-controls="biomePreviewContent">Hide Map</button>
             <button id="refreshBiomePreviewButton" class="secondary" type="button">Refresh Map</button>
           </div>
@@ -196,6 +216,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260527-biome-preview-collapse"></script>
+  <script src="/app.js?v=20260527-map-painter-walls2"></script>
 </body>
 </html>

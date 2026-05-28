@@ -98,6 +98,7 @@ Godot should continue to own:
 - Compare runs in a table.
 - Open linked HTML reports, CSVs, snapshots, and checkpoint folders.
 - Aggregate repeated seeds or variants.
+- Future HTML reports should add spatial heatmaps for occupancy, deaths by cause, food consumption, births/eggs, and successful lineages so authored map layouts can be judged by where risk and reward actually occurred.
 
 ### Reopen In Godot
 

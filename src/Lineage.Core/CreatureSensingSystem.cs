@@ -20,7 +20,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumPlantQualityClarity = 0.04f;
     private const float CreatureSimilarityScentRangeMultiplier = 1.5f;
     private const float CreatureSimilarityScentDensitySaturation = 1f;
-    public const int DefaultWorldSenseIntervalTicks = 4;
+    public const int DefaultWorldSenseIntervalTicks = 10;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const bool DefaultEnableSectorVision = false;
     public const float DefaultPlantPayoffTraceHalfLifeSeconds = 45f;

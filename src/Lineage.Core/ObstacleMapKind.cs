@@ -8,5 +8,6 @@ public enum ObstacleMapKind
     None,
     VerticalBarrierWithGaps,
     HorizontalBarrierWithGaps,
-    ScatteredRocks
+    ScatteredRocks,
+    Manual
 }

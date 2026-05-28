@@ -199,20 +199,25 @@ public sealed partial class LineageRunManager
         }
 
         scenario = scenario.Validated();
-        var previewCellCountX = scenario.EnableBiomes
-            ? Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.BiomeCellSize))
-            : 1;
-        var previewCellCountY = scenario.EnableBiomes
-            ? Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.BiomeCellSize))
-            : 1;
-        var previewCellCount = (long)previewCellCountX * previewCellCountY;
+        var scenarioDirectory = ResolveScenarioDirectory(request.ScenarioPath);
+        var map = SimulationScenarioFactory.CreateBiomeMap(
+            scenario,
+            scenarioDirectory);
+        var obstacleMap = SimulationScenarioFactory.CreateObstacleMap(scenario, scenarioDirectory);
+        var previewCellCount = (long)map.CellCountX * map.CellCountY;
         if (previewCellCount > MaxBiomePreviewCells)
         {
             throw new ArgumentException(
                 $"Biome preview would contain {previewCellCount.ToString("N0", CultureInfo.InvariantCulture)} cells. Increase biomeCellSize or reduce world size for launcher preview.");
         }
 
-        var map = CreatePreviewBiomeMap(scenario);
+        var obstaclePreviewCellCount = (long)obstacleMap.CellCountX * obstacleMap.CellCountY;
+        if (obstaclePreviewCellCount > MaxBiomePreviewCells)
+        {
+            throw new ArgumentException(
+                $"Obstacle preview would contain {obstaclePreviewCellCount.ToString("N0", CultureInfo.InvariantCulture)} cells. Increase obstacleCellSize or reduce world size for launcher preview.");
+        }
+
         var cells = map.GetCellsCopy()
             .Select(FormatBiomeKind)
             .ToArray();
@@ -252,7 +257,123 @@ public sealed partial class LineageRunManager
             map.CellCountY,
             map.ResourceVoidBorderWidth,
             cells,
+            scenario.EnableObstacles,
+            scenario.ObstacleMapKind.ToString(),
+            obstacleMap.CellSize,
+            obstacleMap.CellCountX,
+            obstacleMap.CellCountY,
+            obstacleMap.BlockedCellCount,
+            obstacleMap.GetCellsCopy(),
             biomes);
+    }
+
+    public ManualBiomeMapSaveResult SaveManualBiomeMap(ManualBiomeMapSaveRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Manual map scenario name is required.");
+        }
+
+        if (request.Scenario.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            throw new ArgumentException("Scenario JSON is required.");
+        }
+
+        var scenario = SimulationScenarioJson.FromJson(request.Scenario.GetRawText());
+        if (request.Seed is { } seed)
+        {
+            scenario = scenario with { Seed = seed };
+        }
+
+        var scenarioDirectory = ResolveScenarioDirectory(request.ScenarioPath);
+        scenario = scenario.Validated();
+        var map = scenario.EnableBiomes
+            ? request.Cells is { Count: > 0 }
+                ? CreateBiomeMapFromEditedCells(scenario, request.Cells)
+                : SimulationScenarioFactory.CreateBiomeMap(scenario, scenarioDirectory)
+            : null;
+        var obstacleMap = request.ObstacleCells is { Count: > 0 }
+            ? CreateObstacleMapFromEditedCells(scenario, request.ObstacleCells)
+            : SimulationScenarioFactory.CreateObstacleMap(scenario, scenarioDirectory);
+
+        var userScenarioRoot = UserScenarioRoot();
+        var userMapRoot = Path.Combine(userScenarioRoot, "maps");
+        Directory.CreateDirectory(userScenarioRoot);
+        Directory.CreateDirectory(userMapRoot);
+
+        var slug = Slugify(name);
+        string? mapPath = null;
+        string? manualBiomeMapPath = null;
+        if (map is not null)
+        {
+            mapPath = GetUniquePath(Path.Combine(userMapRoot, $"{slug}_map.json"));
+            EnsurePathInside(mapPath, userScenarioRoot);
+            ManualBiomeMapJson.Save(
+                mapPath,
+                ManualBiomeMapDocument.FromBiomeMap(
+                    map,
+                    name,
+                    scenario.BiomeMapKind,
+                    scenario.Seed));
+
+            manualBiomeMapPath = Path.GetRelativePath(userScenarioRoot, mapPath).Replace('\\', '/');
+        }
+
+        string? obstacleMapPath = null;
+        string? manualObstacleMapPath = null;
+        if (obstacleMap.BlockedCellCount > 0)
+        {
+            obstacleMapPath = GetUniquePath(Path.Combine(userMapRoot, $"{slug}_obstacles.json"));
+            EnsurePathInside(obstacleMapPath, userScenarioRoot);
+            ManualObstacleMapJson.Save(
+                obstacleMapPath,
+                ManualObstacleMapDocument.FromObstacleMap(
+                    obstacleMap,
+                    name,
+                    scenario.ObstacleMapKind,
+                    scenario.Seed));
+
+            manualObstacleMapPath = Path.GetRelativePath(userScenarioRoot, obstacleMapPath).Replace('\\', '/');
+        }
+
+        var savedScenario = scenario with
+        {
+            Name = name,
+            EnableBiomes = map is not null,
+            BiomeMapKind = map is not null ? BiomeMapKind.Manual : scenario.BiomeMapKind,
+            ManualBiomeMapPath = manualBiomeMapPath,
+            EnableObstacles = obstacleMap.BlockedCellCount > 0,
+            ObstacleMapKind = obstacleMap.BlockedCellCount > 0 ? ObstacleMapKind.Manual : ObstacleMapKind.None,
+            ManualObstacleMapPath = manualObstacleMapPath
+        };
+
+        var scenarioPath = GetUniquePath(Path.Combine(userScenarioRoot, $"{slug}.json"));
+        EnsurePathInside(scenarioPath, userScenarioRoot);
+        SimulationScenarioJson.Save(scenarioPath, savedScenario);
+
+        var relativePath = NormalizeRelativePath(Path.GetRelativePath(_repoRoot, scenarioPath));
+        var now = DateTimeOffset.UtcNow;
+        var registry = LoadUserScenarioRegistry();
+        registry.Scenarios[relativePath] = new UserScenarioRegistryEntry
+        {
+            Path = relativePath,
+            Name = name,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        SaveUserScenarioRegistry(registry);
+
+        var option = new ScenarioOption(
+            name,
+            relativePath,
+            IsUserCreated: true,
+            CanDelete: true);
+        return new ManualBiomeMapSaveResult(
+            option,
+            BuildScenarioEditor(scenarioPath),
+            mapPath is null ? null : NormalizeRelativePath(Path.GetRelativePath(_repoRoot, mapPath)),
+            obstacleMapPath is null ? null : NormalizeRelativePath(Path.GetRelativePath(_repoRoot, obstacleMapPath)));
     }
 
     public ScenarioSaveResult SaveUserScenario(ScenarioSaveRequest request)
@@ -497,7 +618,7 @@ public sealed partial class LineageRunManager
         var seed = request.Seed ?? TryReadScenarioSeed(request.Scenario) ?? TryReadScenarioSeed(scenarioPath);
         var id = $"{createdAt:yyyyMMdd_HHmmss}_{Slugify(scenarioName)}_{ProcessIdToken}";
         var runDirectory = Path.Combine(_runsRoot, id);
-        var launchScenarioPath = WriteLaunchScenarioIfProvided(request.Scenario, createdAt, scenarioName);
+        var launchScenarioPath = WriteLaunchScenarioIfProvided(request.Scenario, createdAt, scenarioName, scenarioPath);
         var loadSnapshotPath = ResolveLoadSnapshotPath(request.LoadSnapshotPath);
 
         var manifest = new RunManifest
@@ -622,7 +743,11 @@ public sealed partial class LineageRunManager
         }
     }
 
-    private string WriteLaunchScenarioIfProvided(JsonElement? scenarioElement, DateTimeOffset createdAt, string scenarioName)
+    private string WriteLaunchScenarioIfProvided(
+        JsonElement? scenarioElement,
+        DateTimeOffset createdAt,
+        string scenarioName,
+        string sourceScenarioPath)
     {
         if (scenarioElement is null
             || scenarioElement.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
@@ -631,6 +756,26 @@ public sealed partial class LineageRunManager
         }
 
         var scenario = SimulationScenarioJson.FromJson(scenarioElement.Value.GetRawText());
+        if (!string.IsNullOrWhiteSpace(scenario.ManualBiomeMapPath))
+        {
+            scenario = scenario with
+            {
+                ManualBiomeMapPath = SimulationScenarioFactory.ResolveManualBiomeMapPath(
+                    scenario.ManualBiomeMapPath,
+                    Path.GetDirectoryName(sourceScenarioPath))
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(scenario.ManualObstacleMapPath))
+        {
+            scenario = scenario with
+            {
+                ManualObstacleMapPath = SimulationScenarioFactory.ResolveManualObstacleMapPath(
+                    scenario.ManualObstacleMapPath,
+                    Path.GetDirectoryName(sourceScenarioPath))
+            };
+        }
+
         var launchScenarioDirectory = Path.Combine(_runsRoot, "_launch_scenarios");
         Directory.CreateDirectory(launchScenarioDirectory);
         var launchScenarioPath = Path.Combine(
@@ -1656,6 +1801,69 @@ public sealed partial class LineageRunManager
         return Path.GetFullPath(path);
     }
 
+    private string? ResolveScenarioDirectory(string? scenarioPath)
+    {
+        return string.IsNullOrWhiteSpace(scenarioPath)
+            ? null
+            : Path.GetDirectoryName(ResolveScenarioPath(scenarioPath));
+    }
+
+    private static BiomeMap CreateBiomeMapFromEditedCells(
+        SimulationScenario scenario,
+        IReadOnlyList<string> cells)
+    {
+        var cellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.BiomeCellSize));
+        var cellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.BiomeCellSize));
+        var expectedCellCount = cellCountX * cellCountY;
+        if (cells.Count != expectedCellCount)
+        {
+            throw new ArgumentException(
+                $"Edited biome map has {cells.Count} cells, but the scenario expects {expectedCellCount}.");
+        }
+
+        var parsedCells = cells
+            .Select(ParseBiomeKindName)
+            .ToArray();
+        return BiomeMap.CreateFromCells(
+            new WorldBounds(scenario.WorldWidth, scenario.WorldHeight),
+            scenario.BiomeCellSize,
+            cellCountX,
+            cellCountY,
+            parsedCells,
+            scenario.ResourceVoidBorderWidth);
+    }
+
+    private static ObstacleMap CreateObstacleMapFromEditedCells(
+        SimulationScenario scenario,
+        IReadOnlyList<bool> cells)
+    {
+        var cellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.ObstacleCellSize));
+        var cellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.ObstacleCellSize));
+        var expectedCellCount = cellCountX * cellCountY;
+        if (cells.Count != expectedCellCount)
+        {
+            throw new ArgumentException(
+                $"Edited obstacle map has {cells.Count} cells, but the scenario expects {expectedCellCount}.");
+        }
+
+        return ObstacleMap.CreateFromCells(
+            new WorldBounds(scenario.WorldWidth, scenario.WorldHeight),
+            scenario.ObstacleCellSize,
+            cellCountX,
+            cellCountY,
+            cells);
+    }
+
+    private static BiomeKind ParseBiomeKindName(string value)
+    {
+        if (Enum.TryParse<BiomeKind>(value, ignoreCase: true, out var kind))
+        {
+            return BiomeKinds.Canonicalize(kind);
+        }
+
+        throw new ArgumentException($"Unknown biome kind '{value}'.");
+    }
+
     private string UserScenarioRoot()
     {
         return Path.Combine(_repoRoot, "scenarios", UserScenarioFolderName);
@@ -1871,6 +2079,13 @@ public sealed partial class LineageRunManager
 
     private static string GetUniqueArchivePath(string preferredPath)
     {
+        return GetUniquePath(preferredPath, "Could not choose a unique scenario archive path.");
+    }
+
+    private static string GetUniquePath(
+        string preferredPath,
+        string failureMessage = "Could not choose a unique managed file path.")
+    {
         if (!File.Exists(preferredPath))
         {
             return preferredPath;
@@ -1888,7 +2103,7 @@ public sealed partial class LineageRunManager
             }
         }
 
-        throw new IOException("Could not choose a unique scenario archive path.");
+        throw new IOException(failureMessage);
     }
 
     private ScenarioEditorDefinition BuildScenarioEditor(string resolvedPath)
@@ -1902,45 +2117,6 @@ public sealed partial class LineageRunManager
             Path.GetRelativePath(_repoRoot, resolvedPath),
             scenarioObject,
             ScenarioFieldDefinitions);
-    }
-
-    private static BiomeMap CreatePreviewBiomeMap(SimulationScenario scenario)
-    {
-        var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
-        if (!scenario.EnableBiomes)
-        {
-            return BiomeMap.CreateUniform(
-                bounds,
-                MathF.Max(scenario.WorldWidth, scenario.WorldHeight),
-                BiomeKind.Grassland,
-                scenario.ResourceVoidBorderWidth);
-        }
-
-        return scenario.BiomeMapKind switch
-        {
-            BiomeMapKind.NaturalClimate => BiomeMap.GenerateNaturalClimate(
-                bounds,
-                scenario.BiomeCellSize,
-                scenario.Seed,
-                scenario.ResourceVoidBorderWidth),
-            BiomeMapKind.HorizontalBands
-                or BiomeMapKind.VerticalBands
-                or BiomeMapKind.HorizontalEdgeBands
-                or BiomeMapKind.VerticalEdgeBands
-                or BiomeMapKind.HorizontalEdgeLadderBands
-                or BiomeMapKind.VerticalEdgeLadderBands
-                or BiomeMapKind.VerticalEdgeCorridorBands
-                or BiomeMapKind.VerticalEdgeWideCorridorBands => BiomeMap.GenerateBands(
-                bounds,
-                scenario.BiomeCellSize,
-                scenario.BiomeMapKind,
-                scenario.ResourceVoidBorderWidth),
-            _ => BiomeMap.Generate(
-                bounds,
-                scenario.BiomeCellSize,
-                scenario.Seed,
-                scenario.ResourceVoidBorderWidth)
-        };
     }
 
     private static string FormatBiomeKind(BiomeKind biome)

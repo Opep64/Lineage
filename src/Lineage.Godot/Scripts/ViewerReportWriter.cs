@@ -466,6 +466,7 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
 
         WriteBiomePreferenceSection(writer, snapshots, biomeSummaries, worldArea);
+        WriteBiomeRiskRewardSection(writer, snapshots, biomeSummaries, worldArea);
         WriteBiomePreferenceByGenerationSection(writer, state.Creatures, state.Biomes, biomeSummaries, worldArea);
 
         WriteDeathCausesByBiomeSection(writer, state.Stats.CreatureDeathCausesByBiome);
@@ -2364,6 +2365,84 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteBiomeRiskRewardSection(
+        TextWriter writer,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyList<BiomeSummary> biomeSummaries,
+        float worldArea)
+    {
+        const int TailSnapshotCount = 100;
+
+        var tailCount = Math.Min(TailSnapshotCount, snapshots.Count);
+        var tailSnapshots = tailCount > 0
+            ? snapshots.Skip(snapshots.Count - tailCount).ToArray()
+            : Array.Empty<SimulationStatsSnapshot>();
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Biome Risk and Reward</h2>");
+        writer.WriteLine("<p class=\"biome-map-note\">Uses the last up to 100 stat snapshots. Reward index compares food-eaten share to living share; risk index compares death share to living share. Values above 1x are overrepresented for the creatures using that biome.</p>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Living Share</th><th>Preference</th><th>Plant Availability</th><th>Food / Creature / s</th><th>Reward Index</th><th>Late Deaths</th><th>Deaths / Creature Hr</th><th>Risk Index</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+
+        if (tailSnapshots.Length == 0)
+        {
+            writer.WriteLine("<tr><td colspan=\"10\" class=\"empty\">No stat snapshots were recorded.</td></tr>");
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        var first = tailSnapshots[0];
+        var last = tailSnapshots[^1];
+        var tailHours = Math.Max(0d, last.ElapsedSeconds - first.ElapsedSeconds) / 3600d;
+        var averageCreatures = Average(tailSnapshots, snapshot => snapshot.CreatureCount);
+        var averagePlantCalories = Average(tailSnapshots, snapshot => snapshot.TotalPlantCalories);
+        var averageCaloriesEaten = Average(tailSnapshots, snapshot => snapshot.TotalCaloriesEatenPerSecond);
+        var lateDeaths = Math.Max(0, last.CreatureDeathCount - first.CreatureDeathCount);
+        var activeBiomeSummaries = ActiveBiomeSummaries(biomeSummaries);
+
+        foreach (var summary in activeBiomeSummaries)
+        {
+            var areaShare = summary.Area / worldArea;
+            var averageLiving = Average(tailSnapshots, snapshot => CreatureCountForBiome(snapshot, summary.Kind));
+            var livingShare = averageCreatures > 0f ? averageLiving / averageCreatures : 0f;
+            var preference = areaShare > 0f ? livingShare / areaShare : 0f;
+            var plantCalories = Average(tailSnapshots, snapshot => PlantCaloriesForBiome(snapshot, summary.Kind));
+            var plantCaloriesShare = averagePlantCalories > 0f ? plantCalories / averagePlantCalories : 0f;
+            var plantAvailability = areaShare > 0f ? plantCaloriesShare / areaShare : 0f;
+            var eatenPerSecond = Average(tailSnapshots, snapshot => CaloriesEatenForBiome(snapshot, summary.Kind));
+            var eatenShare = averageCaloriesEaten > 0f ? eatenPerSecond / averageCaloriesEaten : 0f;
+            var foodPerCreaturePerSecond = averageLiving > 0f ? eatenPerSecond / averageLiving : 0f;
+            var rewardIndex = livingShare > 0f ? eatenShare / livingShare : float.NaN;
+            var biomeLateDeaths = Math.Max(
+                0,
+                DeathCountForBiome(last, summary.Kind) - DeathCountForBiome(first, summary.Kind));
+            var deathShare = lateDeaths > 0 ? Share(biomeLateDeaths, lateDeaths) : 0f;
+            var deathsPerCreatureHour = averageLiving > 0f && tailHours > 0d
+                ? biomeLateDeaths / (averageLiving * (float)tailHours)
+                : 0f;
+            var riskIndex = livingShare > 0f ? deathShare / livingShare : float.NaN;
+
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(FormatBiomeKind(summary.Kind))}</td>" +
+                $"<td>{Html(FormatPercent(areaShare))}</td>" +
+                $"<td>{Html(FormatPercent(livingShare))}</td>" +
+                $"<td>{Html(FormatIndex(preference))}</td>" +
+                $"<td>{Html(FormatIndex(plantAvailability))}</td>" +
+                $"<td>{Html(foodPerCreaturePerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatIndex(rewardIndex))}</td>" +
+                $"<td>{Html(biomeLateDeaths)}</td>" +
+                $"<td>{Html(deathsPerCreatureHour.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatIndex(riskIndex))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
     private static void WriteBiomePreferenceByGenerationSection(
         TextWriter writer,
         IReadOnlyList<CreatureState> creatures,
@@ -2583,6 +2662,13 @@ public static class ViewerReportWriter
     private static string FormatPercent(float value)
     {
         return $"{value * 100f:0.0}%";
+    }
+
+    private static string FormatIndex(float value)
+    {
+        return float.IsFinite(value)
+            ? $"{value.ToString("0.##", CultureInfo.InvariantCulture)}x"
+            : "n/a";
     }
 
     private static string FormatChange(string earlyValue, string finalValue)

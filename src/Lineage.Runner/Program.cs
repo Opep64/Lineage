@@ -101,6 +101,18 @@ api.MapPost("/scenario-preview/biome-map", (BiomeMapPreviewRequest request, Line
     }
 });
 
+api.MapPost("/manual-biome-maps", (ManualBiomeMapSaveRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.SaveManualBiomeMap(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
 
 api.MapPost("/runs/export", (RunExportRequest request, LineageRunManager manager) =>

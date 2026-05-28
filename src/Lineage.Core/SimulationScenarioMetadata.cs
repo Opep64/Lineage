@@ -193,6 +193,8 @@ public static class SimulationScenarioMetadata
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
             "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are no longer referenced by living creatures or eggs.",
             "ExtinctPayloadPruneIntervalTicks" => "How often extinct genome and brain payload compaction runs.",
+            "ManualBiomeMapPath" => "Manual biome map JSON used when biomeMapKind is manual.",
+            "ManualObstacleMapPath" => "Manual obstacle map JSON used when obstacleMapKind is manual.",
             "SpeciesSeeds" => "Optional authored founder roster stored as scenario JSON.",
             _ => null
         };

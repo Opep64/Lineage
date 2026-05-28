@@ -15,6 +15,7 @@ public sealed record SimulationScenario
 {
     public const ulong DefaultSeed = 20260519UL;
     public const float ResourceDensityAreaUnits = 1_000_000f;
+    public const int DefaultStatsSnapshotIntervalTicks = 300;
 
     public string Name { get; init; } = "Balanced Foraging";
 
@@ -38,9 +39,13 @@ public sealed record SimulationScenario
 
     public BiomeMapKind BiomeMapKind { get; init; } = BiomeMapKind.NaturalClimate;
 
+    public string? ManualBiomeMapPath { get; init; }
+
     public bool EnableObstacles { get; init; }
 
     public ObstacleMapKind ObstacleMapKind { get; init; } = ObstacleMapKind.None;
+
+    public string? ManualObstacleMapPath { get; init; }
 
     public float ObstacleCellSize { get; init; } = 128f;
 
@@ -68,7 +73,7 @@ public sealed record SimulationScenario
 
     public bool EnableLegacyNearestCreatureVisionInputs { get; init; } = true;
 
-    public int StatsSnapshotIntervalTicks { get; init; } = 10;
+    public int StatsSnapshotIntervalTicks { get; init; } = DefaultStatsSnapshotIntervalTicks;
 
     public bool EnableExtinctPayloadPruning { get; init; }
 
@@ -354,7 +359,21 @@ public sealed record SimulationScenario
         EnsureEnumDefined(BrainArchitectureKind, nameof(BrainArchitectureKind));
         EnsureEnumDefined(InitialBrainKind, nameof(InitialBrainKind));
         EnsureEnumDefined(BiomeMapKind, nameof(BiomeMapKind));
+        if (EnableBiomes
+            && BiomeMapKind == BiomeMapKind.Manual
+            && string.IsNullOrWhiteSpace(ManualBiomeMapPath))
+        {
+            throw new InvalidOperationException("Manual biome maps require manualBiomeMapPath.");
+        }
+
         EnsureEnumDefined(ObstacleMapKind, nameof(ObstacleMapKind));
+        if (EnableObstacles
+            && ObstacleMapKind == ObstacleMapKind.Manual
+            && string.IsNullOrWhiteSpace(ManualObstacleMapPath))
+        {
+            throw new InvalidOperationException("Manual obstacle maps require manualObstacleMapPath.");
+        }
+
         EnsureHiddenNodeCount(BrainHiddenNodeCount, nameof(BrainHiddenNodeCount));
         EnsurePositive(BiomeCellSize, nameof(BiomeCellSize));
         EnsurePositive(ObstacleCellSize, nameof(ObstacleCellSize));
@@ -507,6 +526,12 @@ public sealed record SimulationScenario
         return this with
         {
             BrainHiddenNodeCount = BrainFactory.ResolveHiddenNodeCount(BrainArchitectureKind, BrainHiddenNodeCount),
+            ManualBiomeMapPath = string.IsNullOrWhiteSpace(ManualBiomeMapPath)
+                ? null
+                : ManualBiomeMapPath.Trim(),
+            ManualObstacleMapPath = string.IsNullOrWhiteSpace(ManualObstacleMapPath)
+                ? null
+                : ManualObstacleMapPath.Trim(),
             SpeciesSeeds = speciesSeeds
         };
     }

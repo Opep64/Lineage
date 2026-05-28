@@ -163,6 +163,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario resource clustering creates local food patches", ScenarioResourceClusteringCreatesLocalFoodPatches),
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
     ("Natural climate biome maps create broad five-biome regions", NaturalClimateBiomeMapsCreateBroadFiveBiomeRegions),
+    ("Natural climate single-cell maps stay neutral", NaturalClimateSingleCellMapsStayNeutral),
     ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
@@ -171,11 +172,15 @@ var tests = new (string Name, Action Body)[]
     ("Biome map samples resources by density", BiomeMapSamplesResourcesByDensity),
     ("Resource void border excludes plant growth", ResourceVoidBorderExcludesPlantGrowth),
     ("Resource void clipped biome cells are skipped during sampling", ResourceVoidClippedBiomeCellsAreSkippedDuringSampling),
+    ("Manual biome map JSON round trips", ManualBiomeMapJsonRoundTrips),
+    ("Manual obstacle map JSON round trips", ManualObstacleMapJsonRoundTrips),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
     ("Persistent spatial rebuild removes decayed resources", PersistentSpatialRebuildRemovesDecayedResources),
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
     ("Scenario factory creates deterministic biomes", ScenarioFactoryCreatesDeterministicBiomes),
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
+    ("Scenario factory honors manual biome map path", ScenarioFactoryHonorsManualBiomeMapPath),
+    ("Scenario factory honors manual obstacle map path", ScenarioFactoryHonorsManualObstacleMapPath),
     ("Scenario factory honors natural climate biome map kind", ScenarioFactoryHonorsNaturalClimateBiomeMapKind),
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
@@ -7099,6 +7104,18 @@ static void NaturalClimateBiomeMapsCreateBroadFiveBiomeRegions()
     AssertTrue(isolatedShare < 0.04f, $"Natural climate maps should avoid isolated cell noise, saw {isolatedShare:0.00}");
 }
 
+static void NaturalClimateSingleCellMapsStayNeutral()
+{
+    var map = BiomeMap.GenerateNaturalClimate(
+        new WorldBounds(4_000f, 4_000f),
+        cellSize: 4_000f,
+        seed: SimulationScenario.DefaultSeed);
+
+    AssertEqual(1, map.CellCountX, "Single-cell natural climate count x");
+    AssertEqual(1, map.CellCountY, "Single-cell natural climate count y");
+    AssertEqual(BiomeKind.Grassland, map.GetKind(0, 0), "Single-cell natural climate biome");
+}
+
 static void BandedBiomeMapsCreateBroadRegions()
 {
     var vertical = BiomeMap.GenerateBands(
@@ -7525,6 +7542,194 @@ static void ScenarioFactoryHonorsBiomeMapKind()
     AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(0, 0), "Vertical band left edge");
     AssertEqual(BiomeKind.Rich, simulation.State.Biomes.GetKind(3, 0), "Vertical band rich center");
     AssertEqual(BiomeKind.Barren, simulation.State.Biomes.GetKind(7, 0), "Vertical band right edge");
+}
+
+static void ManualBiomeMapJsonRoundTrips()
+{
+    var map = BiomeMap.CreateFromCells(
+        new WorldBounds(300f, 200f),
+        100f,
+        3,
+        2,
+        [
+            BiomeKind.Grassland,
+            BiomeKind.Forest,
+            BiomeKind.Wetland,
+            BiomeKind.Desert,
+            BiomeKind.Fertile,
+            BiomeKind.Scrubland
+        ],
+        10f);
+    var document = ManualBiomeMapDocument.FromBiomeMap(
+        map,
+        "Painted seed 42",
+        BiomeMapKind.NaturalClimate,
+        42UL);
+
+    var json = ManualBiomeMapJson.ToJson(document);
+    var roundTripped = ManualBiomeMapJson.FromJson(json);
+    var loadedMap = roundTripped.ToBiomeMap();
+
+    AssertTrue(json.Contains("\"schemaVersion\": \"lineage.manualBiomeMap.v1\""), "Manual biome map JSON should serialize schema version");
+    AssertTrue(json.Contains("\"sourceMapKind\": \"naturalClimate\""), "Manual biome map JSON should serialize source map kind");
+    AssertTrue(json.Contains("\"forest\""), "Manual biome map JSON should serialize biome cells by name");
+    AssertEqual("Painted seed 42", roundTripped.Name, "Manual biome map name");
+    AssertEqual(BiomeMapKind.NaturalClimate, roundTripped.SourceMapKind, "Manual biome map source kind");
+    AssertEqual(42UL, roundTripped.SourceSeed ?? 0UL, "Manual biome map source seed");
+    AssertClose(map.Bounds.Width, loadedMap.Bounds.Width, 0.000001, "Manual biome map world width");
+    AssertClose(map.Bounds.Height, loadedMap.Bounds.Height, 0.000001, "Manual biome map world height");
+    AssertClose(map.CellSize, loadedMap.CellSize, 0.000001, "Manual biome map cell size");
+    AssertEqual(map.CellCountX, loadedMap.CellCountX, "Manual biome map cell count x");
+    AssertEqual(map.CellCountY, loadedMap.CellCountY, "Manual biome map cell count y");
+    AssertEqual(BiomeKind.Forest, loadedMap.GetKind(1, 0), "Manual biome map forest cell");
+    AssertEqual(BiomeKind.Scrubland, loadedMap.GetKind(2, 1), "Manual biome map scrubland cell");
+}
+
+static void ScenarioFactoryHonorsManualBiomeMapPath()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_manual_biome_{Guid.NewGuid():N}");
+    try
+    {
+        var mapPath = Path.Combine(tempRoot, "maps", "painted.json");
+        ManualBiomeMapJson.Save(
+            mapPath,
+            new ManualBiomeMapDocument
+            {
+                Name = "Painted test map",
+                SourceMapKind = BiomeMapKind.NaturalClimate,
+                SourceSeed = 123UL,
+                WorldWidth = 300f,
+                WorldHeight = 200f,
+                CellSize = 100f,
+                CellCountX = 3,
+                CellCountY = 2,
+                ResourceVoidBorderWidth = 10f,
+                Cells =
+                [
+                    BiomeKind.Desert,
+                    BiomeKind.Grassland,
+                    BiomeKind.Forest,
+                    BiomeKind.Wetland,
+                    BiomeKind.Fertile,
+                    BiomeKind.Scrubland
+                ]
+            });
+
+        var scenario = new SimulationScenario
+        {
+            Seed = 77UL,
+            BiomeMapKind = BiomeMapKind.Manual,
+            ManualBiomeMapPath = Path.Combine("maps", "painted.json"),
+            WorldWidth = 300f,
+            WorldHeight = 200f,
+            BiomeCellSize = 100f,
+            ResourceVoidBorderWidth = 10f,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f
+        };
+
+        var simulation = SimulationScenarioFactory.CreateSimulation(scenario, tempRoot);
+
+        AssertEqual(BiomeKind.Desert, simulation.State.Biomes.GetKind(0, 0), "Manual map first cell");
+        AssertEqual(BiomeKind.Forest, simulation.State.Biomes.GetKind(2, 0), "Manual map forest cell");
+        AssertEqual(BiomeKind.Fertile, simulation.State.Biomes.GetKind(1, 1), "Manual map fertile cell");
+        AssertThrows<InvalidOperationException>(
+            () => SimulationScenarioFactory.CreateSimulation(scenario with { WorldWidth = 400f }, tempRoot),
+            "Manual biome map dimensions must match the scenario");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+static void ManualObstacleMapJsonRoundTrips()
+{
+    var map = ObstacleMap.CreateFromCells(
+        new WorldBounds(300f, 200f),
+        100f,
+        3,
+        2,
+        [false, true, false, true, false, true]);
+    var document = ManualObstacleMapDocument.FromObstacleMap(
+        map,
+        "Painted walls",
+        ObstacleMapKind.VerticalBarrierWithGaps,
+        42UL);
+
+    var json = ManualObstacleMapJson.ToJson(document);
+    var roundTripped = ManualObstacleMapJson.FromJson(json);
+    var loadedMap = roundTripped.ToObstacleMap();
+
+    AssertTrue(json.Contains("\"schemaVersion\": \"lineage.manualObstacleMap.v1\""), "Manual obstacle map JSON should serialize schema version");
+    AssertTrue(json.Contains("\"sourceMapKind\": \"verticalBarrierWithGaps\""), "Manual obstacle map JSON should serialize source map kind");
+    AssertTrue(json.Contains("\"blockedCells\""), "Manual obstacle map JSON should serialize obstacle cells");
+    AssertEqual("Painted walls", roundTripped.Name, "Manual obstacle map name");
+    AssertEqual(ObstacleMapKind.VerticalBarrierWithGaps, roundTripped.SourceMapKind, "Manual obstacle map source kind");
+    AssertEqual(42UL, roundTripped.SourceSeed ?? 0UL, "Manual obstacle map source seed");
+    AssertClose(map.Bounds.Width, loadedMap.Bounds.Width, 0.000001, "Manual obstacle map world width");
+    AssertClose(map.Bounds.Height, loadedMap.Bounds.Height, 0.000001, "Manual obstacle map world height");
+    AssertClose(map.CellSize, loadedMap.CellSize, 0.000001, "Manual obstacle map cell size");
+    AssertEqual(map.CellCountX, loadedMap.CellCountX, "Manual obstacle map cell count x");
+    AssertEqual(map.CellCountY, loadedMap.CellCountY, "Manual obstacle map cell count y");
+    AssertTrue(loadedMap.IsBlocked(1, 0), "Manual obstacle map blocked cell");
+    AssertTrue(!loadedMap.IsBlocked(2, 0), "Manual obstacle map open cell");
+}
+
+static void ScenarioFactoryHonorsManualObstacleMapPath()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_manual_obstacle_{Guid.NewGuid():N}");
+    try
+    {
+        var mapPath = Path.Combine(tempRoot, "maps", "walls.json");
+        ManualObstacleMapJson.Save(
+            mapPath,
+            new ManualObstacleMapDocument
+            {
+                Name = "Painted wall map",
+                SourceMapKind = ObstacleMapKind.VerticalBarrierWithGaps,
+                SourceSeed = 123UL,
+                WorldWidth = 300f,
+                WorldHeight = 200f,
+                CellSize = 100f,
+                CellCountX = 3,
+                CellCountY = 2,
+                BlockedCells = [false, true, false, false, false, true]
+            });
+
+        var scenario = new SimulationScenario
+        {
+            Seed = 77UL,
+            EnableObstacles = true,
+            ObstacleMapKind = ObstacleMapKind.Manual,
+            ManualObstacleMapPath = Path.Combine("maps", "walls.json"),
+            WorldWidth = 300f,
+            WorldHeight = 200f,
+            ObstacleCellSize = 100f,
+            ResourceVoidBorderWidth = 10f,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f
+        };
+
+        var simulation = SimulationScenarioFactory.CreateSimulation(scenario, tempRoot);
+
+        AssertTrue(simulation.State.Obstacles.IsBlocked(1, 0), "Manual obstacle map blocked first row");
+        AssertTrue(!simulation.State.Obstacles.IsBlocked(0, 1), "Manual obstacle map open second row");
+        AssertTrue(simulation.State.Obstacles.IsBlocked(2, 1), "Manual obstacle map blocked second row");
+        AssertThrows<InvalidOperationException>(
+            () => SimulationScenarioFactory.CreateSimulation(scenario with { WorldWidth = 400f }, tempRoot),
+            "Manual obstacle map dimensions must match the scenario");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
 }
 
 static void ScenarioFactoryHonorsNaturalClimateBiomeMapKind()
@@ -8635,8 +8840,10 @@ static void ScenarioJsonRoundTrips()
         BrainHiddenNodeCount = 16,
         EnableBiomes = false,
         BiomeMapKind = BiomeMapKind.HorizontalBands,
+        ManualBiomeMapPath = "maps/painted.json",
         EnableObstacles = true,
         ObstacleMapKind = ObstacleMapKind.ScatteredRocks,
+        ManualObstacleMapPath = "maps/walls.json",
         ObstacleCellSize = 150f,
         BiomeCellSize = 250f,
         ResourceVoidBorderWidth = 25f,
@@ -8782,7 +8989,9 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"brainHiddenNodeCount\": 16"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
+    AssertTrue(json.Contains("\"manualBiomeMapPath\": \"maps/painted.json\""), "JSON should serialize manual biome map path");
     AssertTrue(json.Contains("\"obstacleMapKind\": \"scatteredRocks\""), "JSON should serialize obstacle map kind as a string");
+    AssertTrue(json.Contains("\"manualObstacleMapPath\": \"maps/walls.json\""), "JSON should serialize manual obstacle map path");
     AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
     AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
@@ -8817,8 +9026,10 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.BrainHiddenNodeCount, roundTripped.BrainHiddenNodeCount, "Scenario brain hidden nodes");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
     AssertEqual(scenario.BiomeMapKind, roundTripped.BiomeMapKind, "Scenario biome map kind");
+    AssertEqual(scenario.ManualBiomeMapPath, roundTripped.ManualBiomeMapPath, "Scenario manual biome map path");
     AssertEqual(scenario.EnableObstacles, roundTripped.EnableObstacles, "Scenario obstacle mode");
     AssertEqual(scenario.ObstacleMapKind, roundTripped.ObstacleMapKind, "Scenario obstacle map kind");
+    AssertEqual(scenario.ManualObstacleMapPath, roundTripped.ManualObstacleMapPath, "Scenario manual obstacle map path");
     AssertClose(scenario.ObstacleCellSize, roundTripped.ObstacleCellSize, 0.000001, "Scenario obstacle cell size");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");

@@ -51,6 +51,11 @@ const biomePreviewLegend = document.querySelector("#biomePreviewLegend");
 const biomePreviewStatus = document.querySelector("#biomePreviewStatus");
 const toggleBiomePreviewButton = document.querySelector("#toggleBiomePreviewButton");
 const refreshBiomePreviewButton = document.querySelector("#refreshBiomePreviewButton");
+const paintLayerSelect = document.querySelector("#paintLayerSelect");
+const biomeBrushSelect = document.querySelector("#biomeBrushSelect");
+const obstacleBrushSelect = document.querySelector("#obstacleBrushSelect");
+const paintBiomeMapButton = document.querySelector("#paintBiomeMapButton");
+const saveManualBiomeMapButton = document.querySelector("#saveManualBiomeMapButton");
 
 let refreshTimer = null;
 let allRuns = [];
@@ -72,6 +77,9 @@ let biomePreviewTimer = null;
 let biomePreviewRequestId = 0;
 let currentBiomePreview = null;
 let biomePreviewCollapsed = false;
+let biomePaintEnabled = false;
+let biomePaintDirty = false;
+let biomePaintPointerDown = false;
 
 async function loadScenarios(selectedPath = scenarioSelect.value) {
   const response = await fetch("/api/scenarios");
@@ -771,6 +779,8 @@ function loadScenarioEditorDefinition(editor) {
   recipeBaseScenario = cloneJson(editor.scenario);
   recipeDiffCheckpoint = cloneJson(editor.scenario);
   activeScenarioGroup = scenarioEditorGroups()[0] || null;
+  biomePaintDirty = false;
+  setBiomePaintEnabled(false);
   renderScenarioEditor();
   renderRecipeStack();
   updateScenarioManagementButtons();
@@ -822,6 +832,63 @@ function setBiomePreviewCollapsed(collapsed, persist = true) {
   }
 }
 
+function setBiomePaintEnabled(enabled) {
+  biomePaintEnabled = Boolean(
+    enabled
+    && currentBiomePreview
+    && (currentBiomePreview.enabled || currentBiomePreview.obstacleCells?.length));
+  if (biomePaintEnabled && biomePreviewCollapsed) {
+    setBiomePreviewCollapsed(false);
+  }
+
+  updateBiomePaintControls();
+  if (biomePreviewStatus && currentBiomePreview) {
+    const layer = paintLayerSelect?.value === "obstacle" ? "wall" : "biome";
+    biomePreviewStatus.textContent = biomePaintEnabled
+      ? `Painting ${layer} cells. Drag on the map, then save a manual copy.`
+      : biomePaintDirty
+        ? "Manual map edits are unsaved."
+        : "Preview reflects the scenario options and launch seed override above.";
+  }
+}
+
+function updateBiomePaintControls() {
+  const canEditBiomes = Boolean(currentBiomePreview?.enabled && currentBiomePreview?.cells?.length);
+  const canEditObstacles = Boolean(currentBiomePreview?.obstacleCells?.length);
+  const canEdit = canEditBiomes || canEditObstacles;
+  const layer = paintLayerSelect?.value === "obstacle" ? "obstacle" : "biome";
+  if (!canEdit) {
+    biomePaintEnabled = false;
+    biomePaintDirty = false;
+  }
+
+  if (paintLayerSelect) {
+    paintLayerSelect.disabled = !canEdit;
+  }
+
+  if (biomeBrushSelect) {
+    biomeBrushSelect.disabled = !canEditBiomes || layer !== "biome";
+  }
+
+  if (obstacleBrushSelect) {
+    obstacleBrushSelect.disabled = !canEditObstacles || layer !== "obstacle";
+  }
+
+  if (paintBiomeMapButton) {
+    paintBiomeMapButton.disabled = !canEdit;
+    paintBiomeMapButton.textContent = biomePaintEnabled ? "Stop Painting" : "Paint Map";
+  }
+
+  if (saveManualBiomeMapButton) {
+    saveManualBiomeMapButton.disabled = !canEdit;
+    saveManualBiomeMapButton.textContent = biomePaintDirty ? "Save Manual Copy *" : "Save Manual Copy";
+  }
+
+  if (biomePreview) {
+    biomePreview.classList.toggle("is-painting", biomePaintEnabled);
+  }
+}
+
 async function updateBiomePreview() {
   if (!scenarioEditor || !biomePreviewCanvas) {
     clearBiomePreview("Choose a scenario to preview its biome layout.");
@@ -844,7 +911,7 @@ async function updateBiomePreview() {
     const response = await fetch("/api/scenario-preview/biome-map", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scenario, seed: seedOverride })
+      body: JSON.stringify({ scenario, seed: seedOverride, scenarioPath: scenarioSelect.value })
     });
 
     if (requestId !== biomePreviewRequestId) {
@@ -857,7 +924,9 @@ async function updateBiomePreview() {
       return;
     }
 
-    currentBiomePreview = await response.json();
+    currentBiomePreview = normalizeBiomePreview(await response.json());
+    biomePaintDirty = false;
+    setBiomePaintEnabled(false);
     renderBiomePreview(currentBiomePreview, seedOverride !== null);
   } catch (error) {
     if (requestId === biomePreviewRequestId) {
@@ -872,6 +941,8 @@ async function updateBiomePreview() {
 
 function clearBiomePreview(message) {
   currentBiomePreview = null;
+  biomePaintDirty = false;
+  biomePaintEnabled = false;
   if (biomePreviewMeta) {
     biomePreviewMeta.textContent = "";
   }
@@ -888,6 +959,8 @@ function clearBiomePreview(message) {
     const context = biomePreviewCanvas.getContext("2d");
     context.clearRect(0, 0, biomePreviewCanvas.width, biomePreviewCanvas.height);
   }
+
+  updateBiomePaintControls();
 }
 
 function renderBiomePreview(preview, seedIsOverride) {
@@ -895,6 +968,7 @@ function renderBiomePreview(preview, seedIsOverride) {
     return;
   }
 
+  normalizeBiomePreview(preview);
   const seedNote = seedIsOverride ? "launch override" : "scenario";
   biomePreviewMeta.textContent = [
     `${preview.mapKind}${preview.enabled ? "" : " (disabled)"}`,
@@ -902,11 +976,64 @@ function renderBiomePreview(preview, seedIsOverride) {
     `${formatNumber(preview.cellCountX)} x ${formatNumber(preview.cellCountY)} cells`,
     `seed ${formatSeed(preview.seed)} (${seedNote})`
   ].join(" | ");
+  renderBiomeBrushOptions(preview);
   drawBiomePreview(preview);
   renderBiomePreviewLegend(preview);
   biomePreviewStatus.textContent = preview.enabled
     ? "Preview reflects the scenario options and launch seed override above."
     : "Biomes are disabled; the map is shown as uniform grassland.";
+  updateBiomePaintControls();
+}
+
+function normalizeBiomePreview(preview) {
+  if (!preview) {
+    return preview;
+  }
+
+  const fallbackScenario = scenarioEditor?.scenario || {};
+  preview.worldWidth = finitePositiveNumber(preview.worldWidth, fallbackScenario.worldWidth || 1);
+  preview.worldHeight = finitePositiveNumber(preview.worldHeight, fallbackScenario.worldHeight || 1);
+  preview.obstacleCellSize = finitePositiveNumber(
+    preview.obstacleCellSize,
+    fallbackScenario.obstacleCellSize || 128);
+  preview.obstacleCellCountX = finitePositiveInteger(
+    preview.obstacleCellCountX,
+    Math.ceil(preview.worldWidth / preview.obstacleCellSize));
+  preview.obstacleCellCountY = finitePositiveInteger(
+    preview.obstacleCellCountY,
+    Math.ceil(preview.worldHeight / preview.obstacleCellSize));
+
+  const obstacleCellCount = preview.obstacleCellCountX * preview.obstacleCellCountY;
+  if (!Array.isArray(preview.obstacleCells) || preview.obstacleCells.length !== obstacleCellCount) {
+    preview.obstacleCells = new Array(obstacleCellCount).fill(false);
+  } else {
+    preview.obstacleCells = preview.obstacleCells.map(Boolean);
+  }
+
+  preview.obstacleBlockedCellCount = preview.obstacleCells.reduce(
+    (count, blocked) => count + (blocked ? 1 : 0),
+    0);
+  return preview;
+}
+
+function finitePositiveNumber(value, fallback) {
+  const number = Number(value);
+  if (Number.isFinite(number) && number > 0) {
+    return number;
+  }
+
+  const fallbackNumber = Number(fallback);
+  return Number.isFinite(fallbackNumber) && fallbackNumber > 0 ? fallbackNumber : 1;
+}
+
+function finitePositiveInteger(value, fallback) {
+  const number = Math.ceil(Number(value));
+  if (Number.isFinite(number) && number > 0) {
+    return number;
+  }
+
+  const fallbackNumber = Math.ceil(Number(fallback));
+  return Number.isFinite(fallbackNumber) && fallbackNumber > 0 ? fallbackNumber : 1;
 }
 
 function drawBiomePreview(preview) {
@@ -963,6 +1090,8 @@ function drawBiomePreview(preview) {
     }
   }
 
+  drawObstacleOverlay(context, preview, scaleX, scaleY);
+
   if (preview.resourceVoidBorderWidth > 0
       && preview.resourceVoidBorderWidth * 2 < preview.worldWidth
       && preview.resourceVoidBorderWidth * 2 < preview.worldHeight) {
@@ -980,14 +1109,329 @@ function drawBiomePreview(preview) {
   }
 }
 
+function drawObstacleOverlay(context, preview, scaleX, scaleY) {
+  if (!preview?.obstacleCells?.length || preview.obstacleBlockedCellCount <= 0) {
+    return;
+  }
+
+  context.save();
+  context.fillStyle = "rgba(6, 9, 8, 0.84)";
+  context.strokeStyle = "rgba(255, 127, 0, 0.95)";
+  for (let y = 0; y < preview.obstacleCellCountY; y++) {
+    for (let x = 0; x < preview.obstacleCellCountX; x++) {
+      const index = y * preview.obstacleCellCountX + x;
+      if (!preview.obstacleCells[index]) {
+        continue;
+      }
+
+      const worldX = x * preview.obstacleCellSize;
+      const worldY = y * preview.obstacleCellSize;
+      const worldWidth = Math.min(preview.obstacleCellSize, preview.worldWidth - worldX);
+      const worldHeight = Math.min(preview.obstacleCellSize, preview.worldHeight - worldY);
+      const left = Math.floor(worldX * scaleX);
+      const top = Math.floor(worldY * scaleY);
+      const width = Math.max(1, Math.ceil(worldWidth * scaleX));
+      const height = Math.max(1, Math.ceil(worldHeight * scaleY));
+      context.fillRect(left, top, width, height);
+      if (width >= 5 && height >= 5) {
+        context.lineWidth = 1;
+        context.strokeRect(left + 0.5, top + 0.5, Math.max(0, width - 1), Math.max(0, height - 1));
+      }
+    }
+  }
+
+  context.restore();
+}
+
 function renderBiomePreviewLegend(preview) {
-  const biomes = (preview.biomes || []).filter((biome) => biome.cellCount > 0);
-  biomePreviewLegend.innerHTML = biomes.map((biome) => `
-    <span class="biome-preview-legend-item">
+  const biomes = preview.biomes || [];
+  const biomeItems = biomes.map((biome) => `
+    <button class="biome-preview-legend-item${biomeBrushSelect?.value === biome.name ? " is-active" : ""}" type="button" data-biome="${escapeHtml(biome.name)}">
       <span class="biome-preview-swatch" style="background:${escapeHtml(biome.color)}"></span>
       ${escapeHtml(biome.name)} ${escapeHtml(formatPercent(biome.areaShare))}
+    </button>
+  `);
+  const obstacleShare = preview.obstacleCells?.length
+    ? preview.obstacleBlockedCellCount / preview.obstacleCells.length
+    : 0;
+  const obstacleItem = `
+    <span class="biome-preview-legend-item">
+      <span class="biome-preview-swatch obstacle-swatch"></span>
+      Walls ${escapeHtml(formatPercent(obstacleShare))}
     </span>
-  `).join("");
+  `;
+  biomePreviewLegend.innerHTML = [...biomeItems, obstacleItem].join("");
+}
+
+function renderBiomeBrushOptions(preview) {
+  if (!biomeBrushSelect) {
+    return;
+  }
+
+  const previous = biomeBrushSelect.value;
+  const biomes = preview?.biomes || [];
+  biomeBrushSelect.innerHTML = "";
+  for (const biome of biomes) {
+    const option = document.createElement("option");
+    option.value = biome.name;
+    option.textContent = biome.name;
+    biomeBrushSelect.append(option);
+  }
+
+  if (biomes.some((biome) => biome.name === previous)) {
+    biomeBrushSelect.value = previous;
+  } else if (biomes.length > 0) {
+    biomeBrushSelect.value = biomes[0].name;
+  }
+}
+
+function setBiomeBrush(biome) {
+  if (!biomeBrushSelect || !biome) {
+    return;
+  }
+
+  if ([...biomeBrushSelect.options].some((option) => option.value === biome)) {
+    biomeBrushSelect.value = biome;
+    if (currentBiomePreview) {
+      renderBiomePreviewLegend(currentBiomePreview);
+    }
+  }
+}
+
+function paintBiomeCellAtEvent(event) {
+  if (!biomePaintEnabled || !currentBiomePreview) {
+    return;
+  }
+
+  if (paintLayerSelect?.value === "obstacle") {
+    paintObstacleCellAtEvent(event);
+    return;
+  }
+
+  if (!biomeBrushSelect?.value) {
+    return;
+  }
+
+  const cell = biomeCellFromPointerEvent(event);
+  if (!cell) {
+    return;
+  }
+
+  const index = cell.y * currentBiomePreview.cellCountX + cell.x;
+  if (currentBiomePreview.cells[index] === biomeBrushSelect.value) {
+    return;
+  }
+
+  currentBiomePreview.cells[index] = biomeBrushSelect.value;
+  recomputeBiomePreviewSummaries(currentBiomePreview);
+  biomePaintDirty = true;
+  drawBiomePreview(currentBiomePreview);
+  renderBiomePreviewLegend(currentBiomePreview);
+  updateBiomePaintControls();
+  biomePreviewStatus.textContent = "Manual map edits are unsaved.";
+}
+
+function paintObstacleCellAtEvent(event) {
+  if (!currentBiomePreview?.obstacleCells?.length) {
+    return;
+  }
+
+  const cell = obstacleCellFromPointerEvent(event);
+  if (!cell) {
+    return;
+  }
+
+  const index = cell.y * currentBiomePreview.obstacleCellCountX + cell.x;
+  const blocked = obstacleBrushSelect?.value !== "erase";
+  if (currentBiomePreview.obstacleCells[index] === blocked) {
+    return;
+  }
+
+  currentBiomePreview.obstacleCells[index] = blocked;
+  currentBiomePreview.obstacleBlockedCellCount += blocked ? 1 : -1;
+  currentBiomePreview.obstacleBlockedCellCount = Math.max(
+    0,
+    Math.min(currentBiomePreview.obstacleCells.length, currentBiomePreview.obstacleBlockedCellCount));
+  biomePaintDirty = true;
+  drawBiomePreview(currentBiomePreview);
+  renderBiomePreviewLegend(currentBiomePreview);
+  updateBiomePaintControls();
+  biomePreviewStatus.textContent = "Manual map edits are unsaved.";
+}
+
+function biomeCellFromPointerEvent(event) {
+  const rect = biomePreviewCanvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+    return null;
+  }
+
+  const worldX = x / rect.width * currentBiomePreview.worldWidth;
+  const worldY = y / rect.height * currentBiomePreview.worldHeight;
+  return {
+    x: Math.max(0, Math.min(currentBiomePreview.cellCountX - 1, Math.floor(worldX / currentBiomePreview.cellSize))),
+    y: Math.max(0, Math.min(currentBiomePreview.cellCountY - 1, Math.floor(worldY / currentBiomePreview.cellSize)))
+  };
+}
+
+function obstacleCellFromPointerEvent(event) {
+  const rect = biomePreviewCanvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+    return null;
+  }
+
+  const worldX = x / rect.width * currentBiomePreview.worldWidth;
+  const worldY = y / rect.height * currentBiomePreview.worldHeight;
+  return {
+    x: Math.max(0, Math.min(currentBiomePreview.obstacleCellCountX - 1, Math.floor(worldX / currentBiomePreview.obstacleCellSize))),
+    y: Math.max(0, Math.min(currentBiomePreview.obstacleCellCountY - 1, Math.floor(worldY / currentBiomePreview.obstacleCellSize)))
+  };
+}
+
+function recomputeBiomePreviewSummaries(preview) {
+  const countByBiome = new Map((preview.biomes || []).map((biome) => [biome.name, 0]));
+  const areaByBiome = new Map((preview.biomes || []).map((biome) => [biome.name, 0]));
+  for (let y = 0; y < preview.cellCountY; y++) {
+    for (let x = 0; x < preview.cellCountX; x++) {
+      const index = y * preview.cellCountX + x;
+      const biome = preview.cells[index];
+      const worldX = x * preview.cellSize;
+      const worldY = y * preview.cellSize;
+      const cellWidth = Math.max(0, Math.min(preview.cellSize, preview.worldWidth - worldX));
+      const cellHeight = Math.max(0, Math.min(preview.cellSize, preview.worldHeight - worldY));
+      countByBiome.set(biome, (countByBiome.get(biome) || 0) + 1);
+      areaByBiome.set(biome, (areaByBiome.get(biome) || 0) + cellWidth * cellHeight);
+    }
+  }
+
+  const worldArea = Math.max(1, preview.worldWidth * preview.worldHeight);
+  for (const biome of preview.biomes || []) {
+    biome.cellCount = countByBiome.get(biome.name) || 0;
+    biome.areaShare = (areaByBiome.get(biome.name) || 0) / worldArea;
+  }
+}
+
+function beginBiomePaint(event) {
+  if (!biomePaintEnabled) {
+    return;
+  }
+
+  event.preventDefault();
+  biomePaintPointerDown = true;
+  biomePreviewCanvas.setPointerCapture?.(event.pointerId);
+  paintBiomeCellAtEvent(event);
+}
+
+function continueBiomePaint(event) {
+  if (!biomePaintPointerDown) {
+    return;
+  }
+
+  event.preventDefault();
+  paintBiomeCellAtEvent(event);
+}
+
+function endBiomePaint(event) {
+  if (!biomePaintPointerDown) {
+    return;
+  }
+
+  biomePaintPointerDown = false;
+  biomePreviewCanvas.releasePointerCapture?.(event.pointerId);
+}
+
+async function saveManualBiomeMap() {
+  if (!currentBiomePreview || !scenarioEditor) {
+    formMessage.textContent = "Render a map preview before saving a manual copy.";
+    return;
+  }
+
+  let scenario;
+  try {
+    scenario = collectScenarioOptions();
+  } catch (error) {
+    formMessage.textContent = error.message;
+    return;
+  }
+
+  const currentName = scenario?.name || selectedScenarioOption()?.name || "Manual Map";
+  const name = prompt("Save manual map scenario as", `${currentName} Manual`);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    formMessage.textContent = "Manual map scenario name is required.";
+    return;
+  }
+
+  saveManualBiomeMapButton.disabled = true;
+  formMessage.textContent = "Saving manual map scenario...";
+  const response = await fetch("/api/manual-biome-maps", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: trimmedName,
+      scenario,
+      seed: valueOrNull("#seed"),
+      scenarioPath: scenarioSelect.value,
+      cells: currentBiomePreview.enabled ? currentBiomePreview.cells : null,
+      obstacleCells: currentBiomePreview.obstacleCells
+    })
+  });
+
+  if (!response.ok) {
+    formMessage.textContent = await responseErrorMessage(
+      response,
+      "Manual map save failed.",
+      response.status === 405
+        ? "The running Runner backend does not have the manual map save endpoint yet. Restart Lineage Runner and refresh this page."
+        : null);
+    updateBiomePaintControls();
+    return;
+  }
+
+  const result = await response.json();
+  biomePaintDirty = false;
+  setBiomePaintEnabled(false);
+  await loadScenarios(result.scenario.path);
+  scenarioOptionsPanel.hidden = false;
+  const savedParts = [
+    result.mapPath ? `map ${result.mapPath}` : null,
+    result.obstacleMapPath ? `walls ${result.obstacleMapPath}` : null
+  ].filter(Boolean).join(" and ");
+  formMessage.textContent = `Saved manual scenario ${result.scenario.name}${savedParts ? ` with ${savedParts}` : ""}.`;
+}
+
+async function responseErrorMessage(response, fallback, hint = null) {
+  let detail = "";
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const problem = await response.json().catch(() => null);
+    detail = problem?.error || problem?.title || "";
+  } else {
+    detail = (await response.text().catch(() => "")).trim();
+  }
+
+  const status = response.status ? `HTTP ${response.status}` : "";
+  return [
+    fallback,
+    status,
+    detail,
+    hint
+  ].filter(Boolean).join(" ");
 }
 
 function resetScenarioOptionFilters() {
@@ -1198,6 +1642,12 @@ function resetAllScenarioOptions() {
 
 async function saveScenarioAs() {
   if (!scenarioEditor) {
+    return;
+  }
+
+  if (biomePaintDirty && currentBiomePreview) {
+    formMessage.textContent = "Saving painted map as a manual scenario...";
+    await saveManualBiomeMap();
     return;
   }
 
@@ -1979,6 +2429,37 @@ scenarioFields.addEventListener("input", () => {
 seedInput.addEventListener("input", () => scheduleBiomePreview());
 toggleBiomePreviewButton.addEventListener("click", () => setBiomePreviewCollapsed(!biomePreviewCollapsed));
 refreshBiomePreviewButton.addEventListener("click", () => scheduleBiomePreview(0));
+paintBiomeMapButton.addEventListener("click", () => setBiomePaintEnabled(!biomePaintEnabled));
+saveManualBiomeMapButton.addEventListener("click", saveManualBiomeMap);
+paintLayerSelect.addEventListener("change", () => {
+  if (biomePaintEnabled) {
+    setBiomePaintEnabled(true);
+  } else {
+    updateBiomePaintControls();
+  }
+  if (currentBiomePreview) {
+    renderBiomePreviewLegend(currentBiomePreview);
+  }
+});
+biomeBrushSelect.addEventListener("change", () => {
+  if (currentBiomePreview) {
+    renderBiomePreviewLegend(currentBiomePreview);
+  }
+});
+obstacleBrushSelect.addEventListener("change", updateBiomePaintControls);
+biomePreviewLegend.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-biome]");
+  if (button) {
+    setBiomeBrush(button.dataset.biome);
+  }
+});
+biomePreviewCanvas.addEventListener("pointerdown", beginBiomePaint);
+biomePreviewCanvas.addEventListener("pointermove", continueBiomePaint);
+biomePreviewCanvas.addEventListener("pointerup", endBiomePaint);
+biomePreviewCanvas.addEventListener("pointercancel", endBiomePaint);
+biomePreviewCanvas.addEventListener("lostpointercapture", () => {
+  biomePaintPointerDown = false;
+});
 window.addEventListener("resize", () => {
   if (currentBiomePreview) {
     drawBiomePreview(currentBiomePreview);

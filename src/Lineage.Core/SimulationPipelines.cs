@@ -7,7 +7,7 @@ public static class SimulationPipelines
 {
     public static ISimulationSystem[] CreateMinimalLifeLoop(
         float spatialCellSize = 64f,
-        int statsSnapshotIntervalTicks = 1,
+        int statsSnapshotIntervalTicks = SimulationScenario.DefaultStatsSnapshotIntervalTicks,
         float bodyRadiusEnergyCostPerSecond = 0f,
         float maxSpeedEnergyCostPerSecond = 0f,
         float turnRateEnergyCostPerSecond = 0f,
@@ -127,7 +127,7 @@ public static class SimulationPipelines
 
     public static ISimulationSystem[] CreateNeuralLifeLoop(
         float spatialCellSize = 64f,
-        int statsSnapshotIntervalTicks = 1,
+        int statsSnapshotIntervalTicks = SimulationScenario.DefaultStatsSnapshotIntervalTicks,
         float bodyRadiusEnergyCostPerSecond = 0f,
         float maxSpeedEnergyCostPerSecond = 0f,
         float turnRateEnergyCostPerSecond = 0f,

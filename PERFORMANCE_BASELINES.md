@@ -1,9 +1,13 @@
 # Lineage Performance Baselines
 
 Created: 2026-05-22
-Updated: 2026-05-25
+Updated: 2026-05-27
 
 This file records performance baselines for repeatable CLI runs. Use these numbers as reference points when judging whether future performance work changes behavior or speed.
+
+## Baseline Cadence Note
+
+As of 2026-05-27, checked-in scenarios now default to `worldSenseIntervalTicks: 10` and `statsSnapshotIntervalTicks: 300`. Baselines recorded before this note used the scenario values checked in at the time, usually `worldSenseIntervalTicks: 4` and snapshot intervals of `10` or `30` ticks, with a few diagnostic scenarios using `1`. When comparing against those older baselines, use the recorded scenario files or pass explicit overrides for the older cadence.
 
 ## Current Baseline
 
@@ -13,7 +17,7 @@ Context:
 - Commit: `d51ca23`
 - Command shape: `dotnet .\src\Lineage.Cli\bin\Release\net8.0\Lineage.Cli.dll --probe --ticks <ticks> --probe-seeds <seeds> --probe-scenario <scenario>`
 - Default spatial cell size: `64`
-- Default world sensing cadence: expensive world queries refresh every `4` ticks, with close-range refresh at proximity `0.85`
+- Default world sensing cadence at measurement time: expensive world queries refreshed every `4` ticks, with close-range refresh at proximity `0.85`
 - Spatial index mode: array-backed grid cells; persistent dirty resource/egg cells; stamp-array resource/egg candidate dedupe; squared-distance sensing scan filters; specialized visible-creature scan with lazy trait caching; dormant depleted plants stay out of the resource index until respawn; creature cells still rebuild every tick.
 - Vision mode: sector vision enabled; legacy nearest-food and nearest-creature vision inputs disabled in authored scenarios.
 - Neural mode: `HybridNeural` default; `HiddenLayerNeural` available per scenario.

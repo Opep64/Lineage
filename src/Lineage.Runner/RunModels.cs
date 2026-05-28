@@ -43,7 +43,8 @@ public sealed record ScenarioDeleteResult(
 
 public sealed record BiomeMapPreviewRequest(
     JsonElement Scenario,
-    ulong? Seed);
+    ulong? Seed,
+    string? ScenarioPath = null);
 
 public sealed record BiomeMapPreview(
     bool Enabled,
@@ -56,6 +57,13 @@ public sealed record BiomeMapPreview(
     int CellCountY,
     double ResourceVoidBorderWidth,
     IReadOnlyList<string> Cells,
+    bool ObstaclesEnabled,
+    string ObstacleMapKind,
+    double ObstacleCellSize,
+    int ObstacleCellCountX,
+    int ObstacleCellCountY,
+    int ObstacleBlockedCellCount,
+    IReadOnlyList<bool> ObstacleCells,
     IReadOnlyList<BiomeMapPreviewSummary> Biomes);
 
 public sealed record BiomeMapPreviewSummary(
@@ -63,6 +71,20 @@ public sealed record BiomeMapPreviewSummary(
     string Color,
     int CellCount,
     double AreaShare);
+
+public sealed record ManualBiomeMapSaveRequest(
+    string Name,
+    JsonElement Scenario,
+    ulong? Seed,
+    string? ScenarioPath,
+    IReadOnlyList<string>? Cells,
+    IReadOnlyList<bool>? ObstacleCells);
+
+public sealed record ManualBiomeMapSaveResult(
+    ScenarioOption Scenario,
+    ScenarioEditorDefinition ScenarioEditor,
+    string? MapPath,
+    string? ObstacleMapPath);
 
 public sealed record ScenarioRecipe(
     string Name,

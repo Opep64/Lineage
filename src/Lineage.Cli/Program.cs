@@ -16,6 +16,12 @@ try
         return;
     }
 
+    if (options.IsBiomeMapExport)
+    {
+        ExportBiomeMap(options);
+        return;
+    }
+
     if (options.IsProbe)
     {
         var results = RunProbe(options);
@@ -59,6 +65,7 @@ static void PrintHelp()
           --scenario <path>          Load scenario JSON.
           --load-snapshot <path>     Load a saved simulation snapshot instead of starting from a scenario.
           --save-scenario <path>     Save the resolved scenario JSON before running.
+          --export-biome-map <path>  Export the scenario's biome map as editable manual-map JSON, then exit.
           --ticks <n>                Number of simulation ticks to run. Default: 5000
           --seed <n>                 Override scenario seed.
           --pipeline <neural|simple> Override controller pipeline.
@@ -112,7 +119,7 @@ static void PrintHelp()
           --probe-variant <name:key=value,...> Add a temporary scenario variant. Can repeat; base also runs.
           --probe-output <path>      Compact probe CSV output path. Default: out/probe_summary.csv
           --probe-report <path>      Compact probe HTML output path. Default: probe output with .html extension
-          --probe-snapshot-interval <n> Override stats interval for probe runs. Default: 100
+          --probe-snapshot-interval <n> Override stats interval for probe runs. Default: scenario value
           --probe-stop-on-extinction Stop a probe run early if all creatures die.
           --probe-max-population <n> Stop a probe run early if population exceeds n.
           --no-output                Run without writing CSV.
@@ -176,6 +183,47 @@ static RunResult RunSingle(RunOptions options)
         exportedSpecies);
 }
 
+static void ExportBiomeMap(RunOptions options)
+{
+    if (options.ExportBiomeMapPath is null)
+    {
+        throw new ArgumentException("--export-biome-map requires a path.");
+    }
+
+    if (options.LoadSnapshotPath is not null)
+    {
+        throw new ArgumentException("--export-biome-map exports scenario maps and cannot be combined with --load-snapshot.");
+    }
+
+    var scenario = options.CreateScenario();
+    if (options.SaveScenarioPath is not null)
+    {
+        SimulationScenarioJson.Save(options.SaveScenarioPath, scenario);
+    }
+
+    var map = SimulationScenarioFactory.CreateBiomeMap(scenario, options.ScenarioDirectory);
+    var document = ManualBiomeMapDocument.FromBiomeMap(
+        map,
+        scenario.Name,
+        scenario.EnableBiomes ? scenario.BiomeMapKind : null,
+        scenario.Seed);
+    ManualBiomeMapJson.Save(options.ExportBiomeMapPath, document);
+
+    Console.WriteLine($"Scenario: {scenario.Name}");
+    if (options.ScenarioPath is not null)
+    {
+        Console.WriteLine($"Scenario file: {Path.GetFullPath(options.ScenarioPath)}");
+    }
+
+    if (options.SaveScenarioPath is not null)
+    {
+        Console.WriteLine($"Saved scenario: {Path.GetFullPath(options.SaveScenarioPath)}");
+    }
+
+    Console.WriteLine($"Exported biome map: {Path.GetFullPath(options.ExportBiomeMapPath)}");
+    Console.WriteLine($"Map: {map.CellCountX}x{map.CellCountY} cells, {map.CellSize:0.###}u cell size");
+}
+
 static (SimulationScenario Scenario, Simulation Simulation) CreateSimulationRun(RunOptions options)
 {
     if (options.LoadSnapshotPath is not null)
@@ -189,7 +237,7 @@ static (SimulationScenario Scenario, Simulation Simulation) CreateSimulationRun(
     }
 
     var scenario = options.CreateScenario();
-    return (scenario, SimulationScenarioFactory.CreateSimulation(scenario));
+    return (scenario, SimulationScenarioFactory.CreateSimulation(scenario, options.ScenarioDirectory));
 }
 
 static IReadOnlyList<SpeciesInjectionResult> InjectStartupSpeciesProfiles(
@@ -430,8 +478,7 @@ static IReadOnlyList<ProbeRunResult> RunProbe(RunOptions options)
                     ScenarioPath = scenarioPath,
                     SeedOverride = seedOverride,
                     SnapshotIntervalTicksOverride = options.ProbeSnapshotIntervalTicks
-                        ?? options.SnapshotIntervalTicksOverride
-                        ?? 100,
+                        ?? options.SnapshotIntervalTicksOverride,
                     SaveScenarioPath = null,
                     OutputPath = null,
                     LineageOutputPath = null,
@@ -455,7 +502,7 @@ static IReadOnlyList<ProbeRunResult> RunProbe(RunOptions options)
                 };
                 scenario = scenario.Validated();
 
-                var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+                var simulation = SimulationScenarioFactory.CreateSimulation(scenario, scenarioOptions.ScenarioDirectory);
                 _ = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
                     scenario,
                     simulation.State,
@@ -831,6 +878,8 @@ internal sealed record RunOptions
 
     public string? SaveScenarioPath { get; init; }
 
+    public string? ExportBiomeMapPath { get; init; }
+
     public ulong? SeedOverride { get; init; }
 
     public SimulationPipelineKind? PipelineKindOverride { get; init; }
@@ -962,11 +1011,18 @@ internal sealed record RunOptions
 
     public bool IsBatch => BatchScenarioPaths.Count > 0 || BatchReportPath is not null;
 
+    public bool IsBiomeMapExport => ExportBiomeMapPath is not null;
+
+    public string? ScenarioDirectory => ScenarioPath is null
+        ? null
+        : Path.GetDirectoryName(Path.GetFullPath(ScenarioPath));
+
     public RunOptions ExpandProcessIdToken()
     {
         return this with
         {
             SaveScenarioPath = ExpandProcessIdToken(SaveScenarioPath),
+            ExportBiomeMapPath = ExpandProcessIdToken(ExportBiomeMapPath),
             OutputPath = ExpandProcessIdToken(OutputPath),
             LineageOutputPath = ExpandProcessIdToken(LineageOutputPath),
             TraitSummaryOutputPath = ExpandProcessIdToken(TraitSummaryOutputPath),
@@ -995,7 +1051,7 @@ internal sealed record RunOptions
     public SimulationScenario CreateScenario()
     {
         var scenario = ScenarioPath is null
-            ? new SimulationScenario { StatsSnapshotIntervalTicks = 10 }
+            ? new SimulationScenario()
             : SimulationScenarioJson.Load(ScenarioPath);
 
         scenario = scenario with
@@ -1098,6 +1154,7 @@ internal sealed record RunOptions
         {
             ScenarioPath = scenarioPath,
             SaveScenarioPath = null,
+            ExportBiomeMapPath = null,
             OutputPath = DisableOutput ? null : statsPath,
             LineageOutputPath = null,
             TraitSummaryOutputPath = null,
@@ -1142,6 +1199,9 @@ internal sealed record RunOptions
                     break;
                 case "--save-scenario":
                     options = options with { SaveScenarioPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--export-biome-map":
+                    options = options with { ExportBiomeMapPath = ReadValue(args, ref i, arg) };
                     break;
                 case "--ticks":
                     options = options with { Ticks = ParseNonNegativeInt(ReadValue(args, ref i, arg), arg) };
@@ -1718,6 +1778,7 @@ internal readonly record struct ProbeRunResult(
     ulong Seed,
     ProbeRunStatus Status,
     int RequestedTicks,
+    int SnapshotIntervalTicks,
     long FinalTick,
     double SimulatedSeconds,
     double WallSeconds,
@@ -1896,6 +1957,7 @@ internal readonly record struct ProbeRunResult(
             scenario.Seed,
             status,
             requestedTicks,
+            scenario.StatsSnapshotIntervalTicks,
             state.Tick,
             state.ElapsedSeconds,
             elapsed.TotalSeconds,
@@ -2453,7 +2515,7 @@ internal static class ProbeReportWriter
         WriteMetric(writer, "Ticks requested", options.Ticks.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Total wall time", $"{results.Sum(result => result.WallSeconds):0.###} seconds");
         WriteMetric(writer, "Average ticks/s", $"{results.Average(result => result.TicksPerSecond):0.###}");
-        WriteMetric(writer, "Snapshot interval", (options.ProbeSnapshotIntervalTicks ?? options.SnapshotIntervalTicksOverride ?? 100).ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Snapshot interval", FormatSnapshotIntervals(results));
         WriteMetric(writer, "Stop on extinction", options.ProbeStopOnExtinction ? "Yes" : "No");
         WriteMetric(writer, "Max population stop", options.ProbeMaxPopulation?.ToString(CultureInfo.InvariantCulture) ?? "Off");
         writer.WriteLine("</div></section>");
@@ -2584,6 +2646,18 @@ internal static class ProbeReportWriter
     private static string FormatStatuses(IEnumerable<ProbeRunResult> results)
     {
         return string.Join(", ", results.Select(result => result.Status.ToString()).Distinct().Order());
+    }
+
+    private static string FormatSnapshotIntervals(IEnumerable<ProbeRunResult> results)
+    {
+        var intervals = results
+            .Select(result => result.SnapshotIntervalTicks)
+            .Distinct()
+            .Order()
+            .ToArray();
+        return intervals.Length == 0
+            ? "-"
+            : string.Join(", ", intervals.Select(interval => interval.ToString(CultureInfo.InvariantCulture)));
     }
 
     private static string FormatDistinct(IEnumerable<string> values)
@@ -4983,6 +5057,11 @@ internal static class RunReportWriter
         writer.WriteLine("</section>");
 
         WriteBiomePreferenceSection(
+            writer,
+            snapshots,
+            biomeSummaries,
+            MathF.Max(1f, state.Bounds.Width * state.Bounds.Height));
+        WriteBiomeRiskRewardSection(
             writer,
             snapshots,
             biomeSummaries,
@@ -7409,6 +7488,13 @@ internal static class RunReportWriter
         return total > 0 ? count / (float)total : 0f;
     }
 
+    private static string FormatIndex(float value)
+    {
+        return float.IsFinite(value)
+            ? $"{value.ToString("0.##", CultureInfo.InvariantCulture)}x"
+            : "n/a";
+    }
+
     private static float EastProgressShare(float x, WorldBounds bounds)
     {
         return bounds.Width > 0f
@@ -7605,6 +7691,84 @@ internal static class RunReportWriter
                 $"<td>{Html(FormatPercent(eatenShare))}</td>" +
                 $"<td>{Html(FormatPercent(deathShare))}</td>" +
                 $"<td>{Html(biomeLateDeaths)}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteBiomeRiskRewardSection(
+        TextWriter writer,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        IReadOnlyList<BiomeSummary> biomeSummaries,
+        float worldArea)
+    {
+        const int TailSnapshotCount = 100;
+
+        var tailCount = Math.Min(TailSnapshotCount, snapshots.Count);
+        var tailSnapshots = tailCount > 0
+            ? snapshots.Skip(snapshots.Count - tailCount).ToArray()
+            : Array.Empty<SimulationStatsSnapshot>();
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Biome Risk and Reward</h2>");
+        writer.WriteLine("<p class=\"biome-map-note\">Uses the last up to 100 stat snapshots. Reward index compares food-eaten share to living share; risk index compares death share to living share. Values above 1x are overrepresented for the creatures using that biome.</p>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Living Share</th><th>Preference</th><th>Plant Availability</th><th>Food / Creature / s</th><th>Reward Index</th><th>Late Deaths</th><th>Deaths / Creature Hr</th><th>Risk Index</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+
+        if (tailSnapshots.Length == 0)
+        {
+            writer.WriteLine("<tr><td colspan=\"10\" class=\"empty\">No stat snapshots were recorded.</td></tr>");
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        var first = tailSnapshots[0];
+        var last = tailSnapshots[^1];
+        var tailHours = Math.Max(0d, last.ElapsedSeconds - first.ElapsedSeconds) / 3600d;
+        var averageCreatures = Average(tailSnapshots, snapshot => snapshot.CreatureCount);
+        var averagePlantCalories = Average(tailSnapshots, snapshot => snapshot.TotalPlantCalories);
+        var averageCaloriesEaten = Average(tailSnapshots, snapshot => snapshot.TotalCaloriesEatenPerSecond);
+        var lateDeaths = Math.Max(0, last.CreatureDeathCount - first.CreatureDeathCount);
+        var activeBiomeSummaries = ActiveBiomeSummaries(biomeSummaries);
+
+        foreach (var summary in activeBiomeSummaries)
+        {
+            var areaShare = summary.Area / worldArea;
+            var averageLiving = Average(tailSnapshots, snapshot => CreatureCountForBiome(snapshot, summary.Kind));
+            var livingShare = averageCreatures > 0f ? averageLiving / averageCreatures : 0f;
+            var preference = areaShare > 0f ? livingShare / areaShare : 0f;
+            var plantCalories = Average(tailSnapshots, snapshot => PlantCaloriesForBiome(snapshot, summary.Kind));
+            var plantCaloriesShare = averagePlantCalories > 0f ? plantCalories / averagePlantCalories : 0f;
+            var plantAvailability = areaShare > 0f ? plantCaloriesShare / areaShare : 0f;
+            var eatenPerSecond = Average(tailSnapshots, snapshot => CaloriesEatenForBiome(snapshot, summary.Kind));
+            var eatenShare = averageCaloriesEaten > 0f ? eatenPerSecond / averageCaloriesEaten : 0f;
+            var foodPerCreaturePerSecond = averageLiving > 0f ? eatenPerSecond / averageLiving : 0f;
+            var rewardIndex = livingShare > 0f ? eatenShare / livingShare : float.NaN;
+            var biomeLateDeaths = Math.Max(
+                0,
+                DeathCountForBiome(last, summary.Kind) - DeathCountForBiome(first, summary.Kind));
+            var deathShare = lateDeaths > 0 ? Share(biomeLateDeaths, lateDeaths) : 0f;
+            var deathsPerCreatureHour = averageLiving > 0f && tailHours > 0d
+                ? biomeLateDeaths / (averageLiving * (float)tailHours)
+                : 0f;
+            var riskIndex = livingShare > 0f ? deathShare / livingShare : float.NaN;
+
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(FormatBiomeKind(summary.Kind))}</td>" +
+                $"<td>{Html(FormatPercent(areaShare))}</td>" +
+                $"<td>{Html(FormatPercent(livingShare))}</td>" +
+                $"<td>{Html(FormatIndex(preference))}</td>" +
+                $"<td>{Html(FormatIndex(plantAvailability))}</td>" +
+                $"<td>{Html(foodPerCreaturePerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatIndex(rewardIndex))}</td>" +
+                $"<td>{Html(biomeLateDeaths)}</td>" +
+                $"<td>{Html(deathsPerCreatureHour.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatIndex(riskIndex))}</td>" +
                 "</tr>");
         }
 

@@ -14,5 +14,6 @@ public enum BiomeMapKind
     HorizontalEdgeLadderBands,
     VerticalEdgeLadderBands,
     VerticalEdgeCorridorBands,
-    VerticalEdgeWideCorridorBands
+    VerticalEdgeWideCorridorBands,
+    Manual
 }

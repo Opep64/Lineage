@@ -1,7 +1,8 @@
 {
   "name": "Mixed Starter Roster",
   "seed": 20260519,
-  "worldSenseIntervalTicks": 4,
+  "worldSenseIntervalTicks": 10,
+  "statsSnapshotIntervalTicks": 300,
   "plantLocalDispersalChance": 0.35,
   "plantLocalDispersalRadius": 220,
   "enableLocalFertility": true,

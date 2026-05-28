@@ -643,10 +643,10 @@ public sealed class BiomeMap
         Array.Fill(cells, BiomeKind.Grassland);
         var assigned = new bool[cells.Length];
         var indices = Enumerable.Range(0, cells.Length).ToArray();
-        var desertCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.18f));
-        var wetlandCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.16f));
-        var forestCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.28f));
-        var fertileCount = Math.Max(1, (int)MathF.Round(cells.Length * 0.14f));
+        var desertCount = (int)MathF.Round(cells.Length * 0.18f);
+        var wetlandCount = (int)MathF.Round(cells.Length * 0.16f);
+        var forestCount = (int)MathF.Round(cells.Length * 0.28f);
+        var fertileCount = (int)MathF.Round(cells.Length * 0.14f);
 
         Array.Sort(indices, (left, right) => climateCells[left].Moisture.CompareTo(climateCells[right].Moisture));
         for (var i = 0; i < desertCount && i < indices.Length; i++)

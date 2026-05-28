@@ -241,6 +241,16 @@ textarea {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  align-items: end;
+}
+
+.biome-brush-label {
+  display: grid;
+  gap: 4px;
+  min-width: 128px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .biome-preview h3 {
@@ -274,6 +284,10 @@ textarea {
   background: #f7f9f4;
 }
 
+.biome-preview.is-painting #biomePreviewCanvas {
+  cursor: crosshair;
+}
+
 .biome-preview-legend {
   display: flex;
   flex-wrap: wrap;
@@ -291,6 +305,21 @@ textarea {
   align-items: center;
   gap: 5px;
   min-width: 118px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.biome-preview-legend-item {
+  cursor: pointer;
+}
+
+button.biome-preview-legend-item.is-active {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .biome-preview-swatch {
@@ -299,6 +328,12 @@ textarea {
   flex: 0 0 12px;
   border: 1px solid rgba(29, 37, 43, 0.18);
   border-radius: 3px;
+}
+
+.biome-preview-swatch.obstacle-swatch {
+  background:
+    linear-gradient(135deg, transparent 42%, #ff7f00 42% 58%, transparent 58%),
+    #060908;
 }
 
 .scenario-options-panel {

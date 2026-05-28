@@ -7,7 +7,7 @@ public static class SimulationScenarioFactory
 {
     private const ulong InitialBrainRandomizationSalt = 0x6C696E6561676542UL;
 
-    public static Simulation CreateSimulation(SimulationScenario scenario)
+    public static Simulation CreateSimulation(SimulationScenario scenario, string? scenarioDirectory = null)
     {
         scenario = scenario.Validated();
 
@@ -21,8 +21,8 @@ public static class SimulationScenarioFactory
             scenario.Seed,
             CreatePipeline(scenario));
 
-        simulation.State.Biomes = CreateBiomeMap(scenario);
-        simulation.State.SetObstacles(CreateObstacleMap(scenario));
+        simulation.State.Biomes = CreateBiomeMap(scenario, scenarioDirectory);
+        simulation.State.SetObstacles(CreateObstacleMap(scenario, scenarioDirectory));
         simulation.State.SetLocalFertility(CreateLocalFertilityMap(scenario));
         SeedWorld(simulation, scenario);
         return simulation;
@@ -244,8 +244,9 @@ public static class SimulationScenarioFactory
         }
     }
 
-    private static BiomeMap CreateBiomeMap(SimulationScenario scenario)
+    public static BiomeMap CreateBiomeMap(SimulationScenario scenario, string? scenarioDirectory = null)
     {
+        scenario = scenario.Validated();
         var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
         if (!scenario.EnableBiomes)
         {
@@ -258,6 +259,7 @@ public static class SimulationScenarioFactory
 
         return scenario.BiomeMapKind switch
         {
+            BiomeMapKind.Manual => LoadManualBiomeMap(scenario, scenarioDirectory),
             BiomeMapKind.NaturalClimate => BiomeMap.GenerateNaturalClimate(
                 bounds,
                 scenario.BiomeCellSize,
@@ -279,12 +281,118 @@ public static class SimulationScenarioFactory
         };
     }
 
-    private static ObstacleMap CreateObstacleMap(SimulationScenario scenario)
+    public static string ResolveManualBiomeMapPath(string manualBiomeMapPath, string? scenarioDirectory = null)
     {
+        return ResolveManualMapPath(manualBiomeMapPath, scenarioDirectory, nameof(manualBiomeMapPath));
+    }
+
+    public static string ResolveManualObstacleMapPath(string manualObstacleMapPath, string? scenarioDirectory = null)
+    {
+        return ResolveManualMapPath(manualObstacleMapPath, scenarioDirectory, nameof(manualObstacleMapPath));
+    }
+
+    private static BiomeMap LoadManualBiomeMap(SimulationScenario scenario, string? scenarioDirectory)
+    {
+        var manualPath = ResolveManualBiomeMapPath(
+            scenario.ManualBiomeMapPath
+                ?? throw new InvalidOperationException("Manual biome maps require manualBiomeMapPath."),
+            scenarioDirectory);
+        var document = ManualBiomeMapJson.Load(manualPath);
+        ValidateManualBiomeMapMatchesScenario(document, scenario, manualPath);
+        return document.ToBiomeMap();
+    }
+
+    private static void ValidateManualBiomeMapMatchesScenario(
+        ManualBiomeMapDocument document,
+        SimulationScenario scenario,
+        string manualPath)
+    {
+        AssertClose(document.WorldWidth, scenario.WorldWidth, nameof(document.WorldWidth), manualPath);
+        AssertClose(document.WorldHeight, scenario.WorldHeight, nameof(document.WorldHeight), manualPath);
+        AssertClose(document.CellSize, scenario.BiomeCellSize, nameof(document.CellSize), manualPath);
+        AssertClose(document.ResourceVoidBorderWidth, scenario.ResourceVoidBorderWidth, nameof(document.ResourceVoidBorderWidth), manualPath);
+
+        var expectedCellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.BiomeCellSize));
+        var expectedCellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.BiomeCellSize));
+        if (document.CellCountX != expectedCellCountX || document.CellCountY != expectedCellCountY)
+        {
+            throw new InvalidOperationException(
+                $"Manual biome map '{manualPath}' is {document.CellCountX}x{document.CellCountY} cells, " +
+                $"but the scenario expects {expectedCellCountX}x{expectedCellCountY}.");
+        }
+    }
+
+    private static void AssertClose(float actual, float expected, string name, string manualPath)
+    {
+        if (MathF.Abs(actual - expected) > 0.0001f)
+        {
+            throw new InvalidOperationException(
+                $"Manual biome map '{manualPath}' {name} is {actual}, but the scenario expects {expected}.");
+        }
+    }
+
+    public static ObstacleMap CreateObstacleMap(SimulationScenario scenario, string? scenarioDirectory = null)
+    {
+        scenario = scenario.Validated();
         var bounds = new WorldBounds(scenario.WorldWidth, scenario.WorldHeight);
-        return scenario.EnableObstacles && scenario.ObstacleMapKind != ObstacleMapKind.None
-            ? ObstacleMap.Generate(bounds, scenario.ObstacleCellSize, scenario.ObstacleMapKind, scenario.Seed)
-            : ObstacleMap.CreateEmpty(bounds, scenario.ObstacleCellSize);
+        if (!scenario.EnableObstacles || scenario.ObstacleMapKind == ObstacleMapKind.None)
+        {
+            return ObstacleMap.CreateEmpty(bounds, scenario.ObstacleCellSize);
+        }
+
+        return scenario.ObstacleMapKind switch
+        {
+            ObstacleMapKind.Manual => LoadManualObstacleMap(scenario, scenarioDirectory),
+            _ => ObstacleMap.Generate(bounds, scenario.ObstacleCellSize, scenario.ObstacleMapKind, scenario.Seed)
+        };
+    }
+
+    private static string ResolveManualMapPath(string path, string? scenarioDirectory, string argumentName)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Manual map path is required.", argumentName);
+        }
+
+        if (Path.IsPathRooted(path))
+        {
+            return Path.GetFullPath(path);
+        }
+
+        var baseDirectory = string.IsNullOrWhiteSpace(scenarioDirectory)
+            ? Directory.GetCurrentDirectory()
+            : scenarioDirectory;
+        return Path.GetFullPath(Path.Combine(baseDirectory, path));
+    }
+
+    private static ObstacleMap LoadManualObstacleMap(SimulationScenario scenario, string? scenarioDirectory)
+    {
+        var manualPath = ResolveManualObstacleMapPath(
+            scenario.ManualObstacleMapPath
+                ?? throw new InvalidOperationException("Manual obstacle maps require manualObstacleMapPath."),
+            scenarioDirectory);
+        var document = ManualObstacleMapJson.Load(manualPath);
+        ValidateManualObstacleMapMatchesScenario(document, scenario, manualPath);
+        return document.ToObstacleMap();
+    }
+
+    private static void ValidateManualObstacleMapMatchesScenario(
+        ManualObstacleMapDocument document,
+        SimulationScenario scenario,
+        string manualPath)
+    {
+        AssertClose(document.WorldWidth, scenario.WorldWidth, nameof(document.WorldWidth), manualPath);
+        AssertClose(document.WorldHeight, scenario.WorldHeight, nameof(document.WorldHeight), manualPath);
+        AssertClose(document.CellSize, scenario.ObstacleCellSize, nameof(document.CellSize), manualPath);
+
+        var expectedCellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.ObstacleCellSize));
+        var expectedCellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.ObstacleCellSize));
+        if (document.CellCountX != expectedCellCountX || document.CellCountY != expectedCellCountY)
+        {
+            throw new InvalidOperationException(
+                $"Manual obstacle map '{manualPath}' is {document.CellCountX}x{document.CellCountY} cells, " +
+                $"but the scenario expects {expectedCellCountX}x{expectedCellCountY}.");
+        }
     }
 
     private static LocalFertilityMap CreateLocalFertilityMap(SimulationScenario scenario)
