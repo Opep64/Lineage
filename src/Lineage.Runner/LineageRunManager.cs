@@ -82,6 +82,23 @@ public sealed partial class LineageRunManager
             .ToArray();
     }
 
+    public IReadOnlyList<MapArtifactOption> ListMapArtifacts()
+    {
+        var mapRoot = MapArtifactRoot();
+        if (!Directory.Exists(mapRoot))
+        {
+            return Array.Empty<MapArtifactOption>();
+        }
+
+        return Directory
+            .EnumerateFiles(mapRoot, "*.lineage-map.json", SearchOption.AllDirectories)
+            .Select(TryReadMapArtifact)
+            .OfType<MapArtifactOption>()
+            .OrderBy(map => map.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(map => map.Path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public IReadOnlyList<ScenarioRecipe> ListScenarioRecipes()
     {
         var recipeRoot = ScenarioRecipeRoot();
@@ -342,6 +359,7 @@ public sealed partial class LineageRunManager
             Name = name,
             EnableBiomes = map is not null,
             BiomeMapKind = map is not null ? BiomeMapKind.Manual : scenario.BiomeMapKind,
+            WorldMapPath = null,
             ManualBiomeMapPath = manualBiomeMapPath,
             EnableObstacles = obstacleMap.BlockedCellCount > 0,
             ObstacleMapKind = obstacleMap.BlockedCellCount > 0 ? ObstacleMapKind.Manual : ObstacleMapKind.None,
@@ -374,6 +392,53 @@ public sealed partial class LineageRunManager
             BuildScenarioEditor(scenarioPath),
             mapPath is null ? null : NormalizeRelativePath(Path.GetRelativePath(_repoRoot, mapPath)),
             obstacleMapPath is null ? null : NormalizeRelativePath(Path.GetRelativePath(_repoRoot, obstacleMapPath)));
+    }
+
+    public MapArtifactSaveResult SaveMapArtifact(MapArtifactSaveRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Map name is required.");
+        }
+
+        if (request.Scenario.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        {
+            throw new ArgumentException("Scenario JSON is required.");
+        }
+
+        var scenario = SimulationScenarioJson.FromJson(request.Scenario.GetRawText());
+        if (request.Seed is { } seed)
+        {
+            scenario = scenario with { Seed = seed };
+        }
+
+        var scenarioDirectory = ResolveScenarioDirectory(request.ScenarioPath);
+        scenario = scenario.Validated();
+        var biomeMap = request.Cells is { Count: > 0 }
+            ? CreateBiomeMapFromEditedCells(scenario, request.Cells)
+            : SimulationScenarioFactory.CreateBiomeMap(scenario, scenarioDirectory);
+        var obstacleMap = request.ObstacleCells is { Count: > 0 }
+            ? CreateObstacleMapFromEditedCells(scenario, request.ObstacleCells)
+            : SimulationScenarioFactory.CreateObstacleMap(scenario, scenarioDirectory);
+
+        var mapRoot = UserMapArtifactRoot();
+        Directory.CreateDirectory(mapRoot);
+        var slug = Slugify(name);
+        var mapPath = GetUniquePath(Path.Combine(mapRoot, $"{slug}.lineage-map.json"));
+        EnsurePathInside(mapPath, mapRoot);
+        WorldMapArtifactJson.Save(
+            mapPath,
+            WorldMapArtifactDocument.FromMaps(
+                biomeMap,
+                obstacleMap,
+                name,
+                scenario.BiomeMapKind,
+                scenario.ObstacleMapKind,
+                scenario.Seed));
+
+        var option = ToMapArtifactOption(mapPath, WorldMapArtifactJson.Load(mapPath));
+        return new MapArtifactSaveResult(option, option.Path);
     }
 
     public ScenarioSaveResult SaveUserScenario(ScenarioSaveRequest request)
@@ -756,6 +821,16 @@ public sealed partial class LineageRunManager
         }
 
         var scenario = SimulationScenarioJson.FromJson(scenarioElement.Value.GetRawText());
+        if (!string.IsNullOrWhiteSpace(scenario.WorldMapPath))
+        {
+            scenario = scenario with
+            {
+                WorldMapPath = SimulationScenarioFactory.ResolveWorldMapPath(
+                    scenario.WorldMapPath,
+                    Path.GetDirectoryName(sourceScenarioPath))
+            };
+        }
+
         if (!string.IsNullOrWhiteSpace(scenario.ManualBiomeMapPath))
         {
             scenario = scenario with
@@ -1460,6 +1535,7 @@ public sealed partial class LineageRunManager
                 InitialResourcesPerMillionArea: resourceDensity,
                 InitialResourceCount: calculatedResourceCount ?? GetInt32(root, "initialResourceCount"),
                 BiomeMapKind: GetString(root, "biomeMapKind"),
+                WorldMapPath: GetString(root, "worldMapPath"),
                 EnableObstacles: GetBoolean(root, "enableObstacles"),
                 ObstacleMapKind: GetString(root, "obstacleMapKind"),
                 ResourceVoidBorderWidth: GetDouble(root, "resourceVoidBorderWidth"),
@@ -1869,6 +1945,16 @@ public sealed partial class LineageRunManager
         return Path.Combine(_repoRoot, "scenarios", UserScenarioFolderName);
     }
 
+    private string MapArtifactRoot()
+    {
+        return Path.Combine(_repoRoot, "maps");
+    }
+
+    private string UserMapArtifactRoot()
+    {
+        return Path.Combine(MapArtifactRoot(), UserScenarioFolderName);
+    }
+
     private string UserScenarioRegistryPath()
     {
         return Path.Combine(UserScenarioRoot(), UserScenarioRegistryFileName);
@@ -1926,6 +2012,42 @@ public sealed partial class LineageRunManager
             Changes: CloneJsonObject(file.Changes ?? new JsonObject()),
             CreatedAtUtc: file.CreatedAtUtc,
             UpdatedAtUtc: file.UpdatedAtUtc);
+    }
+
+    private MapArtifactOption? TryReadMapArtifact(string path)
+    {
+        try
+        {
+            return ToMapArtifactOption(path, WorldMapArtifactJson.Load(path));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private MapArtifactOption ToMapArtifactOption(string path, WorldMapArtifactDocument document)
+    {
+        var validated = document.Validated();
+        var blockedCells = validated.ObstacleBlockedCells.Count(static blocked => blocked);
+        return new MapArtifactOption(
+            Name: string.IsNullOrWhiteSpace(validated.Name)
+                ? Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path))
+                : validated.Name,
+            Path: NormalizeArtifactRelativePath(path),
+            WorldWidth: validated.WorldWidth,
+            WorldHeight: validated.WorldHeight,
+            BiomeCellSize: validated.BiomeCellSize,
+            BiomeCellCountX: validated.BiomeCellCountX,
+            BiomeCellCountY: validated.BiomeCellCountY,
+            ResourceVoidBorderWidth: validated.ResourceVoidBorderWidth,
+            ObstacleCellSize: validated.ObstacleCellSize,
+            ObstacleCellCountX: validated.ObstacleCellCountX,
+            ObstacleCellCountY: validated.ObstacleCellCountY,
+            ObstacleBlockedCellCount: blockedCells,
+            SourceSeed: validated.SourceSeed,
+            SourceBiomeMapKind: validated.SourceBiomeMapKind?.ToString(),
+            SourceObstacleMapKind: validated.SourceObstacleMapKind?.ToString());
     }
 
     private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)
@@ -2064,7 +2186,7 @@ public sealed partial class LineageRunManager
 
         if (!fullPath.StartsWith(fullRoot, comparison))
         {
-            throw new InvalidOperationException("Scenario path is outside the managed user scenario folder.");
+            throw new InvalidOperationException("Path is outside the managed folder.");
         }
     }
 
@@ -2075,6 +2197,14 @@ public sealed partial class LineageRunManager
             .Replace('\\', Path.DirectorySeparatorChar)
             .Replace('/', Path.DirectorySeparatorChar)
             .TrimStart(Path.DirectorySeparatorChar);
+    }
+
+    private string NormalizeArtifactRelativePath(string path)
+    {
+        return Path.GetRelativePath(_repoRoot, path)
+            .Trim()
+            .Replace('\\', '/')
+            .TrimStart('/');
     }
 
     private static string GetUniqueArchivePath(string preferredPath)
@@ -2322,7 +2452,7 @@ public sealed partial class LineageRunManager
         var current = ResolveBuildConfiguration();
         return string.Equals(current, "Release", StringComparison.OrdinalIgnoreCase)
             ? ["Release", "Debug"]
-            : ["Release", current];
+            : [current, "Release"];
     }
 
     private static string FormatCommandLine(string fileName, IEnumerable<string> arguments)
@@ -2471,6 +2601,7 @@ public sealed partial class LineageRunManager
             new[]
             {
                 summary.BiomeMapKind is null ? null : $"biomes {summary.BiomeMapKind}",
+                summary.WorldMapPath is null ? null : $"world map {summary.WorldMapPath}",
                 summary.EnableObstacles is null ? null : $"obstacles {FormatBoolean(summary.EnableObstacles.Value)}",
                 summary.ObstacleMapKind is null ? null : $"obstacle map {summary.ObstacleMapKind}"
             }.Where(value => !string.IsNullOrWhiteSpace(value)));

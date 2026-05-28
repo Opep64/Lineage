@@ -86,6 +86,35 @@ public sealed record ManualBiomeMapSaveResult(
     string? MapPath,
     string? ObstacleMapPath);
 
+public sealed record MapArtifactOption(
+    string Name,
+    string Path,
+    double WorldWidth,
+    double WorldHeight,
+    double BiomeCellSize,
+    int BiomeCellCountX,
+    int BiomeCellCountY,
+    double ResourceVoidBorderWidth,
+    double ObstacleCellSize,
+    int ObstacleCellCountX,
+    int ObstacleCellCountY,
+    int ObstacleBlockedCellCount,
+    ulong? SourceSeed,
+    string? SourceBiomeMapKind,
+    string? SourceObstacleMapKind);
+
+public sealed record MapArtifactSaveRequest(
+    string Name,
+    JsonElement Scenario,
+    ulong? Seed,
+    string? ScenarioPath,
+    IReadOnlyList<string>? Cells,
+    IReadOnlyList<bool>? ObstacleCells);
+
+public sealed record MapArtifactSaveResult(
+    MapArtifactOption Map,
+    string WorldMapPath);
+
 public sealed record ScenarioRecipe(
     string Name,
     string Path,
@@ -192,6 +221,7 @@ public sealed record RunScenarioSummary(
     double? InitialResourcesPerMillionArea,
     int? InitialResourceCount,
     string? BiomeMapKind,
+    string? WorldMapPath,
     bool? EnableObstacles,
     string? ObstacleMapKind,
     double? ResourceVoidBorderWidth,

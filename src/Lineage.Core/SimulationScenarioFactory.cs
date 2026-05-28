@@ -291,8 +291,21 @@ public static class SimulationScenarioFactory
         return ResolveManualMapPath(manualObstacleMapPath, scenarioDirectory, nameof(manualObstacleMapPath));
     }
 
+    public static string ResolveWorldMapPath(string worldMapPath, string? scenarioDirectory = null)
+    {
+        return ResolveManualMapPath(worldMapPath, scenarioDirectory, nameof(worldMapPath));
+    }
+
     private static BiomeMap LoadManualBiomeMap(SimulationScenario scenario, string? scenarioDirectory)
     {
+        if (!string.IsNullOrWhiteSpace(scenario.WorldMapPath))
+        {
+            var worldMapPath = ResolveWorldMapPath(scenario.WorldMapPath, scenarioDirectory);
+            var worldMap = WorldMapArtifactJson.Load(worldMapPath);
+            ValidateWorldMapBiomeMatchesScenario(worldMap, scenario, worldMapPath);
+            return worldMap.ToBiomeMap();
+        }
+
         var manualPath = ResolveManualBiomeMapPath(
             scenario.ManualBiomeMapPath
                 ?? throw new InvalidOperationException("Manual biome maps require manualBiomeMapPath."),
@@ -322,12 +335,37 @@ public static class SimulationScenarioFactory
         }
     }
 
-    private static void AssertClose(float actual, float expected, string name, string manualPath)
+    private static void ValidateWorldMapBiomeMatchesScenario(
+        WorldMapArtifactDocument document,
+        SimulationScenario scenario,
+        string worldMapPath)
+    {
+        AssertClose(document.WorldWidth, scenario.WorldWidth, nameof(document.WorldWidth), worldMapPath, "World map artifact");
+        AssertClose(document.WorldHeight, scenario.WorldHeight, nameof(document.WorldHeight), worldMapPath, "World map artifact");
+        AssertClose(document.BiomeCellSize, scenario.BiomeCellSize, nameof(document.BiomeCellSize), worldMapPath, "World map artifact");
+        AssertClose(document.ResourceVoidBorderWidth, scenario.ResourceVoidBorderWidth, nameof(document.ResourceVoidBorderWidth), worldMapPath, "World map artifact");
+
+        var expectedCellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.BiomeCellSize));
+        var expectedCellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.BiomeCellSize));
+        if (document.BiomeCellCountX != expectedCellCountX || document.BiomeCellCountY != expectedCellCountY)
+        {
+            throw new InvalidOperationException(
+                $"World map artifact '{worldMapPath}' biome grid is {document.BiomeCellCountX}x{document.BiomeCellCountY} cells, " +
+                $"but the scenario expects {expectedCellCountX}x{expectedCellCountY}.");
+        }
+    }
+
+    private static void AssertClose(
+        float actual,
+        float expected,
+        string name,
+        string manualPath,
+        string mapLabel = "Manual biome map")
     {
         if (MathF.Abs(actual - expected) > 0.0001f)
         {
             throw new InvalidOperationException(
-                $"Manual biome map '{manualPath}' {name} is {actual}, but the scenario expects {expected}.");
+                $"{mapLabel} '{manualPath}' {name} is {actual}, but the scenario expects {expected}.");
         }
     }
 
@@ -362,11 +400,35 @@ public static class SimulationScenarioFactory
         var baseDirectory = string.IsNullOrWhiteSpace(scenarioDirectory)
             ? Directory.GetCurrentDirectory()
             : scenarioDirectory;
-        return Path.GetFullPath(Path.Combine(baseDirectory, path));
+        var scenarioRelativePath = Path.GetFullPath(Path.Combine(baseDirectory, path));
+        if (File.Exists(scenarioRelativePath))
+        {
+            return scenarioRelativePath;
+        }
+
+        var repositoryRoot = TryFindRepositoryRoot(baseDirectory);
+        if (!string.IsNullOrWhiteSpace(repositoryRoot))
+        {
+            var repositoryRelativePath = Path.GetFullPath(Path.Combine(repositoryRoot, path));
+            if (File.Exists(repositoryRelativePath))
+            {
+                return repositoryRelativePath;
+            }
+        }
+
+        return scenarioRelativePath;
     }
 
     private static ObstacleMap LoadManualObstacleMap(SimulationScenario scenario, string? scenarioDirectory)
     {
+        if (!string.IsNullOrWhiteSpace(scenario.WorldMapPath))
+        {
+            var worldMapPath = ResolveWorldMapPath(scenario.WorldMapPath, scenarioDirectory);
+            var worldMap = WorldMapArtifactJson.Load(worldMapPath);
+            ValidateWorldMapObstacleMatchesScenario(worldMap, scenario, worldMapPath);
+            return worldMap.ToObstacleMap();
+        }
+
         var manualPath = ResolveManualObstacleMapPath(
             scenario.ManualObstacleMapPath
                 ?? throw new InvalidOperationException("Manual obstacle maps require manualObstacleMapPath."),
@@ -381,9 +443,9 @@ public static class SimulationScenarioFactory
         SimulationScenario scenario,
         string manualPath)
     {
-        AssertClose(document.WorldWidth, scenario.WorldWidth, nameof(document.WorldWidth), manualPath);
-        AssertClose(document.WorldHeight, scenario.WorldHeight, nameof(document.WorldHeight), manualPath);
-        AssertClose(document.CellSize, scenario.ObstacleCellSize, nameof(document.CellSize), manualPath);
+        AssertClose(document.WorldWidth, scenario.WorldWidth, nameof(document.WorldWidth), manualPath, "Manual obstacle map");
+        AssertClose(document.WorldHeight, scenario.WorldHeight, nameof(document.WorldHeight), manualPath, "Manual obstacle map");
+        AssertClose(document.CellSize, scenario.ObstacleCellSize, nameof(document.CellSize), manualPath, "Manual obstacle map");
 
         var expectedCellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.ObstacleCellSize));
         var expectedCellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.ObstacleCellSize));
@@ -393,6 +455,41 @@ public static class SimulationScenarioFactory
                 $"Manual obstacle map '{manualPath}' is {document.CellCountX}x{document.CellCountY} cells, " +
                 $"but the scenario expects {expectedCellCountX}x{expectedCellCountY}.");
         }
+    }
+
+    private static void ValidateWorldMapObstacleMatchesScenario(
+        WorldMapArtifactDocument document,
+        SimulationScenario scenario,
+        string worldMapPath)
+    {
+        AssertClose(document.WorldWidth, scenario.WorldWidth, nameof(document.WorldWidth), worldMapPath, "World map artifact");
+        AssertClose(document.WorldHeight, scenario.WorldHeight, nameof(document.WorldHeight), worldMapPath, "World map artifact");
+        AssertClose(document.ObstacleCellSize, scenario.ObstacleCellSize, nameof(document.ObstacleCellSize), worldMapPath, "World map artifact");
+
+        var expectedCellCountX = Math.Max(1, (int)MathF.Ceiling(scenario.WorldWidth / scenario.ObstacleCellSize));
+        var expectedCellCountY = Math.Max(1, (int)MathF.Ceiling(scenario.WorldHeight / scenario.ObstacleCellSize));
+        if (document.ObstacleCellCountX != expectedCellCountX || document.ObstacleCellCountY != expectedCellCountY)
+        {
+            throw new InvalidOperationException(
+                $"World map artifact '{worldMapPath}' obstacle grid is {document.ObstacleCellCountX}x{document.ObstacleCellCountY} cells, " +
+                $"but the scenario expects {expectedCellCountX}x{expectedCellCountY}.");
+        }
+    }
+
+    private static string? TryFindRepositoryRoot(string startDirectory)
+    {
+        var directory = new DirectoryInfo(Path.GetFullPath(startDirectory));
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Lineage.slnx")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
     }
 
     private static LocalFertilityMap CreateLocalFertilityMap(SimulationScenario scenario)

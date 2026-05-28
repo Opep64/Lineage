@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260527-map-painter-walls2">
+  <link rel="stylesheet" href="/styles.css?v=20260527-map-artifacts1">
 </head>
 <body>
   <header class="app-header">
@@ -70,6 +70,14 @@
                 <option value="erase">Erase</option>
               </select>
             </label>
+            <label class="biome-brush-label">
+              Reusable Map
+              <select id="mapArtifactSelect" disabled>
+                <option value="">No saved maps</option>
+              </select>
+            </label>
+            <button id="applyMapArtifactButton" class="secondary" type="button" disabled>Apply Map</button>
+            <button id="saveMapArtifactButton" class="secondary" type="button" disabled>Save Reusable Map</button>
             <button id="paintBiomeMapButton" class="secondary" type="button" disabled>Paint Map</button>
             <button id="saveManualBiomeMapButton" class="secondary" type="button" disabled>Save Manual Copy</button>
             <button id="toggleBiomePreviewButton" class="secondary" type="button" aria-expanded="true" aria-controls="biomePreviewContent">Hide Map</button>
@@ -216,6 +224,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260527-map-painter-walls2"></script>
+  <script src="/app.js?v=20260527-map-artifacts1"></script>
 </body>
 </html>

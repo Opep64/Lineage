@@ -113,6 +113,20 @@ api.MapPost("/manual-biome-maps", (ManualBiomeMapSaveRequest request, LineageRun
     }
 });
 
+api.MapGet("/map-artifacts", (LineageRunManager manager) => Results.Ok(manager.ListMapArtifacts()));
+
+api.MapPost("/map-artifacts", (MapArtifactSaveRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.SaveMapArtifact(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
 
 api.MapPost("/runs/export", (RunExportRequest request, LineageRunManager manager) =>

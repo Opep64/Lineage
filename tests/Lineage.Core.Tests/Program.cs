@@ -174,6 +174,7 @@ var tests = new (string Name, Action Body)[]
     ("Resource void clipped biome cells are skipped during sampling", ResourceVoidClippedBiomeCellsAreSkippedDuringSampling),
     ("Manual biome map JSON round trips", ManualBiomeMapJsonRoundTrips),
     ("Manual obstacle map JSON round trips", ManualObstacleMapJsonRoundTrips),
+    ("World map artifact JSON round trips", WorldMapArtifactJsonRoundTrips),
     ("Creature-only spatial rebuild preserves static entities", CreatureOnlySpatialRebuildPreservesStaticEntities),
     ("Persistent spatial rebuild removes decayed resources", PersistentSpatialRebuildRemovesDecayedResources),
     ("Persistent spatial rebuild removes hatched eggs", PersistentSpatialRebuildRemovesHatchedEggs),
@@ -181,6 +182,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors biome map kind", ScenarioFactoryHonorsBiomeMapKind),
     ("Scenario factory honors manual biome map path", ScenarioFactoryHonorsManualBiomeMapPath),
     ("Scenario factory honors manual obstacle map path", ScenarioFactoryHonorsManualObstacleMapPath),
+    ("Scenario factory honors world map path", ScenarioFactoryHonorsWorldMapPath),
     ("Scenario factory honors natural climate biome map kind", ScenarioFactoryHonorsNaturalClimateBiomeMapKind),
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
@@ -7679,6 +7681,62 @@ static void ManualObstacleMapJsonRoundTrips()
     AssertTrue(!loadedMap.IsBlocked(2, 0), "Manual obstacle map open cell");
 }
 
+static void WorldMapArtifactJsonRoundTrips()
+{
+    var biomeMap = BiomeMap.CreateFromCells(
+        new WorldBounds(300f, 200f),
+        100f,
+        3,
+        2,
+        [
+            BiomeKind.Desert,
+            BiomeKind.Grassland,
+            BiomeKind.Forest,
+            BiomeKind.Wetland,
+            BiomeKind.Fertile,
+            BiomeKind.Scrubland
+        ],
+        12f);
+    var obstacleMap = ObstacleMap.CreateFromCells(
+        new WorldBounds(300f, 200f),
+        50f,
+        6,
+        4,
+        [
+            false, true, false, false, false, false,
+            false, false, false, true, false, false,
+            false, false, false, false, true, false,
+            true, false, false, false, false, false
+        ]);
+    var document = WorldMapArtifactDocument.FromMaps(
+        biomeMap,
+        obstacleMap,
+        "Reusable valley",
+        BiomeMapKind.NaturalClimate,
+        ObstacleMapKind.VerticalBarrierWithGaps,
+        42UL);
+
+    var json = WorldMapArtifactJson.ToJson(document);
+    var roundTripped = WorldMapArtifactJson.FromJson(json);
+    var loadedBiomeMap = roundTripped.ToBiomeMap();
+    var loadedObstacleMap = roundTripped.ToObstacleMap();
+
+    AssertTrue(json.Contains("\"schemaVersion\": \"lineage.worldMap.v1\""), "World map artifact JSON should serialize schema version");
+    AssertTrue(json.Contains("\"sourceBiomeMapKind\": \"naturalClimate\""), "World map artifact JSON should serialize source biome map kind");
+    AssertTrue(json.Contains("\"sourceObstacleMapKind\": \"verticalBarrierWithGaps\""), "World map artifact JSON should serialize source obstacle map kind");
+    AssertTrue(json.Contains("\"biomeCells\""), "World map artifact JSON should serialize biome cells");
+    AssertTrue(json.Contains("\"obstacleBlockedCells\""), "World map artifact JSON should serialize obstacle cells");
+    AssertEqual("Reusable valley", roundTripped.Name, "World map artifact name");
+    AssertEqual(42UL, roundTripped.SourceSeed ?? 0UL, "World map artifact source seed");
+    AssertClose(biomeMap.Bounds.Width, loadedBiomeMap.Bounds.Width, 0.000001, "World map biome width");
+    AssertClose(biomeMap.CellSize, loadedBiomeMap.CellSize, 0.000001, "World map biome cell size");
+    AssertEqual(BiomeKind.Forest, loadedBiomeMap.GetKind(2, 0), "World map forest cell");
+    AssertEqual(BiomeKind.Fertile, loadedBiomeMap.GetKind(1, 1), "World map fertile cell");
+    AssertClose(obstacleMap.CellSize, loadedObstacleMap.CellSize, 0.000001, "World map obstacle cell size");
+    AssertTrue(loadedObstacleMap.IsBlocked(1, 0), "World map obstacle blocked cell");
+    AssertTrue(!loadedObstacleMap.IsBlocked(2, 0), "World map obstacle open cell");
+}
+
 static void ScenarioFactoryHonorsManualObstacleMapPath()
 {
     var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_manual_obstacle_{Guid.NewGuid():N}");
@@ -7722,6 +7780,79 @@ static void ScenarioFactoryHonorsManualObstacleMapPath()
         AssertThrows<InvalidOperationException>(
             () => SimulationScenarioFactory.CreateSimulation(scenario with { WorldWidth = 400f }, tempRoot),
             "Manual obstacle map dimensions must match the scenario");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+static void ScenarioFactoryHonorsWorldMapPath()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_world_map_{Guid.NewGuid():N}");
+    try
+    {
+        var mapPath = Path.Combine(tempRoot, "maps", "painted.lineage-map.json");
+        var biomeMap = BiomeMap.CreateFromCells(
+            new WorldBounds(300f, 200f),
+            100f,
+            3,
+            2,
+            [
+                BiomeKind.Desert,
+                BiomeKind.Grassland,
+                BiomeKind.Forest,
+                BiomeKind.Wetland,
+                BiomeKind.Fertile,
+                BiomeKind.Scrubland
+            ],
+            10f);
+        var obstacleMap = ObstacleMap.CreateFromCells(
+            new WorldBounds(300f, 200f),
+            100f,
+            3,
+            2,
+            [false, true, false, false, false, true]);
+        WorldMapArtifactJson.Save(
+            mapPath,
+            WorldMapArtifactDocument.FromMaps(
+                biomeMap,
+                obstacleMap,
+                "Painted world",
+                BiomeMapKind.NaturalClimate,
+                ObstacleMapKind.VerticalBarrierWithGaps,
+                123UL));
+
+        var scenario = new SimulationScenario
+        {
+            Seed = 77UL,
+            BiomeMapKind = BiomeMapKind.Manual,
+            WorldMapPath = Path.Combine("maps", "painted.lineage-map.json"),
+            EnableObstacles = true,
+            ObstacleMapKind = ObstacleMapKind.Manual,
+            WorldWidth = 300f,
+            WorldHeight = 200f,
+            BiomeCellSize = 100f,
+            ObstacleCellSize = 100f,
+            ResourceVoidBorderWidth = 10f,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f
+        };
+
+        var simulation = SimulationScenarioFactory.CreateSimulation(scenario, tempRoot);
+
+        AssertEqual(BiomeKind.Desert, simulation.State.Biomes.GetKind(0, 0), "World map first biome cell");
+        AssertEqual(BiomeKind.Forest, simulation.State.Biomes.GetKind(2, 0), "World map forest cell");
+        AssertEqual(BiomeKind.Fertile, simulation.State.Biomes.GetKind(1, 1), "World map fertile cell");
+        AssertTrue(simulation.State.Obstacles.IsBlocked(1, 0), "World map blocked first row");
+        AssertTrue(!simulation.State.Obstacles.IsBlocked(0, 1), "World map open second row");
+        AssertTrue(simulation.State.Obstacles.IsBlocked(2, 1), "World map blocked second row");
+        AssertThrows<InvalidOperationException>(
+            () => SimulationScenarioFactory.CreateSimulation(scenario with { ObstacleCellSize = 50f }, tempRoot),
+            "World map obstacle dimensions must match the scenario");
     }
     finally
     {
@@ -8840,6 +8971,7 @@ static void ScenarioJsonRoundTrips()
         BrainHiddenNodeCount = 16,
         EnableBiomes = false,
         BiomeMapKind = BiomeMapKind.HorizontalBands,
+        WorldMapPath = "maps/user/painted.lineage-map.json",
         ManualBiomeMapPath = "maps/painted.json",
         EnableObstacles = true,
         ObstacleMapKind = ObstacleMapKind.ScatteredRocks,
@@ -8989,9 +9121,10 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"brainHiddenNodeCount\": 16"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
-    AssertTrue(json.Contains("\"manualBiomeMapPath\": \"maps/painted.json\""), "JSON should serialize manual biome map path");
+    AssertTrue(json.Contains("\"worldMapPath\": \"maps/user/painted.lineage-map.json\""), "JSON should serialize world map path");
+    AssertTrue(json.Contains("\"manualBiomeMapPath\": null"), "JSON should clear manual biome map path when world map path is present");
     AssertTrue(json.Contains("\"obstacleMapKind\": \"scatteredRocks\""), "JSON should serialize obstacle map kind as a string");
-    AssertTrue(json.Contains("\"manualObstacleMapPath\": \"maps/walls.json\""), "JSON should serialize manual obstacle map path");
+    AssertTrue(json.Contains("\"manualObstacleMapPath\": null"), "JSON should clear manual obstacle map path when world map path is present");
     AssertTrue(json.Contains("\"initialCreatureSpawnRegion\": \"rightThird\""), "JSON should serialize initial spawn region");
     AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
@@ -9026,10 +9159,11 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(scenario.BrainHiddenNodeCount, roundTripped.BrainHiddenNodeCount, "Scenario brain hidden nodes");
     AssertEqual(scenario.EnableBiomes, roundTripped.EnableBiomes, "Scenario biome mode");
     AssertEqual(scenario.BiomeMapKind, roundTripped.BiomeMapKind, "Scenario biome map kind");
-    AssertEqual(scenario.ManualBiomeMapPath, roundTripped.ManualBiomeMapPath, "Scenario manual biome map path");
+    AssertEqual(scenario.WorldMapPath, roundTripped.WorldMapPath, "Scenario world map path");
+    AssertEqual(null, roundTripped.ManualBiomeMapPath, "Scenario manual biome map path cleared by world map");
     AssertEqual(scenario.EnableObstacles, roundTripped.EnableObstacles, "Scenario obstacle mode");
     AssertEqual(scenario.ObstacleMapKind, roundTripped.ObstacleMapKind, "Scenario obstacle map kind");
-    AssertEqual(scenario.ManualObstacleMapPath, roundTripped.ManualObstacleMapPath, "Scenario manual obstacle map path");
+    AssertEqual(null, roundTripped.ManualObstacleMapPath, "Scenario manual obstacle map path cleared by world map");
     AssertClose(scenario.ObstacleCellSize, roundTripped.ObstacleCellSize, 0.000001, "Scenario obstacle cell size");
     AssertClose(scenario.BiomeCellSize, roundTripped.BiomeCellSize, 0.000001, "Scenario biome cell size");
     AssertClose(scenario.ResourceVoidBorderWidth, roundTripped.ResourceVoidBorderWidth, 0.000001, "Scenario resource void border");

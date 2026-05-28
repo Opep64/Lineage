@@ -39,6 +39,8 @@ public sealed record SimulationScenario
 
     public BiomeMapKind BiomeMapKind { get; init; } = BiomeMapKind.NaturalClimate;
 
+    public string? WorldMapPath { get; init; }
+
     public string? ManualBiomeMapPath { get; init; }
 
     public bool EnableObstacles { get; init; }
@@ -361,17 +363,19 @@ public sealed record SimulationScenario
         EnsureEnumDefined(BiomeMapKind, nameof(BiomeMapKind));
         if (EnableBiomes
             && BiomeMapKind == BiomeMapKind.Manual
-            && string.IsNullOrWhiteSpace(ManualBiomeMapPath))
+            && string.IsNullOrWhiteSpace(ManualBiomeMapPath)
+            && string.IsNullOrWhiteSpace(WorldMapPath))
         {
-            throw new InvalidOperationException("Manual biome maps require manualBiomeMapPath.");
+            throw new InvalidOperationException("Manual biome maps require manualBiomeMapPath or worldMapPath.");
         }
 
         EnsureEnumDefined(ObstacleMapKind, nameof(ObstacleMapKind));
         if (EnableObstacles
             && ObstacleMapKind == ObstacleMapKind.Manual
-            && string.IsNullOrWhiteSpace(ManualObstacleMapPath))
+            && string.IsNullOrWhiteSpace(ManualObstacleMapPath)
+            && string.IsNullOrWhiteSpace(WorldMapPath))
         {
-            throw new InvalidOperationException("Manual obstacle maps require manualObstacleMapPath.");
+            throw new InvalidOperationException("Manual obstacle maps require manualObstacleMapPath or worldMapPath.");
         }
 
         EnsureHiddenNodeCount(BrainHiddenNodeCount, nameof(BrainHiddenNodeCount));
@@ -523,13 +527,18 @@ public sealed record SimulationScenario
             throw new InvalidOperationException("Reproductive senescence age must be greater than or equal to prime age.");
         }
 
+        var normalizedWorldMapPath = string.IsNullOrWhiteSpace(WorldMapPath)
+            ? null
+            : WorldMapPath.Trim();
+
         return this with
         {
             BrainHiddenNodeCount = BrainFactory.ResolveHiddenNodeCount(BrainArchitectureKind, BrainHiddenNodeCount),
-            ManualBiomeMapPath = string.IsNullOrWhiteSpace(ManualBiomeMapPath)
+            WorldMapPath = normalizedWorldMapPath,
+            ManualBiomeMapPath = normalizedWorldMapPath is not null || string.IsNullOrWhiteSpace(ManualBiomeMapPath)
                 ? null
                 : ManualBiomeMapPath.Trim(),
-            ManualObstacleMapPath = string.IsNullOrWhiteSpace(ManualObstacleMapPath)
+            ManualObstacleMapPath = normalizedWorldMapPath is not null || string.IsNullOrWhiteSpace(ManualObstacleMapPath)
                 ? null
                 : ManualObstacleMapPath.Trim(),
             SpeciesSeeds = speciesSeeds
