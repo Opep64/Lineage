@@ -30,6 +30,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         "Energy & Movement",
         "Reproduction",
         "Diet & Combat",
+        "Performance",
         "Species",
         "Advanced"
     ];

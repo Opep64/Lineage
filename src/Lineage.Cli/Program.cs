@@ -98,6 +98,8 @@ static void PrintHelp()
           --status-interval <n>      Status write interval in ticks. Default: 100
           --status-detail-interval <n> Recompute heavier status metrics every n ticks. Default: 1000
           --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
+          --reuse-neural-actions-on-skipped-world-senses Reuse prior neural outputs when world senses are stale.
+          --no-reuse-neural-actions-on-skipped-world-senses Disable stale-world-sense neural action reuse.
           --prune-extinct-payloads   Compact genome/brain payloads not referenced by living creatures or eggs.
           --prune-extinct-payload-interval <n> Payload pruning interval in ticks. Default: scenario value.
           --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
@@ -957,6 +959,8 @@ internal sealed record RunOptions
 
     public bool StopOnExtinction { get; init; }
 
+    public bool? ReuseNeuralActionsOnSkippedWorldSensesOverride { get; init; }
+
     public bool EnableExtinctPayloadPruning { get; init; }
 
     public int? ExtinctPayloadPruneIntervalTicksOverride { get; init; }
@@ -1076,6 +1080,8 @@ internal sealed record RunOptions
             InitialCreatureCount = InitialCreatureCountOverride ?? scenario.InitialCreatureCount,
             SpatialCellSize = SpatialCellSizeOverride ?? scenario.SpatialCellSize,
             StatsSnapshotIntervalTicks = SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks,
+            ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
+                ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
             EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
             ExtinctPayloadPruneIntervalTicks = ExtinctPayloadPruneIntervalTicksOverride
                 ?? scenario.ExtinctPayloadPruneIntervalTicks
@@ -1107,6 +1113,8 @@ internal sealed record RunOptions
     {
         return scenario with
         {
+            ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
+                ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
             EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
             ExtinctPayloadPruneIntervalTicks = ExtinctPayloadPruneIntervalTicksOverride
                 ?? scenario.ExtinctPayloadPruneIntervalTicks
@@ -1313,6 +1321,12 @@ internal sealed record RunOptions
                     break;
                 case "--stop-on-extinction":
                     options = options with { StopOnExtinction = true };
+                    break;
+                case "--reuse-neural-actions-on-skipped-world-senses":
+                    options = options with { ReuseNeuralActionsOnSkippedWorldSensesOverride = true };
+                    break;
+                case "--no-reuse-neural-actions-on-skipped-world-senses":
+                    options = options with { ReuseNeuralActionsOnSkippedWorldSensesOverride = false };
                     break;
                 case "--prune-extinct-payloads":
                     options = options with { EnableExtinctPayloadPruning = true };
