@@ -21,3 +21,6 @@ artifacts/
 
 # Launcher-managed local scenario scratch files
 scenarios/user/
+
+# Launcher-managed local map artifacts
+maps/user/

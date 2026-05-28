@@ -58,7 +58,6 @@ const mapArtifactSelect = document.querySelector("#mapArtifactSelect");
 const applyMapArtifactButton = document.querySelector("#applyMapArtifactButton");
 const saveMapArtifactButton = document.querySelector("#saveMapArtifactButton");
 const paintBiomeMapButton = document.querySelector("#paintBiomeMapButton");
-const saveManualBiomeMapButton = document.querySelector("#saveManualBiomeMapButton");
 
 let refreshTimer = null;
 let allRuns = [];
@@ -886,9 +885,9 @@ function setBiomePaintEnabled(enabled) {
   if (biomePreviewStatus && currentBiomePreview) {
     const layer = paintLayerSelect?.value === "obstacle" ? "wall" : "biome";
     biomePreviewStatus.textContent = biomePaintEnabled
-      ? `Painting ${layer} cells. Drag on the map, then save a manual copy.`
+      ? `Painting ${layer} cells. Drag on the map, then save a reusable map.`
       : biomePaintDirty
-        ? "Manual map edits are unsaved."
+        ? "Map edits are unsaved."
         : "Preview reflects the scenario options and launch seed override above.";
   }
 }
@@ -918,11 +917,6 @@ function updateBiomePaintControls() {
   if (paintBiomeMapButton) {
     paintBiomeMapButton.disabled = !canEdit;
     paintBiomeMapButton.textContent = biomePaintEnabled ? "Stop Painting" : "Paint Map";
-  }
-
-  if (saveManualBiomeMapButton) {
-    saveManualBiomeMapButton.disabled = !canEdit;
-    saveManualBiomeMapButton.textContent = biomePaintDirty ? "Save Manual Copy *" : "Save Manual Copy";
   }
 
   if (mapArtifactSelect) {
@@ -1405,74 +1399,17 @@ function endBiomePaint(event) {
   biomePreviewCanvas.releasePointerCapture?.(event.pointerId);
 }
 
-async function saveManualBiomeMap() {
-  if (!currentBiomePreview || !scenarioEditor) {
-    formMessage.textContent = "Render a map preview before saving a manual copy.";
-    return;
+async function saveMapArtifact() {
+  const result = await promptAndSaveMapArtifact();
+  if (result) {
+    formMessage.textContent = `Saved reusable map ${result.map.name} at ${result.worldMapPath}. Save the scenario to keep using it.`;
   }
-
-  let scenario;
-  try {
-    scenario = collectScenarioOptions();
-  } catch (error) {
-    formMessage.textContent = error.message;
-    return;
-  }
-
-  const currentName = scenario?.name || selectedScenarioOption()?.name || "Manual Map";
-  const name = prompt("Save manual map scenario as", `${currentName} Manual`);
-  if (name === null) {
-    return;
-  }
-
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    formMessage.textContent = "Manual map scenario name is required.";
-    return;
-  }
-
-  saveManualBiomeMapButton.disabled = true;
-  formMessage.textContent = "Saving manual map scenario...";
-  const response = await fetch("/api/manual-biome-maps", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: trimmedName,
-      scenario,
-      seed: valueOrNull("#seed"),
-      scenarioPath: scenarioSelect.value,
-      cells: currentBiomePreview.enabled ? currentBiomePreview.cells : null,
-      obstacleCells: currentBiomePreview.obstacleCells
-    })
-  });
-
-  if (!response.ok) {
-    formMessage.textContent = await responseErrorMessage(
-      response,
-      "Manual map save failed.",
-      response.status === 405
-        ? "The running Runner backend does not have the manual map save endpoint yet. Restart Lineage Runner and refresh this page."
-        : null);
-    updateBiomePaintControls();
-    return;
-  }
-
-  const result = await response.json();
-  biomePaintDirty = false;
-  setBiomePaintEnabled(false);
-  await loadScenarios(result.scenario.path);
-  scenarioOptionsPanel.hidden = false;
-  const savedParts = [
-    result.mapPath ? `map ${result.mapPath}` : null,
-    result.obstacleMapPath ? `walls ${result.obstacleMapPath}` : null
-  ].filter(Boolean).join(" and ");
-  formMessage.textContent = `Saved manual scenario ${result.scenario.name}${savedParts ? ` with ${savedParts}` : ""}.`;
 }
 
-async function saveMapArtifact() {
+async function promptAndSaveMapArtifact() {
   if (!currentBiomePreview || !scenarioEditor) {
     formMessage.textContent = "Render a map preview before saving a reusable map.";
-    return;
+    return null;
   }
 
   let scenario;
@@ -1480,28 +1417,32 @@ async function saveMapArtifact() {
     scenario = collectScenarioOptions();
   } catch (error) {
     formMessage.textContent = error.message;
-    return;
+    return null;
   }
 
   const currentName = scenario?.name || selectedScenarioOption()?.name || "Reusable Map";
   const name = prompt("Save reusable map as", `${currentName} Map`);
   if (name === null) {
-    return;
+    return null;
   }
 
   const trimmedName = name.trim();
   if (!trimmedName) {
     formMessage.textContent = "Map name is required.";
-    return;
+    return null;
   }
 
+  return saveMapArtifactFromScenario(trimmedName, scenario);
+}
+
+async function saveMapArtifactFromScenario(name, scenario) {
   saveMapArtifactButton.disabled = true;
   formMessage.textContent = "Saving reusable map...";
   const response = await fetch("/api/map-artifacts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      name: trimmedName,
+      name,
       scenario,
       seed: valueOrNull("#seed"),
       scenarioPath: scenarioSelect.value,
@@ -1518,7 +1459,7 @@ async function saveMapArtifact() {
         ? "The running Runner backend does not have the reusable map endpoint yet. Restart Lineage Runner and refresh this page."
         : null);
     updateBiomePaintControls();
-    return;
+    return null;
   }
 
   const result = await response.json();
@@ -1526,7 +1467,7 @@ async function saveMapArtifact() {
   applyMapArtifactToScenario(result.map);
   biomePaintDirty = false;
   setBiomePaintEnabled(false);
-  formMessage.textContent = `Saved reusable map ${result.map.name} at ${result.worldMapPath}. Save the scenario to keep using it.`;
+  return result;
 }
 
 function applySelectedMapArtifact() {
@@ -1818,9 +1759,10 @@ async function saveScenarioAs() {
   }
 
   if (biomePaintDirty && currentBiomePreview) {
-    formMessage.textContent = "Saving painted map as a manual scenario...";
-    await saveManualBiomeMap();
-    return;
+    const savedMap = await promptAndSaveMapArtifact();
+    if (!savedMap) {
+      return;
+    }
   }
 
   let scenario;
@@ -2602,7 +2544,6 @@ seedInput.addEventListener("input", () => scheduleBiomePreview());
 toggleBiomePreviewButton.addEventListener("click", () => setBiomePreviewCollapsed(!biomePreviewCollapsed));
 refreshBiomePreviewButton.addEventListener("click", () => scheduleBiomePreview(0));
 paintBiomeMapButton.addEventListener("click", () => setBiomePaintEnabled(!biomePaintEnabled));
-saveManualBiomeMapButton.addEventListener("click", saveManualBiomeMap);
 mapArtifactSelect.addEventListener("change", updateBiomePaintControls);
 applyMapArtifactButton.addEventListener("click", applySelectedMapArtifact);
 saveMapArtifactButton.addEventListener("click", saveMapArtifact);

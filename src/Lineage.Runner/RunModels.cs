@@ -72,20 +72,6 @@ public sealed record BiomeMapPreviewSummary(
     int CellCount,
     double AreaShare);
 
-public sealed record ManualBiomeMapSaveRequest(
-    string Name,
-    JsonElement Scenario,
-    ulong? Seed,
-    string? ScenarioPath,
-    IReadOnlyList<string>? Cells,
-    IReadOnlyList<bool>? ObstacleCells);
-
-public sealed record ManualBiomeMapSaveResult(
-    ScenarioOption Scenario,
-    ScenarioEditorDefinition ScenarioEditor,
-    string? MapPath,
-    string? ObstacleMapPath);
-
 public sealed record MapArtifactOption(
     string Name,
     string Path,

@@ -284,116 +284,6 @@ public sealed partial class LineageRunManager
             biomes);
     }
 
-    public ManualBiomeMapSaveResult SaveManualBiomeMap(ManualBiomeMapSaveRequest request)
-    {
-        var name = (request.Name ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Manual map scenario name is required.");
-        }
-
-        if (request.Scenario.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
-        {
-            throw new ArgumentException("Scenario JSON is required.");
-        }
-
-        var scenario = SimulationScenarioJson.FromJson(request.Scenario.GetRawText());
-        if (request.Seed is { } seed)
-        {
-            scenario = scenario with { Seed = seed };
-        }
-
-        var scenarioDirectory = ResolveScenarioDirectory(request.ScenarioPath);
-        scenario = scenario.Validated();
-        var map = scenario.EnableBiomes
-            ? request.Cells is { Count: > 0 }
-                ? CreateBiomeMapFromEditedCells(scenario, request.Cells)
-                : SimulationScenarioFactory.CreateBiomeMap(scenario, scenarioDirectory)
-            : null;
-        var obstacleMap = request.ObstacleCells is { Count: > 0 }
-            ? CreateObstacleMapFromEditedCells(scenario, request.ObstacleCells)
-            : SimulationScenarioFactory.CreateObstacleMap(scenario, scenarioDirectory);
-
-        var userScenarioRoot = UserScenarioRoot();
-        var userMapRoot = Path.Combine(userScenarioRoot, "maps");
-        Directory.CreateDirectory(userScenarioRoot);
-        Directory.CreateDirectory(userMapRoot);
-
-        var slug = Slugify(name);
-        string? mapPath = null;
-        string? manualBiomeMapPath = null;
-        if (map is not null)
-        {
-            mapPath = GetUniquePath(Path.Combine(userMapRoot, $"{slug}_map.json"));
-            EnsurePathInside(mapPath, userScenarioRoot);
-            ManualBiomeMapJson.Save(
-                mapPath,
-                ManualBiomeMapDocument.FromBiomeMap(
-                    map,
-                    name,
-                    scenario.BiomeMapKind,
-                    scenario.Seed));
-
-            manualBiomeMapPath = Path.GetRelativePath(userScenarioRoot, mapPath).Replace('\\', '/');
-        }
-
-        string? obstacleMapPath = null;
-        string? manualObstacleMapPath = null;
-        if (obstacleMap.BlockedCellCount > 0)
-        {
-            obstacleMapPath = GetUniquePath(Path.Combine(userMapRoot, $"{slug}_obstacles.json"));
-            EnsurePathInside(obstacleMapPath, userScenarioRoot);
-            ManualObstacleMapJson.Save(
-                obstacleMapPath,
-                ManualObstacleMapDocument.FromObstacleMap(
-                    obstacleMap,
-                    name,
-                    scenario.ObstacleMapKind,
-                    scenario.Seed));
-
-            manualObstacleMapPath = Path.GetRelativePath(userScenarioRoot, obstacleMapPath).Replace('\\', '/');
-        }
-
-        var savedScenario = scenario with
-        {
-            Name = name,
-            EnableBiomes = map is not null,
-            BiomeMapKind = map is not null ? BiomeMapKind.Manual : scenario.BiomeMapKind,
-            WorldMapPath = null,
-            ManualBiomeMapPath = manualBiomeMapPath,
-            EnableObstacles = obstacleMap.BlockedCellCount > 0,
-            ObstacleMapKind = obstacleMap.BlockedCellCount > 0 ? ObstacleMapKind.Manual : ObstacleMapKind.None,
-            ManualObstacleMapPath = manualObstacleMapPath
-        };
-
-        var scenarioPath = GetUniquePath(Path.Combine(userScenarioRoot, $"{slug}.json"));
-        EnsurePathInside(scenarioPath, userScenarioRoot);
-        SimulationScenarioJson.Save(scenarioPath, savedScenario);
-
-        var relativePath = NormalizeRelativePath(Path.GetRelativePath(_repoRoot, scenarioPath));
-        var now = DateTimeOffset.UtcNow;
-        var registry = LoadUserScenarioRegistry();
-        registry.Scenarios[relativePath] = new UserScenarioRegistryEntry
-        {
-            Path = relativePath,
-            Name = name,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now
-        };
-        SaveUserScenarioRegistry(registry);
-
-        var option = new ScenarioOption(
-            name,
-            relativePath,
-            IsUserCreated: true,
-            CanDelete: true);
-        return new ManualBiomeMapSaveResult(
-            option,
-            BuildScenarioEditor(scenarioPath),
-            mapPath is null ? null : NormalizeRelativePath(Path.GetRelativePath(_repoRoot, mapPath)),
-            obstacleMapPath is null ? null : NormalizeRelativePath(Path.GetRelativePath(_repoRoot, obstacleMapPath)));
-    }
-
     public MapArtifactSaveResult SaveMapArtifact(MapArtifactSaveRequest request)
     {
         var name = (request.Name ?? string.Empty).Trim();
@@ -2797,6 +2687,7 @@ public sealed partial class LineageRunManager
     private static IReadOnlyList<ScenarioFieldDefinition> BuildScenarioFieldDefinitions()
     {
         return SimulationScenarioMetadata.Fields
+            .Where(field => field.Name is not "ManualBiomeMapPath" and not "ManualObstacleMapPath")
             .Select(field => new ScenarioFieldDefinition(
                 field.Name,
                 field.JsonName,
