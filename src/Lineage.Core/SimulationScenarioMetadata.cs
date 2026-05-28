@@ -191,6 +191,7 @@ public static class SimulationScenarioMetadata
             "EnableLegacyNearestFoodVisionInputs" => "Keeps legacy nearest-food inputs available beside sector vision.",
             "EnableLegacyNearestCreatureVisionInputs" => "Keeps legacy nearest-creature inputs available beside sector vision.",
             "ReuseNeuralActionsOnSkippedWorldSenses" => "Reuses the previous neural action on ticks where expensive world senses were not refreshed, unless contact or internal-state changes force a new decision.",
+            "CloseSenseRefreshMinimumTicks" => "Minimum age of stale world senses before proximity-only close cues can force an extra world refresh.",
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
             "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are no longer referenced by living creatures or eggs.",
             "ExtinctPayloadPruneIntervalTicks" => "How often extinct genome and brain payload compaction runs.",
@@ -366,6 +367,9 @@ public static class SimulationScenarioMetadata
             || name.Contains("LocalFertility", StringComparison.Ordinal)
             || name.Contains("Species", StringComparison.Ordinal)
             || name.Contains("Phase", StringComparison.Ordinal)
-            || name is "FixedDeltaSeconds" or "CloseSenseRefreshProximity" or "ReuseNeuralActionsOnSkippedWorldSenses";
+            || name is "FixedDeltaSeconds"
+                or "CloseSenseRefreshProximity"
+                or "CloseSenseRefreshMinimumTicks"
+                or "ReuseNeuralActionsOnSkippedWorldSenses";
     }
 }

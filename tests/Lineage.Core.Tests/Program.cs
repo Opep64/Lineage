@@ -10,6 +10,8 @@ var tests = new (string Name, Action Body)[]
     ("Simulation profiler can be paused", SimulationProfilerCanBePaused),
     ("Sensing profiler records candidate counts", SensingProfilerRecordsCandidateCounts),
     ("Creature sensing time slices world queries", CreatureSensingTimeSlicesWorldQueries),
+    ("Creature sensing throttles proximity close refreshes", CreatureSensingThrottlesProximityCloseRefreshes),
+    ("Creature sensing keeps contact close refresh immediate", CreatureSensingKeepsContactCloseRefreshImmediate),
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
@@ -421,6 +423,114 @@ static void CreatureSensingTimeSlicesWorldQueries()
     AssertEqual(1L, closeSensing.WorldSenseCloseRefreshes, "Close food should force a world sense refresh");
     AssertEqual(0L, closeSensing.WorldSenseSkippedUpdates, "Close food should not skip world sensing");
     AssertEqual(1L, closeSensing.ResourceQueries, "Close refresh should run resource query");
+}
+
+static void CreatureSensingThrottlesProximityCloseRefreshes()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 81,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 10,
+                closeSenseRefreshProximity: 0.7f,
+                closeSenseRefreshMinimumTicks: 3)
+        ]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(30f, 20f),
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+    AssertEqual(1L, simulation.Profile.Sensing.WorldSenseForcedRefreshes, "Initial world sense refresh should be forced");
+
+    simulation.Profile = new SimulationProfile();
+    var creature = simulation.State.Creatures[0];
+    creature.Energy = 75f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var firstSkippedSensing = simulation.Profile.Sensing;
+    AssertEqual(1L, firstSkippedSensing.WorldSenseSkippedUpdates, "Fresh close proximity should wait for the close minimum");
+    AssertEqual(0L, firstSkippedSensing.WorldSenseCloseRefreshes, "Close proximity should not refresh before the minimum age");
+    AssertEqual(0L, firstSkippedSensing.ResourceQueries, "Skipped proximity refresh should avoid resource queries");
+    AssertClose(0.75f, simulation.State.Creatures[0].Senses.EnergyRatio, 0.000001, "Skipped world sense should still refresh internal energy");
+
+    simulation.Step();
+    simulation.Step();
+
+    var sensing = simulation.Profile.Sensing;
+    AssertEqual(2L, sensing.WorldSenseSkippedUpdates, "Two proximity refreshes should be throttled");
+    AssertEqual(1L, sensing.WorldSenseCloseRefreshes, "Close proximity should refresh once the minimum age is reached");
+    AssertEqual(1L, sensing.ResourceQueries, "Only the delayed close refresh should run resource queries");
+}
+
+static void CreatureSensingKeepsContactCloseRefreshImmediate()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 82,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 10,
+                closeSenseRefreshProximity: 0.7f,
+                closeSenseRefreshMinimumTicks: 3)
+        ]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.Step();
+
+    simulation.Profile = new SimulationProfile();
+    var creature = simulation.State.Creatures[0];
+    creature.IsTouchingFood = true;
+    creature.FoodContactKind = FoodContactKind.Resource;
+    creature.FoodContactResourceKind = ResourceKind.Plant;
+    creature.FoodContactPlantKind = PlantResourceKind.Rich;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var sensing = simulation.Profile.Sensing;
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertEqual(1L, sensing.WorldSenseCloseRefreshes, "Direct food contact should bypass the close refresh minimum");
+    AssertEqual(0L, sensing.WorldSenseSkippedUpdates, "Direct food contact should not be skipped");
+    AssertClose(1f, senses.FoodContact, 0.000001, "Food contact should stay fresh");
+    AssertClose(1f, senses.PlantFoodContact, 0.000001, "Plant contact should stay fresh");
+    AssertClose(PlantResourceTraits.EnergyQualitySense(PlantResourceKind.Rich), senses.PlantFoodContactEnergyQuality, 0.000001, "Plant contact quality should stay fresh");
 }
 
 static void RandomRepeatsFromSameSeed()
@@ -9150,6 +9260,13 @@ static void ScenarioMetadataDescribesEditableJsonFields()
     AssertEqual("boolean", neuralReuse.Type, "Neural action reuse type");
     AssertEqual("Performance", neuralReuse.Group, "Neural action reuse group");
     AssertTrue(neuralReuse.Advanced, "Neural action reuse should be advanced");
+
+    var closeMinimum = SimulationScenarioMetadata.FindByJsonName("closeSenseRefreshMinimumTicks")
+        ?? throw new InvalidOperationException("Missing close sense refresh minimum metadata.");
+    AssertEqual("number", closeMinimum.Type, "Close sense refresh minimum type");
+    AssertEqual("Brain & Vision", closeMinimum.Group, "Close sense refresh minimum group");
+    AssertEqual("ticks", closeMinimum.Units, "Close sense refresh minimum units");
+    AssertTrue(closeMinimum.Advanced, "Close sense refresh minimum should be advanced");
 }
 
 static void ScenarioJsonRoundTrips()
@@ -9176,6 +9293,7 @@ static void ScenarioJsonRoundTrips()
         WorldHeight = 300f,
         WorldSenseIntervalTicks = 6,
         CloseSenseRefreshProximity = 0.93f,
+        CloseSenseRefreshMinimumTicks = 3,
         PlantPayoffTraceHalfLifeSeconds = 31f,
         EnableSectorVision = true,
         ReuseNeuralActionsOnSkippedWorldSenses = true,
@@ -9340,6 +9458,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"barrenBiomeVisionRangeMultiplier\""), "JSON should serialize biome vision range");
     AssertTrue(json.Contains("\"worldSenseIntervalTicks\""), "JSON should serialize world sense interval");
     AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
+    AssertTrue(json.Contains("\"closeSenseRefreshMinimumTicks\""), "JSON should serialize close sense refresh minimum");
     AssertTrue(json.Contains("\"plantPayoffTraceHalfLifeSeconds\""), "JSON should serialize plant payoff trace half-life");
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
     AssertTrue(json.Contains("\"reuseNeuralActionsOnSkippedWorldSenses\""), "JSON should serialize neural action reuse toggle");
@@ -9366,6 +9485,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.WorldHeight, roundTripped.WorldHeight, 0.000001, "Scenario world height");
     AssertEqual(scenario.WorldSenseIntervalTicks, roundTripped.WorldSenseIntervalTicks, "Scenario world sense interval");
     AssertClose(scenario.CloseSenseRefreshProximity, roundTripped.CloseSenseRefreshProximity, 0.000001, "Scenario close sense threshold");
+    AssertEqual(scenario.CloseSenseRefreshMinimumTicks, roundTripped.CloseSenseRefreshMinimumTicks, "Scenario close sense refresh minimum");
     AssertClose(scenario.PlantPayoffTraceHalfLifeSeconds, roundTripped.PlantPayoffTraceHalfLifeSeconds, 0.000001, "Scenario plant payoff trace half-life");
     AssertEqual(scenario.EnableSectorVision, roundTripped.EnableSectorVision, "Scenario sector vision toggle");
     AssertEqual(scenario.ReuseNeuralActionsOnSkippedWorldSenses, roundTripped.ReuseNeuralActionsOnSkippedWorldSenses, "Scenario neural action reuse toggle");

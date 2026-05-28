@@ -332,6 +332,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Initial creature spawn", scenario.InitialCreatureSpawnRegion.ToString());
         WriteMetric(writer, "World sense interval", $"{scenario.WorldSenseIntervalTicks} ticks");
         WriteMetric(writer, "Close sense refresh", FormatPercent(scenario.CloseSenseRefreshProximity));
+        WriteMetric(writer, "Close refresh minimum", $"{scenario.CloseSenseRefreshMinimumTicks} ticks");
         WriteMetric(writer, "Initial resource density", $"{scenario.InitialResourcesPerMillionArea:0.###} per 1M area");
         WriteMetric(writer, "Initial resource patches", scenario.CalculateInitialResourceCount().ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");

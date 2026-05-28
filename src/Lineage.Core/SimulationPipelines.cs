@@ -153,6 +153,7 @@ public static class SimulationPipelines
         float meatScentDensitySaturation = 1f,
         int worldSenseIntervalTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = CreatureSensingSystem.DefaultCloseSenseRefreshProximity,
+        int closeSenseRefreshMinimumTicks = CreatureSensingSystem.DefaultCloseSenseRefreshMinimumTicks,
         bool enableSectorVision = CreatureSensingSystem.DefaultEnableSectorVision,
         float plantPayoffTraceHalfLifeSeconds = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds,
         bool enableLegacyNearestFoodVisionInputs = true,
@@ -233,6 +234,7 @@ public static class SimulationPipelines
                 biomeVisionRangeProfile,
                 worldSenseIntervalTicks,
                 closeSenseRefreshProximity,
+                closeSenseRefreshMinimumTicks,
                 enableSectorVision,
                 plantPayoffTraceHalfLifeSeconds),
             new NeuralControllerSystem(

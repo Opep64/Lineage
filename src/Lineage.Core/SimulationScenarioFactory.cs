@@ -60,6 +60,7 @@ public static class SimulationScenarioFactory
                 scenario.MeatScentDensitySaturation,
                 scenario.WorldSenseIntervalTicks,
                 scenario.CloseSenseRefreshProximity,
+                scenario.CloseSenseRefreshMinimumTicks,
                 scenario.EnableSectorVision,
                 scenario.PlantPayoffTraceHalfLifeSeconds,
                 scenario.EnableLegacyNearestFoodVisionInputs,

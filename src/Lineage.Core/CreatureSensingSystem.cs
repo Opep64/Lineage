@@ -22,6 +22,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float CreatureSimilarityScentDensitySaturation = 1f;
     public const int DefaultWorldSenseIntervalTicks = 10;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
+    public const int DefaultCloseSenseRefreshMinimumTicks = 1;
     public const bool DefaultEnableSectorVision = false;
     public const float DefaultPlantPayoffTraceHalfLifeSeconds = 45f;
     private static readonly float MaximumHabitatDensityMultiplier =
@@ -39,6 +40,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly float _meatScentDensitySaturation;
     private readonly int _worldSenseIntervalTicks;
     private readonly float _closeSenseRefreshProximity;
+    private readonly int _closeSenseRefreshMinimumTicks;
     private readonly bool _enableSectorVision;
     private readonly float _plantPayoffTraceHalfLifeSeconds;
 
@@ -63,6 +65,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         BiomePressureProfile? biomeVisionRangeProfile = null,
         int worldSenseIntervalTicks = DefaultWorldSenseIntervalTicks,
         float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity,
+        int closeSenseRefreshMinimumTicks = DefaultCloseSenseRefreshMinimumTicks,
         bool enableSectorVision = DefaultEnableSectorVision,
         float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds)
     {
@@ -91,6 +94,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             throw new ArgumentOutOfRangeException(nameof(closeSenseRefreshProximity), "Close sense refresh proximity must be in [0, 1].");
         }
 
+        if (closeSenseRefreshMinimumTicks <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(closeSenseRefreshMinimumTicks), "Close sense refresh minimum ticks must be positive.");
+        }
+
         if (plantPayoffTraceHalfLifeSeconds <= 0f || !float.IsFinite(plantPayoffTraceHalfLifeSeconds))
         {
             throw new ArgumentOutOfRangeException(nameof(plantPayoffTraceHalfLifeSeconds), "Plant payoff trace half-life must be finite and positive.");
@@ -110,6 +118,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _meatScentDensitySaturation = meatScentDensitySaturation;
         _worldSenseIntervalTicks = worldSenseIntervalTicks;
         _closeSenseRefreshProximity = closeSenseRefreshProximity;
+        _closeSenseRefreshMinimumTicks = closeSenseRefreshMinimumTicks;
         _enableSectorVision = enableSectorVision;
         _plantPayoffTraceHalfLifeSeconds = plantPayoffTraceHalfLifeSeconds;
     }
@@ -627,7 +636,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             return WorldSenseRefreshReason.Forced;
         }
 
-        if (NeedsCloseWorldSenseRefresh(creature))
+        if (HasImmediateCloseWorldSenseRefreshCue(creature))
+        {
+            return WorldSenseRefreshReason.Close;
+        }
+
+        if (NeedsProximityCloseWorldSenseRefresh(creature)
+            && WorldSenseAgeTicks(state, creature) >= _closeSenseRefreshMinimumTicks)
         {
             return WorldSenseRefreshReason.Close;
         }
@@ -637,15 +652,15 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             : WorldSenseRefreshReason.Skipped;
     }
 
-    private bool NeedsCloseWorldSenseRefresh(CreatureState creature)
+    private static bool HasImmediateCloseWorldSenseRefreshCue(CreatureState creature)
     {
-        if (creature.IsTouchingFood
+        return creature.IsTouchingFood
             || creature.IsTouchingCreature
-            || creature.LastMovementBlocked)
-        {
-            return true;
-        }
+            || creature.LastMovementBlocked;
+    }
 
+    private bool NeedsProximityCloseWorldSenseRefresh(CreatureState creature)
+    {
         var senses = creature.Senses;
         return senses.FoodProximity >= _closeSenseRefreshProximity
             || senses.PlantProximity >= _closeSenseRefreshProximity
@@ -655,6 +670,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             || senses.ForwardObstacle >= _closeSenseRefreshProximity
             || senses.LeftObstacle >= _closeSenseRefreshProximity
             || senses.RightObstacle >= _closeSenseRefreshProximity;
+    }
+
+    private static int WorldSenseAgeTicks(WorldState state, CreatureState creature)
+    {
+        return creature.Senses.WorldSenseTick >= 0 && state.Tick >= creature.Senses.WorldSenseTick
+            ? (int)Math.Min(int.MaxValue, state.Tick - creature.Senses.WorldSenseTick)
+            : int.MaxValue;
     }
 
     private static void SetWorldSenseFreshness(ref CreatureSenseState senses, long tick, bool refreshed)

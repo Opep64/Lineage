@@ -67,6 +67,8 @@ public sealed record SimulationScenario
 
     public float CloseSenseRefreshProximity { get; init; } = CreatureSensingSystem.DefaultCloseSenseRefreshProximity;
 
+    public int CloseSenseRefreshMinimumTicks { get; init; } = CreatureSensingSystem.DefaultCloseSenseRefreshMinimumTicks;
+
     public float PlantPayoffTraceHalfLifeSeconds { get; init; } = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds;
 
     public bool EnableSectorVision { get; init; } = true;
@@ -388,6 +390,7 @@ public sealed record SimulationScenario
         EnsurePositive(SpatialCellSize, nameof(SpatialCellSize));
         EnsurePositive(WorldSenseIntervalTicks, nameof(WorldSenseIntervalTicks));
         EnsureRange(CloseSenseRefreshProximity, 0f, 1f, nameof(CloseSenseRefreshProximity));
+        EnsurePositive(CloseSenseRefreshMinimumTicks, nameof(CloseSenseRefreshMinimumTicks));
         EnsurePositive(PlantPayoffTraceHalfLifeSeconds, nameof(PlantPayoffTraceHalfLifeSeconds));
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsurePositive(ExtinctPayloadPruneIntervalTicks, nameof(ExtinctPayloadPruneIntervalTicks));

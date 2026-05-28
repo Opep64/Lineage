@@ -98,6 +98,7 @@ static void PrintHelp()
           --status-interval <n>      Status write interval in ticks. Default: 100
           --status-detail-interval <n> Recompute heavier status metrics every n ticks. Default: 1000
           --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
+          --close-sense-refresh-minimum-ticks <n> Minimum stale-world-sense age before proximity close refreshes.
           --reuse-neural-actions-on-skipped-world-senses Reuse prior neural outputs when world senses are stale.
           --no-reuse-neural-actions-on-skipped-world-senses Disable stale-world-sense neural action reuse.
           --prune-extinct-payloads   Compact genome/brain payloads not referenced by living creatures or eggs.
@@ -959,6 +960,8 @@ internal sealed record RunOptions
 
     public bool StopOnExtinction { get; init; }
 
+    public int? CloseSenseRefreshMinimumTicksOverride { get; init; }
+
     public bool? ReuseNeuralActionsOnSkippedWorldSensesOverride { get; init; }
 
     public bool EnableExtinctPayloadPruning { get; init; }
@@ -1080,6 +1083,8 @@ internal sealed record RunOptions
             InitialCreatureCount = InitialCreatureCountOverride ?? scenario.InitialCreatureCount,
             SpatialCellSize = SpatialCellSizeOverride ?? scenario.SpatialCellSize,
             StatsSnapshotIntervalTicks = SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks,
+            CloseSenseRefreshMinimumTicks = CloseSenseRefreshMinimumTicksOverride
+                ?? scenario.CloseSenseRefreshMinimumTicks,
             ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
                 ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
             EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
@@ -1113,6 +1118,8 @@ internal sealed record RunOptions
     {
         return scenario with
         {
+            CloseSenseRefreshMinimumTicks = CloseSenseRefreshMinimumTicksOverride
+                ?? scenario.CloseSenseRefreshMinimumTicks,
             ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
                 ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
             EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
@@ -1321,6 +1328,9 @@ internal sealed record RunOptions
                     break;
                 case "--stop-on-extinction":
                     options = options with { StopOnExtinction = true };
+                    break;
+                case "--close-sense-refresh-minimum-ticks":
+                    options = options with { CloseSenseRefreshMinimumTicksOverride = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--reuse-neural-actions-on-skipped-world-senses":
                     options = options with { ReuseNeuralActionsOnSkippedWorldSensesOverride = true };
@@ -4742,6 +4752,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Initial creature spawn", scenario.InitialCreatureSpawnRegion.ToString());
         WriteMetric(writer, "World sense interval", $"{scenario.WorldSenseIntervalTicks} ticks");
         WriteMetric(writer, "Close sense refresh", FormatPercent(scenario.CloseSenseRefreshProximity));
+        WriteMetric(writer, "Close refresh minimum", $"{scenario.CloseSenseRefreshMinimumTicks} ticks");
         WriteMetric(writer, "Plant payoff trace half-life", $"{scenario.PlantPayoffTraceHalfLifeSeconds:0.###} seconds");
         WriteMetric(writer, "Initial resource density", $"{scenario.InitialResourcesPerMillionArea:0.###} per 1M area");
         WriteMetric(writer, "Initial resource patches", scenario.CalculateInitialResourceCount().ToString(CultureInfo.InvariantCulture));
