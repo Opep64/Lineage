@@ -6554,6 +6554,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(4.25f, snapshot.GrasslandCaloriesEatenPerSecond, 0.000001, "Grassland calories eaten per second");
     AssertEqual(0, snapshot.BarrenDeathCount, "Barren death count");
     AssertEqual(0, snapshot.GrasslandDeathCount, "Grassland death count");
+    AssertClose(2f, simulation.State.Stats.SpatialHeatmaps.CreatureExposureSeconds.Sum(), 0.000001, "Creature exposure seconds");
+    AssertClose(2f, simulation.State.Stats.SpatialHeatmaps.BiomeCreatureExposureSeconds.Sum(), 0.000001, "Biome exposure seconds");
     AssertClose(25f, snapshot.AverageCreatureX, 0.000001, "Average creature x");
     AssertClose(30f, snapshot.MaxCreatureX, 0.000001, "Max creature x");
     AssertClose(25f, snapshot.AverageMaxCreatureXReached, 0.000001, "Average max creature x reached");

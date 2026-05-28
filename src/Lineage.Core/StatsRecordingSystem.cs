@@ -184,6 +184,7 @@ public sealed class StatsRecordingSystem(
         var middleRegionGenerationTotal = 0;
         var rightRegionGenerationTotal = 0;
         var maxGeneration = 0;
+        var creatureExposureSampleSeconds = CreatureExposureSampleSeconds(_sampleIntervalTicks, deltaSeconds);
 
         for (var i = 0; i < state.Creatures.Count; i++)
         {
@@ -303,6 +304,7 @@ public sealed class StatsRecordingSystem(
             totalBiteStrength += genome.BiteStrength;
             totalDamageResistance += genome.DamageResistance;
             var biome = state.Biomes.GetKindAt(creature.Position);
+            state.Stats.RecordCreatureExposure(state.Bounds, creature.Position, biome, creatureExposureSampleSeconds);
             totalBiomeMovementCostMultiplier += _biomeMovementCostProfile.For(biome);
             totalBiomeBasalCostMultiplier += _biomeBasalCostProfile.For(biome);
             totalBiomeSpeedMultiplier += _biomeSpeedProfile.For(biome);
@@ -1258,6 +1260,11 @@ public sealed class StatsRecordingSystem(
     private static float Rate(float value, float seconds)
     {
         return seconds > 0f ? value / seconds : 0f;
+    }
+
+    private static float CreatureExposureSampleSeconds(int sampleIntervalTicks, float deltaSeconds)
+    {
+        return sampleIntervalTicks * deltaSeconds;
     }
 
     private static float EastProgressShare(float x, WorldBounds bounds)

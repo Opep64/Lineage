@@ -29,6 +29,10 @@ public sealed record SimulationSpatialHeatmapSnapshot
     public float[] EggCaloriesEaten { get; init; } = [];
 
     public float[] AttackDamage { get; init; } = [];
+
+    public float[] CreatureExposureSeconds { get; init; } = [];
+
+    public float[] BiomeCreatureExposureSeconds { get; init; } = [];
 }
 
 public sealed class SimulationSpatialHeatmaps
@@ -45,6 +49,8 @@ public sealed class SimulationSpatialHeatmaps
     private float[] _meatCaloriesEaten = [];
     private float[] _eggCaloriesEaten = [];
     private float[] _attackDamage = [];
+    private float[] _creatureExposureSeconds = [];
+    private float[] _biomeCreatureExposureSeconds = [];
 
     public float WorldWidth { get; private set; }
 
@@ -74,13 +80,22 @@ public sealed class SimulationSpatialHeatmaps
 
     public IReadOnlyList<float> AttackDamage => _attackDamage;
 
+    public IReadOnlyList<float> CreatureExposureSeconds => _creatureExposureSeconds;
+
+    public IReadOnlyList<float> BiomeCreatureExposureSeconds => _biomeCreatureExposureSeconds;
+
+    public bool HasExposure =>
+        HasAny(_creatureExposureSeconds)
+        || HasAny(_biomeCreatureExposureSeconds);
+
     public bool HasData =>
         HasAny(_births)
         || HasAny(_deaths)
         || HasAny(_plantCaloriesEaten)
         || HasAny(_meatCaloriesEaten)
         || HasAny(_eggCaloriesEaten)
-        || HasAny(_attackDamage);
+        || HasAny(_attackDamage)
+        || HasExposure;
 
     public void RecordBirth(WorldBounds bounds, SimVector2 position)
     {
@@ -123,6 +138,13 @@ public sealed class SimulationSpatialHeatmaps
         Add(bounds, position, _attackDamage, damage);
     }
 
+    public void RecordCreatureExposure(WorldBounds bounds, SimVector2 position, BiomeKind biome, float seconds)
+    {
+        EnsureInitialized(bounds);
+        Add(bounds, position, _creatureExposureSeconds, seconds);
+        AddBiomeExposure(biome, seconds);
+    }
+
     public SimulationSpatialHeatmapSnapshot ToSnapshot()
     {
         return new SimulationSpatialHeatmapSnapshot
@@ -140,7 +162,9 @@ public sealed class SimulationSpatialHeatmaps
             PlantCaloriesEaten = _plantCaloriesEaten.ToArray(),
             MeatCaloriesEaten = _meatCaloriesEaten.ToArray(),
             EggCaloriesEaten = _eggCaloriesEaten.ToArray(),
-            AttackDamage = _attackDamage.ToArray()
+            AttackDamage = _attackDamage.ToArray(),
+            CreatureExposureSeconds = _creatureExposureSeconds.ToArray(),
+            BiomeCreatureExposureSeconds = _biomeCreatureExposureSeconds.ToArray()
         };
     }
 
@@ -188,6 +212,8 @@ public sealed class SimulationSpatialHeatmaps
         _meatCaloriesEaten = NormalizeValues(snapshot.MeatCaloriesEaten);
         _eggCaloriesEaten = NormalizeValues(snapshot.EggCaloriesEaten);
         _attackDamage = NormalizeValues(snapshot.AttackDamage);
+        _creatureExposureSeconds = NormalizeValues(snapshot.CreatureExposureSeconds, expectedLength);
+        _biomeCreatureExposureSeconds = NormalizeValues(snapshot.BiomeCreatureExposureSeconds, BiomeKinds.All.Count);
     }
 
     private void Add(WorldBounds bounds, SimVector2 position, float[] values, float amount)
@@ -202,6 +228,16 @@ public sealed class SimulationSpatialHeatmaps
         }
 
         values[CellIndex(position)] += amount;
+    }
+
+    private void AddBiomeExposure(BiomeKind biome, float seconds)
+    {
+        if (!float.IsFinite(seconds) || seconds <= 0f || _biomeCreatureExposureSeconds.Length == 0)
+        {
+            return;
+        }
+
+        _biomeCreatureExposureSeconds[BiomeIndex(biome)] += seconds;
     }
 
     private void EnsureInitialized(WorldBounds bounds)
@@ -237,6 +273,8 @@ public sealed class SimulationSpatialHeatmaps
         _meatCaloriesEaten = new float[length];
         _eggCaloriesEaten = new float[length];
         _attackDamage = new float[length];
+        _creatureExposureSeconds = new float[length];
+        _biomeCreatureExposureSeconds = new float[BiomeKinds.All.Count];
     }
 
     private int CellIndex(SimVector2 position)
@@ -268,6 +306,8 @@ public sealed class SimulationSpatialHeatmaps
         _meatCaloriesEaten = [];
         _eggCaloriesEaten = [];
         _attackDamage = [];
+        _creatureExposureSeconds = [];
+        _biomeCreatureExposureSeconds = [];
     }
 
     private static float NormalizeDimension(float value)
@@ -285,10 +325,42 @@ public sealed class SimulationSpatialHeatmaps
         return values.Any(static value => value > 0f);
     }
 
+    private static int BiomeIndex(BiomeKind biome)
+    {
+        var canonical = BiomeKinds.Canonicalize(biome);
+        for (var i = 0; i < BiomeKinds.All.Count; i++)
+        {
+            if (BiomeKinds.All[i] == canonical)
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
     private static float[] NormalizeValues(float[] values)
     {
         return values
             .Select(static value => float.IsFinite(value) && value > 0f ? value : 0f)
             .ToArray();
+    }
+
+    private static float[] NormalizeValues(float[]? values, int expectedLength)
+    {
+        var normalized = new float[expectedLength];
+        if (values is null)
+        {
+            return normalized;
+        }
+
+        var length = Math.Min(values.Length, expectedLength);
+        for (var i = 0; i < length; i++)
+        {
+            var value = values[i];
+            normalized[i] = float.IsFinite(value) && value > 0f ? value : 0f;
+        }
+
+        return normalized;
     }
 }

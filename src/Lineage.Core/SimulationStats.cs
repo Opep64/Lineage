@@ -211,6 +211,11 @@ public sealed class SimulationStats
         SpatialHeatmaps.RecordAttackDamage(bounds, position, damage);
     }
 
+    internal void RecordCreatureExposure(WorldBounds bounds, SimVector2 position, BiomeKind biome, float seconds)
+    {
+        SpatialHeatmaps.RecordCreatureExposure(bounds, position, biome, seconds);
+    }
+
     internal void RecordPlantDepletion()
     {
         PlantDepletionCount++;

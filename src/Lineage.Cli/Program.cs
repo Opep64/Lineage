@@ -5068,6 +5068,11 @@ internal static class RunReportWriter
             snapshots,
             biomeSummaries,
             MathF.Max(1f, state.Bounds.Width * state.Bounds.Height));
+        WriteBiomeExposureSection(
+            writer,
+            biomeSummaries,
+            state.Stats.SpatialHeatmaps,
+            MathF.Max(1f, state.Bounds.Width * state.Bounds.Height));
         WriteBiomeRiskRewardSection(
             writer,
             snapshots,
@@ -5853,8 +5858,15 @@ internal static class RunReportWriter
         }
 
         var meatCalories = CombineHeatmaps(heatmaps.MeatCaloriesEaten, heatmaps.EggCaloriesEaten);
+        var exposureHours = ScaleHeatmap(heatmaps.CreatureExposureSeconds, 1f / 3600f);
         var layers = new[]
         {
+            new SpatialHeatmapLayer(
+                "Creature Exposure",
+                "creature-hr",
+                exposureHours,
+                "#255f85",
+                "Sampled creature-hours by location, based on the stats snapshot interval."),
             new SpatialHeatmapLayer(
                 "Births",
                 "births",
@@ -5902,7 +5914,37 @@ internal static class RunReportWriter
                 "damage",
                 heatmaps.AttackDamage,
                 "#3c5aa6",
-                "Bite damage applied at the target creature location.")
+                "Bite damage applied at the target creature location."),
+            new SpatialHeatmapLayer(
+                "Births per Creature Hour",
+                "births/creature-hr",
+                DivideHeatmaps(heatmaps.Births, exposureHours),
+                "#1f7f4c",
+                "Birth intensity normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Deaths per Creature Hour",
+                "deaths/creature-hr",
+                DivideHeatmaps(heatmaps.Deaths, exposureHours),
+                "#9d1f1f",
+                "Death risk normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Plant Eating per Creature Hour",
+                "raw kcal/creature-hr",
+                DivideHeatmaps(heatmaps.PlantCaloriesEaten, exposureHours),
+                "#5f9d1f",
+                "Plant calories eaten normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Meat and Egg Eating per Creature Hour",
+                "raw kcal/creature-hr",
+                DivideHeatmaps(meatCalories, exposureHours),
+                "#a8442f",
+                "Meat and egg calories eaten normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Attack Damage per Creature Hour",
+                "damage/creature-hr",
+                DivideHeatmaps(heatmaps.AttackDamage, exposureHours),
+                "#2f4f9d",
+                "Bite damage normalized by sampled creature-hours in each cell.")
         }.Where(layer => HeatmapTotal(layer.Values) > 0f).ToArray();
 
         if (layers.Length == 0)
@@ -5913,7 +5955,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine(
-            $"<p class=\"biome-map-note\">Events are aggregated into a {Html(heatmaps.CellCountX)} x {Html(heatmaps.CellCountY)} report grid. Biome colors are shown faintly under each heat layer.</p>");
+            $"<p class=\"biome-map-note\">Events are aggregated into a {Html(heatmaps.CellCountX)} x {Html(heatmaps.CellCountY)} report grid. Creature exposure is sampled on the stats snapshot interval; per-creature-hour layers are estimates from those samples. Biome colors are shown faintly under each heat layer.</p>");
         writer.WriteLine("<div class=\"heatmap-grid\">");
         foreach (var layer in layers)
         {
@@ -5967,8 +6009,18 @@ internal static class RunReportWriter
 
         writer.WriteLine("</svg>");
         writer.WriteLine("<div class=\"heatmap-legend\">");
-        writer.WriteLine(
-            $"<span><span class=\"legend-swatch\" style=\"background:{Html(layer.Color)}\"></span>Total {Html(FormatHeatmapValue(total, layer.Units))}</span>");
+        if (IsRateHeatmapUnit(layer.Units))
+        {
+            var activeCellCount = Math.Max(1, HeatmapActiveCellCount(layer.Values));
+            writer.WriteLine(
+                $"<span><span class=\"legend-swatch\" style=\"background:{Html(layer.Color)}\"></span>Mean active cell {Html(FormatHeatmapValue(total / activeCellCount, layer.Units))}</span>");
+        }
+        else
+        {
+            writer.WriteLine(
+                $"<span><span class=\"legend-swatch\" style=\"background:{Html(layer.Color)}\"></span>Total {Html(FormatHeatmapValue(total, layer.Units))}</span>");
+        }
+
         writer.WriteLine($"<span>Peak cell {Html(FormatHeatmapValue(max, layer.Units))}</span>");
         writer.WriteLine("</div>");
         writer.WriteLine("</article>");
@@ -6004,6 +6056,39 @@ internal static class RunReportWriter
         return combined;
     }
 
+    private static float[] ScaleHeatmap(IReadOnlyList<float> values, float scale)
+    {
+        var scaled = new float[values.Count];
+        if (!float.IsFinite(scale) || scale <= 0f)
+        {
+            return scaled;
+        }
+
+        for (var i = 0; i < scaled.Length; i++)
+        {
+            var value = values[i];
+            scaled[i] = float.IsFinite(value) && value > 0f ? value * scale : 0f;
+        }
+
+        return scaled;
+    }
+
+    private static float[] DivideHeatmaps(IReadOnlyList<float> numerator, IReadOnlyList<float> denominator)
+    {
+        var length = Math.Max(numerator.Count, denominator.Count);
+        var divided = new float[length];
+        for (var i = 0; i < divided.Length; i++)
+        {
+            var top = i < numerator.Count ? numerator[i] : 0f;
+            var bottom = i < denominator.Count ? denominator[i] : 0f;
+            divided[i] = float.IsFinite(top) && top > 0f && float.IsFinite(bottom) && bottom > 0f
+                ? top / bottom
+                : 0f;
+        }
+
+        return divided;
+    }
+
     private static float HeatmapTotal(IReadOnlyList<float> values)
     {
         var total = 0f;
@@ -6032,12 +6117,31 @@ internal static class RunReportWriter
         return max;
     }
 
+    private static int HeatmapActiveCellCount(IReadOnlyList<float> values)
+    {
+        var count = 0;
+        foreach (var value in values)
+        {
+            if (float.IsFinite(value) && value > 0f)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     private static string FormatHeatmapValue(float value, string units)
     {
         var formatted = units is "births" or "deaths"
             ? value.ToString("0", CultureInfo.InvariantCulture)
             : value.ToString("0.###", CultureInfo.InvariantCulture);
         return $"{formatted} {units}";
+    }
+
+    private static bool IsRateHeatmapUnit(string units)
+    {
+        return units.Contains('/', StringComparison.Ordinal);
     }
 
     private static void WriteSeasonPressureSection(
@@ -7937,6 +8041,53 @@ internal static class RunReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteBiomeExposureSection(
+        TextWriter writer,
+        IReadOnlyList<BiomeSummary> biomeSummaries,
+        SimulationSpatialHeatmaps heatmaps,
+        float worldArea)
+    {
+        var totalExposureSeconds = HeatmapTotal(heatmaps.BiomeCreatureExposureSeconds);
+        var activeBiomeSummaries = ActiveBiomeSummaries(biomeSummaries)
+            .Where(summary => summary.Area > 0f || BiomeExposureSecondsFor(heatmaps, summary.Kind) > 0f)
+            .ToArray();
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Biome Exposure</h2>");
+        writer.WriteLine("<p class=\"biome-map-note\">Creature exposure is sampled on the stats snapshot interval. Lowering that interval makes these estimates closer to exact path occupancy.</p>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Area Share</th><th>Creature Hours</th><th>Exposure Share</th><th>Exposure Index</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+
+        if (!heatmaps.HasExposure || totalExposureSeconds <= 0f || activeBiomeSummaries.Length == 0)
+        {
+            writer.WriteLine("<tr><td colspan=\"5\" class=\"empty\">No sampled creature exposure was recorded.</td></tr>");
+            writer.WriteLine("</tbody></table></div>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        foreach (var summary in activeBiomeSummaries)
+        {
+            var areaShare = summary.Area / worldArea;
+            var exposureSeconds = BiomeExposureSecondsFor(heatmaps, summary.Kind);
+            var exposureShare = exposureSeconds / totalExposureSeconds;
+            var exposureIndex = areaShare > 0f ? exposureShare / areaShare : float.NaN;
+
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(FormatBiomeKind(summary.Kind))}</td>" +
+                $"<td>{Html(FormatPercent(areaShare))}</td>" +
+                $"<td>{Html((exposureSeconds / 3600f).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(exposureShare))}</td>" +
+                $"<td>{Html(FormatIndex(exposureIndex))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
     private static void WriteBiomeRiskRewardSection(
         TextWriter writer,
         IReadOnlyList<SimulationStatsSnapshot> snapshots,
@@ -8090,6 +8241,21 @@ internal static class RunReportWriter
         return active.Length > 0
             ? active
             : biomeSummaries.ToArray();
+    }
+
+    private static float BiomeExposureSecondsFor(SimulationSpatialHeatmaps heatmaps, BiomeKind biome)
+    {
+        var canonical = BiomeKinds.Canonicalize(biome);
+        for (var i = 0; i < BiomeKinds.All.Count && i < heatmaps.BiomeCreatureExposureSeconds.Count; i++)
+        {
+            if (BiomeKinds.All[i] == canonical)
+            {
+                var value = heatmaps.BiomeCreatureExposureSeconds[i];
+                return float.IsFinite(value) && value > 0f ? value : 0f;
+            }
+        }
+
+        return 0f;
     }
 
     private static float Average(IReadOnlyList<SimulationStatsSnapshot> snapshots, Func<SimulationStatsSnapshot, float> selector)
