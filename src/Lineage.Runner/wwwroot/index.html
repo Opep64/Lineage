@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260527-map-artifacts2">
+  <link rel="stylesheet" href="/styles.css?v=20260527-map-library1">
 </head>
 <body>
   <header class="app-header">
@@ -78,11 +78,15 @@
             </label>
             <button id="applyMapArtifactButton" class="secondary" type="button" disabled>Apply Map</button>
             <button id="saveMapArtifactButton" class="secondary" type="button" disabled>Save Reusable Map</button>
+            <button id="renameMapArtifactButton" class="secondary" type="button" disabled>Rename Map</button>
+            <button id="duplicateMapArtifactButton" class="secondary" type="button" disabled>Duplicate Map</button>
+            <button id="deleteMapArtifactButton" class="danger" type="button" disabled>Delete Map</button>
             <button id="paintBiomeMapButton" class="secondary" type="button" disabled>Paint Map</button>
             <button id="toggleBiomePreviewButton" class="secondary" type="button" aria-expanded="true" aria-controls="biomePreviewContent">Hide Map</button>
             <button id="refreshBiomePreviewButton" class="secondary" type="button">Refresh Map</button>
           </div>
         </div>
+        <div id="mapArtifactDetails" class="map-artifact-details" hidden></div>
         <div id="biomePreviewContent" class="biome-preview-content">
           <div class="biome-preview-body">
             <canvas id="biomePreviewCanvas" aria-label="Biome map preview"></canvas>
@@ -223,6 +227,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260527-map-artifacts2"></script>
+  <script src="/app.js?v=20260527-map-library1"></script>
 </body>
 </html>

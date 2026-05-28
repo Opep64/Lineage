@@ -57,6 +57,10 @@ const obstacleBrushSelect = document.querySelector("#obstacleBrushSelect");
 const mapArtifactSelect = document.querySelector("#mapArtifactSelect");
 const applyMapArtifactButton = document.querySelector("#applyMapArtifactButton");
 const saveMapArtifactButton = document.querySelector("#saveMapArtifactButton");
+const renameMapArtifactButton = document.querySelector("#renameMapArtifactButton");
+const duplicateMapArtifactButton = document.querySelector("#duplicateMapArtifactButton");
+const deleteMapArtifactButton = document.querySelector("#deleteMapArtifactButton");
+const mapArtifactDetails = document.querySelector("#mapArtifactDetails");
 const paintBiomeMapButton = document.querySelector("#paintBiomeMapButton");
 
 let refreshTimer = null;
@@ -110,6 +114,7 @@ async function loadMapArtifacts(selectedPath = mapArtifactSelect?.value || "") {
   const response = await fetch("/api/map-artifacts");
   mapArtifacts = response.ok ? await response.json() : [];
   renderMapArtifactOptions(selectedPath);
+  renderMapArtifactDetails();
   updateBiomePaintControls();
 }
 
@@ -127,12 +132,14 @@ function renderMapArtifactOptions(selectedPath = "") {
   for (const map of mapArtifacts) {
     const option = document.createElement("option");
     option.value = map.path;
-    option.textContent = `${map.name} (${map.path})`;
+    const wallCount = Number(map.obstacleBlockedCellCount || 0);
+    option.textContent = `${map.name} - ${formatDecimal(map.worldWidth)} x ${formatDecimal(map.worldHeight)} (${map.path})`;
     option.title = [
       `${formatDecimal(map.worldWidth)} x ${formatDecimal(map.worldHeight)}`,
       `${formatNumber(map.biomeCellCountX)} x ${formatNumber(map.biomeCellCountY)} biome cells`,
-      `${formatNumber(map.obstacleBlockedCellCount)} walls`
-    ].join(" | ");
+      wallCount > 0 ? `${formatNumber(wallCount)} walls` : "no walls",
+      map.sourceSeed === null || map.sourceSeed === undefined ? null : `seed ${formatSeed(map.sourceSeed)}`
+    ].filter(Boolean).join(" | ");
     mapArtifactSelect.append(option);
   }
 
@@ -140,6 +147,98 @@ function renderMapArtifactOptions(selectedPath = "") {
     mapArtifactSelect.value = selectedPath;
   } else {
     mapArtifactSelect.value = "";
+  }
+}
+
+function selectedMapArtifact() {
+  return mapArtifacts.find((candidate) => candidate.path === mapArtifactSelect?.value) ?? null;
+}
+
+function renderMapArtifactDetails() {
+  if (!mapArtifactDetails) {
+    return;
+  }
+
+  const map = selectedMapArtifact();
+  if (!map) {
+    mapArtifactDetails.hidden = true;
+    mapArtifactDetails.innerHTML = "";
+    return;
+  }
+
+  const scenario = scenarioEditor?.scenario ?? null;
+  const compatibility = scenario ? mapArtifactCompatibility(map, scenario) : [];
+  const biomeSummary = Array.isArray(map.biomes)
+    ? map.biomes
+        .filter((biome) => Number(biome.cellCount || 0) > 0)
+        .map((biome) => `
+          <span class="map-artifact-biome">
+            <span class="biome-preview-swatch" style="background:${escapeHtml(biome.color)}"></span>
+            ${escapeHtml(biome.name)} ${escapeHtml(formatPercent(biome.areaShare))}
+          </span>
+        `).join("")
+    : "";
+  const wallShare = Number(map.obstacleCellCountX || 0) * Number(map.obstacleCellCountY || 0) > 0
+    ? Number(map.obstacleBlockedCellCount || 0) / (Number(map.obstacleCellCountX || 0) * Number(map.obstacleCellCountY || 0))
+    : 0;
+  const compatibilityHtml = compatibility.length === 0
+    ? `<div class="map-artifact-ok">Compatible with the current scenario dimensions.</div>`
+    : `
+      <div class="map-artifact-warning">Apply Map will update scenario dimensions/settings:</div>
+      <ul>${compatibility.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    `;
+
+  mapArtifactDetails.hidden = false;
+  mapArtifactDetails.innerHTML = `
+    <div class="map-artifact-summary">
+      <strong>${escapeHtml(map.name)}</strong>
+      <span>${escapeHtml(map.path)}</span>
+    </div>
+    <div class="map-artifact-facts">
+      <span>${escapeHtml(formatDecimal(map.worldWidth))} x ${escapeHtml(formatDecimal(map.worldHeight))}</span>
+      <span>${escapeHtml(formatNumber(map.biomeCellCountX))} x ${escapeHtml(formatNumber(map.biomeCellCountY))} biome cells @ ${escapeHtml(formatDecimal(map.biomeCellSize))}u</span>
+      <span>${escapeHtml(formatNumber(map.obstacleBlockedCellCount))} walls (${escapeHtml(formatPercent(wallShare))})</span>
+      <span>${map.sourceSeed === null || map.sourceSeed === undefined ? "seed n/a" : `seed ${escapeHtml(formatSeed(map.sourceSeed))}`}</span>
+    </div>
+    ${biomeSummary ? `<div class="map-artifact-biomes">${biomeSummary}</div>` : ""}
+    <div class="map-artifact-compatibility">${compatibilityHtml}</div>
+  `;
+}
+
+function mapArtifactCompatibility(map, scenario) {
+  const differences = [];
+  addNumericDifference(differences, "World width", scenario.worldWidth, map.worldWidth);
+  addNumericDifference(differences, "World height", scenario.worldHeight, map.worldHeight);
+  addNumericDifference(differences, "Biome cell size", scenario.biomeCellSize, map.biomeCellSize);
+  addNumericDifference(differences, "Resource void border", scenario.resourceVoidBorderWidth, map.resourceVoidBorderWidth);
+  addNumericDifference(differences, "Obstacle cell size", scenario.obstacleCellSize, map.obstacleCellSize);
+
+  if (scenario.worldMapPath && scenario.worldMapPath !== map.path) {
+    differences.push(`World map path: ${scenario.worldMapPath} -> ${map.path}`);
+  }
+
+  if (scenario.biomeMapKind && scenario.biomeMapKind !== "manual") {
+    differences.push(`Biome map kind: ${scenario.biomeMapKind} -> manual`);
+  }
+
+  const hasWalls = Number(map.obstacleBlockedCellCount || 0) > 0;
+  const targetObstacleKind = hasWalls ? "manual" : "none";
+  if ((scenario.obstacleMapKind || "none") !== targetObstacleKind) {
+    differences.push(`Obstacle map kind: ${scenario.obstacleMapKind || "none"} -> ${targetObstacleKind}`);
+  }
+
+  return differences;
+}
+
+function addNumericDifference(differences, label, currentValue, mapValue) {
+  const current = Number(currentValue);
+  const next = Number(mapValue);
+  if (!Number.isFinite(current) || !Number.isFinite(next)) {
+    return;
+  }
+
+  if (Math.abs(current - next) > 0.0001) {
+    differences.push(`${label}: ${formatDecimal(current)} -> ${formatDecimal(next)}`);
   }
 }
 
@@ -821,6 +920,8 @@ function loadScenarioEditorDefinition(editor) {
   activeScenarioGroup = scenarioEditorGroups()[0] || null;
   biomePaintDirty = false;
   setBiomePaintEnabled(false);
+  renderMapArtifactOptions(editor.scenario?.worldMapPath ?? mapArtifactSelect?.value ?? "");
+  renderMapArtifactDetails();
   renderScenarioEditor();
   renderRecipeStack();
   updateScenarioManagementButtons();
@@ -897,6 +998,7 @@ function updateBiomePaintControls() {
   const canEditObstacles = Boolean(currentBiomePreview?.obstacleCells?.length);
   const canEdit = canEditBiomes || canEditObstacles;
   const layer = paintLayerSelect?.value === "obstacle" ? "obstacle" : "biome";
+  const selectedMap = selectedMapArtifact();
   if (!canEdit) {
     biomePaintEnabled = false;
     biomePaintDirty = false;
@@ -924,13 +1026,36 @@ function updateBiomePaintControls() {
   }
 
   if (applyMapArtifactButton) {
-    applyMapArtifactButton.disabled = !mapArtifactSelect?.value;
+    applyMapArtifactButton.disabled = !selectedMap;
   }
 
   if (saveMapArtifactButton) {
     saveMapArtifactButton.disabled = !currentBiomePreview;
     saveMapArtifactButton.textContent = biomePaintDirty ? "Save Reusable Map *" : "Save Reusable Map";
   }
+
+  if (renameMapArtifactButton) {
+    renameMapArtifactButton.disabled = !selectedMap?.canDelete;
+    renameMapArtifactButton.title = selectedMap?.canDelete
+      ? "Rename this reusable map artifact."
+      : "Only launcher-managed user maps can be renamed.";
+  }
+
+  if (duplicateMapArtifactButton) {
+    duplicateMapArtifactButton.disabled = !selectedMap?.canDelete;
+    duplicateMapArtifactButton.title = selectedMap?.canDelete
+      ? "Copy this reusable map artifact."
+      : "Only launcher-managed user maps can be duplicated.";
+  }
+
+  if (deleteMapArtifactButton) {
+    deleteMapArtifactButton.disabled = !selectedMap?.canDelete;
+    deleteMapArtifactButton.title = selectedMap?.canDelete
+      ? "Archive this reusable map artifact."
+      : "Only launcher-managed user maps can be deleted.";
+  }
+
+  renderMapArtifactDetails();
 
   if (biomePreview) {
     biomePreview.classList.toggle("is-painting", biomePaintEnabled);
@@ -1525,7 +1650,146 @@ function applyMapArtifactToScenario(map) {
 
   activeScenarioGroup = "World & Terrain";
   renderScenarioEditor();
+  renderMapArtifactDetails();
   scheduleBiomePreview(0);
+}
+
+async function renameSelectedMapArtifact() {
+  const map = selectedMapArtifact();
+  if (!map?.canDelete) {
+    formMessage.textContent = "Selected map cannot be renamed.";
+    return;
+  }
+
+  const name = prompt("Rename reusable map", map.name);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    formMessage.textContent = "Map name is required.";
+    return;
+  }
+
+  formMessage.textContent = "Renaming reusable map...";
+  const response = await fetch("/api/map-artifacts/rename", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: map.path, name: trimmedName })
+  });
+
+  if (!response.ok) {
+    formMessage.textContent = await responseErrorMessage(response, "Map rename failed.");
+    updateBiomePaintControls();
+    return;
+  }
+
+  const result = await response.json();
+  updateScenarioMapReference(map.path, result.worldMapPath);
+  await loadMapArtifacts(result.worldMapPath);
+  formMessage.textContent = `Renamed reusable map to ${result.map.name}.`;
+}
+
+async function duplicateSelectedMapArtifact() {
+  const map = selectedMapArtifact();
+  if (!map?.canDelete) {
+    formMessage.textContent = "Selected map cannot be duplicated.";
+    return;
+  }
+
+  const name = prompt("Duplicate reusable map as", `${map.name} Copy`);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    formMessage.textContent = "Map name is required.";
+    return;
+  }
+
+  formMessage.textContent = "Duplicating reusable map...";
+  const response = await fetch("/api/map-artifacts/duplicate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: map.path, name: trimmedName })
+  });
+
+  if (!response.ok) {
+    formMessage.textContent = await responseErrorMessage(response, "Map duplicate failed.");
+    updateBiomePaintControls();
+    return;
+  }
+
+  const result = await response.json();
+  await loadMapArtifacts(result.worldMapPath);
+  formMessage.textContent = `Duplicated reusable map as ${result.map.name}.`;
+}
+
+async function deleteSelectedMapArtifact() {
+  const map = selectedMapArtifact();
+  if (!map?.canDelete) {
+    formMessage.textContent = "Selected map cannot be deleted.";
+    return;
+  }
+
+  const isReferenced = scenarioEditor?.scenario?.worldMapPath === map.path;
+  const referenceWarning = isReferenced
+    ? " The current scenario uses this map; deleting it will clear the scenario's reusable map path."
+    : "";
+  if (!confirm(`Archive reusable map "${map.name}"?${referenceWarning}`)) {
+    return;
+  }
+
+  formMessage.textContent = "Archiving reusable map...";
+  const response = await fetch("/api/map-artifacts/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: map.path })
+  });
+
+  if (!response.ok) {
+    formMessage.textContent = await responseErrorMessage(response, "Map delete failed.");
+    updateBiomePaintControls();
+    return;
+  }
+
+  const result = await response.json();
+  if (isReferenced) {
+    clearScenarioMapReference();
+    renderScenarioEditor();
+    scheduleBiomePreview(0);
+  }
+
+  await loadMapArtifacts("");
+  formMessage.textContent = `Archived reusable map ${map.name} to ${result.archivedPath}.`;
+}
+
+function updateScenarioMapReference(oldPath, newPath) {
+  if (!scenarioEditor?.scenario || scenarioEditor.scenario.worldMapPath !== oldPath) {
+    return;
+  }
+
+  scenarioEditor.scenario.worldMapPath = newPath;
+  renderScenarioEditor();
+  scheduleBiomePreview(0);
+}
+
+function clearScenarioMapReference() {
+  if (!scenarioEditor?.scenario) {
+    return;
+  }
+
+  scenarioEditor.scenario.worldMapPath = null;
+  if (scenarioEditor.scenario.biomeMapKind === "manual") {
+    scenarioEditor.scenario.biomeMapKind = "naturalClimate";
+  }
+
+  if (scenarioEditor.scenario.obstacleMapKind === "manual") {
+    scenarioEditor.scenario.enableObstacles = false;
+    scenarioEditor.scenario.obstacleMapKind = "none";
+  }
 }
 
 async function responseErrorMessage(response, fallback, hint = null) {
@@ -2524,6 +2788,7 @@ scenarioFields.addEventListener("change", () => {
   try {
     storeVisibleScenarioValues();
     updateScenarioFieldChangeMarkers();
+    renderMapArtifactDetails();
     scheduleBiomePreview();
   } catch (error) {
     scenarioOptionsStatus.textContent = error.message;
@@ -2534,6 +2799,7 @@ scenarioFields.addEventListener("input", () => {
   try {
     storeVisibleScenarioValues();
     updateScenarioFieldChangeMarkers();
+    renderMapArtifactDetails();
     scheduleBiomePreview();
   } catch (error) {
     scenarioOptionsStatus.textContent = error.message;
@@ -2547,6 +2813,9 @@ paintBiomeMapButton.addEventListener("click", () => setBiomePaintEnabled(!biomeP
 mapArtifactSelect.addEventListener("change", updateBiomePaintControls);
 applyMapArtifactButton.addEventListener("click", applySelectedMapArtifact);
 saveMapArtifactButton.addEventListener("click", saveMapArtifact);
+renameMapArtifactButton.addEventListener("click", renameSelectedMapArtifact);
+duplicateMapArtifactButton.addEventListener("click", duplicateSelectedMapArtifact);
+deleteMapArtifactButton.addEventListener("click", deleteSelectedMapArtifact);
 paintLayerSelect.addEventListener("change", () => {
   if (biomePaintEnabled) {
     setBiomePaintEnabled(true);

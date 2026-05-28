@@ -75,6 +75,7 @@ public sealed record BiomeMapPreviewSummary(
 public sealed record MapArtifactOption(
     string Name,
     string Path,
+    bool CanDelete,
     double WorldWidth,
     double WorldHeight,
     double BiomeCellSize,
@@ -87,7 +88,8 @@ public sealed record MapArtifactOption(
     int ObstacleBlockedCellCount,
     ulong? SourceSeed,
     string? SourceBiomeMapKind,
-    string? SourceObstacleMapKind);
+    string? SourceObstacleMapKind,
+    IReadOnlyList<BiomeMapPreviewSummary> Biomes);
 
 public sealed record MapArtifactSaveRequest(
     string Name,
@@ -100,6 +102,21 @@ public sealed record MapArtifactSaveRequest(
 public sealed record MapArtifactSaveResult(
     MapArtifactOption Map,
     string WorldMapPath);
+
+public sealed record MapArtifactRenameRequest(
+    string Path,
+    string Name);
+
+public sealed record MapArtifactDuplicateRequest(
+    string Path,
+    string Name);
+
+public sealed record MapArtifactDeleteRequest(
+    string Path);
+
+public sealed record MapArtifactDeleteResult(
+    string Path,
+    string ArchivedPath);
 
 public sealed record ScenarioRecipe(
     string Name,

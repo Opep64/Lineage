@@ -115,6 +115,42 @@ api.MapPost("/map-artifacts", (MapArtifactSaveRequest request, LineageRunManager
     }
 });
 
+api.MapPost("/map-artifacts/rename", (MapArtifactRenameRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.RenameMapArtifact(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/map-artifacts/duplicate", (MapArtifactDuplicateRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.DuplicateMapArtifact(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/map-artifacts/delete", (MapArtifactDeleteRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.DeleteMapArtifact(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapGet("/runs", (LineageRunManager manager) => Results.Ok(manager.ListRuns()));
 
 api.MapPost("/runs/export", (RunExportRequest request, LineageRunManager manager) =>

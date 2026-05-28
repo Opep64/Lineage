@@ -331,6 +331,66 @@ public sealed partial class LineageRunManager
         return new MapArtifactSaveResult(option, option.Path);
     }
 
+    public MapArtifactSaveResult RenameMapArtifact(MapArtifactRenameRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Map name is required.");
+        }
+
+        var path = ResolveUserMapArtifactPath(request.Path);
+        var document = WorldMapArtifactJson.Load(path).Validated() with { Name = name };
+        var targetPath = Path.Combine(UserMapArtifactRoot(), $"{Slugify(name)}.lineage-map.json");
+        if (!PathsEqual(path, targetPath))
+        {
+            targetPath = GetUniquePath(targetPath);
+        }
+
+        EnsurePathInside(targetPath, UserMapArtifactRoot());
+        WorldMapArtifactJson.Save(targetPath, document);
+        if (!PathsEqual(path, targetPath))
+        {
+            File.Delete(path);
+        }
+
+        var option = ToMapArtifactOption(targetPath, WorldMapArtifactJson.Load(targetPath));
+        return new MapArtifactSaveResult(option, option.Path);
+    }
+
+    public MapArtifactSaveResult DuplicateMapArtifact(MapArtifactDuplicateRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Map name is required.");
+        }
+
+        var sourcePath = ResolveUserMapArtifactPath(request.Path);
+        var document = WorldMapArtifactJson.Load(sourcePath).Validated() with { Name = name };
+        var targetPath = GetUniquePath(Path.Combine(UserMapArtifactRoot(), $"{Slugify(name)}.lineage-map.json"));
+        EnsurePathInside(targetPath, UserMapArtifactRoot());
+        WorldMapArtifactJson.Save(targetPath, document);
+
+        var option = ToMapArtifactOption(targetPath, WorldMapArtifactJson.Load(targetPath));
+        return new MapArtifactSaveResult(option, option.Path);
+    }
+
+    public MapArtifactDeleteResult DeleteMapArtifact(MapArtifactDeleteRequest request)
+    {
+        var path = ResolveUserMapArtifactPath(request.Path);
+        var archiveRoot = Path.Combine(_repoRoot, "out", "map-trash");
+        Directory.CreateDirectory(archiveRoot);
+        var archivePath = GetUniquePath(Path.Combine(
+            archiveRoot,
+            $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_{Path.GetFileName(path)}"));
+        File.Move(path, archivePath);
+
+        return new MapArtifactDeleteResult(
+            NormalizeArtifactRelativePath(path),
+            NormalizeArtifactRelativePath(archivePath));
+    }
+
     public ScenarioSaveResult SaveUserScenario(ScenarioSaveRequest request)
     {
         var name = (request.Name ?? string.Empty).Trim();
@@ -1845,6 +1905,29 @@ public sealed partial class LineageRunManager
         return Path.Combine(MapArtifactRoot(), UserScenarioFolderName);
     }
 
+    private string ResolveUserMapArtifactPath(string artifactPath)
+    {
+        if (string.IsNullOrWhiteSpace(artifactPath))
+        {
+            throw new ArgumentException("Map path is required.");
+        }
+
+        var path = ResolveArtifactPath(artifactPath);
+        var mapRoot = UserMapArtifactRoot();
+        EnsurePathInside(path, mapRoot);
+        if (!path.EndsWith(".lineage-map.json", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only reusable Lineage map artifacts can be managed.");
+        }
+
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Map artifact was not found.", artifactPath);
+        }
+
+        return path;
+    }
+
     private string UserScenarioRegistryPath()
     {
         return Path.Combine(UserScenarioRoot(), UserScenarioRegistryFileName);
@@ -1920,11 +2003,22 @@ public sealed partial class LineageRunManager
     {
         var validated = document.Validated();
         var blockedCells = validated.ObstacleBlockedCells.Count(static blocked => blocked);
+        var biomes = validated.BiomeCells
+            .Select(BiomeKinds.Canonicalize)
+            .GroupBy(static biome => biome)
+            .OrderBy(static group => group.Key.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new BiomeMapPreviewSummary(
+                FormatBiomeKind(group.Key),
+                BiomeColor(group.Key),
+                group.Count(),
+                group.Count() / (double)validated.BiomeCells.Length))
+            .ToArray();
         return new MapArtifactOption(
             Name: string.IsNullOrWhiteSpace(validated.Name)
                 ? Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path))
                 : validated.Name,
             Path: NormalizeArtifactRelativePath(path),
+            CanDelete: IsPathUnderDirectory(path, UserMapArtifactRoot()),
             WorldWidth: validated.WorldWidth,
             WorldHeight: validated.WorldHeight,
             BiomeCellSize: validated.BiomeCellSize,
@@ -1937,7 +2031,8 @@ public sealed partial class LineageRunManager
             ObstacleBlockedCellCount: blockedCells,
             SourceSeed: validated.SourceSeed,
             SourceBiomeMapKind: validated.SourceBiomeMapKind?.ToString(),
-            SourceObstacleMapKind: validated.SourceObstacleMapKind?.ToString());
+            SourceObstacleMapKind: validated.SourceObstacleMapKind?.ToString(),
+            Biomes: biomes);
     }
 
     private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)

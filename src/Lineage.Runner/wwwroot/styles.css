@@ -266,6 +266,61 @@ textarea {
   font-weight: 600;
 }
 
+.map-artifact-details {
+  margin: 4px 0 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.map-artifact-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.map-artifact-summary strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.map-artifact-facts,
+.map-artifact-biomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+
+.map-artifact-biome {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-artifact-compatibility {
+  margin-top: 7px;
+}
+
+.map-artifact-compatibility ul {
+  margin: 5px 0 0 18px;
+  padding: 0;
+}
+
+.map-artifact-ok {
+  color: #1f6f38;
+}
+
+.map-artifact-warning {
+  color: #9a5b00;
+}
+
 .biome-preview-body {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(180px, 280px);
