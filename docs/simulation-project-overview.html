@@ -1126,6 +1126,9 @@
             </ul>
           </div>
         </div>
+        <div class="note">
+          <strong>Long-run stats cadence:</strong> for very long unattended experiments, a practical starting point is <code>statsSnapshotIntervalTicks</code> <code>9000</code>, which is about 5 simulated minutes at the current 30 Hz fixed step. Use <code>3000</code> when diagnosing a mechanic, <code>9000</code> as the normal long-run balance, <code>18000</code> for multi-day wall-clock runs, and <code>54000</code> only for extreme trend-focused runs. Coarser values reduce CSV, report, and saved-snapshot history size, but make graphs, species trends, lineage trends, and latest-snapshot diagnostics less temporally precise; they do not change simulation behavior or lineage recording.
+        </div>
       </section>
 
       <section id="roadmap">
