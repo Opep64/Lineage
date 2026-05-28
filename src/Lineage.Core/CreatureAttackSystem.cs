@@ -77,6 +77,7 @@ public sealed class CreatureAttackSystem(
 
             attacker.Energy -= biteCost;
             attacker.LastAttackDamageDealt = damage;
+            state.Stats.RecordAttackDamage(state.Bounds, target.Position, damage);
             _damageByCreature[contact.TargetIndex] += damage;
             _damageSourceByCreature[contact.TargetIndex] = attacker.Id;
             state.Creatures[i] = attacker;

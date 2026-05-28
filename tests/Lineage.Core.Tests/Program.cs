@@ -146,6 +146,7 @@ var tests = new (string Name, Action Body)[]
     ("Spawned creatures create lineage records", SpawnedCreaturesCreateLineageRecords),
     ("Offspring lineage records parent and generation", OffspringLineageRecordsParentAndGeneration),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
+    ("Spatial heatmaps record lifecycle and interaction events", SpatialHeatmapsRecordLifecycleAndInteractionEvents),
     ("World state prunes extinct payloads", WorldStatePrunesExtinctPayloads),
     ("Pruned simulation snapshots restore continuation", PrunedSimulationSnapshotsRestoreContinuation),
     ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
@@ -6128,6 +6129,9 @@ static void SpawnedCreaturesCreateLineageRecords()
     AssertEqual(genomeId, record.GenomeId, "Lineage genome id");
     AssertEqual(brainId, record.BrainId, "Lineage brain id");
     AssertClose(25f, record.BirthEnergy, 0.000001, "Lineage birth energy");
+    AssertClose(10f, record.BirthPosition.X, 0.000001, "Lineage birth position x");
+    AssertClose(10f, record.BirthPosition.Y, 0.000001, "Lineage birth position y");
+    AssertClose(1f, simulation.State.Stats.SpatialHeatmaps.Births.Sum(), 0.000001, "Birth heatmap count");
 }
 
 static void OffspringLineageRecordsParentAndGeneration()
@@ -6190,6 +6194,75 @@ static void DeathSystemMarksLineageDeathReason()
     AssertTrue(simulation.State.TryGetLineageRecord(creatureId, out var record), "Dead lineage lookup should succeed");
     AssertTrue(!record.IsAlive, "Dead lineage should not be alive");
     AssertEqual(CreatureDeathReason.Starvation, record.DeathReason, "Death reason");
+    AssertTrue(record.DeathPosition is not null, "Death position should be recorded");
+    AssertClose(20f, record.DeathPosition!.Value.X, 0.000001, "Death position x");
+    AssertClose(20f, record.DeathPosition.Value.Y, 0.000001, "Death position y");
+    AssertClose(1f, simulation.State.Stats.SpatialHeatmaps.Deaths.Sum(), 0.000001, "Death heatmap count");
+    AssertClose(1f, simulation.State.Stats.SpatialHeatmaps.StarvationDeaths.Sum(), 0.000001, "Starvation heatmap count");
+}
+
+static void SpatialHeatmapsRecordLifecycleAndInteractionEvents()
+{
+    var foodIndex = new UniformSpatialIndex(cellSize: 16f);
+    var foodSimulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 101,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(foodIndex),
+            new EatingSystem(foodIndex)
+        ]);
+    var foodGenomeId = foodSimulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        EatCaloriesPerSecond = 10f,
+        GutCapacityCalories = 100f
+    });
+    foodSimulation.State.SpawnCreature(foodGenomeId, new SimVector2(40f, 40f), energy: 50f);
+    foodSimulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(40f, 40f),
+        Radius = 4f,
+        Calories = 25f,
+        MaxCalories = 25f
+    });
+
+    foodSimulation.Step();
+
+    AssertTrue(foodSimulation.State.Stats.SpatialHeatmaps.PlantCaloriesEaten.Sum() > 0f, "Plant eating heatmap should record calories");
+
+    var attackIndex = new UniformSpatialIndex(cellSize: 16f);
+    var attackSimulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 102,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(attackIndex),
+            new CreatureAttackSystem(attackIndex, biteDamagePerSecond: 1f, biteRangePadding: 4f, requireAttackIntent: false)
+        ]);
+    var attackerGenomeId = attackSimulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 5f,
+        BiteStrength = 1f
+    });
+    attackSimulation.State.SpawnCreature(attackerGenomeId, new SimVector2(50f, 50f), energy: 50f);
+    attackSimulation.State.SpawnCreature(attackerGenomeId, new SimVector2(58f, 50f), energy: 50f);
+    var attacker = attackSimulation.State.Creatures[0];
+    attacker.HeadingRadians = 0f;
+    attackSimulation.State.Creatures[0] = attacker;
+
+    attackSimulation.Step();
+
+    AssertTrue(attackSimulation.State.Stats.SpatialHeatmaps.AttackDamage.Sum() > 0f, "Attack heatmap should record damage");
+
+    var snapshotScenario = new SimulationScenario { WorldWidth = 1000f, WorldHeight = 1000f };
+    var snapshotJson = SimulationSnapshotJson.ToJson(SimulationSnapshot.Capture(snapshotScenario, foodSimulation));
+    var restored = SimulationSnapshotJson.RestoreSimulation(SimulationSnapshotJson.FromJson(snapshotJson)).Simulation;
+    AssertClose(
+        foodSimulation.State.Stats.SpatialHeatmaps.PlantCaloriesEaten.Sum(),
+        restored.State.Stats.SpatialHeatmaps.PlantCaloriesEaten.Sum(),
+        0.000001,
+        "Restored heatmap calories");
 }
 
 static void WorldStatePrunesExtinctPayloads()

@@ -246,6 +246,7 @@ public sealed class WorldState
             ParentId = parentId,
             BirthTick = Tick,
             BirthElapsedSeconds = ElapsedSeconds,
+            BirthPosition = clampedPosition,
             Generation = generation,
             GenomeId = genomeId,
             BrainId = brainId,
@@ -330,6 +331,7 @@ public sealed class WorldState
         EntityId id,
         CreatureDeathReason reason,
         BiomeKind deathBiome,
+        SimVector2 deathPosition,
         float maxXReached,
         EntityId attackerId = default)
     {
@@ -346,12 +348,13 @@ public sealed class WorldState
 
         record.DeathTick = Tick;
         record.DeathElapsedSeconds = ElapsedSeconds;
+        record.DeathPosition = Bounds.Clamp(deathPosition);
         record.DeathReason = reason;
         record.DeathAttackerId = attackerId;
         record.MaxXReached = Math.Max(record.MaxXReached, maxXReached);
         _lineageRecords[index] = record;
         var lifespanSeconds = MathF.Max(0f, (float)(record.DeathElapsedSeconds.Value - record.BirthElapsedSeconds));
-        Stats.RecordCreatureDeath(reason, lifespanSeconds, deathBiome);
+        Stats.RecordCreatureDeath(reason, lifespanSeconds, deathBiome, Bounds, record.DeathPosition.Value);
     }
 
     internal void RecordCreatureProgress(EntityId id, float maxXReached)
@@ -533,7 +536,7 @@ public sealed class WorldState
     {
         _lineageRecordByEntityId.Add(record.Id, _lineageRecords.Count);
         _lineageRecords.Add(record);
-        Stats.RecordCreatureBirth(record);
+        Stats.RecordCreatureBirth(record, Bounds);
     }
 
     private IEnumerable<int> EnumerateActiveGenomeIds()

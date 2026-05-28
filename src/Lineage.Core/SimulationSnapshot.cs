@@ -40,6 +40,8 @@ public sealed record SimulationSnapshot
 
     public SimulationStatsSnapshot[] StatsSnapshots { get; init; } = [];
 
+    public SimulationSpatialHeatmapSnapshot SpatialHeatmaps { get; init; } = new();
+
     public int CreatureBirthCount { get; init; }
 
     public int FounderCreatureCount { get; init; }
@@ -127,6 +129,7 @@ public sealed record SimulationSnapshot
                 .ToArray(),
             LineageRecords = state.LineageRecords.ToArray(),
             StatsSnapshots = SelectStatsSnapshots(state.Stats.Snapshots, maxStatsSnapshots),
+            SpatialHeatmaps = state.Stats.SpatialHeatmaps.ToSnapshot(),
             CreatureBirthCount = state.Stats.CreatureBirthCount,
             FounderCreatureCount = state.Stats.FounderCreatureCount,
             CreatureDeathCount = state.Stats.CreatureDeathCount,

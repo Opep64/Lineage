@@ -18,6 +18,8 @@ public struct CreatureLineageRecord
 
     public double BirthElapsedSeconds { get; set; }
 
+    public SimVector2 BirthPosition { get; set; }
+
     public int Generation { get; set; }
 
     public int GenomeId { get; set; }
@@ -31,6 +33,8 @@ public struct CreatureLineageRecord
     public long? DeathTick { get; set; }
 
     public double? DeathElapsedSeconds { get; set; }
+
+    public SimVector2? DeathPosition { get; set; }
 
     public CreatureDeathReason? DeathReason { get; set; }
 

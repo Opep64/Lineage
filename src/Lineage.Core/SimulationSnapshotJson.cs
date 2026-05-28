@@ -129,6 +129,7 @@ public static class SimulationSnapshotJson
             snapshot.TundraDeathCount,
             snapshot.HighlandDeathCount,
             snapshot.CreatureDeathCausesByBiome);
+        state.Stats.SpatialHeatmaps.Restore(snapshot.SpatialHeatmaps);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }
 

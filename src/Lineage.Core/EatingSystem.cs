@@ -214,6 +214,7 @@ public sealed class EatingSystem(
         var meatFreshness = resource.Kind == ResourceKind.Meat
             ? MeatQuality.Freshness(resource)
             : 1f;
+        state.Stats.RecordFoodEaten(state.Bounds, resource.Position, resource.Kind, amount);
         AddToGut(ref creature, resource.Kind, resource.PlantKind, amount, meatFreshness);
         creature.LastCaloriesEaten = amount;
         if (resource.Kind == ResourceKind.Meat)
@@ -285,6 +286,7 @@ public sealed class EatingSystem(
         }
 
         egg.Energy -= amount;
+        state.Stats.RecordEggEaten(state.Bounds, egg.Position, amount);
         if (egg.Energy <= 0f)
         {
             egg.Energy = 0f;

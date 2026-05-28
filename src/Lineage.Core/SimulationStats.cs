@@ -48,6 +48,8 @@ public sealed class SimulationStats
 
     public BiomeDeathCauseCounts CreatureDeathCausesByBiome { get; private set; }
 
+    public SimulationSpatialHeatmaps SpatialHeatmaps { get; } = new();
+
     public int PlantDepletionCount { get; private set; }
 
     public int PlantLocalDispersalCount { get; private set; }
@@ -96,10 +98,11 @@ public sealed class SimulationStats
         ? 0f
         : PlantDormancyCompletedSecondsTotal / PlantDormancyCompletedCount;
 
-    internal void RecordCreatureBirth(CreatureLineageRecord record)
+    internal void RecordCreatureBirth(CreatureLineageRecord record, WorldBounds bounds)
     {
         CreatureBirthCount++;
         RecordEastwardProgress(record.MaxXReached);
+        SpatialHeatmaps.RecordBirth(bounds, record.BirthPosition);
 
         if (record.IsFounder)
         {
@@ -107,11 +110,17 @@ public sealed class SimulationStats
         }
     }
 
-    internal void RecordCreatureDeath(CreatureDeathReason reason, float lifespanSeconds, BiomeKind biome)
+    internal void RecordCreatureDeath(
+        CreatureDeathReason reason,
+        float lifespanSeconds,
+        BiomeKind biome,
+        WorldBounds bounds,
+        SimVector2 position)
     {
         CreatureDeathCount++;
         AddDeadCreatureLifespan(lifespanSeconds);
         CreatureDeathCausesByBiome = CreatureDeathCausesByBiome.Add(biome, reason);
+        SpatialHeatmaps.RecordDeath(bounds, position, reason);
 
         switch (reason)
         {
@@ -185,6 +194,21 @@ public sealed class SimulationStats
         {
             EggPredationDeathCount++;
         }
+    }
+
+    internal void RecordFoodEaten(WorldBounds bounds, SimVector2 position, ResourceKind kind, float calories)
+    {
+        SpatialHeatmaps.RecordFoodEaten(bounds, position, kind, calories);
+    }
+
+    internal void RecordEggEaten(WorldBounds bounds, SimVector2 position, float calories)
+    {
+        SpatialHeatmaps.RecordEggEaten(bounds, position, calories);
+    }
+
+    internal void RecordAttackDamage(WorldBounds bounds, SimVector2 position, float damage)
+    {
+        SpatialHeatmaps.RecordAttackDamage(bounds, position, damage);
     }
 
     internal void RecordPlantDepletion()
@@ -306,6 +330,7 @@ public sealed class SimulationStats
             : 0f;
         Snapshots.Clear();
         Snapshots.AddRange(snapshots);
+        SpatialHeatmaps.Restore(null);
     }
 
     private void AddDeadCreatureLifespan(float lifespanSeconds)
