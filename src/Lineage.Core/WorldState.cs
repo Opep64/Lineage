@@ -232,6 +232,8 @@ public sealed class WorldState
             Position = clampedPosition,
             MaxXReached = clampedPosition.X,
             HeadingRadians = Random.NextSingle(0f, MathF.Tau),
+            Senses = new CreatureSenseState { WorldSenseTick = -1 },
+            LastNeuralDecisionTick = -1,
             Energy = energy,
             Health = health,
             BirthInvestmentRatio = OffspringDevelopment.NormalizeInvestmentRatio(birthInvestmentRatio),

@@ -862,6 +862,7 @@ function scenarioEditorGroups() {
     "Diet & Combat",
     "Energy & Movement",
     "Mutation",
+    "Performance",
     "Species",
     "Advanced"
   ];

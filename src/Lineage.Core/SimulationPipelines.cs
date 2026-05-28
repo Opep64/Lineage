@@ -157,6 +157,7 @@ public static class SimulationPipelines
         float plantPayoffTraceHalfLifeSeconds = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds,
         bool enableLegacyNearestFoodVisionInputs = true,
         bool enableLegacyNearestCreatureVisionInputs = true,
+        bool reuseNeuralActionsOnSkippedWorldSenses = false,
         float biteDamagePerSecond = 0.25f,
         float biteEnergyCostPerSecond = 0.12f,
         float biteRangePadding = 1f,
@@ -238,7 +239,8 @@ public static class SimulationPipelines
                 memoryDecayPerSecond: memoryDecayPerSecond,
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,
                 enableLegacyNearestFoodVisionInputs: enableLegacyNearestFoodVisionInputs,
-                enableLegacyNearestCreatureVisionInputs: enableLegacyNearestCreatureVisionInputs),
+                enableLegacyNearestCreatureVisionInputs: enableLegacyNearestCreatureVisionInputs,
+                reuseActionsOnSkippedWorldSenses: reuseNeuralActionsOnSkippedWorldSenses),
             new MovementSystem(
                 biomeMovementCostProfile,
                 biomeSpeedProfile,

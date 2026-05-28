@@ -33,6 +33,19 @@ public struct CreatureState
     public CreatureActionState Actions { get; set; }
 
     /// <summary>
+    /// Tick of the most recent neural evaluation, or -1 before the first one.
+    /// </summary>
+    public long LastNeuralDecisionTick { get; set; }
+
+    public float LastNeuralEnergyRatio { get; set; }
+
+    public float LastNeuralHealthRatio { get; set; }
+
+    public float LastNeuralHunger { get; set; }
+
+    public float LastNeuralReproductionReadiness { get; set; }
+
+    /// <summary>
     /// Persistent world-space direction the neural controller can write and read later.
     /// </summary>
     public SimVector2 MemoryVector { get; set; }

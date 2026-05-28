@@ -87,6 +87,8 @@ var tests = new (string Name, Action Body)[]
     ("Legacy neural adapter can suppress nearest food vision inputs", LegacyNeuralAdapterCanSuppressNearestFoodVisionInputs),
     ("Legacy neural adapter can suppress nearest creature vision inputs", LegacyNeuralAdapterCanSuppressNearestCreatureVisionInputs),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
+    ("Neural controller reuses actions on skipped world senses", NeuralControllerReusesActionsOnSkippedWorldSenses),
+    ("Neural controller forces decisions on stale contact", NeuralControllerForcesDecisionsOnStaleContact),
     ("Neural controller consumes sector vision inputs", NeuralControllerConsumesSectorVisionInputs),
     ("Neural controller writes spatial memory", NeuralControllerWritesSpatialMemory),
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
@@ -3790,6 +3792,115 @@ static void NeuralControllerTurnsSensesIntoActions()
     AssertTrue(creature.DesiredVelocity.X > 0f, "Desired velocity should face food");
 }
 
+static void NeuralControllerReusesActionsOnSkippedWorldSenses()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 610,
+        systems:
+        [
+            new NeuralControllerSystem(reuseActionsOnSkippedWorldSenses: true)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 10f,
+        MaxTurnRadiansPerSecond = 4f,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 2f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 50f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    creature.Senses = new CreatureSenseState
+    {
+        WorldSenseRefreshed = false,
+        WorldSenseTick = 0,
+        EnergyRatio = 0.5f,
+        HealthRatio = 1f,
+        Hunger = 0.25f
+    };
+    creature.Actions = new CreatureActionState
+    {
+        MoveForward = 0.25f,
+        Turn = 0.5f,
+        EatOutput = -0.25f,
+        ReproduceOutput = -0.25f,
+        AttackOutput = -0.25f
+    };
+    creature.LastNeuralDecisionTick = 0;
+    creature.LastNeuralEnergyRatio = 0.5f;
+    creature.LastNeuralHealthRatio = 1f;
+    creature.LastNeuralHunger = 0.25f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertClose(0.25f, creature.Actions.MoveForward, 0.000001, "Skipped world sense should reuse previous move output");
+    AssertClose(0.5f, creature.Actions.Turn, 0.000001, "Skipped world sense should reuse previous turn output");
+    AssertEqual(0L, creature.LastNeuralDecisionTick, "Skipped world sense should not record a new neural decision");
+    AssertClose(0.2f, creature.HeadingRadians, 0.000001, "Reused turn output should still update heading");
+    AssertTrue(creature.DesiredVelocity.X > 0f, "Reused move output should still produce desired velocity");
+}
+
+static void NeuralControllerForcesDecisionsOnStaleContact()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 611,
+        systems:
+        [
+            new NeuralControllerSystem(reuseActionsOnSkippedWorldSenses: true)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 10f,
+        MaxTurnRadiansPerSecond = 4f,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 2f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 2f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 50f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        WorldSenseRefreshed = false,
+        WorldSenseTick = 0,
+        EnergyRatio = 0.5f,
+        HealthRatio = 1f,
+        Hunger = 0.25f,
+        FoodContact = 1f
+    };
+    creature.Actions = new CreatureActionState
+    {
+        MoveForward = 0f,
+        Turn = 0f,
+        EatOutput = -1f
+    };
+    creature.LastNeuralDecisionTick = 0;
+    creature.LastNeuralEnergyRatio = 0.5f;
+    creature.LastNeuralHealthRatio = 1f;
+    creature.LastNeuralHunger = 0.25f;
+    creature.IsTouchingFood = true;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertTrue(creature.Actions.MoveForward > 0.9f, "Food contact should force a fresh neural movement decision");
+    AssertTrue(creature.Actions.WantsEat, "Food contact should force a fresh neural eat decision");
+}
+
 static void NeuralControllerConsumesSectorVisionInputs()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 32f);
@@ -6243,7 +6354,8 @@ static void SpatialHeatmapsRecordLifecycleAndInteractionEvents()
     var attackerGenomeId = attackSimulation.State.AddGenome(CreatureGenome.Baseline with
     {
         BodyRadius = 5f,
-        BiteStrength = 1f
+        BiteStrength = 1f,
+        MaturityAgeSeconds = 0f
     });
     attackSimulation.State.SpawnCreature(attackerGenomeId, new SimVector2(50f, 50f), energy: 50f);
     attackSimulation.State.SpawnCreature(attackerGenomeId, new SimVector2(58f, 50f), energy: 50f);
@@ -9032,6 +9144,12 @@ static void ScenarioMetadataDescribesEditableJsonFields()
     AssertEqual("json", species.Type, "Species seeds type");
     AssertEqual("Species", species.Group, "Species seeds group");
     AssertTrue(species.Advanced, "Species seeds should be advanced");
+
+    var neuralReuse = SimulationScenarioMetadata.FindByJsonName("reuseNeuralActionsOnSkippedWorldSenses")
+        ?? throw new InvalidOperationException("Missing neural action reuse metadata.");
+    AssertEqual("boolean", neuralReuse.Type, "Neural action reuse type");
+    AssertEqual("Performance", neuralReuse.Group, "Neural action reuse group");
+    AssertTrue(neuralReuse.Advanced, "Neural action reuse should be advanced");
 }
 
 static void ScenarioJsonRoundTrips()
@@ -9060,6 +9178,7 @@ static void ScenarioJsonRoundTrips()
         CloseSenseRefreshProximity = 0.93f,
         PlantPayoffTraceHalfLifeSeconds = 31f,
         EnableSectorVision = true,
+        ReuseNeuralActionsOnSkippedWorldSenses = true,
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
         InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.RightThird,
@@ -9223,6 +9342,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
     AssertTrue(json.Contains("\"plantPayoffTraceHalfLifeSeconds\""), "JSON should serialize plant payoff trace half-life");
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
+    AssertTrue(json.Contains("\"reuseNeuralActionsOnSkippedWorldSenses\""), "JSON should serialize neural action reuse toggle");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertTrue(json.Contains("\"plantSpecializationEnergyCostPerSecond\""), "JSON should serialize plant specialization cost");
     AssertTrue(json.Contains("\"tenderPlantAdaptation\""), "JSON should serialize tender plant adaptation");
@@ -9248,6 +9368,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.CloseSenseRefreshProximity, roundTripped.CloseSenseRefreshProximity, 0.000001, "Scenario close sense threshold");
     AssertClose(scenario.PlantPayoffTraceHalfLifeSeconds, roundTripped.PlantPayoffTraceHalfLifeSeconds, 0.000001, "Scenario plant payoff trace half-life");
     AssertEqual(scenario.EnableSectorVision, roundTripped.EnableSectorVision, "Scenario sector vision toggle");
+    AssertEqual(scenario.ReuseNeuralActionsOnSkippedWorldSenses, roundTripped.ReuseNeuralActionsOnSkippedWorldSenses, "Scenario neural action reuse toggle");
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
     AssertEqual(scenario.InitialCreatureSpawnRegion, roundTripped.InitialCreatureSpawnRegion, "Scenario initial spawn region");

@@ -11,6 +11,21 @@ namespace Lineage.Core;
 /// </remarks>
 public struct CreatureSenseState
 {
+    /// <summary>
+    /// True only on ticks where expensive world-facing senses were refreshed instead of reused.
+    /// </summary>
+    public bool WorldSenseRefreshed { get; set; }
+
+    /// <summary>
+    /// Simulation tick that last refreshed world-facing senses, or -1 before the first refresh.
+    /// </summary>
+    public long WorldSenseTick { get; set; }
+
+    /// <summary>
+    /// Ticks since the last world-facing sense refresh.
+    /// </summary>
+    public int WorldSenseAgeTicks { get; set; }
+
     public VisionSectorSet VisionSectors { get; set; }
 
     public bool FoodDetected { get; set; }

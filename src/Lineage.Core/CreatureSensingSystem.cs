@@ -155,6 +155,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var senses = shouldRefreshWorldSense
                 ? new CreatureSenseState()
                 : creature.Senses;
+            SetWorldSenseFreshness(ref senses, state.Tick, shouldRefreshWorldSense);
             var internalStateStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
@@ -621,7 +622,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private WorldSenseRefreshReason GetWorldSenseRefreshReason(WorldState state, CreatureState creature)
     {
-        if (_worldSenseIntervalTicks <= 1 || state.Tick == 0)
+        if (_worldSenseIntervalTicks <= 1 || state.Tick == 0 || creature.Senses.WorldSenseTick < 0)
         {
             return WorldSenseRefreshReason.Forced;
         }
@@ -654,6 +655,21 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             || senses.ForwardObstacle >= _closeSenseRefreshProximity
             || senses.LeftObstacle >= _closeSenseRefreshProximity
             || senses.RightObstacle >= _closeSenseRefreshProximity;
+    }
+
+    private static void SetWorldSenseFreshness(ref CreatureSenseState senses, long tick, bool refreshed)
+    {
+        senses.WorldSenseRefreshed = refreshed;
+        if (refreshed)
+        {
+            senses.WorldSenseTick = tick;
+            senses.WorldSenseAgeTicks = 0;
+            return;
+        }
+
+        senses.WorldSenseAgeTicks = senses.WorldSenseTick >= 0 && tick >= senses.WorldSenseTick
+            ? (int)Math.Min(int.MaxValue, tick - senses.WorldSenseTick)
+            : int.MaxValue;
     }
 
     private static void ApplyInternalSense(

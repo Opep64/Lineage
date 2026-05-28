@@ -23,6 +23,8 @@ public sealed class SimulationProfile
 
     public SimulationSensingProfile Sensing { get; } = new();
 
+    public SimulationNeuralControllerProfile NeuralController { get; } = new();
+
     public double TotalMilliseconds => _systems.Sum(system => system.TotalMilliseconds);
 
     internal void EnsureSystems(IReadOnlyList<ISimulationSystem> systems)
@@ -65,6 +67,81 @@ public sealed class SimulationSystemProfile(string systemName)
     public double AverageMillisecondsPerCall => CallCount > 0
         ? TotalMilliseconds / CallCount
         : 0.0;
+}
+
+public sealed class SimulationNeuralControllerProfile
+{
+    public long Updates { get; internal set; }
+
+    public long CreaturesControlled { get; internal set; }
+
+    public long BrainlessCreatures { get; internal set; }
+
+    public long BrainEvaluations { get; internal set; }
+
+    public long ReusedActions { get; internal set; }
+
+    public long ReuseDisabledEvaluations { get; internal set; }
+
+    public long FreshWorldSenseEvaluations { get; internal set; }
+
+    public long FirstDecisionEvaluations { get; internal set; }
+
+    public long ImmediateCueEvaluations { get; internal set; }
+
+    public long InternalChangeEvaluations { get; internal set; }
+
+    public long MaxReuseAgeEvaluations { get; internal set; }
+
+    public double ReusedActionShare => CreaturesControlled > 0
+        ? ReusedActions / (double)CreaturesControlled
+        : 0.0;
+
+    internal void BeginUpdate(int creatureCount)
+    {
+        Updates++;
+        CreaturesControlled += Math.Max(0, creatureCount);
+    }
+
+    internal void RecordBrainlessCreature()
+    {
+        BrainlessCreatures++;
+    }
+
+    internal void RecordReusedAction()
+    {
+        ReusedActions++;
+    }
+
+    internal void RecordBrainEvaluation(NeuralDecisionReason reason)
+    {
+        BrainEvaluations++;
+        switch (reason)
+        {
+            case NeuralDecisionReason.ReuseDisabled:
+                ReuseDisabledEvaluations++;
+                break;
+            case NeuralDecisionReason.FreshWorldSense:
+                FreshWorldSenseEvaluations++;
+                break;
+            case NeuralDecisionReason.FirstDecision:
+                FirstDecisionEvaluations++;
+                break;
+            case NeuralDecisionReason.ImmediateCue:
+                ImmediateCueEvaluations++;
+                break;
+            case NeuralDecisionReason.InternalChange:
+                InternalChangeEvaluations++;
+                break;
+            case NeuralDecisionReason.MaxReuseAge:
+                MaxReuseAgeEvaluations++;
+                break;
+            case NeuralDecisionReason.ReusedAction:
+                throw new ArgumentOutOfRangeException(nameof(reason), reason, "Reused actions are not brain evaluations.");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unsupported neural decision reason.");
+        }
+    }
 }
 
 public sealed class SimulationSensingProfile

@@ -75,6 +75,8 @@ public sealed record SimulationScenario
 
     public bool EnableLegacyNearestCreatureVisionInputs { get; init; } = true;
 
+    public bool ReuseNeuralActionsOnSkippedWorldSenses { get; init; }
+
     public int StatsSnapshotIntervalTicks { get; init; } = DefaultStatsSnapshotIntervalTicks;
 
     public bool EnableExtinctPayloadPruning { get; init; }

@@ -190,6 +190,7 @@ public static class SimulationScenarioMetadata
             "EnableSectorVision" => "Enables grouped sector vision inputs for the neural controller.",
             "EnableLegacyNearestFoodVisionInputs" => "Keeps legacy nearest-food inputs available beside sector vision.",
             "EnableLegacyNearestCreatureVisionInputs" => "Keeps legacy nearest-creature inputs available beside sector vision.",
+            "ReuseNeuralActionsOnSkippedWorldSenses" => "Reuses the previous neural action on ticks where expensive world senses were not refreshed, unless contact or internal-state changes force a new decision.",
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
             "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are no longer referenced by living creatures or eggs.",
             "ExtinctPayloadPruneIntervalTicks" => "How often extinct genome and brain payload compaction runs.",
@@ -277,6 +278,14 @@ public static class SimulationScenarioMetadata
             return "Mutation";
         }
 
+        if (name is "ReuseNeuralActionsOnSkippedWorldSenses"
+            || name.Contains("Prune", StringComparison.Ordinal)
+            || name.Contains("Pruning", StringComparison.Ordinal)
+            || name.Contains("Payload", StringComparison.Ordinal))
+        {
+            return "Performance";
+        }
+
         if (name.Contains("Brain", StringComparison.Ordinal)
             || name.Contains("Vision", StringComparison.Ordinal)
             || name.Contains("Sense", StringComparison.Ordinal)
@@ -347,13 +356,6 @@ public static class SimulationScenarioMetadata
             return "Species";
         }
 
-        if (name.Contains("Prune", StringComparison.Ordinal)
-            || name.Contains("Pruning", StringComparison.Ordinal)
-            || name.Contains("Payload", StringComparison.Ordinal))
-        {
-            return "Performance";
-        }
-
         return "Advanced";
     }
 
@@ -364,6 +366,6 @@ public static class SimulationScenarioMetadata
             || name.Contains("LocalFertility", StringComparison.Ordinal)
             || name.Contains("Species", StringComparison.Ordinal)
             || name.Contains("Phase", StringComparison.Ordinal)
-            || name is "FixedDeltaSeconds" or "CloseSenseRefreshProximity";
+            || name is "FixedDeltaSeconds" or "CloseSenseRefreshProximity" or "ReuseNeuralActionsOnSkippedWorldSenses";
     }
 }

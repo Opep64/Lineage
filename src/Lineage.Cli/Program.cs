@@ -764,7 +764,22 @@ static void PrintProfileSummary(SimulationProfile profile, int maxSystems = 8)
             $"  {system.SystemName}: {system.TotalMilliseconds:0.000}ms ({share:0.0}%), avg {system.AverageMillisecondsPerCall:0.0000}ms");
     }
 
+    PrintNeuralControllerProfileSummary(profile.NeuralController);
     PrintSensingProfileSummary(profile.Sensing);
+}
+
+static void PrintNeuralControllerProfileSummary(SimulationNeuralControllerProfile profile)
+{
+    if (profile.CreaturesControlled == 0)
+    {
+        return;
+    }
+
+    Console.WriteLine(
+        $"Neural controller profile: {profile.BrainEvaluations} evaluations, {profile.ReusedActions} reused"
+        + $" ({profile.ReusedActionShare * 100.0:0.0}% reused)");
+    Console.WriteLine(
+        $"  Evaluation reasons: fresh {profile.FreshWorldSenseEvaluations}, immediate {profile.ImmediateCueEvaluations}, internal {profile.InternalChangeEvaluations}, first {profile.FirstDecisionEvaluations}, max-age {profile.MaxReuseAgeEvaluations}, disabled {profile.ReuseDisabledEvaluations}");
 }
 
 static void PrintSensingProfileSummary(SimulationSensingProfile profile)
