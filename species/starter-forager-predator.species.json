@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Starter Forager Predator",
   "notes": "Creature-contact predatory forager starter exported from the current BrainFactory for scenario rosters.",
+  "defaultBrainPath": "brains/starter/starter-forager-predator-hybrid.brain.json",
   "source": {
     "scenarioName": "Predation Pressure",
     "seed": 20260519,

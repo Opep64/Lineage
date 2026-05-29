@@ -10,6 +10,8 @@ Roster entries use the profile's saved brain by default, but the launcher and Go
 one of the normal scenario starter brains when you want to reuse a body/genome with a weaker or different controller.
 Newer profiles may also set `defaultBrainPath` to point at a `.brain.json` artifact under `brains/`, and individual
 scenario roster entries may set `brainProfilePath` to transplant a catalog brain onto the species body.
+The built-in starter profiles point at matching hybrid brain catalog artifacts so the body and controller can be selected
+or swapped independently while preserving the old embedded brain as a compatibility fallback.
 
 Current starter profiles:
 

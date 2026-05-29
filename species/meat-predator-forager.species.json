@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Meat Predator Forager",
   "notes": "Meat-biased predator starter derived from the forager predator for predator-prey roster probes.",
+  "defaultBrainPath": "brains/starter/meat-predator-forager-hybrid.brain.json",
   "source": {
     "scenarioName": "Predation Pressure",
     "seed": 20260519,

@@ -2,6 +2,7 @@
     "version":  1,
     "name":  "Rookie Scavenger Forager",
     "notes":  "Deliberately weakened scavenger-forager. It has mild carrion interest and basic plant seeking, but is intentionally less decisive and less efficient than the standard scavenger starter.",
+    "defaultBrainPath":  "brains/starter/rookie-scavenger-forager-hybrid.brain.json",
     "source":  {
                    "scenarioName":  "Starter Species Catalog",
                    "seed":  20260519,

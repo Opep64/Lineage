@@ -2,6 +2,7 @@
     "version":  1,
     "name":  "Rookie Explorer Forager",
     "notes":  "Deliberately weakened exploratory plant forager. It wanders and can use visible food, but weaker control and tighter body economics should leave room for selection to improve basic foraging.",
+    "defaultBrainPath":  "brains/starter/rookie-explorer-forager-hybrid.brain.json",
     "source":  {
                    "scenarioName":  "Starter Species Catalog",
                    "seed":  20260522,

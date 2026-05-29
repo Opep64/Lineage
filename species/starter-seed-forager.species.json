@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Starter Seed Forager",
   "notes": "Legacy nearest-cue plant forager starter exported from the current BrainFactory for scenario rosters.",
+  "defaultBrainPath": "brains/starter/starter-seed-forager-hybrid.brain.json",
   "source": {
     "scenarioName": "Test Foraging",
     "seed": 20260519,

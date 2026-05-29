@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Starter Sector Forager",
   "notes": "Sector-vision plant forager starter exported from the current BrainFactory for scenario rosters.",
+  "defaultBrainPath": "brains/starter/starter-sector-forager-hybrid.brain.json",
   "source": {
     "scenarioName": "Balanced Foraging",
     "seed": 20260519,

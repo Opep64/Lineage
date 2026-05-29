@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Starter Scavenger Forager",
   "notes": "Meat-scent scavenger starter exported from the current BrainFactory for scenario rosters.",
+  "defaultBrainPath": "brains/starter/starter-scavenger-forager-hybrid.brain.json",
   "source": {
     "scenarioName": "Scavenger Pressure",
     "seed": 20260519,

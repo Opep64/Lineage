@@ -2,6 +2,7 @@
     "version":  1,
     "name":  "Rookie Sector Forager",
     "notes":  "Deliberately weakened sector-vision plant forager. It retains enough directed food seeking and reproduction behavior to seed evolution, but has weaker brain weights, shorter senses, slower feeding, and less polished energetics than the standard starter.",
+    "defaultBrainPath":  "brains/starter/rookie-sector-forager-hybrid.brain.json",
     "source":  {
                    "scenarioName":  "Starter Species Catalog",
                    "seed":  20260519,

@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Starter Explorer Forager",
   "notes": "Terrain-aware explorer forager starter exported from the current BrainFactory for scenario rosters.",
+  "defaultBrainPath": "brains/starter/starter-explorer-forager-hybrid.brain.json",
   "source": {
     "scenarioName": "Terrain Pressure",
     "seed": 20260522,

@@ -2,6 +2,7 @@
   "version": 1,
   "name": "Efficient Explorer Prey Forager",
   "notes": "Plant-efficient explorer prey starter derived from the explorer forager for predator-prey roster probes.",
+  "defaultBrainPath": "brains/starter/efficient-explorer-prey-forager-hybrid.brain.json",
   "source": {
     "scenarioName": "Terrain Pressure",
     "seed": 20260522,
