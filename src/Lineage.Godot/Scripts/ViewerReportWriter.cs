@@ -18,6 +18,13 @@ public static class ViewerReportWriter
     private const int ReportTrendRowCount = 8;
     private const int ReportTimelineSampleLimit = 1200;
 
+    private readonly record struct SpatialHeatmapLayer(
+        string Title,
+        string Units,
+        IReadOnlyList<float> Values,
+        string Color,
+        string Description);
+
     public static void Write(
         string path,
         SimulationScenario scenario,
@@ -471,6 +478,7 @@ public static class ViewerReportWriter
         WriteBiomePreferenceByGenerationSection(writer, state.Creatures, state.Biomes, biomeSummaries, worldArea);
 
         WriteDeathCausesByBiomeSection(writer, state.Stats.CreatureDeathCausesByBiome);
+        WriteSpatialHeatmapSection(writer, state.Biomes, state.Stats.SpatialHeatmaps);
 
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
         WriteSpeciesClusterSection(writer, speciesSummaries);
@@ -809,6 +817,33 @@ public static class ViewerReportWriter
               height: auto;
               overflow: visible;
             }
+            .heatmap-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+              gap: 16px;
+            }
+            .heatmap-card p {
+              margin: 0 0 8px;
+              color: var(--muted);
+              font-size: 0.84rem;
+            }
+            .heatmap {
+              display: block;
+              width: 100%;
+              height: auto;
+              max-height: 420px;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #eef3e8;
+            }
+            .heatmap-legend {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px 12px;
+              margin-top: 8px;
+              color: var(--muted);
+              font-size: 0.82rem;
+            }
             .chart-axis {
               stroke: #9daa95;
               stroke-width: 1;
@@ -1094,6 +1129,309 @@ public static class ViewerReportWriter
 
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpatialHeatmapSection(
+        TextWriter writer,
+        BiomeMap biomeMap,
+        SimulationSpatialHeatmaps heatmaps)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Spatial Heatmaps</h2>");
+        if (heatmaps.CellCountX <= 0
+            || heatmaps.CellCountY <= 0
+            || !heatmaps.HasData)
+        {
+            writer.WriteLine("<p class=\"empty\">No spatial event heatmap data was recorded for this run.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        var meatCalories = CombineHeatmaps(heatmaps.MeatCaloriesEaten, heatmaps.EggCaloriesEaten);
+        var exposureHours = ScaleHeatmap(heatmaps.CreatureExposureSeconds, 1f / 3600f);
+        var layers = new[]
+        {
+            new SpatialHeatmapLayer(
+                "Creature Exposure",
+                "creature-hr",
+                exposureHours,
+                "#255f85",
+                "Sampled creature-hours by location, based on the stats snapshot interval."),
+            new SpatialHeatmapLayer(
+                "Births",
+                "births",
+                heatmaps.Births,
+                "#2f8f43",
+                "Creature birth locations, including founders and hatched offspring."),
+            new SpatialHeatmapLayer(
+                "Deaths",
+                "deaths",
+                heatmaps.Deaths,
+                "#b42318",
+                "All creature death locations, regardless of cause."),
+            new SpatialHeatmapLayer(
+                "Starvation Deaths",
+                "deaths",
+                heatmaps.StarvationDeaths,
+                "#d78325",
+                "Creature death locations where starvation was the recorded cause."),
+            new SpatialHeatmapLayer(
+                "Injury Deaths",
+                "deaths",
+                heatmaps.InjuryDeaths,
+                "#932f6d",
+                "Creature death locations where attack injury was the recorded cause."),
+            new SpatialHeatmapLayer(
+                "Rotten Meat Deaths",
+                "deaths",
+                heatmaps.RottenMeatDeaths,
+                "#5f4b8b",
+                "Creature death locations attributed to rotten meat damage."),
+            new SpatialHeatmapLayer(
+                "Plant Eating",
+                "raw kcal",
+                heatmaps.PlantCaloriesEaten,
+                "#6aaa2a",
+                "Raw plant calories eaten at the plant patch location."),
+            new SpatialHeatmapLayer(
+                "Meat and Egg Eating",
+                "raw kcal",
+                meatCalories,
+                "#c64b35",
+                "Raw meat and egg calories eaten at the food location."),
+            new SpatialHeatmapLayer(
+                "Attack Damage",
+                "damage",
+                heatmaps.AttackDamage,
+                "#3c5aa6",
+                "Bite damage applied at the target creature location."),
+            new SpatialHeatmapLayer(
+                "Births per Creature Hour",
+                "births/creature-hr",
+                DivideHeatmaps(heatmaps.Births, exposureHours),
+                "#1f7f4c",
+                "Birth intensity normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Deaths per Creature Hour",
+                "deaths/creature-hr",
+                DivideHeatmaps(heatmaps.Deaths, exposureHours),
+                "#9d1f1f",
+                "Death risk normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Plant Eating per Creature Hour",
+                "raw kcal/creature-hr",
+                DivideHeatmaps(heatmaps.PlantCaloriesEaten, exposureHours),
+                "#5f9d1f",
+                "Plant calories eaten normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Meat and Egg Eating per Creature Hour",
+                "raw kcal/creature-hr",
+                DivideHeatmaps(meatCalories, exposureHours),
+                "#a8442f",
+                "Meat and egg calories eaten normalized by sampled creature-hours in each cell."),
+            new SpatialHeatmapLayer(
+                "Attack Damage per Creature Hour",
+                "damage/creature-hr",
+                DivideHeatmaps(heatmaps.AttackDamage, exposureHours),
+                "#2f4f9d",
+                "Bite damage normalized by sampled creature-hours in each cell.")
+        }.Where(layer => HeatmapTotal(layer.Values) > 0f).ToArray();
+
+        if (layers.Length == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">Spatial heatmaps were initialized, but every event layer is empty.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine(
+            $"<p class=\"biome-map-note\">Events are aggregated into a {Html(heatmaps.CellCountX)} x {Html(heatmaps.CellCountY)} report grid. Creature exposure is sampled on the stats snapshot interval; per-creature-hour layers are estimates from those samples. Biome colors are shown faintly under each heat layer.</p>");
+        writer.WriteLine("<div class=\"heatmap-grid\">");
+        foreach (var layer in layers)
+        {
+            WriteSpatialHeatmapCard(writer, biomeMap, heatmaps, layer);
+        }
+
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSpatialHeatmapCard(
+        TextWriter writer,
+        BiomeMap biomeMap,
+        SimulationSpatialHeatmaps heatmaps,
+        SpatialHeatmapLayer layer)
+    {
+        var total = HeatmapTotal(layer.Values);
+        var max = HeatmapMax(layer.Values);
+        var width = MathF.Max(1f, heatmaps.WorldWidth);
+        var height = MathF.Max(1f, heatmaps.WorldHeight);
+        var cellWidth = width / Math.Max(1, heatmaps.CellCountX);
+        var cellHeight = height / Math.Max(1, heatmaps.CellCountY);
+        writer.WriteLine(
+            $"<article class=\"chart-card heatmap-card\" role=\"button\" tabindex=\"0\" aria-label=\"Open {Html(layer.Title)} heatmap\">");
+        writer.WriteLine($"<h3>{Html(layer.Title)}</h3>");
+        writer.WriteLine($"<p>{Html(layer.Description)}</p>");
+        writer.WriteLine($"<svg class=\"heatmap\" viewBox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" role=\"img\" aria-label=\"{Html(layer.Title)} spatial heatmap\" preserveAspectRatio=\"xMidYMid meet\" shape-rendering=\"crispEdges\">");
+        WriteBiomeHeatmapBackground(writer, biomeMap);
+        for (var y = 0; y < heatmaps.CellCountY; y++)
+        {
+            for (var x = 0; x < heatmaps.CellCountX; x++)
+            {
+                var index = y * heatmaps.CellCountX + x;
+                if (index < 0 || index >= layer.Values.Count)
+                {
+                    continue;
+                }
+
+                var value = layer.Values[index];
+                if (value <= 0f)
+                {
+                    continue;
+                }
+
+                var opacity = 0.14f + 0.78f * MathF.Sqrt(value / MathF.Max(0.000001f, max));
+                writer.WriteLine(
+                    $"<rect x=\"{SvgNumber(x * cellWidth)}\" y=\"{SvgNumber(y * cellHeight)}\" width=\"{SvgNumber(cellWidth)}\" height=\"{SvgNumber(cellHeight)}\" fill=\"{Html(layer.Color)}\" fill-opacity=\"{SvgNumber(opacity)}\">" +
+                    $"<title>{Html(FormatHeatmapValue(value, layer.Units))}</title></rect>");
+            }
+        }
+
+        writer.WriteLine("</svg>");
+        writer.WriteLine("<div class=\"heatmap-legend\">");
+        if (IsRateHeatmapUnit(layer.Units))
+        {
+            var activeCellCount = Math.Max(1, HeatmapActiveCellCount(layer.Values));
+            writer.WriteLine(
+                $"<span><span class=\"legend-swatch\" style=\"background:{Html(layer.Color)}\"></span>Mean active cell {Html(FormatHeatmapValue(total / activeCellCount, layer.Units))}</span>");
+        }
+        else
+        {
+            writer.WriteLine(
+                $"<span><span class=\"legend-swatch\" style=\"background:{Html(layer.Color)}\"></span>Total {Html(FormatHeatmapValue(total, layer.Units))}</span>");
+        }
+
+        writer.WriteLine($"<span>Peak cell {Html(FormatHeatmapValue(max, layer.Units))}</span>");
+        writer.WriteLine("</div>");
+        writer.WriteLine("</article>");
+    }
+
+    private static void WriteBiomeHeatmapBackground(TextWriter writer, BiomeMap map)
+    {
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                var cell = map.GetCellBounds(x, y);
+                if (cell.Width <= 0f || cell.Height <= 0f)
+                {
+                    continue;
+                }
+
+                writer.WriteLine(
+                    $"<rect x=\"{SvgNumber(cell.X)}\" y=\"{SvgNumber(cell.Y)}\" width=\"{SvgNumber(cell.Width)}\" height=\"{SvgNumber(cell.Height)}\" fill=\"{Html(BiomeColor(map.GetKind(x, y)))}\" fill-opacity=\"0.32\" />");
+            }
+        }
+    }
+
+    private static float[] CombineHeatmaps(IReadOnlyList<float> left, IReadOnlyList<float> right)
+    {
+        var length = Math.Max(left.Count, right.Count);
+        var combined = new float[length];
+        for (var i = 0; i < combined.Length; i++)
+        {
+            combined[i] = (i < left.Count ? left[i] : 0f) + (i < right.Count ? right[i] : 0f);
+        }
+
+        return combined;
+    }
+
+    private static float[] ScaleHeatmap(IReadOnlyList<float> values, float scale)
+    {
+        var scaled = new float[values.Count];
+        if (!float.IsFinite(scale) || scale <= 0f)
+        {
+            return scaled;
+        }
+
+        for (var i = 0; i < scaled.Length; i++)
+        {
+            var value = values[i];
+            scaled[i] = float.IsFinite(value) && value > 0f ? value * scale : 0f;
+        }
+
+        return scaled;
+    }
+
+    private static float[] DivideHeatmaps(IReadOnlyList<float> numerator, IReadOnlyList<float> denominator)
+    {
+        var length = Math.Max(numerator.Count, denominator.Count);
+        var divided = new float[length];
+        for (var i = 0; i < divided.Length; i++)
+        {
+            var top = i < numerator.Count ? numerator[i] : 0f;
+            var bottom = i < denominator.Count ? denominator[i] : 0f;
+            divided[i] = float.IsFinite(top) && top > 0f && float.IsFinite(bottom) && bottom > 0f
+                ? top / bottom
+                : 0f;
+        }
+
+        return divided;
+    }
+
+    private static float HeatmapTotal(IReadOnlyList<float> values)
+    {
+        var total = 0f;
+        foreach (var value in values)
+        {
+            if (float.IsFinite(value) && value > 0f)
+            {
+                total += value;
+            }
+        }
+
+        return total;
+    }
+
+    private static float HeatmapMax(IReadOnlyList<float> values)
+    {
+        var max = 0f;
+        foreach (var value in values)
+        {
+            if (float.IsFinite(value) && value > max)
+            {
+                max = value;
+            }
+        }
+
+        return max;
+    }
+
+    private static int HeatmapActiveCellCount(IReadOnlyList<float> values)
+    {
+        var count = 0;
+        foreach (var value in values)
+        {
+            if (float.IsFinite(value) && value > 0f)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static string FormatHeatmapValue(float value, string units)
+    {
+        var formatted = units is "births" or "deaths"
+            ? value.ToString("0", CultureInfo.InvariantCulture)
+            : value.ToString("0.###", CultureInfo.InvariantCulture);
+        return $"{formatted} {units}";
+    }
+
+    private static bool IsRateHeatmapUnit(string units)
+    {
+        return units.Contains('/', StringComparison.Ordinal);
     }
 
     private static void WriteSeasonPressureSection(
