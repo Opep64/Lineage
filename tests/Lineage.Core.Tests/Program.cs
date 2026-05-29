@@ -146,6 +146,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
     ("Sparse mutation rates gate genome and brain changes", SparseMutationRatesGateGenomeAndBrainChanges),
+    ("World mutation policy overrides inherited genome mutation settings", WorldMutationPolicyOverridesInheritedGenomeMutationSettings),
     ("Intent-gated eating requires eat output", IntentGatedEatingRequiresEatOutput),
     ("Intent-gated reproduction mutates brain", IntentGatedReproductionMutatesBrain),
     ("Neural life loop is repeatable", NeuralLifeLoopIsRepeatable),
@@ -6368,6 +6369,57 @@ static void SparseMutationRatesGateGenomeAndBrainChanges()
     AssertTrue(
         sparseBrain.Weights.Any(weight => Math.Abs(weight) > 0.000001f),
         "Nonzero sparse brain mutation rate should force at least one changed weight");
+}
+
+static void WorldMutationPolicyOverridesInheritedGenomeMutationSettings()
+{
+    var mutationProfile = new MutationProfile(
+        MutationStrength: 0.25f,
+        TraitMutationRate: 1f,
+        BrainMutationRate: 1f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 617,
+        systems:
+        [
+            new ReproductionSystem(mutationPolicy: new WorldMutationPolicy(mutationProfile))
+        ]);
+    var parentGenome = CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 50f,
+        OffspringEnergyInvestment = 20f,
+        EggProductionEnergyPerSecond = 20f,
+        MaturityAgeSeconds = 0f,
+        ReproductionCooldownSeconds = 0f,
+        MutationStrength = 0f,
+        TraitMutationRate = 0f,
+        BrainMutationRate = 0f
+    };
+    var genomeId = simulation.State.AddGenome(parentGenome);
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero());
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 80f, brainId: brainId);
+
+    simulation.Step();
+
+    AssertEqual(1, simulation.State.Eggs.Count, "World mutation egg count");
+    AssertEqual(2, simulation.State.Genomes.Count, "World mutation child genome count");
+    var egg = simulation.State.Eggs[0];
+    AssertClose(0.25f, egg.BirthMutationStrength, 0.000001, "Egg birth mutation strength");
+    AssertClose(1f, egg.BirthTraitMutationRate, 0.000001, "Egg birth trait mutation rate");
+    AssertClose(1f, egg.BirthBrainMutationRate, 0.000001, "Egg birth brain mutation rate");
+    var childGenome = simulation.State.GetGenome(egg.GenomeId);
+    AssertClose(0.25f, childGenome.MutationStrength, 0.000001, "Child genome records effective mutation strength");
+    AssertClose(1f, childGenome.TraitMutationRate, 0.000001, "Child genome records effective trait mutation rate");
+    AssertClose(1f, childGenome.BrainMutationRate, 0.000001, "Child genome records effective brain mutation rate");
+    AssertTrue(
+        Math.Abs(childGenome.BodyRadius - parentGenome.BodyRadius) > 0.000001f
+        || Math.Abs(childGenome.MaxSpeed - parentGenome.MaxSpeed) > 0.000001f
+        || Math.Abs(childGenome.SenseRadius - parentGenome.SenseRadius) > 0.000001f
+        || Math.Abs(childGenome.ReproductionEnergyThreshold - parentGenome.ReproductionEnergyThreshold) > 0.000001f,
+        "World mutation policy should mutate inherited body traits even when parent mutation genes are zero");
+    AssertTrue(
+        simulation.State.GetBrain(egg.BrainId).Weights.Any(weight => Math.Abs(weight) > 0.000001f),
+        "World mutation policy should mutate brain weights even when parent mutation genes are zero");
 }
 
 static void IntentGatedEatingRequiresEatOutput()

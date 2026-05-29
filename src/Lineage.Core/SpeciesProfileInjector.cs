@@ -13,7 +13,8 @@ public static class SpeciesProfileInjector
         profile = profile.Validated();
         options = options.Validated(profile);
 
-        var genomeId = state.AddGenome(profile.Genome);
+        var genome = ApplyMutationProfile(profile.Genome, options.MutationProfile);
+        var genomeId = state.AddGenome(genome);
         var sharedBrainId = CreateSharedBrainId(state, profile, options);
         var randomBrain = options.BrainOverrideKind == InitialBrainKind.RandomPerFounder
             ? state.Random.Fork()
@@ -38,15 +39,32 @@ public static class SpeciesProfileInjector
 
             creatureIds[i] = state.SpawnCreature(
                 genomeId,
-                RandomCreaturePosition(state, options.SpawnRegion, profile.Genome.BodyRadius),
+                RandomCreaturePosition(state, options.SpawnRegion, genome.BodyRadius),
                 options.Energy,
                 health: 1f,
                 generation: 0,
                 parentId: default,
-                brainId: brainId);
+                brainId: brainId,
+                birthMutationProfile: options.MutationProfile);
         }
 
         return new SpeciesInjectionResult(profile.Name, genomeId, reportedBrainId, creatureIds);
+    }
+
+    private static CreatureGenome ApplyMutationProfile(CreatureGenome genome, MutationProfile? mutationProfile)
+    {
+        if (mutationProfile is not { } profile)
+        {
+            return genome;
+        }
+
+        profile = profile.Validated();
+        return genome with
+        {
+            MutationStrength = profile.MutationStrength,
+            TraitMutationRate = profile.TraitMutationRate,
+            BrainMutationRate = profile.BrainMutationRate
+        };
     }
 
     private static int CreateSharedBrainId(
@@ -171,7 +189,8 @@ public readonly record struct SpeciesInjectionOptions(
     InitialBrainKind? BrainOverrideKind = null,
     BrainProfile? BrainOverrideProfile = null,
     BrainArchitectureKind BrainArchitectureKind = BrainArchitectureKind.HybridNeural,
-    int BrainHiddenNodeCount = 0)
+    int BrainHiddenNodeCount = 0,
+    MutationProfile? MutationProfile = null)
 {
     public float Energy { get; private init; }
 
@@ -198,6 +217,7 @@ public readonly record struct SpeciesInjectionOptions(
         }
 
         var brainOverrideProfile = BrainOverrideProfile?.Validated();
+        var mutationProfile = MutationProfile?.Validated();
         _ = BrainFactory.Describe(BrainArchitectureKind);
         var resolvedHiddenNodeCount = BrainFactory.ResolveHiddenNodeCount(
             BrainArchitectureKind,
@@ -216,7 +236,8 @@ public readonly record struct SpeciesInjectionOptions(
         {
             Energy = energy,
             BrainOverrideProfile = brainOverrideProfile,
-            BrainHiddenNodeCount = resolvedHiddenNodeCount
+            BrainHiddenNodeCount = resolvedHiddenNodeCount,
+            MutationProfile = mutationProfile
         };
     }
 }

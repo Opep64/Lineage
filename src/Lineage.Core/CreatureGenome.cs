@@ -40,7 +40,7 @@ public readonly record struct CreatureGenome
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 26;
+    private const int MutatingTraitCount = 23;
 
     public float BodyRadius { get; init; }
 
@@ -88,16 +88,31 @@ public readonly record struct CreatureGenome
 
     public float DamageResistance { get; init; }
 
+    /// <summary>
+    /// Legacy snapshot/catalog field. Active mutation pressure is supplied by the world.
+    /// </summary>
     public float MutationStrength { get; init; }
 
+    /// <summary>
+    /// Legacy snapshot/catalog field. Active mutation pressure is supplied by the world.
+    /// </summary>
     public float TraitMutationRate { get; init; }
 
+    /// <summary>
+    /// Legacy snapshot/catalog field. Active mutation pressure is supplied by the world.
+    /// </summary>
     public float BrainMutationRate { get; init; }
 
     public CreatureGenome Mutated(DeterministicRandom random)
     {
-        var strength = Math.Clamp(MutationStrength, 0f, 0.5f);
-        var traitMutationRate = Math.Clamp(TraitMutationRate, 0f, 1f);
+        return Mutated(random, MutationProfile.FromLegacyGenome(this));
+    }
+
+    public CreatureGenome Mutated(DeterministicRandom random, MutationProfile mutationProfile)
+    {
+        mutationProfile = mutationProfile.Validated();
+        var strength = Math.Clamp(mutationProfile.MutationStrength, 0f, 0.5f);
+        var traitMutationRate = Math.Clamp(mutationProfile.TraitMutationRate, 0f, 1f);
         var mutations = CreateMutationMask(random, MutatingTraitCount, traitMutationRate, strength);
 
         var mutated = this with
@@ -124,9 +139,9 @@ public readonly record struct CreatureGenome
             DigestionCaloriesPerSecond = MutateTraitIfSelected(random, mutations[19], DigestionCaloriesPerSecond, strength, 1f, 60f),
             BiteStrength = MutateTraitIfSelected(random, mutations[20], BiteStrength, strength, 0.05f, 4f),
             DamageResistance = MutateTraitIfSelected(random, mutations[21], DamageResistance, strength, 0.25f, 4f),
-            MutationStrength = MutateTraitIfSelected(random, mutations[22], MutationStrength, strength * 0.25f, 0.001f, 0.5f),
-            TraitMutationRate = MutateTraitIfSelected(random, mutations[23], TraitMutationRate, strength * 0.25f, 0f, 1f),
-            BrainMutationRate = MutateTraitIfSelected(random, mutations[24], BrainMutationRate, strength * 0.25f, 0f, 1f)
+            MutationStrength = mutationProfile.MutationStrength,
+            TraitMutationRate = mutationProfile.TraitMutationRate,
+            BrainMutationRate = mutationProfile.BrainMutationRate
         };
 
         var minimumThreshold = mutated.OffspringEnergyInvestment + 1f;
@@ -134,7 +149,7 @@ public readonly record struct CreatureGenome
         {
             ReproductionEnergyThreshold = MutateTraitIfSelected(
                 random,
-                mutations[25],
+                mutations[22],
                 Math.Max(ReproductionEnergyThreshold, minimumThreshold),
                 strength,
                 minimumThreshold,

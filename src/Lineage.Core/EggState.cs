@@ -30,4 +30,10 @@ public struct EggState
     public int GenomeId { get; set; }
 
     public int BrainId { get; set; }
+
+    public float BirthMutationStrength { get; set; }
+
+    public float BirthTraitMutationRate { get; set; }
+
+    public float BirthBrainMutationRate { get; set; }
 }

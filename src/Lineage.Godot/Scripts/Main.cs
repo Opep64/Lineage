@@ -1525,9 +1525,9 @@ public partial class Main : Node2D
             $"Moved last tick {creature.LastDistanceTraveled:0.00}u\n" +
             $"Repro at {genome.ReproductionEnergyThreshold:0.0}\n" +
             $"Mature at {genome.MaturityAgeSeconds:0.0}s\n" +
-            $"Mutation {genome.MutationStrength:0.000}\n" +
-            $"Trait mut {genome.TraitMutationRate:P0}\n" +
-            $"Brain mut {genome.BrainMutationRate:P0}\n" +
+            $"World mutation {_scenario.MutationStrength:0.000}\n" +
+            $"World trait mut {_scenario.TraitMutationRate:P0}\n" +
+            $"World brain mut {_scenario.BrainMutationRate:P0}\n" +
             $"Cooldown {creature.ReproductionCooldownSeconds:0.0}s\n\n" +
             $"Food {(senses.FoodDetected ? "yes" : "no")}\n" +
             $"Visible density {senses.VisibleFoodDensity:0.00}\n" +
@@ -1649,8 +1649,8 @@ public partial class Main : Node2D
             $"Development & Mutation\n" +
             $"Mature at {genome.MaturityAgeSeconds:0.0}s   egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s   repro threshold {genome.ReproductionEnergyThreshold:0.0}\n" +
-            $"Mutation strength {genome.MutationStrength:0.000}\n" +
-            $"Trait mutation {genome.TraitMutationRate:P0}   brain mutation {genome.BrainMutationRate:P0}\n";
+            $"World mutation strength {_scenario.MutationStrength:0.000}\n" +
+            $"World trait mutation {_scenario.TraitMutationRate:P0}   brain mutation {_scenario.BrainMutationRate:P0}\n";
     }
 
     private string BuildCreatureSensesInspectorText(CreatureState creature)
@@ -4330,7 +4330,8 @@ public partial class Main : Node2D
                     request.BrainOverrideKind,
                     null,
                     _scenario.BrainArchitectureKind,
-                    _scenario.BrainHiddenNodeCount));
+                    _scenario.BrainHiddenNodeCount,
+                    MutationProfile.FromScenario(_scenario)));
 
             if (result.CreatureIds.Count > 0)
             {

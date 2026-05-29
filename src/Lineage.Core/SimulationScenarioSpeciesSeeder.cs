@@ -34,7 +34,8 @@ public static class SimulationScenarioSpeciesSeeder
                     seed.BrainOverrideKind,
                     brainProfile,
                     scenario.BrainArchitectureKind,
-                    scenario.BrainHiddenNodeCount)));
+                    scenario.BrainHiddenNodeCount,
+                    MutationProfile.FromScenario(scenario))));
         }
 
         return results;

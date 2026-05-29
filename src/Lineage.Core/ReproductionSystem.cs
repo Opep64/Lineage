@@ -5,11 +5,14 @@ namespace Lineage.Core;
 /// </summary>
 public sealed class ReproductionSystem(
     bool requireReproductionIntent = false,
+    WorldMutationPolicy? mutationPolicy = null,
     float reproductivePrimeAgeSeconds = 240f,
     float reproductiveSenescenceAgeSeconds = 900f,
     float senescentFertilityMultiplier = 0.18f,
     float crowdingFertilityPenalty = 0.65f) : ISimulationSystem
 {
+    private readonly WorldMutationPolicy _mutationPolicy = mutationPolicy
+        ?? new WorldMutationPolicy(MutationProfile.Default);
     private readonly float _reproductivePrimeAgeSeconds =
         ValidateNonNegative(reproductivePrimeAgeSeconds, nameof(reproductivePrimeAgeSeconds));
     private readonly float _reproductiveSenescenceAgeSeconds =
@@ -82,7 +85,8 @@ public sealed class ReproductionSystem(
             parent.ReproductionCooldownSeconds = parentGenome.ReproductionCooldownSeconds;
             state.Creatures[i] = parent;
 
-            var childGenome = parentGenome.Mutated(state.Random);
+            var mutationProfile = _mutationPolicy.GetEffectiveProfile(state, parent);
+            var childGenome = parentGenome.Mutated(state.Random, mutationProfile);
             var childGenomeId = state.AddGenome(childGenome);
             var childBrainId = -1;
             if (parent.BrainId >= 0)
@@ -93,8 +97,8 @@ public sealed class ReproductionSystem(
                         parentBrainKind,
                         state.GetBrain(parent.BrainId),
                         state.Random,
-                        parentGenome.MutationStrength,
-                        parentGenome.BrainMutationRate),
+                        mutationProfile.MutationStrength,
+                        mutationProfile.BrainMutationRate),
                     parentBrainKind);
             }
             var angle = state.Random.NextSingle(0f, MathF.Tau);
@@ -111,7 +115,8 @@ public sealed class ReproductionSystem(
                 position: childPosition,
                 energy: eggEnergy,
                 incubationSeconds: childGenome.EggIncubationSeconds,
-                generation: parent.Generation + 1);
+                generation: parent.Generation + 1,
+                birthMutationProfile: mutationProfile);
         }
     }
 

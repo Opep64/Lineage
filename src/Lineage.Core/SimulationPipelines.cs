@@ -57,7 +57,10 @@ public static class SimulationPipelines
         float crowdingFertilityPenalty = 0.65f,
         BiomePressureProfile? biomeSeasonalAmplitudeProfile = null,
         bool enableExtinctPayloadPruning = false,
-        int extinctPayloadPruneIntervalTicks = 1_000)
+        int extinctPayloadPruneIntervalTicks = 1_000,
+        float mutationStrength = 0.06f,
+        float traitMutationRate = 0.2f,
+        float brainMutationRate = 0.08f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -104,6 +107,10 @@ public static class SimulationPipelines
             new DigestionSystem(rottenMeatDamagePerRawKcal),
             new ReproductionSystem(
                 requireReproductionIntent: requireReproductionIntent,
+                mutationPolicy: WorldMutationPolicy.Uniform(
+                    mutationStrength,
+                    traitMutationRate,
+                    brainMutationRate),
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
                 reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
                 senescentFertilityMultiplier: senescentFertilityMultiplier,
@@ -190,7 +197,10 @@ public static class SimulationPipelines
         float crowdingFertilityPenalty = 0.65f,
         BiomePressureProfile? biomeSeasonalAmplitudeProfile = null,
         bool enableExtinctPayloadPruning = false,
-        int extinctPayloadPruneIntervalTicks = 1_000)
+        int extinctPayloadPruneIntervalTicks = 1_000,
+        float mutationStrength = 0.06f,
+        float traitMutationRate = 0.2f,
+        float brainMutationRate = 0.08f)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -256,6 +266,10 @@ public static class SimulationPipelines
             new DigestionSystem(rottenMeatDamagePerRawKcal),
             new ReproductionSystem(
                 requireReproductionIntent: requireReproductionIntent,
+                mutationPolicy: WorldMutationPolicy.Uniform(
+                    mutationStrength,
+                    traitMutationRate,
+                    brainMutationRate),
                 reproductivePrimeAgeSeconds: reproductivePrimeAgeSeconds,
                 reproductiveSenescenceAgeSeconds: reproductiveSenescenceAgeSeconds,
                 senescentFertilityMultiplier: senescentFertilityMultiplier,

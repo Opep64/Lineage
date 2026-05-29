@@ -207,7 +207,8 @@ public sealed class WorldState
         int generation = 0,
         EntityId parentId = default,
         int brainId = -1,
-        float birthInvestmentRatio = 1f)
+        float birthInvestmentRatio = 1f,
+        MutationProfile? birthMutationProfile = null)
     {
         _ = GetGenome(genomeId);
         if (brainId >= 0)
@@ -230,6 +231,7 @@ public sealed class WorldState
             throw new ArgumentOutOfRangeException(nameof(health), "Creature health must be finite and positive.");
         }
 
+        var mutationProfile = birthMutationProfile?.Validated() ?? default;
         var id = CreateEntityId();
         var clampedPosition = Bounds.Clamp(position);
         Creatures.Add(new CreatureState
@@ -260,6 +262,9 @@ public sealed class WorldState
             GenomeId = genomeId,
             BrainId = brainId,
             BirthEnergy = energy,
+            BirthMutationStrength = mutationProfile.MutationStrength,
+            BirthTraitMutationRate = mutationProfile.TraitMutationRate,
+            BirthBrainMutationRate = mutationProfile.BrainMutationRate,
             MaxXReached = clampedPosition.X
         });
         Stats.RecordEastwardProgress(clampedPosition.X);
@@ -274,7 +279,8 @@ public sealed class WorldState
         SimVector2 position,
         float energy,
         float incubationSeconds,
-        int generation)
+        int generation,
+        MutationProfile? birthMutationProfile = null)
     {
         _ = GetGenome(genomeId);
         if (brainId >= 0)
@@ -302,6 +308,7 @@ public sealed class WorldState
             throw new ArgumentOutOfRangeException(nameof(incubationSeconds), "Egg incubation seconds must be finite and non-negative.");
         }
 
+        var mutationProfile = birthMutationProfile?.Validated() ?? default;
         var investmentRatio = OffspringDevelopment.InvestmentRatio(energy);
         var maxHealth = OffspringDevelopment.EggMaxHealth(investmentRatio);
         var id = CreateEntityId();
@@ -317,7 +324,10 @@ public sealed class WorldState
             IncubationSeconds = incubationSeconds,
             Generation = generation,
             GenomeId = genomeId,
-            BrainId = brainId
+            BrainId = brainId,
+            BirthMutationStrength = mutationProfile.MutationStrength,
+            BirthTraitMutationRate = mutationProfile.TraitMutationRate,
+            BirthBrainMutationRate = mutationProfile.BrainMutationRate
         });
         Stats.RecordEggLaid();
         MarkEggsDirty();

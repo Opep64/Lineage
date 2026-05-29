@@ -1021,10 +1021,7 @@ public static class SpeciesClusterAnalyzer
             LogFeature(genome.GutCapacityCalories, 5f, 250f),
             LogFeature(genome.DigestionCaloriesPerSecond, 1f, 60f),
             LogFeature(genome.BiteStrength, 0.05f, 4f),
-            LogFeature(genome.DamageResistance, 0.25f, 4f),
-            LogFeature(MathF.Max(0.001f, genome.MutationStrength), 0.001f, 0.5f),
-            Math.Clamp(genome.TraitMutationRate, 0f, 1f),
-            Math.Clamp(genome.BrainMutationRate, 0f, 1f)
+            LogFeature(genome.DamageResistance, 0.25f, 4f)
         ];
     }
 

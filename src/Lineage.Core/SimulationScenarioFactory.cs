@@ -97,7 +97,10 @@ public static class SimulationScenarioFactory
                 scenario.CrowdingFertilityPenalty,
                 scenario.CreateBiomeSeasonalAmplitudeProfile(),
                 scenario.EnableExtinctPayloadPruning,
-                scenario.ExtinctPayloadPruneIntervalTicks),
+                scenario.ExtinctPayloadPruneIntervalTicks,
+                scenario.MutationStrength,
+                scenario.TraitMutationRate,
+                scenario.BrainMutationRate),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -150,7 +153,10 @@ public static class SimulationScenarioFactory
                 scenario.CrowdingFertilityPenalty,
                 scenario.CreateBiomeSeasonalAmplitudeProfile(),
                 scenario.EnableExtinctPayloadPruning,
-                scenario.ExtinctPayloadPruneIntervalTicks),
+                scenario.ExtinctPayloadPruneIntervalTicks,
+                scenario.MutationStrength,
+                scenario.TraitMutationRate,
+                scenario.BrainMutationRate),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }
@@ -233,6 +239,7 @@ public static class SimulationScenarioFactory
             : null;
         var initialGenome = state.GetGenome(genomeId);
         var initialBodyRadius = initialGenome.BodyRadius;
+        var initialMutationProfile = MutationProfile.FromScenario(scenario);
 
         for (var i = 0; i < scenario.InitialCreatureCount; i++)
         {
@@ -244,7 +251,8 @@ public static class SimulationScenarioFactory
                     state,
                     scenario.InitialCreatureEnergyMin,
                     scenario.InitialCreatureEnergyMax),
-                brainId: brainId);
+                brainId: brainId,
+                birthMutationProfile: initialMutationProfile);
         }
     }
 

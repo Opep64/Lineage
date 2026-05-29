@@ -40,7 +40,11 @@ public sealed class EggSystem(float eggEnergyCostPerSecond = 0f) : ISimulationSy
                     generation: egg.Generation,
                     parentId: egg.ParentId,
                     brainId: egg.BrainId,
-                    birthInvestmentRatio: egg.InvestmentRatio);
+                    birthInvestmentRatio: egg.InvestmentRatio,
+                    birthMutationProfile: new MutationProfile(
+                        egg.BirthMutationStrength,
+                        egg.BirthTraitMutationRate,
+                        egg.BirthBrainMutationRate));
                 state.Stats.RecordEggHatched();
                 continue;
             }

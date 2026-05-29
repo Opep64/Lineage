@@ -28,6 +28,12 @@ public struct CreatureLineageRecord
 
     public float BirthEnergy { get; set; }
 
+    public float BirthMutationStrength { get; set; }
+
+    public float BirthTraitMutationRate { get; set; }
+
+    public float BirthBrainMutationRate { get; set; }
+
     public float MaxXReached { get; set; }
 
     public long? DeathTick { get; set; }

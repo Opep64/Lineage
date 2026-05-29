@@ -269,11 +269,14 @@ static IReadOnlyList<SpeciesInjectionResult> InjectStartupSpeciesProfiles(
             Directory.GetCurrentDirectory()));
     }
 
-    results.AddRange(InjectSpeciesProfiles(options, simulation));
+    results.AddRange(InjectSpeciesProfiles(options, scenario, simulation));
     return results;
 }
 
-static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions options, Simulation simulation)
+static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(
+    RunOptions options,
+    SimulationScenario scenario,
+    Simulation simulation)
 {
     if (options.InjectSpeciesPaths.Count == 0)
     {
@@ -302,7 +305,8 @@ static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions op
                 options.InjectSpeciesCount,
                 options.InjectSpeciesRegion,
                 options.InjectSpeciesEnergy,
-                BrainOverrideProfile: brainProfile)));
+                BrainOverrideProfile: brainProfile,
+                MutationProfile: MutationProfile.FromScenario(scenario))));
     }
 
     return results;
