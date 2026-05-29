@@ -19,6 +19,7 @@ public partial class Main : Node2D
 {
     private const string StartupScenarioFileName = "balanced-foraging.json";
     private const string SpeciesProfileDirectoryName = "species";
+    private const string BrainProfileDirectoryName = "brains";
     private const string ReadableTokensThemePath = "res://Assets/SpriteThemes/readable_tokens.png";
     private const float LauncherPanelWidth = 520f;
     private const float RightPanelWidth = 640f;
@@ -4114,11 +4115,14 @@ public partial class Main : Node2D
         AddChild(_scenarioEditor);
 
         var repositoryRoot = GetRepositoryRoot();
-        _scenarioEditor.SetScenarioRecipeDirectory(System.IO.Path.Combine(repositoryRoot, "scenarios", "recipes"));
         var scenarioDirectory = System.IO.Path.Combine(repositoryRoot, "scenarios");
         var outDirectory = System.IO.Path.Combine(repositoryRoot, "out");
         var speciesDirectory = System.IO.Path.Combine(repositoryRoot, SpeciesProfileDirectoryName);
+        var brainDirectory = System.IO.Path.Combine(repositoryRoot, BrainProfileDirectoryName);
         System.IO.Directory.CreateDirectory(speciesDirectory);
+        System.IO.Directory.CreateDirectory(brainDirectory);
+        _scenarioEditor.SetScenarioRecipeDirectory(System.IO.Path.Combine(repositoryRoot, "scenarios", "recipes"));
+        _scenarioEditor.SetBrainCatalogDirectory(brainDirectory);
         _loadScenarioDialog = CreateScenarioDialog(FileDialog.FileModeEnum.OpenFile, "Load Scenario", scenarioDirectory);
         _saveScenarioDialog = CreateScenarioDialog(FileDialog.FileModeEnum.SaveFile, "Save Scenario", scenarioDirectory);
         _loadSnapshotDialog = CreateSnapshotDialog(outDirectory);
@@ -4320,6 +4324,7 @@ public partial class Main : Node2D
         try
         {
             var request = _scenarioEditor.ReadSpeciesInjectionRequest();
+            var brainOverrideProfile = LoadSpeciesInjectionBrainProfile(request);
             var result = SpeciesProfileInjector.Inject(
                 _simulation.State,
                 _loadedSpeciesProfile,
@@ -4328,7 +4333,7 @@ public partial class Main : Node2D
                     request.SpawnRegion,
                     request.EnergyOverride,
                     request.BrainOverrideKind,
-                    null,
+                    brainOverrideProfile,
                     _scenario.BrainArchitectureKind,
                     _scenario.BrainHiddenNodeCount,
                     MutationProfile.FromScenario(_scenario)));
@@ -4349,6 +4354,30 @@ public partial class Main : Node2D
         {
             _scenarioEditor.SetStatus($"Species injection failed: {ex.Message}");
         }
+    }
+
+    private BrainProfile? LoadSpeciesInjectionBrainProfile(SpeciesInjectionUiRequest request)
+    {
+        if (request.BrainOverrideKind is not null || _loadedSpeciesProfile is null)
+        {
+            return null;
+        }
+
+        var brainProfilePath = !string.IsNullOrWhiteSpace(request.BrainProfilePath)
+            ? request.BrainProfilePath
+            : _loadedSpeciesProfile.DefaultBrainPath;
+        if (string.IsNullOrWhiteSpace(brainProfilePath))
+        {
+            return null;
+        }
+
+        var workspaceRoot = GetRepositoryRoot();
+        var resolvedPath = SimulationScenarioSpeciesSeeder.ResolveBrainProfilePath(
+            brainProfilePath,
+            _loadedSpeciesProfilePath,
+            _currentScenarioPath,
+            workspaceRoot);
+        return BrainProfileJson.Load(resolvedPath);
     }
 
     private void WriteCurrentReportFromEditor()

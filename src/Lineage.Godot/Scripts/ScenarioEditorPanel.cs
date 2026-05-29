@@ -19,8 +19,9 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 {
     private const float ExpandedPanelWidth = 520f;
     private const float FieldLabelWidth = 205f;
-    private const string SpeciesProfileBrainOption = "Profile brain";
+    private const string SpeciesProfileBrainOption = "Profile/default brain";
     private const string SpeciesScenarioInitialBrainOption = "Scenario initial brain";
+    private const string NoCatalogBrainOption = "No catalog override";
 
     private static readonly string[] ScenarioGroupOrder =
     [
@@ -50,6 +51,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private readonly Dictionary<string, Label> _scenarioGroupEmptyLabels = [];
     private readonly List<SpeciesScenarioSeed> _speciesSeedEntries = [];
     private readonly List<ScenarioRecipeOption> _scenarioRecipes = [];
+    private readonly List<BrainCatalogOption> _brainCatalogOptions = [];
 
     private MarginContainer _expandedRoot = null!;
     private MarginContainer _collapsedRoot = null!;
@@ -79,6 +81,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private SpinBox _speciesInjectEnergyInput = null!;
     private OptionButton _speciesInjectRegionInput = null!;
     private OptionButton _speciesBrainOverrideInput = null!;
+    private OptionButton _speciesBrainProfileInput = null!;
+    private Label _brainCatalogSummaryLabel = null!;
     private CheckBox _speciesSeedEnabledInput = null!;
     private Label _speciesRosterLabel = null!;
     private Label _loadedSpeciesLabel = null!;
@@ -90,6 +94,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private string? _lastCheckpointDirectory;
     private string? _loadedSpeciesProfilePath;
     private string? _lastSpeciesExportPath;
+    private string? _brainCatalogDirectory;
 
     public bool IsCollapsed { get; private set; }
 
@@ -145,6 +150,12 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         LoadScenarioRecipes(recipeDirectory);
     }
 
+    public void SetBrainCatalogDirectory(string brainCatalogDirectory)
+    {
+        _brainCatalogDirectory = brainCatalogDirectory;
+        LoadBrainCatalog(brainCatalogDirectory);
+    }
+
     public bool TryReadScenario(out SimulationScenario scenario, out string error)
     {
         scenario = new SimulationScenario();
@@ -187,13 +198,15 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     public SpeciesInjectionUiRequest ReadSpeciesInjectionRequest()
     {
         var regionText = _speciesInjectRegionInput.GetItemText(_speciesInjectRegionInput.Selected);
+        var brainProfilePath = SelectedSpeciesBrainProfilePath();
         return new SpeciesInjectionUiRequest(
             Math.Max(1, (int)Math.Round(_speciesInjectCountInput.Value)),
             Enum.Parse<InitialCreatureSpawnRegion>(regionText),
             _speciesInjectEnergyInput.Value <= 0
                 ? null
                 : (float)_speciesInjectEnergyInput.Value,
-            ReadSpeciesBrainOverrideKind());
+            brainProfilePath is null ? ReadSpeciesBrainOverrideKind() : null,
+            brainProfilePath);
     }
 
     public SpeciesExportUiRequest ReadSpeciesExportRequest()
@@ -494,6 +507,84 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         _scenarioRecipes.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
         RefreshRecipeOptions();
+    }
+
+    private void LoadBrainCatalog(string brainCatalogDirectory)
+    {
+        _brainCatalogOptions.Clear();
+        if (System.IO.Directory.Exists(brainCatalogDirectory))
+        {
+            var workspaceRoot = System.IO.Directory.GetParent(System.IO.Path.GetFullPath(brainCatalogDirectory))?.FullName
+                ?? System.IO.Path.GetFullPath(brainCatalogDirectory);
+            foreach (var path in System.IO.Directory.EnumerateFiles(
+                brainCatalogDirectory,
+                BrainProfileJson.FilePattern,
+                System.IO.SearchOption.AllDirectories))
+            {
+                if (TryReadBrainCatalogOption(path, workspaceRoot, out var option) && option is not null)
+                {
+                    _brainCatalogOptions.Add(option);
+                }
+            }
+        }
+
+        _brainCatalogOptions.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
+        RefreshBrainCatalogOptions();
+    }
+
+    private static bool TryReadBrainCatalogOption(string path, string workspaceRoot, out BrainCatalogOption? option)
+    {
+        option = default;
+        try
+        {
+            var profile = BrainProfileJson.Load(path);
+            var relativePath = System.IO.Path.GetRelativePath(workspaceRoot, path).Replace('\\', '/');
+            option = new BrainCatalogOption(
+                profile.Name,
+                relativePath,
+                profile.BrainArchitectureKind,
+                profile.HiddenNodeCount,
+                profile.Weights.Length);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void RefreshBrainCatalogOptions()
+    {
+        if (_speciesBrainProfileInput is null)
+        {
+            return;
+        }
+
+        _speciesBrainProfileInput.Clear();
+        _speciesBrainProfileInput.AddItem(NoCatalogBrainOption);
+        foreach (var brain in _brainCatalogOptions)
+        {
+            _speciesBrainProfileInput.AddItem(
+                $"{brain.Name} ({brain.BrainArchitectureKind}, hidden {brain.HiddenNodeCount})");
+        }
+
+        _speciesBrainProfileInput.Selected = 0;
+        UpdateBrainCatalogSummary();
+    }
+
+    private void UpdateBrainCatalogSummary()
+    {
+        if (_brainCatalogSummaryLabel is null)
+        {
+            return;
+        }
+
+        var selected = SelectedBrainCatalogOption();
+        _brainCatalogSummaryLabel.Text = selected is null
+            ? _brainCatalogOptions.Count == 0
+                ? "No brain catalog profiles loaded."
+                : $"{_brainCatalogOptions.Count} catalog brain{(_brainCatalogOptions.Count == 1 ? string.Empty : "s")} available. Leaving this unset uses the species default/profile brain unless a starter brain is selected."
+            : $"Catalog override: {selected.Path} | {selected.WeightCount} weights";
     }
 
     private static bool TryReadScenarioRecipe(string path, out ScenarioRecipeOption? recipe)
@@ -906,6 +997,9 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         {
             _speciesBrainOverrideInput.AddItem(name);
         }
+        _speciesBrainProfileInput = new OptionButton();
+        _speciesBrainProfileInput.ItemSelected += _ => UpdateBrainCatalogSummary();
+        RefreshBrainCatalogOptions();
 
         _speciesSeedEnabledInput = new CheckBox { ButtonPressed = true };
         _speciesRosterLabel = new Label
@@ -938,6 +1032,14 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         root.AddChild(CreateFieldRow("Inject region", _speciesInjectRegionInput));
         root.AddChild(CreateFieldRow("Inject energy", _speciesInjectEnergyInput));
         root.AddChild(CreateFieldRow("Species brain", _speciesBrainOverrideInput));
+        root.AddChild(CreateFieldRow("Catalog brain", _speciesBrainProfileInput));
+        _brainCatalogSummaryLabel = new Label
+        {
+            Text = "No brain catalog profiles loaded.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        root.AddChild(CreateFieldRow("Brain catalog", _brainCatalogSummaryLabel));
+        root.AddChild(CreateButton("Refresh Brain Catalog", RefreshBrainCatalog));
         _injectSpeciesButton = CreateButton("Inject Loaded Species", () => InjectSpeciesRequested?.Invoke());
         _injectSpeciesButton.Disabled = true;
         root.AddChild(_injectSpeciesButton);
@@ -975,12 +1077,25 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             Count = request.Count,
             SpawnRegion = request.SpawnRegion,
             EnergyOverride = request.EnergyOverride,
-            BrainOverrideKind = request.BrainOverrideKind,
+            BrainOverrideKind = request.BrainProfilePath is null ? request.BrainOverrideKind : null,
+            BrainProfilePath = request.BrainProfilePath,
             Enabled = _speciesSeedEnabledInput.ButtonPressed
         }.Validated();
         _speciesSeedEntries.Add(seed);
         UpdateSpeciesRosterLabel();
-        SetStatus($"Added {System.IO.Path.GetFileName(seed.ProfilePath)} to the scenario roster with {FormatSpeciesBrain(seed.BrainOverrideKind)}.");
+        SetStatus($"Added {System.IO.Path.GetFileName(seed.ProfilePath)} to the scenario roster with {FormatSpeciesBrain(seed.BrainOverrideKind, seed.BrainProfilePath)}.");
+    }
+
+    private void RefreshBrainCatalog()
+    {
+        if (string.IsNullOrWhiteSpace(_brainCatalogDirectory))
+        {
+            SetStatus("No brain catalog directory is configured.");
+            return;
+        }
+
+        LoadBrainCatalog(_brainCatalogDirectory);
+        SetStatus($"Loaded {_brainCatalogOptions.Count} brain catalog profile{(_brainCatalogOptions.Count == 1 ? string.Empty : "s")}.");
     }
 
     private InitialBrainKind? ReadSpeciesBrainOverrideKind()
@@ -997,6 +1112,24 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         }
 
         return Enum.Parse<InitialBrainKind>(brainText);
+    }
+
+    private BrainCatalogOption? SelectedBrainCatalogOption()
+    {
+        if (_speciesBrainProfileInput is null || _speciesBrainProfileInput.Selected <= 0)
+        {
+            return null;
+        }
+
+        var index = _speciesBrainProfileInput.Selected - 1;
+        return index >= 0 && index < _brainCatalogOptions.Count
+            ? _brainCatalogOptions[index]
+            : null;
+    }
+
+    private string? SelectedSpeciesBrainProfilePath()
+    {
+        return SelectedBrainCatalogOption()?.Path;
     }
 
     private InitialBrainKind ReadScenarioInitialBrainKind()
@@ -1052,16 +1185,21 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 var brain = !string.IsNullOrWhiteSpace(seed.BrainProfilePath)
                     ? $"{System.IO.Path.GetFileName(seed.BrainProfilePath)} brain profile"
                     : seed.BrainOverrideKind is null
-                        ? "profile brain"
+                        ? "profile/default brain"
                         : FormatSpeciesBrain(seed.BrainOverrideKind);
                 return $"{index + 1}. {state}: {seed.Count} x {System.IO.Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
             }));
     }
 
-    private static string FormatSpeciesBrain(InitialBrainKind? brainOverrideKind)
+    private static string FormatSpeciesBrain(InitialBrainKind? brainOverrideKind, string? brainProfilePath = null)
     {
+        if (!string.IsNullOrWhiteSpace(brainProfilePath))
+        {
+            return $"{System.IO.Path.GetFileName(brainProfilePath)} brain profile";
+        }
+
         return brainOverrideKind is null
-            ? "profile brain"
+            ? "profile/default brain"
             : $"{brainOverrideKind.Value} brain";
     }
 
@@ -1364,6 +1502,13 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         string Description,
         IReadOnlyList<string> Tags,
         IReadOnlyDictionary<string, JsonElement> Changes);
+
+    private sealed record BrainCatalogOption(
+        string Name,
+        string Path,
+        BrainArchitectureKind BrainArchitectureKind,
+        int HiddenNodeCount,
+        int WeightCount);
 }
 
 public readonly record struct CliRunRequest(
@@ -1380,7 +1525,8 @@ public readonly record struct SpeciesInjectionUiRequest(
     int Count,
     InitialCreatureSpawnRegion SpawnRegion,
     float? EnergyOverride,
-    InitialBrainKind? BrainOverrideKind);
+    InitialBrainKind? BrainOverrideKind,
+    string? BrainProfilePath);
 
 public readonly record struct SpeciesExportUiRequest(
     string? Name,
