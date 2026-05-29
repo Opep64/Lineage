@@ -107,6 +107,7 @@ public partial class Main : Node2D
     private FileDialog _loadSnapshotDialog = null!;
     private FileDialog _loadSpeciesProfileDialog = null!;
     private FileDialog _saveSpeciesProfileDialog = null!;
+    private FileDialog _saveBrainProfileDialog = null!;
     private Label _hud = null!;
     private Label _hudSecondary = null!;
     private PanelContainer _selectionPanel = null!;
@@ -140,8 +141,12 @@ public partial class Main : Node2D
     private string? _loadedSpeciesProfilePath;
     private EntityId _pendingSpeciesExportCreatureId;
     private bool _pendingSpeciesExportClusterRepresentative;
+    private bool _pendingSpeciesExportPairedBrain;
+    private EntityId _pendingBrainExportCreatureId;
     private string? _pendingSpeciesExportName;
     private string? _pendingSpeciesExportNotes;
+    private string? _pendingBrainExportName;
+    private string? _pendingBrainExportNotes;
     private bool _isPanning;
     private bool _followSelected;
     private bool _showBiomeOverlay = true;
@@ -4110,6 +4115,7 @@ public partial class Main : Node2D
         _scenarioEditor.LoadSnapshotRequested += LoadSnapshotFromPath;
         _scenarioEditor.ExportSelectedSpeciesRequested += OpenExportSelectedSpeciesDialog;
         _scenarioEditor.ExportSelectedSpeciesClusterRequested += OpenExportSelectedSpeciesClusterDialog;
+        _scenarioEditor.ExportSelectedBrainRequested += OpenExportSelectedBrainDialog;
         _scenarioEditor.LoadSpeciesProfileRequested += OpenLoadSpeciesProfileDialog;
         _scenarioEditor.InjectSpeciesRequested += InjectLoadedSpeciesProfile;
         AddChild(_scenarioEditor);
@@ -4119,8 +4125,10 @@ public partial class Main : Node2D
         var outDirectory = System.IO.Path.Combine(repositoryRoot, "out");
         var speciesDirectory = System.IO.Path.Combine(repositoryRoot, SpeciesProfileDirectoryName);
         var brainDirectory = System.IO.Path.Combine(repositoryRoot, BrainProfileDirectoryName);
+        var userBrainDirectory = System.IO.Path.Combine(brainDirectory, "user");
         System.IO.Directory.CreateDirectory(speciesDirectory);
         System.IO.Directory.CreateDirectory(brainDirectory);
+        System.IO.Directory.CreateDirectory(userBrainDirectory);
         _scenarioEditor.SetScenarioRecipeDirectory(System.IO.Path.Combine(repositoryRoot, "scenarios", "recipes"));
         _scenarioEditor.SetBrainCatalogDirectory(brainDirectory);
         _loadScenarioDialog = CreateScenarioDialog(FileDialog.FileModeEnum.OpenFile, "Load Scenario", scenarioDirectory);
@@ -4128,16 +4136,19 @@ public partial class Main : Node2D
         _loadSnapshotDialog = CreateSnapshotDialog(outDirectory);
         _loadSpeciesProfileDialog = CreateSpeciesProfileDialog(FileDialog.FileModeEnum.OpenFile, "Load Species Profile", speciesDirectory);
         _saveSpeciesProfileDialog = CreateSpeciesProfileDialog(FileDialog.FileModeEnum.SaveFile, "Export Species Profile", speciesDirectory);
+        _saveBrainProfileDialog = CreateBrainProfileDialog(FileDialog.FileModeEnum.SaveFile, "Export Brain Profile", userBrainDirectory);
         _loadScenarioDialog.FileSelected += LoadScenarioFromPath;
         _saveScenarioDialog.FileSelected += SaveScenarioToPath;
         _loadSnapshotDialog.FileSelected += LoadSnapshotFromPath;
         _loadSpeciesProfileDialog.FileSelected += LoadSpeciesProfileFromPath;
         _saveSpeciesProfileDialog.FileSelected += ExportPendingSpeciesProfileToPath;
+        _saveBrainProfileDialog.FileSelected += ExportPendingBrainProfileToPath;
         AddChild(_loadScenarioDialog);
         AddChild(_saveScenarioDialog);
         AddChild(_loadSnapshotDialog);
         AddChild(_loadSpeciesProfileDialog);
         AddChild(_saveSpeciesProfileDialog);
+        AddChild(_saveBrainProfileDialog);
     }
 
     private void OpenLoadSnapshotDialog()
@@ -4199,6 +4210,7 @@ public partial class Main : Node2D
         _pendingSpeciesExportClusterRepresentative = false;
         _pendingSpeciesExportName = request.Name;
         _pendingSpeciesExportNotes = request.Notes;
+        _pendingSpeciesExportPairedBrain = request.ExportPairedBrain;
 
         var profileName = string.IsNullOrWhiteSpace(request.Name)
             ? $"species_{selected.Id.Value}"
@@ -4231,6 +4243,7 @@ public partial class Main : Node2D
         _pendingSpeciesExportClusterRepresentative = true;
         _pendingSpeciesExportName = request.Name;
         _pendingSpeciesExportNotes = request.Notes;
+        _pendingSpeciesExportPairedBrain = request.ExportPairedBrain;
 
         var profileName = string.IsNullOrWhiteSpace(request.Name)
             ? representative.Name
@@ -4239,6 +4252,25 @@ public partial class Main : Node2D
         _scenarioEditor.SetStatus(
             $"Ready to export cluster {representative.Name}; representative creature #{representative.CreatureId.Value}.");
         _saveSpeciesProfileDialog.PopupCenteredRatio(0.75f);
+    }
+
+    private void OpenExportSelectedBrainDialog()
+    {
+        if (!TryGetSelectedCreature(out var selected))
+        {
+            _scenarioEditor.SetStatus("Select a living creature before exporting a brain profile.");
+            return;
+        }
+
+        var request = _scenarioEditor.ReadSpeciesExportRequest();
+        _pendingBrainExportCreatureId = selected.Id;
+        _pendingBrainExportName = string.IsNullOrWhiteSpace(request.Name)
+            ? $"brain_{selected.Id.Value}"
+            : request.Name;
+        _pendingBrainExportNotes = request.Notes;
+
+        _saveBrainProfileDialog.CurrentFile = ToBrainProfileFileName(_pendingBrainExportName);
+        _saveBrainProfileDialog.PopupCenteredRatio(0.75f);
     }
 
     private void OpenLoadSpeciesProfileDialog()
@@ -4288,12 +4320,21 @@ public partial class Main : Node2D
                     _pendingSpeciesExportCreatureId,
                     _pendingSpeciesExportName,
                     _pendingSpeciesExportNotes);
+            string? pairedBrainPath = null;
+            if (_pendingSpeciesExportPairedBrain)
+            {
+                pairedBrainPath = ExportPairedBrainProfile(profile);
+                profile = profile with { DefaultBrainPath = ToWorkspaceRelativePath(pairedBrainPath) };
+            }
+
             SpeciesProfileJson.Save(path, profile);
             _loadedSpeciesProfile = profile;
             _loadedSpeciesProfilePath = path;
             _scenarioEditor.SetLastSpeciesExportPath(path);
             _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path));
-            _scenarioEditor.SetStatus($"Exported species profile {profile.Name}.");
+            _scenarioEditor.SetStatus(pairedBrainPath is null
+                ? $"Exported species profile {profile.Name}."
+                : $"Exported species profile {profile.Name} with paired brain {System.IO.Path.GetFileName(pairedBrainPath)}.");
         }
         catch (Exception ex)
         {
@@ -4303,8 +4344,64 @@ public partial class Main : Node2D
         {
             _pendingSpeciesExportCreatureId = default;
             _pendingSpeciesExportClusterRepresentative = false;
+            _pendingSpeciesExportPairedBrain = false;
             _pendingSpeciesExportName = null;
             _pendingSpeciesExportNotes = null;
+        }
+    }
+
+    private string ExportPairedBrainProfile(SpeciesProfile profile)
+    {
+        var name = $"{profile.Name} Brain";
+        var notes = string.IsNullOrWhiteSpace(profile.Notes)
+            ? $"Paired controller exported with species profile {profile.Name}."
+            : $"Paired controller exported with species profile {profile.Name}. {profile.Notes}";
+        var brainProfile = BrainProfileExporter.ExportCreatureBrain(
+            _scenario,
+            _simulation.State,
+            new EntityId(profile.Source.CreatureId),
+            name,
+            notes);
+        var brainPath = GetUniqueManagedProfilePath(
+            System.IO.Path.Combine(GetUserBrainCatalogDirectory(), $"{SanitizeFileName(name)}{BrainProfileJson.FileExtension}"),
+            BrainProfileJson.FileExtension);
+        BrainProfileJson.Save(brainPath, brainProfile);
+        _scenarioEditor.SetLastBrainExportPath(brainPath);
+        RefreshBrainCatalog();
+        return brainPath;
+    }
+
+    private void ExportPendingBrainProfileToPath(string path)
+    {
+        if (_pendingBrainExportCreatureId == default)
+        {
+            _scenarioEditor.SetStatus("Brain export failed: no creature was selected.");
+            return;
+        }
+
+        try
+        {
+            path = BrainProfileJson.WithFileExtension(path);
+            var profile = BrainProfileExporter.ExportCreatureBrain(
+                _scenario,
+                _simulation.State,
+                _pendingBrainExportCreatureId,
+                _pendingBrainExportName,
+                _pendingBrainExportNotes);
+            BrainProfileJson.Save(path, profile);
+            _scenarioEditor.SetLastBrainExportPath(path);
+            RefreshBrainCatalog();
+            _scenarioEditor.SetStatus($"Exported brain profile {profile.Name}.");
+        }
+        catch (Exception ex)
+        {
+            _scenarioEditor.SetStatus($"Brain export failed: {ex.Message}");
+        }
+        finally
+        {
+            _pendingBrainExportCreatureId = default;
+            _pendingBrainExportName = null;
+            _pendingBrainExportNotes = null;
         }
     }
 
@@ -4498,6 +4595,18 @@ public partial class Main : Node2D
         };
     }
 
+    private static FileDialog CreateBrainProfileDialog(FileDialog.FileModeEnum mode, string title, string profileDirectory)
+    {
+        return new FileDialog
+        {
+            Title = title,
+            FileMode = mode,
+            Access = FileDialog.AccessEnum.Filesystem,
+            CurrentDir = profileDirectory,
+            Filters = [$"{BrainProfileJson.FilePattern};Brain Profile ({BrainProfileJson.FileExtension})"]
+        };
+    }
+
     private static string GetRepositoryRoot()
     {
         var projectDirectory = ProjectSettings.GlobalizePath("res://");
@@ -4556,6 +4665,23 @@ public partial class Main : Node2D
         return path;
     }
 
+    private static string GetBrainCatalogDirectory()
+    {
+        return System.IO.Path.Combine(GetRepositoryRoot(), BrainProfileDirectoryName);
+    }
+
+    private static string GetUserBrainCatalogDirectory()
+    {
+        var directory = System.IO.Path.Combine(GetBrainCatalogDirectory(), "user");
+        System.IO.Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private void RefreshBrainCatalog()
+    {
+        _scenarioEditor.SetBrainCatalogDirectory(GetBrainCatalogDirectory());
+    }
+
     private static string SanitizeFileName(string value)
     {
         var invalid = System.IO.Path.GetInvalidFileNameChars();
@@ -4572,6 +4698,42 @@ public partial class Main : Node2D
         return sanitized.EndsWith(SpeciesProfileJson.FileExtension, StringComparison.OrdinalIgnoreCase)
             ? sanitized
             : $"{sanitized}{SpeciesProfileJson.FileExtension}";
+    }
+
+    private static string ToBrainProfileFileName(string value)
+    {
+        var sanitized = SanitizeFileName(value);
+        return sanitized.EndsWith(BrainProfileJson.FileExtension, StringComparison.OrdinalIgnoreCase)
+            ? sanitized
+            : $"{sanitized}{BrainProfileJson.FileExtension}";
+    }
+
+    private static string GetUniqueManagedProfilePath(string preferredPath, string profileExtension)
+    {
+        if (!System.IO.File.Exists(preferredPath))
+        {
+            return preferredPath;
+        }
+
+        var directory = System.IO.Path.GetDirectoryName(preferredPath) ?? ".";
+        var fileName = System.IO.Path.GetFileName(preferredPath);
+        var stem = fileName.EndsWith(profileExtension, StringComparison.OrdinalIgnoreCase)
+            ? fileName[..^profileExtension.Length]
+            : System.IO.Path.GetFileNameWithoutExtension(fileName);
+        var extension = fileName.EndsWith(profileExtension, StringComparison.OrdinalIgnoreCase)
+            ? profileExtension
+            : System.IO.Path.GetExtension(fileName);
+
+        for (var index = 2; index < 1000; index++)
+        {
+            var candidate = System.IO.Path.Combine(directory, $"{stem}_{index}{extension}");
+            if (!System.IO.File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new IOException("Could not choose a unique profile path.");
     }
 
     private static string LastLine(string primary, string fallback)

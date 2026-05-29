@@ -83,10 +83,12 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private OptionButton _speciesBrainOverrideInput = null!;
     private OptionButton _speciesBrainProfileInput = null!;
     private Label _brainCatalogSummaryLabel = null!;
+    private CheckBox _speciesExportBrainInput = null!;
     private CheckBox _speciesSeedEnabledInput = null!;
     private Label _speciesRosterLabel = null!;
     private Label _loadedSpeciesLabel = null!;
     private Label _lastSpeciesExportLabel = null!;
+    private Label _lastBrainExportLabel = null!;
     private Button _injectSpeciesButton = null!;
     private string? _lastReportPath;
     private string? _lastSnapshotPath;
@@ -94,6 +96,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private string? _lastCheckpointDirectory;
     private string? _loadedSpeciesProfilePath;
     private string? _lastSpeciesExportPath;
+    private string? _lastBrainExportPath;
     private string? _brainCatalogDirectory;
 
     public bool IsCollapsed { get; private set; }
@@ -121,6 +124,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     public event Action? ExportSelectedSpeciesRequested;
 
     public event Action? ExportSelectedSpeciesClusterRequested;
+
+    public event Action? ExportSelectedBrainRequested;
 
     public event Action? LoadSpeciesProfileRequested;
 
@@ -213,7 +218,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     {
         return new SpeciesExportUiRequest(
             string.IsNullOrWhiteSpace(_speciesNameInput.Text) ? null : _speciesNameInput.Text.Trim(),
-            string.IsNullOrWhiteSpace(_speciesNotesInput.Text) ? null : _speciesNotesInput.Text.Trim());
+            string.IsNullOrWhiteSpace(_speciesNotesInput.Text) ? null : _speciesNotesInput.Text.Trim(),
+            _speciesExportBrainInput.ButtonPressed);
     }
 
     public void SetStatus(string message)
@@ -259,6 +265,12 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     {
         _lastSpeciesExportPath = string.IsNullOrWhiteSpace(path) ? null : path;
         _lastSpeciesExportLabel.Text = _lastSpeciesExportPath ?? "No species profile exported yet.";
+    }
+
+    public void SetLastBrainExportPath(string? path)
+    {
+        _lastBrainExportPath = string.IsNullOrWhiteSpace(path) ? null : path;
+        _lastBrainExportLabel.Text = _lastBrainExportPath ?? "No brain profile exported yet.";
     }
 
     public void ToggleCollapsed()
@@ -1010,15 +1022,28 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         root.AddChild(CreateFieldRow("Export name", _speciesNameInput));
         root.AddChild(CreateFieldRow("Export notes", _speciesNotesInput));
+        _speciesExportBrainInput = new CheckBox
+        {
+            ButtonPressed = true,
+            Text = "Save paired brain profile"
+        };
+        root.AddChild(CreateFieldRow("Paired brain", _speciesExportBrainInput));
         root.AddChild(BuildButtonRow(
             CreateButton("Export Selected Creature", () => ExportSelectedSpeciesRequested?.Invoke()),
             CreateButton("Export Selected Cluster", () => ExportSelectedSpeciesClusterRequested?.Invoke())));
+        root.AddChild(CreateButton("Export Selected Brain", () => ExportSelectedBrainRequested?.Invoke()));
         _lastSpeciesExportLabel = new Label
         {
             Text = "No species profile exported yet.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         root.AddChild(CreateFieldRow("Last export", _lastSpeciesExportLabel));
+        _lastBrainExportLabel = new Label
+        {
+            Text = "No brain profile exported yet.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        root.AddChild(CreateFieldRow("Last brain export", _lastBrainExportLabel));
 
         root.AddChild(new HSeparator());
         root.AddChild(CreateButton("Load Species Profile", () => LoadSpeciesProfileRequested?.Invoke()));
@@ -1530,4 +1555,5 @@ public readonly record struct SpeciesInjectionUiRequest(
 
 public readonly record struct SpeciesExportUiRequest(
     string? Name,
-    string? Notes);
+    string? Notes,
+    bool ExportPairedBrain);

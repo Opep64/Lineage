@@ -24,3 +24,7 @@ scenarios/user/
 
 # Launcher-managed local map artifacts
 maps/user/
+
+# Launcher/Godot-managed local profile catalog artifacts
+species/user/
+brains/user/
