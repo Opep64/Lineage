@@ -4326,7 +4326,10 @@ public partial class Main : Node2D
                 new SpeciesInjectionOptions(
                     request.Count,
                     request.SpawnRegion,
-                    request.EnergyOverride));
+                    request.EnergyOverride,
+                    request.BrainOverrideKind,
+                    _scenario.BrainArchitectureKind,
+                    _scenario.BrainHiddenNodeCount));
 
             if (result.CreatureIds.Count > 0)
             {

@@ -26,7 +26,13 @@ public static class SimulationScenarioSpeciesSeeder
             results.Add(SpeciesProfileInjector.Inject(
                 state,
                 profile,
-                new SpeciesInjectionOptions(seed.Count, seed.SpawnRegion, seed.EnergyOverride)));
+                new SpeciesInjectionOptions(
+                    seed.Count,
+                    seed.SpawnRegion,
+                    seed.EnergyOverride,
+                    seed.BrainOverrideKind,
+                    scenario.BrainArchitectureKind,
+                    scenario.BrainHiddenNodeCount)));
         }
 
         return results;

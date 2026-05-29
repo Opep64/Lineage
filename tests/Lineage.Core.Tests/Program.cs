@@ -197,6 +197,8 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
+    ("Species profile injection can override brain kind", SpeciesProfileInjectionCanOverrideBrainKind),
+    ("Species profile injection can randomize brains per founder", SpeciesProfileInjectionCanRandomizeBrainsPerFounder),
     ("Species clustering groups injected profile founders", SpeciesClusteringGroupsInjectedProfileFounders),
     ("Species clustering splits distinct brains", SpeciesClusteringSplitsDistinctBrains),
     ("Species clustering separates starter ecotypes", SpeciesClusteringSeparatesStarterEcotypes),
@@ -204,6 +206,7 @@ var tests = new (string Name, Action Body)[]
     ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
     ("Species behavior change highlights notable shifts", SpeciesBehaviorChangeHighlightsNotableShifts),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
+    ("Scenario species roster injects brain overrides", ScenarioSpeciesRosterInjectsBrainOverrides),
     ("Roster lineage summaries group injected profile descendants", RosterLineageSummariesGroupInjectedProfileDescendants),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Simulation snapshot capture can sample stats history", SimulationSnapshotCaptureCanSampleStatsHistory),
@@ -8794,6 +8797,96 @@ static void SpeciesProfileInjectionCreatesFounderCreatures()
     }
 }
 
+static void SpeciesProfileInjectionCanOverrideBrainKind()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 913,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ExplorerForager,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(sourceScenario, source.State, "Override sample");
+
+    var targetScenario = new SimulationScenario
+    {
+        Seed = 914,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var target = SimulationScenarioFactory.CreateSimulation(targetScenario);
+    var brainCountBefore = target.State.Brains.Count;
+    var result = SpeciesProfileInjector.Inject(
+        target.State,
+        profile,
+        new SpeciesInjectionOptions(
+            Count: 3,
+            EnergyOverride: 35f,
+            BrainOverrideKind: InitialBrainKind.ForagerPredator,
+            BrainArchitectureKind: BrainArchitectureKind.HiddenLayerNeural,
+            BrainHiddenNodeCount: 8));
+
+    AssertEqual(brainCountBefore + 1, target.State.Brains.Count, "Overridden species should add one shared starter brain");
+    AssertEqual(
+        BrainArchitectureKind.HiddenLayerNeural,
+        target.State.GetBrainArchitectureKind(result.BrainId),
+        "Overridden species brain architecture");
+    AssertEqual(8, target.State.GetBrain(result.BrainId).HiddenNodeCount, "Overridden species hidden brain nodes");
+    foreach (var creature in target.State.Creatures)
+    {
+        AssertEqual(result.BrainId, creature.BrainId, "Overridden species creature brain id");
+    }
+}
+
+static void SpeciesProfileInjectionCanRandomizeBrainsPerFounder()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 915,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ExplorerForager,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(sourceScenario, source.State, "Randomized sample");
+
+    var targetScenario = new SimulationScenario
+    {
+        Seed = 916,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var target = SimulationScenarioFactory.CreateSimulation(targetScenario);
+    var brainCountBefore = target.State.Brains.Count;
+    var result = SpeciesProfileInjector.Inject(
+        target.State,
+        profile,
+        new SpeciesInjectionOptions(
+            Count: 4,
+            EnergyOverride: 35f,
+            BrainOverrideKind: InitialBrainKind.RandomPerFounder,
+            BrainArchitectureKind: BrainArchitectureKind.HybridNeural,
+            BrainHiddenNodeCount: 4));
+
+    var brainIds = target.State.Creatures.Select(creature => creature.BrainId).ToHashSet();
+    AssertEqual(brainCountBefore + 4, target.State.Brains.Count, "Randomized species should create one brain per founder");
+    AssertEqual(4, brainIds.Count, "Randomized species founder brain ids");
+    AssertTrue(brainIds.Contains(result.BrainId), "Randomized species result should report one injected brain id");
+    foreach (var brainId in brainIds)
+    {
+        AssertEqual(
+            BrainArchitectureKind.HybridNeural,
+            target.State.GetBrainArchitectureKind(brainId),
+            "Randomized species brain architecture");
+        AssertEqual(4, target.State.GetBrain(brainId).HiddenNodeCount, "Randomized species hidden brain nodes");
+    }
+}
+
 static void SpeciesClusteringGroupsInjectedProfileFounders()
 {
     var sourceScenario = new SimulationScenario
@@ -9140,6 +9233,78 @@ static void ScenarioSpeciesRosterInjectsProfileFounders()
         {
             AssertClose(44f, creature.Energy, 0.000001, "Roster energy override");
             AssertTrue(creature.Position.X > simulation.State.Bounds.Width * 2f / 3f, "Roster creature should spawn in right third");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+static void ScenarioSpeciesRosterInjectsBrainOverrides()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 806,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        InitialBrainKind = InitialBrainKind.ExplorerForager
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
+        sourceScenario,
+        source.State,
+        "Roster override");
+
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_roster_brain_{Guid.NewGuid():N}");
+    try
+    {
+        var profilePath = Path.Combine(tempRoot, "species", "roster-override.species.json");
+        SpeciesProfileJson.Save(profilePath, profile);
+
+        var scenarioPath = Path.Combine(tempRoot, "scenarios", "roster-brain-scenario.json");
+        var scenario = new SimulationScenario
+        {
+            Seed = 807,
+            PipelineKind = SimulationPipelineKind.Neural,
+            BrainArchitectureKind = BrainArchitectureKind.HiddenLayerNeural,
+            BrainHiddenNodeCount = 8,
+            InitialCreatureCount = 99,
+            InitialResourcesPerMillionArea = 0f,
+            SpeciesSeeds =
+            [
+                new SpeciesScenarioSeed
+                {
+                    ProfilePath = "species/roster-override.species.json",
+                    Count = 3,
+                    EnergyOverride = 40f,
+                    BrainOverrideKind = InitialBrainKind.ScavengerForager
+                }
+            ]
+        };
+        SimulationScenarioJson.Save(scenarioPath, scenario);
+
+        var loadedScenario = SimulationScenarioJson.Load(scenarioPath);
+        var simulation = SimulationScenarioFactory.CreateSimulation(loadedScenario);
+        var results = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+            loadedScenario,
+            simulation.State,
+            scenarioPath);
+
+        AssertEqual(1, results.Count, "Roster override injection result count");
+        AssertEqual(3, results[0].CreatureIds.Count, "Roster override creature count");
+        AssertEqual(1, simulation.State.Brains.Count, "Roster override should use a shared starter brain");
+        AssertEqual(
+            BrainArchitectureKind.HiddenLayerNeural,
+            simulation.State.GetBrainArchitectureKind(results[0].BrainId),
+            "Roster override brain architecture");
+        AssertEqual(8, simulation.State.GetBrain(results[0].BrainId).HiddenNodeCount, "Roster override hidden brain nodes");
+        foreach (var creature in simulation.State.Creatures)
+        {
+            AssertEqual(results[0].BrainId, creature.BrainId, "Roster override creature brain id");
         }
     }
     finally
@@ -9619,12 +9784,13 @@ static void ScenarioJsonRoundTrips()
         SpeciesSeeds =
         [
             new SpeciesScenarioSeed
-            {
-                ProfilePath = "species/alpha.species.json",
-                Count = 3,
-                SpawnRegion = InitialCreatureSpawnRegion.LeftThird,
-                EnergyOverride = 42f
-            },
+                {
+                    ProfilePath = "species/alpha.species.json",
+                    Count = 3,
+                    SpawnRegion = InitialCreatureSpawnRegion.LeftThird,
+                    EnergyOverride = 42f,
+                    BrainOverrideKind = InitialBrainKind.ScavengerForager
+                },
             new SpeciesScenarioSeed
             {
                 ProfilePath = "species/disabled.species.json",
@@ -9757,6 +9923,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"speciesSeeds\""), "JSON should serialize species seeds");
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
     AssertTrue(json.Contains("\"spawnRegion\": \"leftThird\""), "JSON should serialize species seed spawn regions");
+    AssertTrue(json.Contains("\"brainOverrideKind\": \"scavengerForager\""), "JSON should serialize species seed brain overrides");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"enablePlantTypeHabitatAffinity\""), "JSON should serialize plant habitat affinity");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
@@ -9817,6 +9984,7 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(3, roundTripped.SpeciesSeeds[0].Count, "Scenario species seed creature count");
     AssertEqual(InitialCreatureSpawnRegion.LeftThird, roundTripped.SpeciesSeeds[0].SpawnRegion, "Scenario species seed spawn region");
     AssertClose(42f, roundTripped.SpeciesSeeds[0].EnergyOverride ?? 0f, 0.000001, "Scenario species seed energy override");
+    AssertEqual(InitialBrainKind.ScavengerForager, roundTripped.SpeciesSeeds[0].BrainOverrideKind, "Scenario species seed brain override");
     AssertTrue(!roundTripped.SpeciesSeeds[1].Enabled, "Scenario disabled species seed");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.GenericPlantWeight, roundTripped.GenericPlantWeight, 0.000001, "Scenario generic plant weight");

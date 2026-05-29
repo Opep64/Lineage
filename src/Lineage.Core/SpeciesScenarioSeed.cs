@@ -18,6 +18,8 @@ public sealed record SpeciesScenarioSeed
 
     public float? EnergyOverride { get; init; }
 
+    public InitialBrainKind? BrainOverrideKind { get; init; }
+
     public bool Enabled { get; init; } = true;
 
     public SpeciesScenarioSeed Validated()
@@ -41,6 +43,11 @@ public sealed record SpeciesScenarioSeed
             && (!float.IsFinite(EnergyOverride.Value) || EnergyOverride.Value <= 0f))
         {
             throw new InvalidOperationException("Species seed energy override must be finite and positive.");
+        }
+
+        if (BrainOverrideKind is not null && !Enum.IsDefined(BrainOverrideKind.Value))
+        {
+            throw new InvalidOperationException("Species seed brain override kind must be defined.");
         }
 
         return this with { ProfilePath = ProfilePath.Trim() };

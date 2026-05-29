@@ -115,6 +115,23 @@ public sealed partial class LineageRunManager
             .ToArray();
     }
 
+    public IReadOnlyList<SpeciesCatalogEntry> ListSpeciesCatalog()
+    {
+        var speciesRoot = SpeciesCatalogRoot();
+        if (!Directory.Exists(speciesRoot))
+        {
+            return Array.Empty<SpeciesCatalogEntry>();
+        }
+
+        return Directory
+            .EnumerateFiles(speciesRoot, SpeciesProfileJson.FilePattern, SearchOption.AllDirectories)
+            .Select(TryReadSpeciesCatalogEntry)
+            .OfType<SpeciesCatalogEntry>()
+            .OrderBy(species => species.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(species => species.Path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public ScenarioRecipeSaveResult SaveScenarioRecipe(ScenarioRecipeSaveRequest request)
     {
         var name = (request.Name ?? string.Empty).Trim();
@@ -511,6 +528,91 @@ public sealed partial class LineageRunManager
             Artifacts: ListRunArtifacts(manifest),
             StdoutTail: ReadTail(manifest.StdoutPath, maxLines),
             StderrTail: ReadTail(manifest.StderrPath, maxLines));
+    }
+
+    public SpeciesCatalogExportResult? ExportRunSpeciesProfile(string id, SpeciesCatalogExportRequest request)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        if (run.IsRunning)
+        {
+            throw new InvalidOperationException("Stop the run before exporting a species profile from it.");
+        }
+
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Species profile name is required.");
+        }
+
+        var selectorCount = new[]
+        {
+            request.CreatureId.HasValue,
+            request.FounderId.HasValue,
+            !string.IsNullOrWhiteSpace(request.ClusterKey)
+        }.Count(static selected => selected);
+        if (selectorCount > 1)
+        {
+            throw new ArgumentException("Choose only one species export selector.");
+        }
+
+        var snapshotPath = ResolveSpeciesExportSnapshotPath(run.Manifest);
+        var restored = SimulationSnapshotJson.LoadSimulation(snapshotPath);
+        var notes = string.IsNullOrWhiteSpace(request.Notes)
+            ? $"Exported from launcher run {run.Manifest.Id} using {NormalizeArtifactRelativePath(snapshotPath)}."
+            : request.Notes.Trim();
+
+        var profile = request switch
+        {
+            { CreatureId: { } creatureId } => SpeciesProfileExporter.ExportCreature(
+                restored.Scenario,
+                restored.Simulation.State,
+                new EntityId(creatureId),
+                name,
+                notes),
+            { FounderId: { } founderId } => SpeciesProfileExporter.ExportFounderLineageRepresentative(
+                restored.Scenario,
+                restored.Simulation.State,
+                new EntityId(founderId),
+                name,
+                notes),
+            { ClusterKey: { } clusterKey } when !string.IsNullOrWhiteSpace(clusterKey) => SpeciesProfileExporter.ExportSpeciesClusterRepresentative(
+                restored.Scenario,
+                restored.Simulation.State,
+                clusterKey.Trim(),
+                name,
+                notes),
+            _ => SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
+                restored.Scenario,
+                restored.Simulation.State,
+                name,
+                notes)
+        };
+
+        var speciesRoot = UserSpeciesCatalogRoot();
+        Directory.CreateDirectory(speciesRoot);
+        var path = GetUniquePath(Path.Combine(speciesRoot, $"{Slugify(name)}{SpeciesProfileJson.FileExtension}"));
+        EnsurePathInside(path, speciesRoot);
+        SpeciesProfileJson.Save(path, profile);
+        return new SpeciesCatalogExportResult(ToSpeciesCatalogEntry(path, profile));
+    }
+
+    public SpeciesCatalogDeleteResult DeleteSpeciesCatalogEntry(SpeciesCatalogDeleteRequest request)
+    {
+        var path = ResolveUserSpeciesCatalogPath(request.Path);
+        var archiveRoot = Path.Combine(_repoRoot, "out", "species-trash");
+        Directory.CreateDirectory(archiveRoot);
+        var archivePath = GetUniquePath(Path.Combine(
+            archiveRoot,
+            $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_{Path.GetFileName(path)}"));
+        File.Move(path, archivePath);
+
+        return new SpeciesCatalogDeleteResult(
+            NormalizeArtifactRelativePath(path),
+            NormalizeArtifactRelativePath(archivePath));
     }
 
     public RunCloneSettings? GetRunCloneSettings(string id)
@@ -1905,6 +2007,16 @@ public sealed partial class LineageRunManager
         return Path.Combine(MapArtifactRoot(), UserScenarioFolderName);
     }
 
+    private string SpeciesCatalogRoot()
+    {
+        return Path.Combine(_repoRoot, "species");
+    }
+
+    private string UserSpeciesCatalogRoot()
+    {
+        return Path.Combine(SpeciesCatalogRoot(), UserScenarioFolderName);
+    }
+
     private string ResolveUserMapArtifactPath(string artifactPath)
     {
         if (string.IsNullOrWhiteSpace(artifactPath))
@@ -1926,6 +2038,43 @@ public sealed partial class LineageRunManager
         }
 
         return path;
+    }
+
+    private string ResolveUserSpeciesCatalogPath(string speciesPath)
+    {
+        if (string.IsNullOrWhiteSpace(speciesPath))
+        {
+            throw new ArgumentException("Species profile path is required.");
+        }
+
+        var path = ResolveArtifactPath(speciesPath);
+        var speciesRoot = UserSpeciesCatalogRoot();
+        EnsurePathInside(path, speciesRoot);
+        if (!path.EndsWith(SpeciesProfileJson.FileExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only Lineage species profile artifacts can be managed.");
+        }
+
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Species profile was not found.", speciesPath);
+        }
+
+        return path;
+    }
+
+    private string ResolveSpeciesExportSnapshotPath(RunManifest manifest)
+    {
+        if (!string.IsNullOrWhiteSpace(manifest.SnapshotPath))
+        {
+            var snapshotPath = ResolveArtifactPath(manifest.SnapshotPath);
+            if (File.Exists(snapshotPath))
+            {
+                return snapshotPath;
+            }
+        }
+
+        return ResolveContinuationSnapshotPath(manifest);
     }
 
     private string UserScenarioRegistryPath()
@@ -2033,6 +2182,48 @@ public sealed partial class LineageRunManager
             SourceBiomeMapKind: validated.SourceBiomeMapKind?.ToString(),
             SourceObstacleMapKind: validated.SourceObstacleMapKind?.ToString(),
             Biomes: biomes);
+    }
+
+    private SpeciesCatalogEntry? TryReadSpeciesCatalogEntry(string path)
+    {
+        try
+        {
+            return ToSpeciesCatalogEntry(path, SpeciesProfileJson.Load(path));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private SpeciesCatalogEntry ToSpeciesCatalogEntry(string path, SpeciesProfile profile)
+    {
+        var validated = profile.Validated();
+        var genome = validated.Genome;
+        return new SpeciesCatalogEntry(
+            Name: validated.Name,
+            Path: NormalizeArtifactRelativePath(path),
+            CanDelete: IsPathUnderDirectory(path, UserSpeciesCatalogRoot()),
+            Notes: validated.Notes,
+            BrainArchitectureKind: validated.BrainArchitectureKind.ToString(),
+            BrainHiddenNodeCount: validated.BrainHiddenNodeCount,
+            BrainWeightCount: validated.BrainWeights.Length,
+            BodyRadius: genome.BodyRadius,
+            MaxSpeed: genome.MaxSpeed,
+            SenseRadius: genome.SenseRadius,
+            VisionAngleDegrees: genome.VisionAngleRadians * 180d / Math.PI,
+            BasalEnergyPerSecond: genome.BasalEnergyPerSecond,
+            MovementEnergyPerSecond: genome.MovementEnergyPerSecond,
+            EatCaloriesPerSecond: genome.EatCaloriesPerSecond,
+            ReproductionEnergyThreshold: genome.ReproductionEnergyThreshold,
+            OffspringEnergyInvestment: genome.OffspringEnergyInvestment,
+            SourceScenarioName: validated.Source.ScenarioName,
+            SourceSeed: validated.Source.Seed,
+            SourceTick: validated.Source.Tick,
+            SourceCreatureId: validated.Source.CreatureId,
+            SourceFounderId: validated.Source.FounderId,
+            SourceGeneration: validated.Source.Generation,
+            ExportedAtUtc: validated.Source.ExportedAtUtc);
     }
 
     private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)

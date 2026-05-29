@@ -19,6 +19,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 {
     private const float ExpandedPanelWidth = 520f;
     private const float FieldLabelWidth = 205f;
+    private const string SpeciesProfileBrainOption = "Profile brain";
+    private const string SpeciesScenarioInitialBrainOption = "Scenario initial brain";
 
     private static readonly string[] ScenarioGroupOrder =
     [
@@ -76,6 +78,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private SpinBox _speciesInjectCountInput = null!;
     private SpinBox _speciesInjectEnergyInput = null!;
     private OptionButton _speciesInjectRegionInput = null!;
+    private OptionButton _speciesBrainOverrideInput = null!;
     private CheckBox _speciesSeedEnabledInput = null!;
     private Label _speciesRosterLabel = null!;
     private Label _loadedSpeciesLabel = null!;
@@ -189,7 +192,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             Enum.Parse<InitialCreatureSpawnRegion>(regionText),
             _speciesInjectEnergyInput.Value <= 0
                 ? null
-                : (float)_speciesInjectEnergyInput.Value);
+                : (float)_speciesInjectEnergyInput.Value,
+            ReadSpeciesBrainOverrideKind());
     }
 
     public SpeciesExportUiRequest ReadSpeciesExportRequest()
@@ -895,6 +899,14 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             _speciesInjectRegionInput.AddItem(name);
         }
 
+        _speciesBrainOverrideInput = new OptionButton();
+        _speciesBrainOverrideInput.AddItem(SpeciesProfileBrainOption);
+        _speciesBrainOverrideInput.AddItem(SpeciesScenarioInitialBrainOption);
+        foreach (var name in Enum.GetNames<InitialBrainKind>())
+        {
+            _speciesBrainOverrideInput.AddItem(name);
+        }
+
         _speciesSeedEnabledInput = new CheckBox { ButtonPressed = true };
         _speciesRosterLabel = new Label
         {
@@ -925,6 +937,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         root.AddChild(CreateFieldRow("Inject count", _speciesInjectCountInput));
         root.AddChild(CreateFieldRow("Inject region", _speciesInjectRegionInput));
         root.AddChild(CreateFieldRow("Inject energy", _speciesInjectEnergyInput));
+        root.AddChild(CreateFieldRow("Species brain", _speciesBrainOverrideInput));
         _injectSpeciesButton = CreateButton("Inject Loaded Species", () => InjectSpeciesRequested?.Invoke());
         _injectSpeciesButton.Disabled = true;
         root.AddChild(_injectSpeciesButton);
@@ -962,11 +975,37 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             Count = request.Count,
             SpawnRegion = request.SpawnRegion,
             EnergyOverride = request.EnergyOverride,
+            BrainOverrideKind = request.BrainOverrideKind,
             Enabled = _speciesSeedEnabledInput.ButtonPressed
         }.Validated();
         _speciesSeedEntries.Add(seed);
         UpdateSpeciesRosterLabel();
-        SetStatus($"Added {System.IO.Path.GetFileName(seed.ProfilePath)} to the scenario roster.");
+        SetStatus($"Added {System.IO.Path.GetFileName(seed.ProfilePath)} to the scenario roster with {FormatSpeciesBrain(seed.BrainOverrideKind)}.");
+    }
+
+    private InitialBrainKind? ReadSpeciesBrainOverrideKind()
+    {
+        if (_speciesBrainOverrideInput.Selected <= 0)
+        {
+            return null;
+        }
+
+        var brainText = _speciesBrainOverrideInput.GetItemText(_speciesBrainOverrideInput.Selected);
+        if (string.Equals(brainText, SpeciesScenarioInitialBrainOption, StringComparison.Ordinal))
+        {
+            return ReadScenarioInitialBrainKind();
+        }
+
+        return Enum.Parse<InitialBrainKind>(brainText);
+    }
+
+    private InitialBrainKind ReadScenarioInitialBrainKind()
+    {
+        var binding = _bindings.FirstOrDefault(candidate =>
+            candidate.Property.Name == nameof(SimulationScenario.InitialBrainKind));
+        return binding is null
+            ? InitialBrainKind.SectorForager
+            : (InitialBrainKind)ReadEditorValue(binding.Editor, typeof(InitialBrainKind));
     }
 
     private void RemoveLastSpeciesSeed()
@@ -1010,8 +1049,18 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 var energy = seed.EnergyOverride is null
                     ? "profile energy"
                     : $"{seed.EnergyOverride.Value:0.###} energy";
-                return $"{index + 1}. {state}: {seed.Count} x {System.IO.Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy})";
+                var brain = seed.BrainOverrideKind is null
+                    ? "profile brain"
+                    : FormatSpeciesBrain(seed.BrainOverrideKind);
+                return $"{index + 1}. {state}: {seed.Count} x {System.IO.Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
             }));
+    }
+
+    private static string FormatSpeciesBrain(InitialBrainKind? brainOverrideKind)
+    {
+        return brainOverrideKind is null
+            ? "profile brain"
+            : $"{brainOverrideKind.Value} brain";
     }
 
     private void OpenLastReport()
@@ -1328,7 +1377,8 @@ public readonly record struct CliRunRequest(
 public readonly record struct SpeciesInjectionUiRequest(
     int Count,
     InitialCreatureSpawnRegion SpawnRegion,
-    float? EnergyOverride);
+    float? EnergyOverride,
+    InitialBrainKind? BrainOverrideKind);
 
 public readonly record struct SpeciesExportUiRequest(
     string? Name,

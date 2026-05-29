@@ -143,6 +143,48 @@ public sealed record ScenarioRecipeArchiveResult(
 public sealed record ScenarioRecipeDeleteResult(
     string Path);
 
+public sealed record SpeciesCatalogEntry(
+    string Name,
+    string Path,
+    bool CanDelete,
+    string Notes,
+    string BrainArchitectureKind,
+    int BrainHiddenNodeCount,
+    int BrainWeightCount,
+    double BodyRadius,
+    double MaxSpeed,
+    double SenseRadius,
+    double VisionAngleDegrees,
+    double BasalEnergyPerSecond,
+    double MovementEnergyPerSecond,
+    double EatCaloriesPerSecond,
+    double ReproductionEnergyThreshold,
+    double OffspringEnergyInvestment,
+    string SourceScenarioName,
+    ulong SourceSeed,
+    long SourceTick,
+    int SourceCreatureId,
+    int SourceFounderId,
+    int SourceGeneration,
+    DateTimeOffset ExportedAtUtc);
+
+public sealed record SpeciesCatalogExportRequest(
+    string Name,
+    string? Notes,
+    int? CreatureId,
+    int? FounderId,
+    string? ClusterKey);
+
+public sealed record SpeciesCatalogExportResult(
+    SpeciesCatalogEntry Species);
+
+public sealed record SpeciesCatalogDeleteRequest(
+    string Path);
+
+public sealed record SpeciesCatalogDeleteResult(
+    string Path,
+    string ArchivedPath);
+
 public sealed record RunCreateRequest(
     string ScenarioPath,
     int Ticks,

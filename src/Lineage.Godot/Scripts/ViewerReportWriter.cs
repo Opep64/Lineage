@@ -3338,7 +3338,10 @@ public static class ViewerReportWriter
                 var energy = seed.EnergyOverride is null
                     ? "profile energy"
                     : $"{seed.EnergyOverride.Value:0.###} energy";
-                return $"{seed.Count} x {Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy})";
+                var brain = seed.BrainOverrideKind is null
+                    ? "profile brain"
+                    : $"{FormatInitialBrainKind(seed.BrainOverrideKind.Value)} brain";
+                return $"{seed.Count} x {Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
             }));
     }
 

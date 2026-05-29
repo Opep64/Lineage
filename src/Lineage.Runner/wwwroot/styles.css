@@ -686,6 +686,52 @@ button.scenario-tab.is-active {
   margin-bottom: 12px;
 }
 
+.species-tools {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.1fr) minmax(160px, 0.55fr) minmax(90px, 0.3fr) minmax(150px, 0.45fr) minmax(130px, 0.4fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.species-catalog-details {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+  color: var(--muted);
+}
+
+.species-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 8px 14px;
+}
+
+.species-summary-grid div {
+  min-width: 0;
+}
+
+.species-summary-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.species-summary-grid strong {
+  display: block;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.species-notes {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
 .selection-status {
   display: flex;
   align-items: center;
@@ -1027,6 +1073,11 @@ tr.is-expanded td {
   }
 
   .run-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .species-tools,
+  .species-summary-grid {
     grid-template-columns: 1fr;
   }
 

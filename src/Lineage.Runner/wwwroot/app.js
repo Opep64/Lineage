@@ -62,12 +62,22 @@ const duplicateMapArtifactButton = document.querySelector("#duplicateMapArtifact
 const deleteMapArtifactButton = document.querySelector("#deleteMapArtifactButton");
 const mapArtifactDetails = document.querySelector("#mapArtifactDetails");
 const paintBiomeMapButton = document.querySelector("#paintBiomeMapButton");
+const speciesCatalogSelect = document.querySelector("#speciesCatalogSelect");
+const speciesCatalogDetails = document.querySelector("#speciesCatalogDetails");
+const refreshSpeciesCatalogButton = document.querySelector("#refreshSpeciesCatalogButton");
+const deleteSpeciesCatalogButton = document.querySelector("#deleteSpeciesCatalogButton");
+const addSpeciesToScenarioButton = document.querySelector("#addSpeciesToScenarioButton");
+const speciesSeedBrainSelect = document.querySelector("#speciesSeedBrain");
+const speciesSeedCountInput = document.querySelector("#speciesSeedCount");
+const speciesSeedRegionSelect = document.querySelector("#speciesSeedRegion");
+const speciesSeedEnergyInput = document.querySelector("#speciesSeedEnergy");
 
 let refreshTimer = null;
 let allRuns = [];
 let scenarioOptions = [];
 let mapArtifacts = [];
 let scenarioRecipes = [];
+let speciesCatalog = [];
 let appliedRecipes = [];
 let recipeBaseScenario = null;
 let recipeDiffCheckpoint = null;
@@ -116,6 +126,110 @@ async function loadMapArtifacts(selectedPath = mapArtifactSelect?.value || "") {
   renderMapArtifactOptions(selectedPath);
   renderMapArtifactDetails();
   updateBiomePaintControls();
+}
+
+async function loadSpeciesCatalog(selectedPath = speciesCatalogSelect?.value || "") {
+  const response = await fetch("/api/species-catalog");
+  speciesCatalog = response.ok ? await response.json() : [];
+  renderSpeciesCatalogOptions(selectedPath);
+  renderSpeciesCatalogDetails();
+}
+
+function renderSpeciesCatalogOptions(selectedPath = "") {
+  if (!speciesCatalogSelect) {
+    return;
+  }
+
+  speciesCatalogSelect.innerHTML = "";
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = speciesCatalog.length > 0 ? "Choose species profile" : "No species profiles";
+  speciesCatalogSelect.append(empty);
+
+  for (const species of speciesCatalog) {
+    const option = document.createElement("option");
+    option.value = species.path;
+    option.textContent = `${species.name} (${species.path})`;
+    option.title = [
+      `${species.brainArchitectureKind}, hidden ${species.brainHiddenNodeCount}`,
+      `speed ${formatDecimal(species.maxSpeed)}`,
+      `sense ${formatDecimal(species.senseRadius)}`,
+      species.sourceScenarioName ? `source ${species.sourceScenarioName}` : null
+    ].filter(Boolean).join(" | ");
+    speciesCatalogSelect.append(option);
+  }
+
+  speciesCatalogSelect.value = [...speciesCatalogSelect.options].some((option) => option.value === selectedPath)
+    ? selectedPath
+    : "";
+  updateSpeciesCatalogButtons();
+}
+
+function selectedSpeciesCatalogEntry() {
+  return speciesCatalog.find((candidate) => candidate.path === speciesCatalogSelect?.value) ?? null;
+}
+
+function renderSpeciesCatalogDetails() {
+  if (!speciesCatalogDetails) {
+    return;
+  }
+
+  const species = selectedSpeciesCatalogEntry();
+  updateSpeciesCatalogButtons();
+  if (!species) {
+    speciesCatalogDetails.textContent = "Choose a species profile to inspect it.";
+    return;
+  }
+
+  speciesCatalogDetails.innerHTML = `
+    <div class="species-summary-grid">
+      <div><span>Name</span><strong>${escapeHtml(species.name)}</strong></div>
+      <div><span>Path</span><strong>${escapeHtml(species.path)}</strong></div>
+      <div><span>Brain</span><strong>${escapeHtml(species.brainArchitectureKind)}, hidden ${formatNumber(species.brainHiddenNodeCount)}, ${formatNumber(species.brainWeightCount)} weights</strong></div>
+      <div><span>Body</span><strong>radius ${formatDecimal(species.bodyRadius)}, speed ${formatDecimal(species.maxSpeed)}, sense ${formatDecimal(species.senseRadius)}</strong></div>
+      <div><span>Vision</span><strong>${formatDecimal(species.visionAngleDegrees)} deg</strong></div>
+      <div><span>Energy</span><strong>basal ${formatDecimal(species.basalEnergyPerSecond)}/s, move ${formatDecimal(species.movementEnergyPerSecond)}/s, eat ${formatDecimal(species.eatCaloriesPerSecond)}/s</strong></div>
+      <div><span>Reproduction</span><strong>threshold ${formatDecimal(species.reproductionEnergyThreshold)}, investment ${formatDecimal(species.offspringEnergyInvestment)}</strong></div>
+      <div><span>Source</span><strong>${escapeHtml(formatSpeciesSource(species))}</strong></div>
+    </div>
+    ${species.notes ? `<div class="species-notes">${escapeHtml(species.notes)}</div>` : ""}
+  `;
+}
+
+function updateSpeciesCatalogButtons() {
+  const species = selectedSpeciesCatalogEntry();
+  if (addSpeciesToScenarioButton) {
+    addSpeciesToScenarioButton.disabled = !species || !scenarioEditor;
+  }
+
+  if (deleteSpeciesCatalogButton) {
+    deleteSpeciesCatalogButton.disabled = !species?.canDelete;
+  }
+}
+
+function formatSpeciesSource(species) {
+  const bits = [];
+  if (species.sourceScenarioName) {
+    bits.push(species.sourceScenarioName);
+  }
+
+  if (species.sourceSeed !== null && species.sourceSeed !== undefined) {
+    bits.push(`seed ${formatSeed(species.sourceSeed)}`);
+  }
+
+  if (species.sourceTick !== null && species.sourceTick !== undefined) {
+    bits.push(`tick ${formatNumber(species.sourceTick)}`);
+  }
+
+  if (species.sourceCreatureId) {
+    bits.push(`creature #${formatNumber(species.sourceCreatureId)}`);
+  }
+
+  if (species.sourceGeneration !== null && species.sourceGeneration !== undefined) {
+    bits.push(`gen ${formatNumber(species.sourceGeneration)}`);
+  }
+
+  return bits.join(", ");
 }
 
 function renderMapArtifactOptions(selectedPath = "") {
@@ -325,11 +439,13 @@ async function loadScenarioEditor() {
   clearBiomePreview("Loading scenario preview...");
   updateScenarioResetButtons();
   updateScenarioManagementButtons();
+  updateSpeciesCatalogButtons();
 
   if (!scenarioSelect.value) {
     scenarioOptionsStatus.textContent = "No scenario selected.";
     clearBiomePreview("Choose a scenario to preview its biome layout.");
     updateScenarioManagementButtons();
+    updateSpeciesCatalogButtons();
     return;
   }
 
@@ -339,6 +455,7 @@ async function loadScenarioEditor() {
     scenarioOptionsStatus.textContent = problem.error || "Scenario options unavailable.";
     clearBiomePreview(problem.error || "Biome preview unavailable.");
     updateScenarioManagementButtons();
+    updateSpeciesCatalogButtons();
     return;
   }
 
@@ -926,6 +1043,7 @@ function loadScenarioEditorDefinition(editor) {
   renderScenarioEditor();
   renderRecipeStack();
   updateScenarioManagementButtons();
+  updateSpeciesCatalogButtons();
   scheduleBiomePreview();
 }
 
@@ -2154,6 +2272,197 @@ function readScenarioControlValue(control, field) {
   return control.value;
 }
 
+function addSelectedSpeciesToScenario() {
+  if (!scenarioEditor) {
+    formMessage.textContent = "Choose a scenario before adding a species profile.";
+    return;
+  }
+
+  const species = selectedSpeciesCatalogEntry();
+  if (!species) {
+    formMessage.textContent = "Choose a species profile first.";
+    return;
+  }
+
+  let count = Number(speciesSeedCountInput?.value || 0);
+  if (!Number.isFinite(count) || count <= 0) {
+    count = 10;
+  }
+
+  const energyRaw = speciesSeedEnergyInput?.value.trim() || "";
+  const energyOverride = energyRaw === "" ? null : Number(energyRaw);
+  if (energyRaw !== "" && (!Number.isFinite(energyOverride) || energyOverride <= 0)) {
+    formMessage.textContent = "Energy override must be blank or a positive number.";
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    formMessage.textContent = error.message;
+    return;
+  }
+
+  const roster = Array.isArray(scenarioEditor.scenario.speciesSeeds)
+    ? cloneJson(scenarioEditor.scenario.speciesSeeds)
+    : [];
+  const brainOverrideKind = selectedSpeciesBrainOverrideKind();
+  roster.push({
+    profilePath: species.path,
+    count: Math.round(count),
+    spawnRegion: speciesSeedRegionSelect?.value || "uniform",
+    energyOverride,
+    brainOverrideKind,
+    enabled: true
+  });
+  scenarioEditor.scenario.speciesSeeds = roster;
+
+  renderScenarioEditor();
+  updateScenarioManagementButtons();
+  formMessage.textContent = `Added ${species.name} to the scenario species roster with ${formatSpeciesBrainChoice(brainOverrideKind)}. Save the scenario or start a run to use it.`;
+}
+
+function selectedSpeciesBrainOverrideKind() {
+  const value = speciesSeedBrainSelect?.value || "";
+  if (!value) {
+    return null;
+  }
+
+  if (value === "scenario") {
+    return scenarioEditor?.scenario?.initialBrainKind || "sectorForager";
+  }
+
+  return value;
+}
+
+function formatSpeciesBrainChoice(brainOverrideKind) {
+  return brainOverrideKind ? `${formatEnumLabel(brainOverrideKind)} brain` : "the profile brain";
+}
+
+async function deleteSelectedSpeciesCatalogEntry() {
+  const species = selectedSpeciesCatalogEntry();
+  if (!species?.canDelete) {
+    refreshStatus.textContent = "Built-in species profiles are protected.";
+    return;
+  }
+
+  if (!confirm(`Archive species profile "${species.name}"?`)) {
+    return;
+  }
+
+  deleteSpeciesCatalogButton.disabled = true;
+  refreshStatus.textContent = "Archiving species profile";
+  const response = await fetch("/api/species-catalog/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: species.path })
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Species profile delete failed." }));
+    refreshStatus.textContent = problem.error || "Species profile delete failed.";
+    renderSpeciesCatalogDetails();
+    return;
+  }
+
+  const result = await response.json();
+  await loadSpeciesCatalog();
+  refreshStatus.textContent = `Archived species profile to ${result.archivedPath}.`;
+}
+
+async function saveSpeciesFromRun(id) {
+  const run = allRuns.find((candidate) => candidate.id === id);
+  const defaultName = `${run?.scenarioName || "Run"} survivor`;
+  const name = prompt("Species profile name", defaultName);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    refreshStatus.textContent = "Species profile name is required.";
+    return;
+  }
+
+  const selector = prompt(
+    "Optional selector: creature 123, founder 123, or cluster key. Leave blank for the dominant living lineage.",
+    "");
+  if (selector === null) {
+    return;
+  }
+
+  const notes = prompt("Species notes", `Saved from run ${run?.name || id}.`);
+  if (notes === null) {
+    return;
+  }
+
+  let payload;
+  try {
+    payload = buildSpeciesExportPayload(trimmedName, notes, selector);
+  } catch (error) {
+    refreshStatus.textContent = error.message;
+    return;
+  }
+
+  refreshStatus.textContent = "Saving species profile";
+  const response = await fetch(`/api/runs/${encodeURIComponent(id)}/species-exports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Species export failed." }));
+    refreshStatus.textContent = problem.error || "Species export failed.";
+    return;
+  }
+
+  const result = await response.json();
+  await loadSpeciesCatalog(result.species.path);
+  refreshStatus.textContent = `Saved species profile ${result.species.name}.`;
+  document.querySelector(".species-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function buildSpeciesExportPayload(name, notes, selectorText) {
+  const payload = { name, notes: notes.trim() };
+  const selector = selectorText.trim();
+  if (!selector) {
+    return payload;
+  }
+
+  const match = selector.match(/^(creature|founder|cluster)\s*[:# ]\s*(.+)$/i);
+  if (match) {
+    const kind = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (kind === "cluster") {
+      payload.clusterKey = value;
+      return payload;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error(`${kind} selector must use a positive numeric id.`);
+    }
+
+    if (kind === "founder") {
+      payload.founderId = parsed;
+    } else {
+      payload.creatureId = parsed;
+    }
+
+    return payload;
+  }
+
+  const numeric = Number(selector);
+  if (Number.isInteger(numeric) && numeric > 0) {
+    payload.creatureId = numeric;
+    return payload;
+  }
+
+  payload.clusterKey = selector;
+  return payload;
+}
+
 async function loadRuns() {
   refreshStatus.textContent = "Refreshing";
   const response = await fetch("/api/runs");
@@ -2258,6 +2567,7 @@ function renderRuns() {
           <button class="secondary" data-action="continue" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Continue</button>
           <button class="secondary" data-action="details" data-id="${escapeHtml(run.id)}">${isExpanded ? "Hide" : "Details"}</button>
           <button class="secondary" data-action="rename" data-id="${escapeHtml(run.id)}">Rename</button>
+          <button class="secondary" data-action="save-species" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Save Species</button>
           <button class="secondary" data-action="checkpoint" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint</button>
           <button class="secondary" data-action="checkpoint-stop" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint + Stop</button>
           <button class="secondary" data-action="stop" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Stop</button>
@@ -2560,6 +2870,11 @@ runsBody.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "save-species") {
+    await saveSpeciesFromRun(id);
+    return;
+  }
+
   if (action === "clone") {
     await cloneRunSettings(id);
     return;
@@ -2767,6 +3082,11 @@ recipeStack.addEventListener("click", (event) => {
 
   updateRecipeStack(button.dataset.recipeAction, Number(button.dataset.index));
 });
+
+speciesCatalogSelect.addEventListener("change", renderSpeciesCatalogDetails);
+refreshSpeciesCatalogButton.addEventListener("click", () => loadSpeciesCatalog());
+deleteSpeciesCatalogButton.addEventListener("click", deleteSelectedSpeciesCatalogEntry);
+addSpeciesToScenarioButton.addEventListener("click", addSelectedSpeciesToScenario);
 
 scenarioTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-group]");
@@ -3163,6 +3483,13 @@ function formatDecimal(value) {
   return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
+function formatEnumLabel(value) {
+  return String(value ?? "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function formatPercent(value) {
   return `${(Number(value || 0) * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 }
@@ -3191,6 +3518,7 @@ function escapeHtml(value) {
 async function boot() {
   setBiomePreviewCollapsed(readBiomePreviewCollapsed(), false);
   await loadMapArtifacts();
+  await loadSpeciesCatalog();
   await loadScenarioRecipes();
   await loadScenarios();
   await loadRuns();

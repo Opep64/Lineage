@@ -14,11 +14,28 @@ public static class SpeciesProfileInjector
         options = options.Validated(profile);
 
         var genomeId = state.AddGenome(profile.Genome);
-        var brainId = state.AddBrain(profile.CreateBrain(), profile.BrainArchitectureKind);
+        var sharedBrainId = CreateSharedBrainId(state, profile, options);
+        var randomBrain = options.BrainOverrideKind == InitialBrainKind.RandomPerFounder
+            ? state.Random.Fork()
+            : null;
         var creatureIds = new EntityId[options.Count];
+        var reportedBrainId = sharedBrainId;
 
         for (var i = 0; i < options.Count; i++)
         {
+            var brainId = options.BrainOverrideKind == InitialBrainKind.RandomPerFounder
+                ? state.AddBrain(
+                    BrainFactory.CreateRandom(
+                        options.BrainArchitectureKind,
+                        randomBrain ?? throw new InvalidOperationException("Random brain source was not created."),
+                        hiddenNodeCount: options.BrainHiddenNodeCount),
+                    options.BrainArchitectureKind)
+                : sharedBrainId;
+            if (reportedBrainId < 0)
+            {
+                reportedBrainId = brainId;
+            }
+
             creatureIds[i] = state.SpawnCreature(
                 genomeId,
                 RandomCreaturePosition(state, options.SpawnRegion, profile.Genome.BodyRadius),
@@ -29,7 +46,30 @@ public static class SpeciesProfileInjector
                 brainId: brainId);
         }
 
-        return new SpeciesInjectionResult(profile.Name, genomeId, brainId, creatureIds);
+        return new SpeciesInjectionResult(profile.Name, genomeId, reportedBrainId, creatureIds);
+    }
+
+    private static int CreateSharedBrainId(
+        WorldState state,
+        SpeciesProfile profile,
+        SpeciesInjectionOptions options)
+    {
+        if (options.BrainOverrideKind is null)
+        {
+            return state.AddBrain(profile.CreateBrain(), profile.BrainArchitectureKind);
+        }
+
+        if (options.BrainOverrideKind == InitialBrainKind.RandomPerFounder)
+        {
+            return -1;
+        }
+
+        return state.AddBrain(
+            BrainFactory.CreateStarter(
+                options.BrainArchitectureKind,
+                options.BrainOverrideKind.Value,
+                options.BrainHiddenNodeCount),
+            options.BrainArchitectureKind);
     }
 
     private static SimVector2 RandomCreaturePosition(
@@ -123,7 +163,10 @@ public static class SpeciesProfileInjector
 public readonly record struct SpeciesInjectionOptions(
     int Count,
     InitialCreatureSpawnRegion SpawnRegion = InitialCreatureSpawnRegion.Uniform,
-    float? EnergyOverride = null)
+    float? EnergyOverride = null,
+    InitialBrainKind? BrainOverrideKind = null,
+    BrainArchitectureKind BrainArchitectureKind = BrainArchitectureKind.HybridNeural,
+    int BrainHiddenNodeCount = 0)
 {
     public float Energy { get; private init; }
 
@@ -139,6 +182,16 @@ public readonly record struct SpeciesInjectionOptions(
             throw new InvalidOperationException("Species injection spawn region must be defined.");
         }
 
+        if (BrainOverrideKind is not null && !Enum.IsDefined(BrainOverrideKind.Value))
+        {
+            throw new InvalidOperationException("Species injection brain override kind must be defined.");
+        }
+
+        _ = BrainFactory.Describe(BrainArchitectureKind);
+        var resolvedHiddenNodeCount = BrainFactory.ResolveHiddenNodeCount(
+            BrainArchitectureKind,
+            BrainHiddenNodeCount);
+
         var defaultEnergy = MathF.Max(
             profile.Genome.OffspringEnergyInvestment,
             profile.Genome.ReproductionEnergyThreshold * 0.75f);
@@ -148,7 +201,11 @@ public readonly record struct SpeciesInjectionOptions(
             throw new InvalidOperationException("Species injection energy must be finite and positive.");
         }
 
-        return this with { Energy = energy };
+        return this with
+        {
+            Energy = energy,
+            BrainHiddenNodeCount = resolvedHiddenNodeCount
+        };
     }
 }
 
