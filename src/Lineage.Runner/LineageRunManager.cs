@@ -2331,26 +2331,29 @@ public sealed partial class LineageRunManager
 
     private (string FileName, IReadOnlyList<string> PrefixArguments) ResolveCliLaunchTarget()
     {
-        foreach (var configuration in CliBuildConfigurations())
+        var cliOutputDirectory = Path.Combine(_repoRoot, "src", "Lineage.Cli", "bin", "Release", "net8.0");
+        var executablePath = Path.Combine(
+            cliOutputDirectory,
+            OperatingSystem.IsWindows() ? "Lineage.Cli.exe" : "Lineage.Cli");
+        if (File.Exists(executablePath))
         {
-            var cliOutputDirectory = Path.Combine(_repoRoot, "src", "Lineage.Cli", "bin", configuration, "net8.0");
-            var executablePath = Path.Combine(
-                cliOutputDirectory,
-                OperatingSystem.IsWindows() ? "Lineage.Cli.exe" : "Lineage.Cli");
-            if (File.Exists(executablePath))
-            {
-                return (executablePath, Array.Empty<string>());
-            }
+            return (executablePath, Array.Empty<string>());
+        }
 
-            var dllPath = Path.Combine(cliOutputDirectory, "Lineage.Cli.dll");
-            if (File.Exists(dllPath))
-            {
-                return ("dotnet", [dllPath]);
-            }
+        var dllPath = Path.Combine(cliOutputDirectory, "Lineage.Cli.dll");
+        if (File.Exists(dllPath))
+        {
+            return ("dotnet", [dllPath]);
+        }
+
+        var cliProjectPath = Path.Combine(_repoRoot, "src", "Lineage.Cli", "Lineage.Cli.csproj");
+        if (File.Exists(cliProjectPath))
+        {
+            return ("dotnet", ["run", "-c", "Release", "--project", cliProjectPath, "--"]);
         }
 
         throw new InvalidOperationException(
-            "Could not find a built Lineage.Cli executable under src/Lineage.Cli/bin. Build the solution before launching runs.");
+            "Could not find Lineage.Cli.csproj. Cannot launch a Release CLI run.");
     }
 
     private IReadOnlyList<string> BuildCliArguments(RunManifest manifest)
@@ -2413,31 +2416,6 @@ public sealed partial class LineageRunManager
         }
 
         return args;
-    }
-
-    private static string ResolveBuildConfiguration()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (string.Equals(directory.Name, "Debug", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(directory.Name, "Release", StringComparison.OrdinalIgnoreCase))
-            {
-                return directory.Name;
-            }
-
-            directory = directory.Parent;
-        }
-
-        return "Debug";
-    }
-
-    private static IReadOnlyList<string> CliBuildConfigurations()
-    {
-        var current = ResolveBuildConfiguration();
-        return string.Equals(current, "Release", StringComparison.OrdinalIgnoreCase)
-            ? ["Release", "Debug"]
-            : [current, "Release"];
     }
 
     private static string FormatCommandLine(string fileName, IEnumerable<string> arguments)

@@ -880,7 +880,7 @@ public partial class Main : Node2D
         _scenario = scenario;
         _currentSeed = scenario.Seed;
         _scenarioEditor.SetScenario(_scenario);
-        _scenarioEditor.SetStatus("CLI running...");
+        _scenarioEditor.SetStatus("CLI running (Release)...");
         _scenarioEditor.SetLastReportPath(null);
         _scenarioEditor.SetLastSnapshotPath(null);
         _scenarioEditor.SetLastCheckpointPath(null, request.CheckpointIntervalTicks > 0 ? checkpointDirectory : null);
@@ -992,6 +992,8 @@ public partial class Main : Node2D
             };
 
             startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add("Release");
             startInfo.ArgumentList.Add("--project");
             startInfo.ArgumentList.Add(cliProjectPath);
             startInfo.ArgumentList.Add("--");
