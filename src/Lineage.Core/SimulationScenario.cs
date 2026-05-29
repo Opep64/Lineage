@@ -71,6 +71,8 @@ public sealed record SimulationScenario
 
     public float PlantPayoffTraceHalfLifeSeconds { get; init; } = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds;
 
+    public int SensingThreadCount { get; init; } = CreatureSensingSystem.DefaultSensingThreadCount;
+
     public bool EnableSectorVision { get; init; } = true;
 
     public bool EnableLegacyNearestFoodVisionInputs { get; init; } = true;
@@ -394,6 +396,7 @@ public sealed record SimulationScenario
         EnsureRange(CloseSenseRefreshProximity, 0f, 1f, nameof(CloseSenseRefreshProximity));
         EnsurePositive(CloseSenseRefreshMinimumTicks, nameof(CloseSenseRefreshMinimumTicks));
         EnsurePositive(PlantPayoffTraceHalfLifeSeconds, nameof(PlantPayoffTraceHalfLifeSeconds));
+        EnsurePositive(SensingThreadCount, nameof(SensingThreadCount));
         EnsurePositive(NeuralControllerThreadCount, nameof(NeuralControllerThreadCount));
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsurePositive(ExtinctPayloadPruneIntervalTicks, nameof(ExtinctPayloadPruneIntervalTicks));

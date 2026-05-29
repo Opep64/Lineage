@@ -99,6 +99,7 @@ static void PrintHelp()
           --status-detail-interval <n> Recompute heavier status metrics every n ticks. Default: 1000
           --stop-on-extinction       Stop early when no creatures and no eggs remain alive.
           --close-sense-refresh-minimum-ticks <n> Minimum stale-world-sense age before proximity close refreshes.
+          --sensing-threads <n>      Worker threads for creature sensing. Default: scenario value.
           --reuse-neural-actions-on-skipped-world-senses Reuse prior neural outputs when world senses are stale.
           --no-reuse-neural-actions-on-skipped-world-senses Disable stale-world-sense neural action reuse.
           --neural-controller-threads <n> Worker threads for neural controller evaluation. Default: scenario value.
@@ -963,6 +964,8 @@ internal sealed record RunOptions
 
     public int? CloseSenseRefreshMinimumTicksOverride { get; init; }
 
+    public int? SensingThreadCountOverride { get; init; }
+
     public bool? ReuseNeuralActionsOnSkippedWorldSensesOverride { get; init; }
 
     public int? NeuralControllerThreadCountOverride { get; init; }
@@ -1088,6 +1091,8 @@ internal sealed record RunOptions
             StatsSnapshotIntervalTicks = SnapshotIntervalTicksOverride ?? scenario.StatsSnapshotIntervalTicks,
             CloseSenseRefreshMinimumTicks = CloseSenseRefreshMinimumTicksOverride
                 ?? scenario.CloseSenseRefreshMinimumTicks,
+            SensingThreadCount = SensingThreadCountOverride
+                ?? scenario.SensingThreadCount,
             ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
                 ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
             NeuralControllerThreadCount = NeuralControllerThreadCountOverride
@@ -1125,6 +1130,8 @@ internal sealed record RunOptions
         {
             CloseSenseRefreshMinimumTicks = CloseSenseRefreshMinimumTicksOverride
                 ?? scenario.CloseSenseRefreshMinimumTicks,
+            SensingThreadCount = SensingThreadCountOverride
+                ?? scenario.SensingThreadCount,
             ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
                 ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
             NeuralControllerThreadCount = NeuralControllerThreadCountOverride
@@ -1338,6 +1345,9 @@ internal sealed record RunOptions
                     break;
                 case "--close-sense-refresh-minimum-ticks":
                     options = options with { CloseSenseRefreshMinimumTicksOverride = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--sensing-threads":
+                    options = options with { SensingThreadCountOverride = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--reuse-neural-actions-on-skipped-world-senses":
                     options = options with { ReuseNeuralActionsOnSkippedWorldSensesOverride = true };

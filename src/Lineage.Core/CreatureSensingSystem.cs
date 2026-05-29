@@ -25,6 +25,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     public const int DefaultCloseSenseRefreshMinimumTicks = 1;
     public const bool DefaultEnableSectorVision = false;
     public const float DefaultPlantPayoffTraceHalfLifeSeconds = 45f;
+    public const int DefaultSensingThreadCount = 4;
     private static readonly float MaximumHabitatDensityMultiplier =
         BiomeKinds.All.Max(BiomeMap.GetResourceDensityMultiplier);
     private static readonly float MaximumHabitatRegrowthMultiplier =
@@ -43,14 +44,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly int _closeSenseRefreshMinimumTicks;
     private readonly bool _enableSectorVision;
     private readonly float _plantPayoffTraceHalfLifeSeconds;
+    private readonly ParallelOptions _parallelOptions;
 
-    private readonly List<int> _plantResourceCandidates = [];
-    private readonly IndexStampSet _seenPlantResourceCandidates = new();
-    private readonly List<int> _meatResourceCandidates = [];
-    private readonly IndexStampSet _seenMeatResourceCandidates = new();
-    private readonly List<int> _eggCandidates = [];
-    private readonly IndexStampSet _seenEggCandidates = new();
-    private readonly List<int> _creatureCandidates = [];
+    private readonly CreatureSensingScratch _sequentialScratch = new();
+    private readonly ThreadLocal<CreatureSensingScratch> _parallelScratch = new(() => new CreatureSensingScratch());
+    private CreatureState[] _parallelCreatureBuffer = [];
     private float[] _cachedBodyRadii = [];
     private float[] _cachedMaxSpeeds = [];
     private int[] _cachedTraitStamps = [];
@@ -67,7 +65,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float closeSenseRefreshProximity = DefaultCloseSenseRefreshProximity,
         int closeSenseRefreshMinimumTicks = DefaultCloseSenseRefreshMinimumTicks,
         bool enableSectorVision = DefaultEnableSectorVision,
-        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds)
+        float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds,
+        int sensingThreadCount = DefaultSensingThreadCount)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -104,6 +103,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             throw new ArgumentOutOfRangeException(nameof(plantPayoffTraceHalfLifeSeconds), "Plant payoff trace half-life must be finite and positive.");
         }
 
+        if (sensingThreadCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sensingThreadCount), "Sensing thread count must be positive.");
+        }
+
         _spatialIndex = spatialIndex;
         _biomeSpeedProfile = BiomePressureProfile.Validate(
             biomeSpeedProfile ?? BiomePressureProfile.Neutral,
@@ -121,6 +125,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _closeSenseRefreshMinimumTicks = closeSenseRefreshMinimumTicks;
         _enableSectorVision = enableSectorVision;
         _plantPayoffTraceHalfLifeSeconds = plantPayoffTraceHalfLifeSeconds;
+        _parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = sensingThreadCount };
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -129,504 +134,537 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var traitCacheStartedAt = sensingProfile is not null
             ? Stopwatch.GetTimestamp()
             : 0L;
-        BeginTraitCache(state);
-        sensingProfile?.RecordTraitCache(
-            state.Creatures.Count,
-            Stopwatch.GetTimestamp() - traitCacheStartedAt);
-        sensingProfile?.BeginUpdate(state.Creatures.Count);
-
-        for (var i = 0; i < state.Creatures.Count; i++)
+        var creatureCount = state.Creatures.Count;
+        var useParallel = _parallelOptions.MaxDegreeOfParallelism > 1 && creatureCount > 1;
+        BeginTraitCache(state, precomputeTraits: useParallel);
+        if (!useParallel)
         {
-            var creatureSetupStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            var creature = state.Creatures[i];
-            var genome = state.GetGenome(creature.GenomeId);
-            var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
-            var effectiveVisionRadius = MathF.Max(
-                0.001f,
-                effectiveSenseRadius * _biomeVisionRangeProfile.For(state.Biomes.GetKindAt(creature.Position)));
-            var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
-            var forward = SimVector2.FromAngle(creature.HeadingRadians);
-            var right = new SimVector2(-forward.Y, forward.X);
-            var hasLimitedVision = effectiveVisionAngle < MathF.Tau;
-            var visionCosThreshold = hasLimitedVision
-                ? MathF.Cos(effectiveVisionAngle * 0.5f)
-                : -1f;
-            var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
-            var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
-            var creatureSimilarityScentRadius = effectiveSenseRadius * CreatureSimilarityScentRangeMultiplier;
-            sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
+            sensingProfile?.RecordTraitCache(
+                creatureCount,
+                Stopwatch.GetTimestamp() - traitCacheStartedAt);
+            sensingProfile?.BeginUpdate(creatureCount);
 
-            var worldSenseRefreshReason = GetWorldSenseRefreshReason(state, creature);
-            sensingProfile?.RecordWorldSenseRefresh(worldSenseRefreshReason);
-            var shouldRefreshWorldSense = worldSenseRefreshReason != WorldSenseRefreshReason.Skipped;
-            var senses = shouldRefreshWorldSense
-                ? new CreatureSenseState()
-                : creature.Senses;
-            SetWorldSenseFreshness(ref senses, state.Tick, shouldRefreshWorldSense);
-            var internalStateStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            ApplyInternalSense(ref senses, ref creature, genome, deltaSeconds, _plantPayoffTraceHalfLifeSeconds);
-            sensingProfile?.RecordInternalState(Stopwatch.GetTimestamp() - internalStateStartedAt);
-
-            senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
-            senses.FoodContact = creature.IsTouchingFood ? 1f : 0f;
-            senses.PlantFoodContact = creature.IsTouchingFood
-                && creature.FoodContactKind == FoodContactKind.Resource
-                && creature.FoodContactResourceKind == ResourceKind.Plant
-                    ? 1f
-                    : 0f;
-            senses.PlantFoodContactEnergyQuality = senses.PlantFoodContact > 0f
-                ? PlantResourceTraits.EnergyQualitySense(creature.FoodContactPlantKind)
-                : 0f;
-            senses.PlantFoodContactBiteEase = senses.PlantFoodContact > 0f
-                ? PlantResourceTraits.BiteEaseSense(creature.FoodContactPlantKind)
-                : 0f;
-            senses.MeatFoodContact = creature.IsTouchingFood
-                && creature.FoodContactKind == FoodContactKind.Resource
-                && creature.FoodContactResourceKind == ResourceKind.Meat
-                    ? 1f
-                    : 0f;
-            senses.EggFoodContact = creature.IsTouchingFood && creature.FoodContactKind == FoodContactKind.Egg
-                ? 1f
-                : 0f;
-            senses.CreatureContact = creature.IsTouchingCreature ? 1f : 0f;
-            if (!creature.IsTouchingCreature)
+            for (var i = 0; i < creatureCount; i++)
             {
-                senses.CreatureContactSimilarity = 0f;
+                state.Creatures[i] = SenseCreature(state, i, deltaSeconds, _sequentialScratch, sensingProfile);
             }
 
-            var memorySenseStartedAt = sensingProfile is not null
+            return;
+        }
+
+        EnsureParallelCreatureBufferCapacity(creatureCount);
+        Parallel.For(
+            0,
+            creatureCount,
+            _parallelOptions,
+            creatureIndex =>
+            {
+                var scratch = _parallelScratch.Value ?? throw new InvalidOperationException("Parallel sensing scratch was not initialized.");
+                _parallelCreatureBuffer[creatureIndex] = SenseCreature(state, creatureIndex, deltaSeconds, scratch, sensingProfile: null);
+            });
+
+        for (var i = 0; i < creatureCount; i++)
+        {
+            state.Creatures[i] = _parallelCreatureBuffer[i];
+        }
+    }
+
+    private CreatureState SenseCreature(
+        WorldState state,
+        int creatureIndex,
+        float deltaSeconds,
+        CreatureSensingScratch scratch,
+        SimulationSensingProfile? sensingProfile)
+    {
+        var creatureSetupStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        var creature = state.Creatures[creatureIndex];
+        var genome = state.GetGenome(creature.GenomeId);
+        var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
+        var effectiveVisionRadius = MathF.Max(
+            0.001f,
+            effectiveSenseRadius * _biomeVisionRangeProfile.For(state.Biomes.GetKindAt(creature.Position)));
+        var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
+        var forward = SimVector2.FromAngle(creature.HeadingRadians);
+        var right = new SimVector2(-forward.Y, forward.X);
+        var hasLimitedVision = effectiveVisionAngle < MathF.Tau;
+        var visionCosThreshold = hasLimitedVision
+            ? MathF.Cos(effectiveVisionAngle * 0.5f)
+            : -1f;
+        var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
+        var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
+        var creatureSimilarityScentRadius = effectiveSenseRadius * CreatureSimilarityScentRangeMultiplier;
+        sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
+
+        var worldSenseRefreshReason = GetWorldSenseRefreshReason(state, creature);
+        sensingProfile?.RecordWorldSenseRefresh(worldSenseRefreshReason);
+        var shouldRefreshWorldSense = worldSenseRefreshReason != WorldSenseRefreshReason.Skipped;
+        var senses = shouldRefreshWorldSense
+            ? new CreatureSenseState()
+            : creature.Senses;
+        SetWorldSenseFreshness(ref senses, state.Tick, shouldRefreshWorldSense);
+        var internalStateStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        ApplyInternalSense(ref senses, ref creature, genome, deltaSeconds, _plantPayoffTraceHalfLifeSeconds);
+        sensingProfile?.RecordInternalState(Stopwatch.GetTimestamp() - internalStateStartedAt);
+
+        senses.MovementBlocked = creature.LastMovementBlocked ? 1f : 0f;
+        senses.FoodContact = creature.IsTouchingFood ? 1f : 0f;
+        senses.PlantFoodContact = creature.IsTouchingFood
+            && creature.FoodContactKind == FoodContactKind.Resource
+            && creature.FoodContactResourceKind == ResourceKind.Plant
+                ? 1f
+                : 0f;
+        senses.PlantFoodContactEnergyQuality = senses.PlantFoodContact > 0f
+            ? PlantResourceTraits.EnergyQualitySense(creature.FoodContactPlantKind)
+            : 0f;
+        senses.PlantFoodContactBiteEase = senses.PlantFoodContact > 0f
+            ? PlantResourceTraits.BiteEaseSense(creature.FoodContactPlantKind)
+            : 0f;
+        senses.MeatFoodContact = creature.IsTouchingFood
+            && creature.FoodContactKind == FoodContactKind.Resource
+            && creature.FoodContactResourceKind == ResourceKind.Meat
+                ? 1f
+                : 0f;
+        senses.EggFoodContact = creature.IsTouchingFood && creature.FoodContactKind == FoodContactKind.Egg
+            ? 1f
+            : 0f;
+        senses.CreatureContact = creature.IsTouchingCreature ? 1f : 0f;
+        if (!creature.IsTouchingCreature)
+        {
+            senses.CreatureContactSimilarity = 0f;
+        }
+
+        var memorySenseStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        ApplyMemorySense(ref senses, creature, forward, right);
+        sensingProfile?.RecordMemorySense(Stopwatch.GetTimestamp() - memorySenseStartedAt);
+
+        if (!shouldRefreshWorldSense)
+        {
+            var skippedFinalizationStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
-            ApplyMemorySense(ref senses, creature, forward, right);
-            sensingProfile?.RecordMemorySense(Stopwatch.GetTimestamp() - memorySenseStartedAt);
+            ApplyPlantPreferenceBridge(ref senses);
+            creature.Senses = senses;
+            sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - skippedFinalizationStartedAt);
+            return creature;
+        }
 
-            if (!shouldRefreshWorldSense)
+        var resourceQueryStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        _spatialIndex.AddPlantAndMeatResourceCandidatesWithCalories(
+            state,
+            creature.Position,
+            effectiveVisionRadius,
+            meatScentRadius,
+            0f,
+            scratch.PlantResourceCandidates,
+            scratch.SeenPlantResourceCandidates,
+            scratch.MeatResourceCandidates,
+            scratch.SeenMeatResourceCandidates);
+        sensingProfile?.RecordSplitResourceQuery(
+            scratch.PlantResourceCandidates.Count,
+            scratch.MeatResourceCandidates.Count,
+            Stopwatch.GetTimestamp() - resourceQueryStartedAt);
+
+        var eggQueryStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        _spatialIndex.AddEggCandidatesWithEnergy(
+            state,
+            creature.Position,
+            effectiveVisionRadius,
+            minimumEnergy: 0f,
+            scratch.EggCandidates,
+            scratch.SeenEggCandidates);
+        sensingProfile?.RecordEggQuery(
+            scratch.EggCandidates.Count,
+            Stopwatch.GetTimestamp() - eggQueryStartedAt);
+
+        var visionSectors = default(VisionSectorSet);
+        var creatureVisibilityStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        var creatureVisibility = _spatialIndex.FindNearestVisibleCreature(
+            state,
+            creatureIndex,
+            creature.Id,
+            creature.Position,
+            effectiveVisionRadius + 12f,
+            effectiveVisionRadius,
+            forward,
+            hasLimitedVision,
+            visionCosThreshold,
+            effectiveVisionAngle,
+            _cachedBodyRadii,
+            _cachedMaxSpeeds,
+            _enableSectorVision,
+            ref visionSectors);
+        sensingProfile?.RecordCreatureQuery(
+            creatureVisibility,
+            Stopwatch.GetTimestamp() - creatureVisibilityStartedAt);
+        sensingProfile?.RecordCreatureScan(
+            creatureVisibility.VisibleCount,
+            0L);
+        var creatureTraits = GetCreatureTraits(state, creatureIndex);
+        var creatureSimilaritySense = CalculateCreatureSimilaritySense(
+            state,
+            creatureIndex,
+            creature,
+            creatureTraits,
+            forward,
+            creatureSimilarityScentRadius,
+            scratch.CreatureCandidates);
+
+        var terrainSenseStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        ApplyTerrainDragSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
+        sensingProfile?.RecordTerrainSense(Stopwatch.GetTimestamp() - terrainSenseStartedAt);
+
+        var obstacleSenseStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        ApplyObstacleSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
+        sensingProfile?.RecordObstacleSense(Stopwatch.GetTimestamp() - obstacleSenseStartedAt);
+
+        var visibleFoodCount = 0;
+        var visiblePlantCount = 0;
+        var visibleMeatCount = 0;
+        var visibleCreatureCount = creatureVisibility.VisibleCount;
+        var totalMeatScentStrength = 0f;
+        var meatScentVector = SimVector2.Zero;
+        var totalRottenMeatScentStrength = 0f;
+        var rottenMeatScentVector = SimVector2.Zero;
+        var bestVisibleFoodKind = FoodContactKind.None;
+        var bestVisibleFoodIndex = -1;
+        var bestVisibleFoodScore = float.NegativeInfinity;
+        var bestVisibleFoodDistanceSquared = float.PositiveInfinity;
+        var nearestVisiblePlantIndex = -1;
+        var nearestVisiblePlantDistanceSquared = float.PositiveInfinity;
+        var nearestVisibleMeatKind = FoodContactKind.None;
+        var nearestVisibleMeatIndex = -1;
+        var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
+        var nearestVisibleMeatFreshness = 0f;
+        var nearestVisibleCreatureIndex = creatureVisibility.NearestIndex;
+        var visiblePlantQualityWeight = 0f;
+        var visiblePlantEnergyQualityTotal = 0f;
+        var visiblePlantBiteEaseTotal = 0f;
+
+        var resourceScanStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        var plantCandidates = 0;
+        var meatResourceCandidates = 0;
+        var visiblePlantCandidates = 0;
+        var visibleMeatResourceCandidates = 0;
+
+        foreach (var resourceIndex in scratch.PlantResourceCandidates)
+        {
+            var resource = state.Resources[resourceIndex];
+            plantCandidates++;
+            var toResource = resource.Position - creature.Position;
+            var distanceSquared = toResource.LengthSquared;
+
+            if (!IsWithinEdgeRange(distanceSquared, resource.Radius, effectiveVisionRadius)
+                || !IsInsideVisionCone(toResource, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
             {
-                var skippedFinalizationStartedAt = sensingProfile is not null
-                    ? Stopwatch.GetTimestamp()
-                    : 0L;
-                ApplyPlantPreferenceBridge(ref senses);
-                creature.Senses = senses;
-                state.Creatures[i] = creature;
-                sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - skippedFinalizationStartedAt);
                 continue;
             }
 
-            var resourceQueryStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            _spatialIndex.AddPlantAndMeatResourceCandidatesWithCalories(
-                state,
-                creature.Position,
-                effectiveVisionRadius,
-                meatScentRadius,
-                0f,
-                _plantResourceCandidates,
-                _seenPlantResourceCandidates,
-                _meatResourceCandidates,
-                _seenMeatResourceCandidates);
-            sensingProfile?.RecordSplitResourceQuery(
-                _plantResourceCandidates.Count,
-                _meatResourceCandidates.Count,
-                Stopwatch.GetTimestamp() - resourceQueryStartedAt);
+            var centerDistance = MathF.Sqrt(distanceSquared);
+            var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
 
-            var eggQueryStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            _spatialIndex.AddEggCandidatesWithEnergy(
-                state,
-                creature.Position,
-                effectiveVisionRadius,
-                minimumEnergy: 0f,
-                _eggCandidates,
-                _seenEggCandidates);
-            sensingProfile?.RecordEggQuery(
-                _eggCandidates.Count,
-                Stopwatch.GetTimestamp() - eggQueryStartedAt);
+            visibleFoodCount++;
+            visiblePlantCount++;
+            visiblePlantCandidates++;
 
-            var visionSectors = default(VisionSectorSet);
-            var creatureVisibilityStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            var creatureVisibility = _spatialIndex.FindNearestVisibleCreature(
-                state,
-                i,
-                creature.Id,
-                creature.Position,
-                effectiveVisionRadius + 12f,
-                effectiveVisionRadius,
-                forward,
-                hasLimitedVision,
-                visionCosThreshold,
-                effectiveVisionAngle,
-                _cachedBodyRadii,
-                _cachedMaxSpeeds,
-                _enableSectorVision,
-                ref visionSectors);
-            sensingProfile?.RecordCreatureQuery(
-                creatureVisibility,
-                Stopwatch.GetTimestamp() - creatureVisibilityStartedAt);
-            sensingProfile?.RecordCreatureScan(
-                creatureVisibility.VisibleCount,
-                0L);
-            var creatureTraits = GetCreatureTraits(state, i);
-            var creatureSimilaritySense = CalculateCreatureSimilaritySense(
-                state,
-                i,
-                creature,
-                creatureTraits,
-                forward,
-                creatureSimilarityScentRadius);
-
-            var terrainSenseStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            ApplyTerrainDragSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
-            sensingProfile?.RecordTerrainSense(Stopwatch.GetTimestamp() - terrainSenseStartedAt);
-
-            var obstacleSenseStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            ApplyObstacleSense(ref senses, state, creature, genome, forward, right, effectiveSenseRadius);
-            sensingProfile?.RecordObstacleSense(Stopwatch.GetTimestamp() - obstacleSenseStartedAt);
-
-            var visibleFoodCount = 0;
-            var visiblePlantCount = 0;
-            var visibleMeatCount = 0;
-            var visibleCreatureCount = creatureVisibility.VisibleCount;
-            var totalMeatScentStrength = 0f;
-            var meatScentVector = SimVector2.Zero;
-            var totalRottenMeatScentStrength = 0f;
-            var rottenMeatScentVector = SimVector2.Zero;
-            var bestVisibleFoodKind = FoodContactKind.None;
-            var bestVisibleFoodIndex = -1;
-            var bestVisibleFoodScore = float.NegativeInfinity;
-            var bestVisibleFoodDistanceSquared = float.PositiveInfinity;
-            var nearestVisiblePlantIndex = -1;
-            var nearestVisiblePlantDistanceSquared = float.PositiveInfinity;
-            var nearestVisibleMeatKind = FoodContactKind.None;
-            var nearestVisibleMeatIndex = -1;
-            var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
-            var nearestVisibleMeatFreshness = 0f;
-            var nearestVisibleCreatureIndex = creatureVisibility.NearestIndex;
-            var visiblePlantQualityWeight = 0f;
-            var visiblePlantEnergyQualityTotal = 0f;
-            var visiblePlantBiteEaseTotal = 0f;
-
-            var resourceScanStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            var plantCandidates = 0;
-            var meatResourceCandidates = 0;
-            var visiblePlantCandidates = 0;
-            var visibleMeatResourceCandidates = 0;
-
-            foreach (var resourceIndex in _plantResourceCandidates)
+            if (distanceSquared < nearestVisiblePlantDistanceSquared)
             {
-                var resource = state.Resources[resourceIndex];
-                plantCandidates++;
-                var toResource = resource.Position - creature.Position;
-                var distanceSquared = toResource.LengthSquared;
-
-                if (!IsWithinEdgeRange(distanceSquared, resource.Radius, effectiveVisionRadius)
-                    || !IsInsideVisionCone(toResource, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
-                {
-                    continue;
-                }
-
-                var centerDistance = MathF.Sqrt(distanceSquared);
-                var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
-
-                visibleFoodCount++;
-                visiblePlantCount++;
-                visiblePlantCandidates++;
-
-                if (distanceSquared < nearestVisiblePlantDistanceSquared)
-                {
-                    nearestVisiblePlantDistanceSquared = distanceSquared;
-                    nearestVisiblePlantIndex = resourceIndex;
-                }
-
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
-                var qualityClarity = PlantQualityClarity(proximity);
-                var qualityWeight = qualityClarity >= MinimumPlantQualityClarity
-                    ? qualityClarity * Math.Clamp(resource.Calories / Math.Max(1f, resource.MaxCalories), 0f, 1f)
-                    : 0f;
-                var energyQuality = PlantResourceTraits.EnergyQualitySense(resource.PlantKind);
-                var biteEase = PlantResourceTraits.BiteEaseSense(resource.PlantKind);
-                if (qualityWeight > 0f)
-                {
-                    visiblePlantQualityWeight += qualityWeight;
-                    visiblePlantEnergyQualityTotal += energyQuality * qualityWeight;
-                    visiblePlantBiteEaseTotal += biteEase * qualityWeight;
-                }
-
-                if (_enableSectorVision
-                    && VisionSectorSet.TryGetSectorIndex(
-                        toResource,
-                        forward,
-                        right,
-                        hasLimitedVision,
-                        effectiveVisionAngle,
-                        out var sectorIndex))
-                {
-                    visionSectors.AddPlant(sectorIndex, proximity, energyQuality, biteEase, qualityWeight);
-                }
-
-                var foodScore = proximity * CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
-                if (foodScore > bestVisibleFoodScore
-                    || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
-                        && distanceSquared < bestVisibleFoodDistanceSquared))
-                {
-                    bestVisibleFoodScore = foodScore;
-                    bestVisibleFoodDistanceSquared = distanceSquared;
-                    bestVisibleFoodKind = FoodContactKind.Resource;
-                    bestVisibleFoodIndex = resourceIndex;
-                }
+                nearestVisiblePlantDistanceSquared = distanceSquared;
+                nearestVisiblePlantIndex = resourceIndex;
             }
 
-            foreach (var resourceIndex in _meatResourceCandidates)
+            var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
+            var qualityClarity = PlantQualityClarity(proximity);
+            var qualityWeight = qualityClarity >= MinimumPlantQualityClarity
+                ? qualityClarity * Math.Clamp(resource.Calories / Math.Max(1f, resource.MaxCalories), 0f, 1f)
+                : 0f;
+            var energyQuality = PlantResourceTraits.EnergyQualitySense(resource.PlantKind);
+            var biteEase = PlantResourceTraits.BiteEaseSense(resource.PlantKind);
+            if (qualityWeight > 0f)
             {
-                var resource = state.Resources[resourceIndex];
-                meatResourceCandidates++;
-                var toResource = resource.Position - creature.Position;
-                var distanceSquared = toResource.LengthSquared;
-                var centerDistance = MathF.Sqrt(distanceSquared);
-                var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
-                var distanceFactor = 1f - Math.Clamp(edgeDistance / meatScentRadius, 0f, 1f);
-                if (distanceFactor > 0f)
-                {
-                    var calorieFactor = Math.Clamp(resource.Calories / _meatScentCaloriesForFullStrength, 0f, 1f);
-                    var scentStrength = calorieFactor * distanceFactor * distanceFactor;
-                    if (scentStrength > MinimumScentStrength)
-                    {
-                        var scentDirection = centerDistance > 0.0001f
-                            ? toResource / centerDistance
-                            : forward;
-                        totalMeatScentStrength += scentStrength;
-                        meatScentVector += scentDirection * scentStrength;
+                visiblePlantQualityWeight += qualityWeight;
+                visiblePlantEnergyQualityTotal += energyQuality * qualityWeight;
+                visiblePlantBiteEaseTotal += biteEase * qualityWeight;
+            }
 
-                        var staleStrength = scentStrength * MeatQuality.Staleness(resource);
-                        if (staleStrength > MinimumScentStrength)
-                        {
-                            totalRottenMeatScentStrength += staleStrength;
-                            rottenMeatScentVector += scentDirection * staleStrength;
-                        }
+            if (_enableSectorVision
+                && VisionSectorSet.TryGetSectorIndex(
+                    toResource,
+                    forward,
+                    right,
+                    hasLimitedVision,
+                    effectiveVisionAngle,
+                    out var sectorIndex))
+            {
+                visionSectors.AddPlant(sectorIndex, proximity, energyQuality, biteEase, qualityWeight);
+            }
+
+            var foodScore = proximity * CreatureDigestion.PlantTypeEnergyEfficiency(genome, resource.PlantKind);
+            if (foodScore > bestVisibleFoodScore
+                || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
+                    && distanceSquared < bestVisibleFoodDistanceSquared))
+            {
+                bestVisibleFoodScore = foodScore;
+                bestVisibleFoodDistanceSquared = distanceSquared;
+                bestVisibleFoodKind = FoodContactKind.Resource;
+                bestVisibleFoodIndex = resourceIndex;
+            }
+        }
+
+        foreach (var resourceIndex in scratch.MeatResourceCandidates)
+        {
+            var resource = state.Resources[resourceIndex];
+            meatResourceCandidates++;
+            var toResource = resource.Position - creature.Position;
+            var distanceSquared = toResource.LengthSquared;
+            var centerDistance = MathF.Sqrt(distanceSquared);
+            var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
+            var distanceFactor = 1f - Math.Clamp(edgeDistance / meatScentRadius, 0f, 1f);
+            if (distanceFactor > 0f)
+            {
+                var calorieFactor = Math.Clamp(resource.Calories / _meatScentCaloriesForFullStrength, 0f, 1f);
+                var scentStrength = calorieFactor * distanceFactor * distanceFactor;
+                if (scentStrength > MinimumScentStrength)
+                {
+                    var scentDirection = centerDistance > 0.0001f
+                        ? toResource / centerDistance
+                        : forward;
+                    totalMeatScentStrength += scentStrength;
+                    meatScentVector += scentDirection * scentStrength;
+
+                    var staleStrength = scentStrength * MeatQuality.Staleness(resource);
+                    if (staleStrength > MinimumScentStrength)
+                    {
+                        totalRottenMeatScentStrength += staleStrength;
+                        rottenMeatScentVector += scentDirection * staleStrength;
                     }
                 }
-
-                if (edgeDistance > effectiveVisionRadius
-                    || !IsInsideVisionCone(toResource, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
-                {
-                    continue;
-                }
-
-                visibleFoodCount++;
-                visibleMeatCount++;
-                visibleMeatResourceCandidates++;
-
-                if (distanceSquared < nearestVisibleMeatDistanceSquared)
-                {
-                    nearestVisibleMeatDistanceSquared = distanceSquared;
-                    nearestVisibleMeatKind = FoodContactKind.Resource;
-                    nearestVisibleMeatIndex = resourceIndex;
-                    nearestVisibleMeatFreshness = MeatQuality.Freshness(resource);
-                }
-
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
-                if (_enableSectorVision
-                    && VisionSectorSet.TryGetSectorIndex(
-                        toResource,
-                        forward,
-                        right,
-                        hasLimitedVision,
-                        effectiveVisionAngle,
-                        out var sectorIndex))
-                {
-                    visionSectors.AddMeat(sectorIndex, proximity);
-                }
-
-                var foodScore = proximity * CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource));
-                if (foodScore > bestVisibleFoodScore
-                    || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
-                        && distanceSquared < bestVisibleFoodDistanceSquared))
-                {
-                    bestVisibleFoodScore = foodScore;
-                    bestVisibleFoodDistanceSquared = distanceSquared;
-                    bestVisibleFoodKind = FoodContactKind.Resource;
-                    bestVisibleFoodIndex = resourceIndex;
-                }
             }
 
-            sensingProfile?.RecordResourceScan(
-                plantCandidates,
-                meatResourceCandidates,
-                visiblePlantCandidates,
-                visibleMeatResourceCandidates,
-                Stopwatch.GetTimestamp() - resourceScanStartedAt);
-
-            var eggScanStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            var visibleEggCandidates = 0;
-
-            foreach (var eggIndex in _eggCandidates)
+            if (edgeDistance > effectiveVisionRadius
+                || !IsInsideVisionCone(toResource, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
             {
-                var egg = state.Eggs[eggIndex];
-                var eggRadius = EggPredation.ContactRadius(egg);
-                var toEgg = egg.Position - creature.Position;
-                var distanceSquared = toEgg.LengthSquared;
-
-                if (!IsWithinEdgeRange(distanceSquared, eggRadius, effectiveVisionRadius)
-                    || !IsInsideVisionCone(toEgg, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
-                {
-                    continue;
-                }
-
-                var centerDistance = MathF.Sqrt(distanceSquared);
-                var edgeDistance = Math.Max(0f, centerDistance - eggRadius);
-
-                visibleFoodCount++;
-                visibleMeatCount++;
-                visibleEggCandidates++;
-
-                if (distanceSquared < nearestVisibleMeatDistanceSquared)
-                {
-                    nearestVisibleMeatDistanceSquared = distanceSquared;
-                    nearestVisibleMeatKind = FoodContactKind.Egg;
-                    nearestVisibleMeatIndex = eggIndex;
-                    nearestVisibleMeatFreshness = 1f;
-                }
-
-                var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
-                if (_enableSectorVision
-                    && VisionSectorSet.TryGetSectorIndex(
-                        toEgg,
-                        forward,
-                        right,
-                        hasLimitedVision,
-                        effectiveVisionAngle,
-                        out var sectorIndex))
-                {
-                    visionSectors.AddEgg(sectorIndex, proximity);
-                }
-
-                var foodScore = proximity * freshMeatFoodEfficiency;
-                if (foodScore > bestVisibleFoodScore
-                    || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
-                        && distanceSquared < bestVisibleFoodDistanceSquared))
-                {
-                    bestVisibleFoodScore = foodScore;
-                    bestVisibleFoodDistanceSquared = distanceSquared;
-                    bestVisibleFoodKind = FoodContactKind.Egg;
-                    bestVisibleFoodIndex = eggIndex;
-                }
+                continue;
             }
 
-            sensingProfile?.RecordEggScan(
-                visibleEggCandidates,
-                Stopwatch.GetTimestamp() - eggScanStartedAt);
+            visibleFoodCount++;
+            visibleMeatCount++;
+            visibleMeatResourceCandidates++;
 
-            var senseFinalizationStartedAt = sensingProfile is not null
-                ? Stopwatch.GetTimestamp()
-                : 0L;
-            senses.VisibleFoodDensity = Math.Clamp(visibleFoodCount / DensitySaturationFoodCount, 0f, 1f);
-            senses.VisiblePlantDensity = Math.Clamp(visiblePlantCount / DensitySaturationFoodCount, 0f, 1f);
-            senses.VisiblePlantEnergyQuality = visiblePlantQualityWeight > 0f
-                ? visiblePlantEnergyQualityTotal / visiblePlantQualityWeight
-                : 0f;
-            senses.VisiblePlantBiteEase = visiblePlantQualityWeight > 0f
-                ? visiblePlantBiteEaseTotal / visiblePlantQualityWeight
-                : 0f;
-            senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
-            senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
-            senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
-            senses.VisionSectors = visionSectors;
-            ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
-            ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
-            ApplyCreatureSimilarityScentSense(
-                ref senses,
-                creatureSimilaritySense.ScentVector,
-                creatureSimilaritySense.TotalScentStrength,
-                forward,
-                right);
-            senses.CreatureContactSimilarity = creatureSimilaritySense.ContactSimilarity;
-
-            if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
+            if (distanceSquared < nearestVisibleMeatDistanceSquared)
             {
-                ApplyGenericFoodSense(
-                    ref senses,
-                    state.Resources[bestVisibleFoodIndex],
-                    creature,
+                nearestVisibleMeatDistanceSquared = distanceSquared;
+                nearestVisibleMeatKind = FoodContactKind.Resource;
+                nearestVisibleMeatIndex = resourceIndex;
+                nearestVisibleMeatFreshness = MeatQuality.Freshness(resource);
+            }
+
+            var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
+            if (_enableSectorVision
+                && VisionSectorSet.TryGetSectorIndex(
+                    toResource,
                     forward,
                     right,
-                    effectiveVisionRadius);
-            }
-            else if (bestVisibleFoodKind == FoodContactKind.Egg && bestVisibleFoodIndex >= 0)
+                    hasLimitedVision,
+                    effectiveVisionAngle,
+                    out var sectorIndex))
             {
-                ApplyGenericEggSense(
-                    ref senses,
-                    state.Eggs[bestVisibleFoodIndex],
-                    creature,
-                    forward,
-                    right,
-                    effectiveVisionRadius);
-            }
-            if (nearestVisiblePlantIndex >= 0)
-            {
-                ApplyPlantSense(
-                    ref senses,
-                    state.Resources[nearestVisiblePlantIndex],
-                    creature,
-                    forward,
-                    right,
-                    effectiveVisionRadius);
+                visionSectors.AddMeat(sectorIndex, proximity);
             }
 
-            if (nearestVisibleMeatKind == FoodContactKind.Resource && nearestVisibleMeatIndex >= 0)
+            var foodScore = proximity * CreatureDigestion.MeatEnergyEfficiency(genome, MeatQuality.Freshness(resource));
+            if (foodScore > bestVisibleFoodScore
+                || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
+                    && distanceSquared < bestVisibleFoodDistanceSquared))
             {
-                senses.VisibleMeatFreshness = nearestVisibleMeatFreshness;
-                ApplyMeatSense(
-                    ref senses,
-                    state.Resources[nearestVisibleMeatIndex],
-                    creature,
-                    forward,
-                    right,
-                    effectiveVisionRadius);
+                bestVisibleFoodScore = foodScore;
+                bestVisibleFoodDistanceSquared = distanceSquared;
+                bestVisibleFoodKind = FoodContactKind.Resource;
+                bestVisibleFoodIndex = resourceIndex;
             }
-            else if (nearestVisibleMeatKind == FoodContactKind.Egg && nearestVisibleMeatIndex >= 0)
-            {
-                senses.VisibleMeatFreshness = nearestVisibleMeatFreshness;
-                ApplyMeatEggSense(
-                    ref senses,
-                    state.Eggs[nearestVisibleMeatIndex],
-                    creature,
-                    forward,
-                    right,
-                    effectiveVisionRadius);
-            }
-            if (nearestVisibleCreatureIndex >= 0)
-            {
-                ApplyCreatureSense(
-                    ref senses,
-                    state.Creatures[nearestVisibleCreatureIndex],
-                    GetCreatureTraits(state, nearestVisibleCreatureIndex),
-                    creatureTraits,
-                    creature,
-                    forward,
-                    right,
-                    effectiveVisionRadius);
-            }
-
-            ApplyPlantPreferenceBridge(ref senses);
-            creature.Senses = senses;
-            state.Creatures[i] = creature;
-            sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - senseFinalizationStartedAt);
         }
+
+        sensingProfile?.RecordResourceScan(
+            plantCandidates,
+            meatResourceCandidates,
+            visiblePlantCandidates,
+            visibleMeatResourceCandidates,
+            Stopwatch.GetTimestamp() - resourceScanStartedAt);
+
+        var eggScanStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        var visibleEggCandidates = 0;
+
+        foreach (var eggIndex in scratch.EggCandidates)
+        {
+            var egg = state.Eggs[eggIndex];
+            var eggRadius = EggPredation.ContactRadius(egg);
+            var toEgg = egg.Position - creature.Position;
+            var distanceSquared = toEgg.LengthSquared;
+
+            if (!IsWithinEdgeRange(distanceSquared, eggRadius, effectiveVisionRadius)
+                || !IsInsideVisionCone(toEgg, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
+            {
+                continue;
+            }
+
+            var centerDistance = MathF.Sqrt(distanceSquared);
+            var edgeDistance = Math.Max(0f, centerDistance - eggRadius);
+
+            visibleFoodCount++;
+            visibleMeatCount++;
+            visibleEggCandidates++;
+
+            if (distanceSquared < nearestVisibleMeatDistanceSquared)
+            {
+                nearestVisibleMeatDistanceSquared = distanceSquared;
+                nearestVisibleMeatKind = FoodContactKind.Egg;
+                nearestVisibleMeatIndex = eggIndex;
+                nearestVisibleMeatFreshness = 1f;
+            }
+
+            var proximity = 1f - Math.Clamp(edgeDistance / effectiveVisionRadius, 0f, 1f);
+            if (_enableSectorVision
+                && VisionSectorSet.TryGetSectorIndex(
+                    toEgg,
+                    forward,
+                    right,
+                    hasLimitedVision,
+                    effectiveVisionAngle,
+                    out var sectorIndex))
+            {
+                visionSectors.AddEgg(sectorIndex, proximity);
+            }
+
+            var foodScore = proximity * freshMeatFoodEfficiency;
+            if (foodScore > bestVisibleFoodScore
+                || (Math.Abs(foodScore - bestVisibleFoodScore) <= 0.0001f
+                    && distanceSquared < bestVisibleFoodDistanceSquared))
+            {
+                bestVisibleFoodScore = foodScore;
+                bestVisibleFoodDistanceSquared = distanceSquared;
+                bestVisibleFoodKind = FoodContactKind.Egg;
+                bestVisibleFoodIndex = eggIndex;
+            }
+        }
+
+        sensingProfile?.RecordEggScan(
+            visibleEggCandidates,
+            Stopwatch.GetTimestamp() - eggScanStartedAt);
+
+        var senseFinalizationStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
+        senses.VisibleFoodDensity = Math.Clamp(visibleFoodCount / DensitySaturationFoodCount, 0f, 1f);
+        senses.VisiblePlantDensity = Math.Clamp(visiblePlantCount / DensitySaturationFoodCount, 0f, 1f);
+        senses.VisiblePlantEnergyQuality = visiblePlantQualityWeight > 0f
+            ? visiblePlantEnergyQualityTotal / visiblePlantQualityWeight
+            : 0f;
+        senses.VisiblePlantBiteEase = visiblePlantQualityWeight > 0f
+            ? visiblePlantBiteEaseTotal / visiblePlantQualityWeight
+            : 0f;
+        senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
+        senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
+        senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
+        senses.VisionSectors = visionSectors;
+        ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
+        ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
+        ApplyCreatureSimilarityScentSense(
+            ref senses,
+            creatureSimilaritySense.ScentVector,
+            creatureSimilaritySense.TotalScentStrength,
+            forward,
+            right);
+        senses.CreatureContactSimilarity = creatureSimilaritySense.ContactSimilarity;
+
+        if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
+        {
+            ApplyGenericFoodSense(
+                ref senses,
+                state.Resources[bestVisibleFoodIndex],
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+        else if (bestVisibleFoodKind == FoodContactKind.Egg && bestVisibleFoodIndex >= 0)
+        {
+            ApplyGenericEggSense(
+                ref senses,
+                state.Eggs[bestVisibleFoodIndex],
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+        if (nearestVisiblePlantIndex >= 0)
+        {
+            ApplyPlantSense(
+                ref senses,
+                state.Resources[nearestVisiblePlantIndex],
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+
+        if (nearestVisibleMeatKind == FoodContactKind.Resource && nearestVisibleMeatIndex >= 0)
+        {
+            senses.VisibleMeatFreshness = nearestVisibleMeatFreshness;
+            ApplyMeatSense(
+                ref senses,
+                state.Resources[nearestVisibleMeatIndex],
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+        else if (nearestVisibleMeatKind == FoodContactKind.Egg && nearestVisibleMeatIndex >= 0)
+        {
+            senses.VisibleMeatFreshness = nearestVisibleMeatFreshness;
+            ApplyMeatEggSense(
+                ref senses,
+                state.Eggs[nearestVisibleMeatIndex],
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+        if (nearestVisibleCreatureIndex >= 0)
+        {
+            ApplyCreatureSense(
+                ref senses,
+                state.Creatures[nearestVisibleCreatureIndex],
+                GetCreatureTraits(state, nearestVisibleCreatureIndex),
+                creatureTraits,
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+
+        ApplyPlantPreferenceBridge(ref senses);
+        creature.Senses = senses;
+        sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - senseFinalizationStartedAt);
+        return creature;
     }
 
     private WorldSenseRefreshReason GetWorldSenseRefreshReason(WorldState state, CreatureState creature)
@@ -1114,20 +1152,21 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         CreatureState creature,
         CreatureSensingTraits creatureTraits,
         SimVector2 forward,
-        float scentRadius)
+        float scentRadius,
+        List<int> creatureCandidates)
     {
         _spatialIndex.AddCreatureCandidates(
             state,
             creature.Position,
             scentRadius + 12f,
-            _creatureCandidates);
+            creatureCandidates);
 
         var totalScentStrength = 0f;
         var scentVector = SimVector2.Zero;
         var contactSimilarity = 0f;
         var hasContact = creature.IsTouchingCreature && creature.CreatureContactId != default;
 
-        foreach (var otherCreatureIndex in _creatureCandidates)
+        foreach (var otherCreatureIndex in creatureCandidates)
         {
             if (otherCreatureIndex == creatureIndex)
             {
@@ -1415,7 +1454,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         return clamped * clamped;
     }
 
-    private void BeginTraitCache(WorldState state)
+    private void BeginTraitCache(WorldState state, bool precomputeTraits)
     {
         var creatureCount = state.Creatures.Count;
         if (_cachedTraitStamps.Length < creatureCount)
@@ -1435,10 +1474,31 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         for (var i = 0; i < creatureCount; i++)
         {
-            _cachedBodyRadii[i] = -1f;
-            _cachedMaxSpeeds[i] = -1f;
+            if (precomputeTraits)
+            {
+                var creature = state.Creatures[i];
+                var genome = state.GetGenome(creature.GenomeId);
+                _cachedBodyRadii[i] = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+                _cachedMaxSpeeds[i] = CreatureGrowth.EffectiveMaxSpeed(creature, genome);
+            }
+            else
+            {
+                _cachedBodyRadii[i] = -1f;
+                _cachedMaxSpeeds[i] = -1f;
+            }
+
             _cachedTraitStamps[i] = _traitCacheStamp;
         }
+    }
+
+    private void EnsureParallelCreatureBufferCapacity(int creatureCount)
+    {
+        if (_parallelCreatureBuffer.Length >= creatureCount)
+        {
+            return;
+        }
+
+        _parallelCreatureBuffer = new CreatureState[Math.Max(creatureCount, _parallelCreatureBuffer.Length * 2)];
     }
 
     private CreatureSensingTraits GetCreatureTraits(WorldState state, int creatureIndex)
@@ -1493,4 +1553,21 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float RelativeSpeed,
         float ApproachRate,
         float FacingAlignment);
+
+    private sealed class CreatureSensingScratch
+    {
+        public List<int> PlantResourceCandidates { get; } = [];
+
+        public IndexStampSet SeenPlantResourceCandidates { get; } = new();
+
+        public List<int> MeatResourceCandidates { get; } = [];
+
+        public IndexStampSet SeenMeatResourceCandidates { get; } = new();
+
+        public List<int> EggCandidates { get; } = [];
+
+        public IndexStampSet SeenEggCandidates { get; } = new();
+
+        public List<int> CreatureCandidates { get; } = [];
+    }
 }

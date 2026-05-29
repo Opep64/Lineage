@@ -156,6 +156,7 @@ public static class SimulationPipelines
         int closeSenseRefreshMinimumTicks = CreatureSensingSystem.DefaultCloseSenseRefreshMinimumTicks,
         bool enableSectorVision = CreatureSensingSystem.DefaultEnableSectorVision,
         float plantPayoffTraceHalfLifeSeconds = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds,
+        int sensingThreadCount = CreatureSensingSystem.DefaultSensingThreadCount,
         bool enableLegacyNearestFoodVisionInputs = true,
         bool enableLegacyNearestCreatureVisionInputs = true,
         bool reuseNeuralActionsOnSkippedWorldSenses = false,
@@ -237,7 +238,8 @@ public static class SimulationPipelines
                 closeSenseRefreshProximity,
                 closeSenseRefreshMinimumTicks,
                 enableSectorVision,
-                plantPayoffTraceHalfLifeSeconds),
+                plantPayoffTraceHalfLifeSeconds,
+                sensingThreadCount),
             new NeuralControllerSystem(
                 memoryDecayPerSecond: memoryDecayPerSecond,
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,

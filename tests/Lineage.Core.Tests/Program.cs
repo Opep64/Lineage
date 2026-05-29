@@ -10,6 +10,7 @@ var tests = new (string Name, Action Body)[]
     ("Simulation profiler can be paused", SimulationProfilerCanBePaused),
     ("Sensing profiler records candidate counts", SensingProfilerRecordsCandidateCounts),
     ("Creature sensing time slices world queries", CreatureSensingTimeSlicesWorldQueries),
+    ("Creature sensing parallel path matches single-threaded path", CreatureSensingParallelPathMatchesSingleThreadedPath),
     ("Creature sensing throttles proximity close refreshes", CreatureSensingThrottlesProximityCloseRefreshes),
     ("Creature sensing keeps contact close refresh immediate", CreatureSensingKeepsContactCloseRefreshImmediate),
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
@@ -424,6 +425,135 @@ static void CreatureSensingTimeSlicesWorldQueries()
     AssertEqual(1L, closeSensing.WorldSenseCloseRefreshes, "Close food should force a world sense refresh");
     AssertEqual(0L, closeSensing.WorldSenseSkippedUpdates, "Close food should not skip world sensing");
     AssertEqual(1L, closeSensing.ResourceQueries, "Close refresh should run resource query");
+}
+
+static void CreatureSensingParallelPathMatchesSingleThreadedPath()
+{
+    var singleThreaded = CreateCreatureSensingParallelProbe(sensingThreadCount: 1);
+    var parallel = CreateCreatureSensingParallelProbe(sensingThreadCount: 4);
+
+    singleThreaded.Step();
+    parallel.Step();
+
+    AssertEqual(singleThreaded.State.Creatures.Count, parallel.State.Creatures.Count, "Parallel sensing creature count");
+    for (var i = 0; i < singleThreaded.State.Creatures.Count; i++)
+    {
+        var expected = singleThreaded.State.Creatures[i];
+        var actual = parallel.State.Creatures[i];
+        AssertEqual(
+            JsonSerializer.Serialize(expected.Senses),
+            JsonSerializer.Serialize(actual.Senses),
+            $"Parallel sensing senses {i}");
+        AssertClose(expected.TenderPlantPayoffTrace, actual.TenderPlantPayoffTrace, 0.000001, $"Parallel sensing tender trace {i}");
+        AssertClose(expected.RichPlantPayoffTrace, actual.RichPlantPayoffTrace, 0.000001, $"Parallel sensing rich trace {i}");
+        AssertClose(expected.ToughPlantPayoffTrace, actual.ToughPlantPayoffTrace, 0.000001, $"Parallel sensing tough trace {i}");
+    }
+}
+
+static Simulation CreateCreatureSensingParallelProbe(int sensingThreadCount)
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 32f);
+    var simulation = new Simulation(
+        new SimulationConfig { WorldWidth = 600f, WorldHeight = 600f, FixedDeltaSeconds = 0.1f },
+        seed: 82,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 1,
+                enableSectorVision: true,
+                sensingThreadCount: sensingThreadCount)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 5f,
+        MaxSpeed = 18f,
+        SenseRadius = 120f,
+        VisionAngleRadians = MathF.Tau * 0.75f,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f,
+        TenderPlantAdaptation = 0.2f,
+        RichPlantAdaptation = 0.1f,
+        ToughPlantAdaptation = 0.05f
+    });
+
+    var positions = new[]
+    {
+        new SimVector2(100f, 100f),
+        new SimVector2(150f, 115f),
+        new SimVector2(220f, 125f),
+        new SimVector2(130f, 210f),
+        new SimVector2(260f, 230f),
+        new SimVector2(320f, 180f),
+        new SimVector2(360f, 260f),
+        new SimVector2(420f, 220f),
+        new SimVector2(460f, 320f),
+        new SimVector2(180f, 330f),
+        new SimVector2(280f, 360f),
+        new SimVector2(380f, 390f)
+    };
+    for (var i = 0; i < positions.Length; i++)
+    {
+        simulation.State.SpawnCreature(genomeId, positions[i], energy: 45f + i * 3f);
+        var creature = simulation.State.Creatures[^1];
+        creature.HeadingRadians = i * 0.43f;
+        creature.Velocity = SimVector2.FromAngle(creature.HeadingRadians) * (2f + i);
+        creature.MemoryVector = new SimVector2((i % 4) * 0.1f, (i % 3) * -0.08f);
+        creature.LastPlantCaloriesEaten = i % 2 == 0 ? 4f : 0f;
+        creature.LastTenderPlantDigestedEnergy = i % 3 == 0 ? 2f : 0f;
+        creature.LastRichPlantDigestedEnergy = i % 4 == 0 ? 3f : 0f;
+        creature.LastToughPlantDigestedEnergy = i % 5 == 0 ? 1.5f : 0f;
+        simulation.State.Creatures[^1] = creature;
+    }
+
+    var parentId = simulation.State.Creatures[0].Id;
+    simulation.State.SpawnEgg(genomeId, brainId: -1, parentId, new SimVector2(175f, 130f), energy: 28f, incubationSeconds: 30f, generation: 1);
+    simulation.State.SpawnEgg(genomeId, brainId: -1, parentId, new SimVector2(340f, 245f), energy: 32f, incubationSeconds: 30f, generation: 1);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Generic,
+        Position = new SimVector2(120f, 105f),
+        Radius = 4f,
+        Calories = 70f,
+        MaxCalories = 80f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        PlantKind = PlantResourceKind.Rich,
+        Position = new SimVector2(245f, 140f),
+        Radius = 6f,
+        Calories = 95f,
+        MaxCalories = 110f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(300f, 210f),
+        Radius = 5f,
+        Calories = 55f,
+        MaxCalories = 80f,
+        MeatAgeSeconds = 8f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(405f, 235f),
+        Radius = 5f,
+        Calories = 45f,
+        MaxCalories = 80f,
+        MeatAgeSeconds = 70f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    return simulation;
 }
 
 static void CreatureSensingThrottlesProximityCloseRefreshes()
@@ -9358,6 +9488,13 @@ static void ScenarioMetadataDescribesEditableJsonFields()
     AssertEqual("Performance", neuralReuse.Group, "Neural action reuse group");
     AssertTrue(neuralReuse.Advanced, "Neural action reuse should be advanced");
 
+    var sensingThreads = SimulationScenarioMetadata.FindByJsonName("sensingThreadCount")
+        ?? throw new InvalidOperationException("Missing sensing thread metadata.");
+    AssertEqual("number", sensingThreads.Type, "Sensing thread type");
+    AssertEqual("Performance", sensingThreads.Group, "Sensing thread group");
+    AssertEqual("threads", sensingThreads.Units, "Sensing thread units");
+    AssertTrue(sensingThreads.Advanced, "Sensing thread count should be advanced");
+
     var neuralThreads = SimulationScenarioMetadata.FindByJsonName("neuralControllerThreadCount")
         ?? throw new InvalidOperationException("Missing neural controller thread metadata.");
     AssertEqual("number", neuralThreads.Type, "Neural controller thread type");
@@ -9399,6 +9536,7 @@ static void ScenarioJsonRoundTrips()
         CloseSenseRefreshProximity = 0.93f,
         CloseSenseRefreshMinimumTicks = 3,
         PlantPayoffTraceHalfLifeSeconds = 31f,
+        SensingThreadCount = 3,
         EnableSectorVision = true,
         ReuseNeuralActionsOnSkippedWorldSenses = true,
         NeuralControllerThreadCount = 4,
@@ -9565,6 +9703,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"closeSenseRefreshProximity\""), "JSON should serialize close sense threshold");
     AssertTrue(json.Contains("\"closeSenseRefreshMinimumTicks\""), "JSON should serialize close sense refresh minimum");
     AssertTrue(json.Contains("\"plantPayoffTraceHalfLifeSeconds\""), "JSON should serialize plant payoff trace half-life");
+    AssertTrue(json.Contains("\"sensingThreadCount\""), "JSON should serialize sensing thread count");
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
     AssertTrue(json.Contains("\"reuseNeuralActionsOnSkippedWorldSenses\""), "JSON should serialize neural action reuse toggle");
     AssertTrue(json.Contains("\"neuralControllerThreadCount\""), "JSON should serialize neural controller thread count");
@@ -9593,6 +9732,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.CloseSenseRefreshProximity, roundTripped.CloseSenseRefreshProximity, 0.000001, "Scenario close sense threshold");
     AssertEqual(scenario.CloseSenseRefreshMinimumTicks, roundTripped.CloseSenseRefreshMinimumTicks, "Scenario close sense refresh minimum");
     AssertClose(scenario.PlantPayoffTraceHalfLifeSeconds, roundTripped.PlantPayoffTraceHalfLifeSeconds, 0.000001, "Scenario plant payoff trace half-life");
+    AssertEqual(scenario.SensingThreadCount, roundTripped.SensingThreadCount, "Scenario sensing thread count");
     AssertEqual(scenario.EnableSectorVision, roundTripped.EnableSectorVision, "Scenario sector vision toggle");
     AssertEqual(scenario.ReuseNeuralActionsOnSkippedWorldSenses, roundTripped.ReuseNeuralActionsOnSkippedWorldSenses, "Scenario neural action reuse toggle");
     AssertEqual(scenario.NeuralControllerThreadCount, roundTripped.NeuralControllerThreadCount, "Scenario neural controller thread count");
