@@ -21,7 +21,7 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Authored scenarios enable sector vision and disable legacy nearest-food and nearest-creature vision inputs.
 - Balanced Foraging remains the default Godot startup scenario.
 - `HybridNeural` remains the default brain architecture unless a scenario explicitly opts into `HiddenLayerNeural`.
-- Extinct genome/brain payload pruning is scenario-backed but disabled by default.
+- Survivor-ancestry genome/brain payload pruning is scenario-backed but disabled by default.
 
 ## Core Entities
 
@@ -54,7 +54,7 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Juveniles cannot reproduce before maturity.
 - Offspring inherit mutated genome and brain data.
 - Trait and brain mutation rates are sparse and heritable/configurable.
-- Optional extinct-payload pruning compacts genome and brain storage to payloads referenced by living creatures and eggs. Lineage records remain available; records whose heavy payloads were pruned use `-1` genome/brain IDs.
+- Optional survivor-ancestry payload pruning compacts genome and brain storage to payloads referenced by living creatures, eggs, and the ancestor chain from current survivors back to founders. Lineage records remain available; extinct side-branch records whose heavy payloads were pruned use `-1` genome/brain IDs.
 
 ## Diet, Digestion, Meat, And Combat
 

@@ -154,6 +154,7 @@ var tests = new (string Name, Action Body)[]
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
     ("Spatial heatmaps record lifecycle and interaction events", SpatialHeatmapsRecordLifecycleAndInteractionEvents),
     ("World state prunes extinct payloads", WorldStatePrunesExtinctPayloads),
+    ("World state keeps survivor ancestor payloads", WorldStateKeepsSurvivorAncestorPayloads),
     ("Pruned simulation snapshots restore continuation", PrunedSimulationSnapshotsRestoreContinuation),
     ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
@@ -6750,6 +6751,78 @@ static void WorldStatePrunesExtinctPayloads()
     AssertTrue(simulation.State.TryGetLineageRecord(liveCreatureId, out var liveRecord), "Live lineage lookup");
     AssertEqual(0, liveRecord.GenomeId, "Live lineage genome remap");
     AssertEqual(0, liveRecord.BrainId, "Live lineage brain remap");
+}
+
+static void WorldStateKeepsSurvivorAncestorPayloads()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { WorldWidth = 500f, WorldHeight = 500f, FixedDeltaSeconds = 1f },
+        seed: 211,
+        systems: [new DeathSystem()]);
+    var ancestorGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { BodyRadius = 2f });
+    var childGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { BodyRadius = 4f });
+    var sideGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { BodyRadius = 6f });
+    var ancestorBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    var childBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+    var sideBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager());
+
+    var ancestorId = simulation.State.SpawnCreature(
+        ancestorGenomeId,
+        new SimVector2(20f, 20f),
+        energy: 5f,
+        brainId: ancestorBrainId);
+    var childId = simulation.State.SpawnCreature(
+        childGenomeId,
+        new SimVector2(40f, 20f),
+        energy: 50f,
+        generation: 1,
+        parentId: ancestorId,
+        brainId: childBrainId);
+    var sideId = simulation.State.SpawnCreature(
+        sideGenomeId,
+        new SimVector2(60f, 20f),
+        energy: 5f,
+        brainId: sideBrainId);
+
+    for (var i = 0; i < simulation.State.Creatures.Count; i++)
+    {
+        var creature = simulation.State.Creatures[i];
+        if (creature.Id == ancestorId || creature.Id == sideId)
+        {
+            creature.Energy = 0f;
+            simulation.State.Creatures[i] = creature;
+        }
+    }
+
+    simulation.Step();
+
+    AssertEqual(1, simulation.State.Creatures.Count, "Living child count before pruning");
+    AssertEqual(childId, simulation.State.Creatures[0].Id, "Living child id before pruning");
+
+    var result = simulation.State.PruneExtinctPayloads();
+
+    AssertEqual(1, result.PrunedGenomeCount, "Only side branch genome should be pruned");
+    AssertEqual(1, result.PrunedBrainCount, "Only side branch brain should be pruned");
+    AssertEqual(2, simulation.State.Genomes.Count, "Ancestor and child genomes should remain");
+    AssertEqual(2, simulation.State.Brains.Count, "Ancestor and child brains should remain");
+
+    AssertTrue(simulation.State.TryGetLineageRecord(ancestorId, out var ancestorRecord), "Ancestor lineage lookup");
+    AssertEqual(0, ancestorRecord.GenomeId, "Ancestor genome payload should be retained");
+    AssertEqual(0, ancestorRecord.BrainId, "Ancestor brain payload should be retained");
+
+    AssertTrue(simulation.State.TryGetLineageRecord(childId, out var childRecord), "Child lineage lookup");
+    AssertEqual(1, childRecord.GenomeId, "Child genome payload should be remapped");
+    AssertEqual(1, childRecord.BrainId, "Child brain payload should be remapped");
+
+    AssertTrue(simulation.State.TryGetLineageRecord(sideId, out var sideRecord), "Side branch lineage lookup");
+    AssertEqual(-1, sideRecord.GenomeId, "Side branch genome payload should be pruned");
+    AssertEqual(-1, sideRecord.BrainId, "Side branch brain payload should be pruned");
+
+    var analysis = SurvivorLineageAnalyzer.Analyze(simulation.State);
+    AssertEqual(1, analysis.LivingCreatureCount, "Survivor ancestry living count");
+    AssertTrue(
+        analysis.Segments.Any(segment => segment.StartRecord.Id == ancestorId && segment.EndRecord.Id == childId),
+        "Survivor ancestry should collapse ancestor-to-child chain into a segment");
 }
 
 static void PrunedSimulationSnapshotsRestoreContinuation()

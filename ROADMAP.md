@@ -147,7 +147,7 @@ Status: always relevant
 - Multicore may help per-creature sensing and brain evaluation, but current design should first keep sensing/query work efficient.
 - Consider lazy or active-region spatial indexing for huge maps with sparse active populations; avoid this for small fully inhabited worlds unless profiling supports it.
 - Revisit spatial cell size after new large-world baselines.
-- Extinct genome/brain payload pruning now has a first implementation: living creatures and eggs retain full payloads, lineage rows are preserved with pruned payload IDs, IDs remap safely, and checkpoints reload. Remaining work is aggregate extinct-branch summaries for richer post-prune history.
+- Survivor-ancestry genome/brain payload pruning now retains full payloads for living creatures, eggs, and the current survivor ancestor chain back to founders; extinct side-branch payloads can be pruned while lineage rows are preserved with pruned payload IDs, IDs remap safely, and checkpoints reload. Remaining work is row-level extinct-branch compaction plus aggregate side-branch summaries for richer post-prune history.
 - Future performance ideas:
   - chunk-level resource/plant summaries
   - active-region updates for dormant/far ecology

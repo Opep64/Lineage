@@ -639,7 +639,7 @@ public static class SpeciesClusterAnalyzer
 
         var notes = BuildHistoryNotes(summaries, diversityRows);
 
-        return new SpeciesClusterHistory(summaries, selectedRows, diversityRows, notes);
+        return new SpeciesClusterHistory(summaries, selectedRows, diversityRows, notes, clusters.RecordClusterById);
     }
 
     public static IReadOnlyList<SpeciesClusterInterpretation> InterpretClusters(
@@ -1143,7 +1143,7 @@ public static class SpeciesClusterAnalyzer
         return Math.Clamp(MathF.Log(clamped / min) / MathF.Log(max / min), 0f, 1f);
     }
 
-    private static string GenerateName(int speciesId)
+    public static string GenerateName(int speciesId)
     {
         var hash = unchecked((uint)(speciesId * 2_654_435_761));
         var prefix = NamePrefixes[(int)(hash % (uint)NamePrefixes.Length)];
@@ -1905,13 +1905,15 @@ public sealed record SpeciesClusterHistory(
     IReadOnlyList<SpeciesClusterHistorySummary> Clusters,
     IReadOnlyList<SpeciesClusterHistoryRow> Rows,
     IReadOnlyList<SpeciesClusterDiversityRow> DiversityRows,
-    IReadOnlyList<string> Notes)
+    IReadOnlyList<string> Notes,
+    IReadOnlyDictionary<EntityId, int> RecordClusterById)
 {
     public static SpeciesClusterHistory Empty { get; } = new(
         Array.Empty<SpeciesClusterHistorySummary>(),
         Array.Empty<SpeciesClusterHistoryRow>(),
         Array.Empty<SpeciesClusterDiversityRow>(),
-        Array.Empty<string>());
+        Array.Empty<string>(),
+        new Dictionary<EntityId, int>());
 }
 
 public readonly record struct SpeciesClusterHistorySummary(

@@ -144,8 +144,15 @@ public sealed class WorldState
     {
         var oldGenomeCount = Genomes.Count;
         var oldBrainCount = Brains.Count;
-        var genomeMap = BuildRetainedPayloadMap(oldGenomeCount, EnumerateActiveGenomeIds(), "genome");
-        var brainMap = BuildRetainedPayloadMap(oldBrainCount, EnumerateActiveBrainIds(), "brain");
+        var survivorAncestorRecords = EnumerateSurvivorAncestryRecords().ToArray();
+        var genomeMap = BuildRetainedPayloadMap(
+            oldGenomeCount,
+            EnumerateActiveGenomeIds().Concat(EnumerateLineageGenomeIds(survivorAncestorRecords)),
+            "genome");
+        var brainMap = BuildRetainedPayloadMap(
+            oldBrainCount,
+            EnumerateActiveBrainIds().Concat(EnumerateLineageBrainIds(survivorAncestorRecords)),
+            "brain");
 
         CompactGenomes(genomeMap);
         CompactBrains(brainMap);
@@ -569,6 +576,44 @@ public sealed class WorldState
             if (egg.BrainId >= 0)
             {
                 yield return egg.BrainId;
+            }
+        }
+    }
+
+    private IEnumerable<CreatureLineageRecord> EnumerateSurvivorAncestryRecords()
+    {
+        var descendantIds = Creatures
+            .Select(creature => creature.Id)
+            .Concat(Eggs.Select(egg => egg.ParentId))
+            .Where(id => id != default);
+        var ancestorIds = SurvivorLineageAnalyzer.CollectAncestorIds(_lineageRecords, descendantIds);
+        foreach (var id in ancestorIds)
+        {
+            if (TryGetLineageRecord(id, out var record))
+            {
+                yield return record;
+            }
+        }
+    }
+
+    private static IEnumerable<int> EnumerateLineageGenomeIds(IEnumerable<CreatureLineageRecord> records)
+    {
+        foreach (var record in records)
+        {
+            if (record.GenomeId >= 0)
+            {
+                yield return record.GenomeId;
+            }
+        }
+    }
+
+    private static IEnumerable<int> EnumerateLineageBrainIds(IEnumerable<CreatureLineageRecord> records)
+    {
+        foreach (var record in records)
+        {
+            if (record.BrainId >= 0)
+            {
+                yield return record.BrainId;
             }
         }
     }

@@ -149,12 +149,12 @@ Performance-pass notes from 2026-05-20:
   - likely medium hit: `EatingSystem` checks food/egg contact for every creature even when the brain does not want to eat
   - likely medium hit: `CreatureAttackSystem` checks nearby creature contact for every creature even when the brain does not want to attack
   - likely medium hit: stats snapshots scan all creatures/resources/eggs when snapshot intervals are very frequent
-  - partly addressed long-run hit: historical genome and brain payloads can now be pruned for extinct branches while preserving lineage rows; stats snapshots and lineage rows can still accumulate in very long runs
+  - partly addressed long-run hit: historical genome and brain payloads can now be pruned for extinct side branches while preserving payloads along the current survivor ancestry chain back to founders; stats snapshots and lineage rows can still accumulate in very long runs
   - likely small cleanup: cache per-creature vision cone cosine instead of recomputing it during candidate checks
   - likely small cleanup: avoid recomputing distance/direction when applying selected senses after best targets were already found
   - likely small cleanup: avoid repeated `CreatureGrowth.Effective*` growth-factor calculations in metabolism/stats
   - likely small cleanup: remove unnecessary `HashSet` dedupe for creature candidate queries if creatures remain indexed in only one cell
-  - follow up the compact extinct genome/brain mechanism with aggregate extinct-branch summaries if detailed post-prune history becomes important
+  - follow up the compact survivor-ancestry genome/brain mechanism with row-level extinct side-branch compaction and aggregate extinct-branch summaries if detailed post-prune history becomes important
   - chunked or active-region simulation for very large maps
   - make world size cheap and active ecology expensive, rather than scaling cost directly with total area
   - support archipelago-style experiments with resource islands separated by large voids so isolated populations can diverge before later bridge/corridor events connect them

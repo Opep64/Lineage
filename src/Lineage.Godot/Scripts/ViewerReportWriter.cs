@@ -17,6 +17,7 @@ public static class ViewerReportWriter
 {
     private const int ReportTrendRowCount = 8;
     private const int ReportTimelineSampleLimit = 1200;
+    private const int SurvivorLineageTreeNodeRenderLimit = 260;
 
     private readonly record struct SpatialHeatmapLayer(
         string Title,
@@ -86,6 +87,7 @@ public static class ViewerReportWriter
         var brainInputDiagnostics = BrainInputDiagnostics.Analyze(state);
         var lineageBrainInputDiagnostics = BrainInputDiagnostics.AnalyzeTopFounderLineages(state, 10);
         var seasonPressure = SeasonPressureAnalysis.Analyze(scenario, snapshots);
+        var survivorAncestry = SurvivorLineageAnalyzer.Analyze(state);
 
         WriteDocumentStart(writer, $"Lineage Viewer Report - {scenario.Name}");
 
@@ -593,6 +595,8 @@ public static class ViewerReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
+        WriteSurvivorLineageTreeSection(writer, survivorAncestry, state, speciesHistory);
+
         writer.WriteLine("</main>");
         WriteDocumentEnd(writer);
     }
@@ -715,7 +719,7 @@ public static class ViewerReportWriter
               color: #f4f7ef;
             }
             .page-width {
-              width: min(1120px, calc(100% - 32px));
+              width: min(1760px, calc(100% - 32px));
               margin: 0 auto;
             }
             .eyebrow {
@@ -816,6 +820,108 @@ public static class ViewerReportWriter
               width: 100%;
               height: auto;
               overflow: visible;
+            }
+            .lineage-tree-frame {
+              position: relative;
+              overflow: auto;
+              padding: 10px;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #fbfcf8;
+            }
+            .lineage-toolbar {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px;
+              align-items: center;
+              justify-content: space-between;
+              margin: 0 0 8px;
+              color: var(--muted);
+              font-size: 0.82rem;
+            }
+            .lineage-toolbar button {
+              padding: 5px 9px;
+              border: 1px solid var(--line);
+              border-radius: 5px;
+              background: #fff;
+              color: var(--text);
+              font: inherit;
+              cursor: pointer;
+            }
+            .lineage-report-grid {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+              gap: 14px;
+              margin-top: 14px;
+              align-items: start;
+            }
+            .lineage-tree {
+              display: block;
+              width: 100%;
+              max-width: 100%;
+              height: auto;
+              font-family: "Segoe UI", system-ui, sans-serif;
+              touch-action: none;
+              user-select: none;
+            }
+            .lineage-tree text {
+              fill: var(--muted);
+              font-size: 11px;
+            }
+            .lineage-segment-node {
+              cursor: pointer;
+            }
+            .lineage-segment-node text {
+              pointer-events: none;
+            }
+            .lineage-segment-node rect {
+              transition: stroke-width 0.12s ease, filter 0.12s ease;
+            }
+            .lineage-segment-node.is-selected rect,
+            .lineage-segment-node:focus-visible rect {
+              stroke: #172015;
+              stroke-width: 3;
+              filter: drop-shadow(0 2px 4px rgba(23, 32, 21, 0.24));
+            }
+            .lineage-detail-panel {
+              padding: 12px;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #fbfcf8;
+            }
+            .lineage-detail-panel h3 {
+              margin: 0 0 8px;
+              font-size: 1rem;
+            }
+            .lineage-detail-panel dl {
+              display: grid;
+              grid-template-columns: auto 1fr;
+              gap: 6px 10px;
+              margin: 0;
+            }
+            .lineage-detail-panel dt {
+              color: var(--muted);
+              font-size: 0.78rem;
+              text-transform: uppercase;
+            }
+            .lineage-detail-panel dd {
+              margin: 0;
+              font-weight: 650;
+              overflow-wrap: anywhere;
+            }
+            .lineage-detail-panel dd + dt {
+              margin-top: 3px;
+            }
+            .lineage-tree-legend {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px 14px;
+              margin-top: 10px;
+              color: var(--muted);
+              font-size: 0.84rem;
+            }
+            @media (max-width: 820px) {
+              .lineage-report-grid { grid-template-columns: 1fr; }
             }
             .heatmap-grid {
               display: grid;
@@ -1432,6 +1538,670 @@ public static class ViewerReportWriter
     private static bool IsRateHeatmapUnit(string units)
     {
         return units.Contains('/', StringComparison.Ordinal);
+    }
+
+    private static void WriteSurvivorLineageTreeSection(
+        StreamWriter writer,
+        SurvivorLineageAnalysis analysis,
+        WorldState state,
+        SpeciesClusterHistory speciesHistory)
+    {
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Survivor Ancestry Tree</h2>");
+        if (analysis.LivingCreatureCount == 0 || analysis.Segments.Count == 0)
+        {
+            writer.WriteLine("<p class=\"empty\">No living creatures remain, so there is no survivor ancestry tree to draw.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine(
+            "<p class=\"biome-map-note\">This view collapses straight creature ancestry into survivor lineage segments. Oldest ancestry is at the top, youngest survivors are at the bottom, and short extinct side branches are omitted.</p>");
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Living endpoints", analysis.LivingCreatureCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Ancestor nodes", analysis.AncestorCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Lineage segments", analysis.SegmentCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Founder roots", analysis.FounderCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Max generation", analysis.MaxGeneration.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Dominant founder", analysis.DominantFounderId == default ? "n/a" : $"#{analysis.DominantFounderId.Value}");
+        WriteMetric(writer, "Dominant living", analysis.DominantFounderLivingDescendants.ToString(CultureInfo.InvariantCulture));
+        writer.WriteLine("</div>");
+
+        var graphSegments = SelectLineageSegmentsForGraph(analysis);
+        var graphTruncated = false;
+        if (graphSegments.Count > SurvivorLineageTreeNodeRenderLimit)
+        {
+            graphTruncated = true;
+            graphSegments = analysis.Segments
+                .Where(segment => segment.IsDominantPath)
+                .ToArray();
+            writer.WriteLine(
+                $"<p class=\"empty\">The complete survivor ancestry has {Html(analysis.Segments.Count)} lineage segments, so the graph is limited to the dominant path. The lineage records still retain the full ancestry data.</p>");
+        }
+        else if (graphSegments.Count < analysis.Segments.Count)
+        {
+            writer.WriteLine(
+                $"<p class=\"empty\">Displaying {Html(graphSegments.Count)} major lineage segments. Single-survivor terminal twigs are hidden to keep the tree readable; the dominant path and major surviving branches are retained.</p>");
+        }
+
+        WriteSurvivorLineageSegmentGraph(writer, graphSegments, analysis, state, speciesHistory, graphTruncated);
+        WriteDominantLineagePathTable(writer, analysis);
+        WriteLineageSegmentScript(writer);
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteSurvivorLineageSegmentGraph(
+        TextWriter writer,
+        IReadOnlyList<SurvivorLineageSegment> segments,
+        SurvivorLineageAnalysis analysis,
+        WorldState state,
+        SpeciesClusterHistory speciesHistory,
+        bool graphTruncated)
+    {
+        if (segments.Count == 0)
+        {
+            return;
+        }
+
+        var layout = LayoutLineageSegments(segments, analysis.MaxGeneration);
+        var width = layout.Width;
+        var height = layout.Height;
+        var generationStride = analysis.MaxGeneration <= 24 ? 1 : analysis.MaxGeneration <= 120 ? 5 : 25;
+
+        writer.WriteLine("<div class=\"lineage-report-grid\" data-lineage-section>");
+        writer.WriteLine("<div>");
+        writer.WriteLine("<div class=\"lineage-tree-frame\">");
+        writer.WriteLine("<div class=\"lineage-toolbar\"><span>Drag to pan. Wheel to zoom. Click a card for details.</span><button type=\"button\" data-lineage-reset>Reset view</button></div>");
+        writer.WriteLine($"<svg class=\"lineage-tree\" data-lineage-panzoom data-lineage-viewbox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" viewBox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" role=\"img\" aria-label=\"Survivor lineage segment tree\">");
+        writer.WriteLine("<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"#fbfcf8\" />");
+        for (var generation = 0; generation <= analysis.MaxGeneration; generation += generationStride)
+        {
+            var y = layout.YForGeneration(generation);
+            writer.WriteLine($"<line x1=\"24\" y1=\"{SvgNumber(y)}\" x2=\"{SvgNumber(width - 24f)}\" y2=\"{SvgNumber(y)}\" stroke=\"#e3e8dc\" stroke-width=\"1\" />");
+            writer.WriteLine($"<text x=\"28\" y=\"{SvgNumber(y - 4f)}\">g{Html(generation)}</text>");
+        }
+
+        foreach (var segment in segments)
+        {
+            if (segment.ParentSegmentId is null || !layout.ById.TryGetValue(segment.ParentSegmentId, out var parent))
+            {
+                continue;
+            }
+
+            var child = layout.ById[segment.SegmentId];
+            var midY = (parent.BoxBottomY + child.BoxTopY) * 0.5f;
+            var stroke = parent.Segment.IsDominantPath && child.Segment.IsDominantPath ? "#172015" : "#aab5a4";
+            var strokeWidth = parent.Segment.IsDominantPath && child.Segment.IsDominantPath ? 2.4f : 1.2f;
+            writer.WriteLine(
+                $"<path d=\"M {SvgNumber(parent.X)} {SvgNumber(parent.BoxBottomY)} C {SvgNumber(parent.X)} {SvgNumber(midY)} {SvgNumber(child.X)} {SvgNumber(midY)} {SvgNumber(child.X)} {SvgNumber(child.BoxTopY)}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{SvgNumber(strokeWidth)}\" stroke-opacity=\"0.8\" />");
+        }
+
+        foreach (var item in layout.Items)
+        {
+            var segment = item.Segment;
+            var strokeWidth = segment.IsDominantPath ? 2.4f : 1.1f;
+            var branchWidth = 1.8f + 10f * MathF.Sqrt(segment.LivingDescendantCount / MathF.Max(1f, analysis.LivingCreatureCount));
+            writer.WriteLine(
+                $"<line x1=\"{SvgNumber(item.X)}\" y1=\"{SvgNumber(item.StartY)}\" x2=\"{SvgNumber(item.X)}\" y2=\"{SvgNumber(item.BoxTopY)}\" stroke=\"{Html(LineageSegmentColor(segment))}\" stroke-width=\"{SvgNumber(branchWidth)}\" stroke-linecap=\"round\" stroke-opacity=\"0.34\" />");
+            var fill = segment.IsDominantPath
+                ? "#172015"
+                : segment.IsLivingEndpoint
+                    ? "#2f8f43"
+                    : segment.ChildSegmentCount > 1
+                        ? "#d69d2f"
+                        : "#6a8fce";
+            var stroke = segment.HasGenomePayload && segment.HasBrainPayload ? "#ffffff" : "#b45309";
+            var title = FormatLineageSegmentGraphTitle(segment);
+            var speciesLabel = TryResolveLineageSpeciesName(segment.EndRecord, speciesHistory, out var speciesName)
+                ? speciesName
+                : "Species unclustered";
+            var detail = FormatLineageSegmentDetailData(segment, state, speciesHistory);
+            var tooltip = FormatLineageSegmentPlainDetail(segment, state, speciesHistory);
+            writer.WriteLine(
+                $"<g class=\"lineage-segment-node{(segment.IsDominantPath ? " is-dominant" : string.Empty)}\" tabindex=\"0\" role=\"button\" data-lineage-title=\"{Html(title)}\" data-lineage-detail=\"{Html(detail)}\">");
+            writer.WriteLine(
+                $"<rect x=\"{SvgNumber(item.BoxX)}\" y=\"{SvgNumber(item.BoxY)}\" width=\"{SvgNumber(item.BoxWidth)}\" height=\"{SvgNumber(item.BoxHeight)}\" rx=\"6\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{SvgNumber(strokeWidth)}\"><title>{Html(tooltip)}</title></rect>");
+            writer.WriteLine($"<text x=\"{SvgNumber(item.BoxX + 8f)}\" y=\"{SvgNumber(item.BoxY + 17f)}\" style=\"fill:#fff\">{Html(TrimLineageGraphLabel(title, 22))}</text>");
+            writer.WriteLine($"<text x=\"{SvgNumber(item.BoxX + 8f)}\" y=\"{SvgNumber(item.BoxY + 33f)}\" style=\"fill:#fff; opacity:0.82\">{Html(TrimLineageGraphLabel(speciesLabel, 22))}</text>");
+            writer.WriteLine($"<text x=\"{SvgNumber(item.BoxX + 8f)}\" y=\"{SvgNumber(item.BoxY + 49f)}\" style=\"fill:#fff\">{Html($"g{segment.StartRecord.Generation}-{segment.EndRecord.Generation}, {segment.LivingDescendantCount} living")}</text>");
+            writer.WriteLine("</g>");
+        }
+
+        writer.WriteLine("</svg>");
+        writer.WriteLine("</div>");
+        writer.WriteLine("<div class=\"lineage-tree-legend\">");
+        writer.WriteLine("<span><span class=\"legend-swatch\" style=\"background:#172015\"></span>Representative path from dominant founder</span>");
+        writer.WriteLine("<span><span class=\"legend-swatch\" style=\"background:#2f8f43\"></span>Living endpoint segment</span>");
+        writer.WriteLine("<span><span class=\"legend-swatch\" style=\"background:#d69d2f\"></span>Branching segment</span>");
+        writer.WriteLine("<span><span class=\"legend-swatch\" style=\"background:#6a8fce\"></span>Linear segment</span>");
+        writer.WriteLine("<span><span class=\"legend-swatch\" style=\"background:#b45309\"></span>Orange border: missing genome/brain payload</span>");
+        if (graphTruncated)
+        {
+            writer.WriteLine("<span>Graph is dominant-path only because the complete tree is too large for an inline SVG.</span>");
+        }
+
+        writer.WriteLine("</div>");
+        writer.WriteLine("</div>");
+        writer.WriteLine("<aside class=\"lineage-detail-panel\" aria-live=\"polite\">");
+        writer.WriteLine("<h3 data-lineage-detail-title>Lineage detail</h3>");
+        writer.WriteLine("<dl data-lineage-detail-body><dt>Select</dt><dd>Click a lineage box in the graph.</dd></dl>");
+        writer.WriteLine("</aside>");
+        writer.WriteLine("</div>");
+    }
+
+    private static IReadOnlyList<SurvivorLineageSegment> SelectLineageSegmentsForGraph(SurvivorLineageAnalysis analysis)
+    {
+        if (analysis.Segments.Count <= 48)
+        {
+            return analysis.Segments;
+        }
+
+        var byId = analysis.Segments.ToDictionary(segment => segment.SegmentId, StringComparer.Ordinal);
+        var keep = new HashSet<string>(StringComparer.Ordinal);
+        var minLivingDescendants = Math.Max(2, (int)MathF.Ceiling(analysis.LivingCreatureCount * 0.015f));
+
+        foreach (var segment in analysis.Segments
+            .Where(segment => segment.IsDominantPath
+                || segment.ChildSegmentCount > 0
+                || segment.LivingDescendantCount >= minLivingDescendants))
+        {
+            AddLineageSegmentAndParents(segment, byId, keep);
+        }
+
+        var rootSegments = analysis.Segments
+            .Where(segment => segment.ParentSegmentId is null)
+            .OrderByDescending(segment => segment.LivingDescendantCount)
+            .ThenBy(segment => segment.SegmentId, StringComparer.Ordinal)
+            .Take(16);
+        foreach (var root in rootSegments)
+        {
+            AddLineageSegmentAndParents(root, byId, keep);
+        }
+
+        var selected = analysis.Segments
+            .Where(segment => keep.Contains(segment.SegmentId))
+            .ToArray();
+        if (selected.Length <= SurvivorLineageTreeNodeRenderLimit)
+        {
+            return selected;
+        }
+
+        keep.Clear();
+        foreach (var segment in analysis.Segments
+            .Where(segment => segment.IsDominantPath || segment.ChildSegmentCount > 0)
+            .Concat(analysis.Segments
+                .OrderByDescending(segment => segment.LivingDescendantCount)
+                .ThenBy(segment => segment.SegmentId, StringComparer.Ordinal)
+                .Take(SurvivorLineageTreeNodeRenderLimit / 2)))
+        {
+            AddLineageSegmentAndParents(segment, byId, keep);
+        }
+
+        return analysis.Segments
+            .Where(segment => keep.Contains(segment.SegmentId))
+            .Take(SurvivorLineageTreeNodeRenderLimit)
+            .ToArray();
+    }
+
+    private static void AddLineageSegmentAndParents(
+        SurvivorLineageSegment segment,
+        IReadOnlyDictionary<string, SurvivorLineageSegment> byId,
+        ISet<string> keep)
+    {
+        var current = segment;
+        while (keep.Add(current.SegmentId)
+            && current.ParentSegmentId is not null
+            && byId.TryGetValue(current.ParentSegmentId, out var parent))
+        {
+            current = parent;
+        }
+    }
+
+    private static LineageSegmentLayout LayoutLineageSegments(
+        IReadOnlyList<SurvivorLineageSegment> segments,
+        int maxGeneration)
+    {
+        var byId = segments.ToDictionary(segment => segment.SegmentId);
+        var childrenByParent = segments
+            .Where(segment => segment.ParentSegmentId is not null && byId.ContainsKey(segment.ParentSegmentId))
+            .GroupBy(segment => segment.ParentSegmentId!)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(segment => segment.LivingDescendantCount)
+                    .ThenBy(segment => segment.EndRecord.Generation)
+                    .ThenBy(segment => segment.SegmentId, StringComparer.Ordinal)
+                    .ToArray());
+        var roots = segments
+            .Where(segment => segment.ParentSegmentId is null || !byId.ContainsKey(segment.ParentSegmentId))
+            .OrderByDescending(segment => segment.LivingDescendantCount)
+            .ThenBy(segment => segment.SegmentId, StringComparer.Ordinal)
+            .ToArray();
+        var laneById = new Dictionary<string, float>(StringComparer.Ordinal);
+        var nextLane = 0;
+
+        float AssignLane(SurvivorLineageSegment segment)
+        {
+            if (laneById.TryGetValue(segment.SegmentId, out var existing))
+            {
+                return existing;
+            }
+
+            if (!childrenByParent.TryGetValue(segment.SegmentId, out var children) || children.Length == 0)
+            {
+                var leafLane = nextLane++;
+                laneById[segment.SegmentId] = leafLane;
+                return leafLane;
+            }
+
+            var total = 0f;
+            foreach (var child in children)
+            {
+                total += AssignLane(child);
+            }
+
+            var lane = total / children.Length;
+            laneById[segment.SegmentId] = lane;
+            return lane;
+        }
+
+        foreach (var root in roots)
+        {
+            AssignLane(root);
+        }
+
+        foreach (var segment in segments)
+        {
+            AssignLane(segment);
+        }
+
+        var laneCount = Math.Max(1, nextLane);
+        const float plotLeft = 112f;
+        const float laneStride = 156f;
+        var plotWidth = MathF.Max(900f, MathF.Max(1f, laneCount - 1f) * laneStride);
+        const float top = 48f;
+        var plotHeight = MathF.Max(640f, Math.Max(1, maxGeneration) * 72f);
+        const float boxWidth = 146f;
+        const float boxHeight = 58f;
+        var width = plotLeft + plotWidth + 112f;
+        var items = segments
+            .Select(segment =>
+            {
+                var x = laneCount == 1
+                    ? width * 0.5f
+                    : plotLeft + laneById[segment.SegmentId] / MathF.Max(1f, laneCount - 1f) * plotWidth;
+                var startY = top + segment.StartRecord.Generation / MathF.Max(1f, maxGeneration) * plotHeight;
+                var endY = top + segment.EndRecord.Generation / MathF.Max(1f, maxGeneration) * plotHeight;
+                var boxY = endY - boxHeight * 0.5f;
+                return new LineageSegmentLayoutItem(
+                    segment,
+                    x,
+                    startY,
+                    endY,
+                    x - boxWidth * 0.5f,
+                    boxY,
+                    boxWidth,
+                    boxHeight);
+            })
+            .OrderBy(item => item.Segment.StartRecord.Generation)
+            .ThenByDescending(item => item.Segment.LivingDescendantCount)
+            .ThenBy(item => item.Segment.SegmentId, StringComparer.Ordinal)
+            .ToArray();
+        return new LineageSegmentLayout(
+            items,
+            items.ToDictionary(item => item.Segment.SegmentId, StringComparer.Ordinal),
+            width,
+            top + plotHeight + 64f,
+            generation => top + generation / MathF.Max(1f, maxGeneration) * plotHeight);
+    }
+
+    private static void WriteDominantLineagePathTable(
+        StreamWriter writer,
+        SurvivorLineageAnalysis analysis)
+    {
+        writer.WriteLine("<h3>Dominant Ancestor Path</h3>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Step</th><th>Creature</th><th>Generation</th><th>Living Descendants</th><th>Surviving Children</th><th>Born</th><th>Status</th><th>Payload</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        for (var i = 0; i < analysis.DominantPath.Count; i++)
+        {
+            var step = analysis.DominantPath[i];
+            var record = step.Record;
+            var payload = record.GenomeId >= 0 && record.BrainId >= 0 ? "Genome+brain kept" : "Payload pruned";
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(i + 1)}</td>" +
+                $"<td>#{Html(record.Id.Value)}</td>" +
+                $"<td>{Html(record.Generation)}</td>" +
+                $"<td>{Html(step.LivingDescendantCount)}</td>" +
+                $"<td>{Html(step.ChildCount)}</td>" +
+                $"<td>{Html($"tick {record.BirthTick}")}</td>" +
+                $"<td>{Html(FormatLineageStatus(record))}</td>" +
+                $"<td>{Html(payload)}</td>" +
+                "</tr>");
+        }
+
+        if (analysis.DominantPath.Count == 0)
+        {
+            writer.WriteLine("<tr><td class=\"empty\" colspan=\"8\">No dominant path could be reconstructed.</td></tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+    }
+
+    private static string FormatLineageNodeTitle(SurvivorLineageNode node)
+    {
+        return $"Creature #{node.Record.Id.Value}, generation {node.Record.Generation}, {node.LivingDescendantCount} living descendants, {FormatLineageStatus(node.Record)}";
+    }
+
+    private static string FormatLineageSegmentName(
+        SurvivorLineageSegment segment,
+        SpeciesClusterHistory speciesHistory)
+    {
+        if (TryResolveLineageSpeciesName(segment.EndRecord, speciesHistory, out var name))
+        {
+            return name;
+        }
+
+        return segment.StartRecord.Id == segment.EndRecord.Id
+            ? $"Lineage #{segment.EndRecord.Id.Value}"
+            : $"Lineage #{segment.StartRecord.Id.Value}-{segment.EndRecord.Id.Value}";
+    }
+
+    private static string FormatLineageSegmentGraphTitle(SurvivorLineageSegment segment)
+    {
+        return segment.ParentSegmentId is null && segment.StartRecord.Generation == 0
+            ? $"Founder #{segment.StartRecord.Id.Value}"
+            : FormatLineageSegmentFallbackId(segment);
+    }
+
+    private static bool TryResolveLineageSpeciesName(
+        CreatureLineageRecord record,
+        SpeciesClusterHistory speciesHistory,
+        out string name)
+    {
+        if (speciesHistory.RecordClusterById.TryGetValue(record.Id, out var speciesId))
+        {
+            name = SpeciesClusterAnalyzer.GenerateName(speciesId);
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+
+    private static string TrimLineageGraphLabel(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return string.Concat(value.AsSpan(0, Math.Max(1, maxLength - 1)), "...");
+    }
+
+    private static string FormatLineageSegmentFallbackId(SurvivorLineageSegment segment)
+    {
+        return segment.StartRecord.Id == segment.EndRecord.Id
+            ? $"L {segment.EndRecord.Id.Value}"
+            : $"L {segment.StartRecord.Id.Value}-{segment.EndRecord.Id.Value}";
+    }
+
+    private static string FormatLineageSegmentDetailData(
+        SurvivorLineageSegment segment,
+        WorldState state,
+        SpeciesClusterHistory speciesHistory)
+    {
+        return string.Join(
+            "||",
+            BuildLineageSegmentDetailEntries(segment, state, speciesHistory)
+                .Select(entry => $"{entry.Label}::{entry.Value}"));
+    }
+
+    private static string FormatLineageSegmentPlainDetail(
+        SurvivorLineageSegment segment,
+        WorldState state,
+        SpeciesClusterHistory speciesHistory)
+    {
+        return string.Join(
+            " | ",
+            BuildLineageSegmentDetailEntries(segment, state, speciesHistory)
+                .Select(entry => $"{entry.Label}: {entry.Value}"));
+    }
+
+    private static IReadOnlyList<LineageDetailEntry> BuildLineageSegmentDetailEntries(
+        SurvivorLineageSegment segment,
+        WorldState state,
+        SpeciesClusterHistory speciesHistory)
+    {
+        var payload = segment.HasGenomePayload && segment.HasBrainPayload ? "kept" : "partly pruned";
+        var entries = new List<LineageDetailEntry>
+        {
+            new("Species", FormatLineageSegmentName(segment, speciesHistory)),
+            new("Segment", FormatLineageSegmentFallbackId(segment)),
+            new("Starts at", $"#{segment.StartRecord.Id.Value}, generation {segment.StartRecord.Generation}"),
+            new("Endpoint", $"#{segment.EndRecord.Id.Value} ({FormatLineageStatus(segment.EndRecord)})"),
+            new("Generations", $"{segment.StartRecord.Generation}-{segment.EndRecord.Generation}"),
+            new("Ancestor nodes", segment.AncestorCount.ToString(CultureInfo.InvariantCulture)),
+            new("Living descendants", segment.LivingDescendantCount.ToString(CultureInfo.InvariantCulture)),
+            new("Child segments", segment.ChildSegmentCount.ToString(CultureInfo.InvariantCulture)),
+            new("Graph role", FormatLineageSegmentGraphRole(segment)),
+            new("Birth ticks", $"{segment.StartRecord.BirthTick}-{segment.EndRecord.BirthTick}"),
+            new("Payload", payload)
+        };
+
+        if (state.TryGetGenome(segment.EndRecord.GenomeId, out var genome))
+        {
+            entries.Add(new("Body genes", $"radius {FormatCompactNumber(genome.BodyRadius)}, speed {FormatCompactNumber(genome.MaxSpeed)}, turn {FormatCompactNumber(genome.MaxTurnRadiansPerSecond)} rad/s"));
+            entries.Add(new("Sense genes", $"range {FormatCompactNumber(genome.SenseRadius)}, vision {FormatCompactNumber(genome.VisionAngleRadians * 180f / MathF.PI)} deg"));
+            entries.Add(new("Energy genes", $"basal {FormatCompactNumber(genome.BasalEnergyPerSecond)}/s, move {FormatCompactNumber(genome.MovementEnergyPerSecond)}/s, eat {FormatCompactNumber(genome.EatCaloriesPerSecond)}/s"));
+            entries.Add(new("Repro genes", $"threshold {FormatCompactNumber(genome.ReproductionEnergyThreshold)}, investment {FormatCompactNumber(genome.OffspringEnergyInvestment)}, cooldown {FormatCompactNumber(genome.ReproductionCooldownSeconds)}s"));
+            entries.Add(new("Diet genes", $"diet {FormatCompactNumber(genome.DietaryAdaptation)}, carrion {FormatCompactNumber(genome.CarrionAdaptation)}, tender/rich/tough {FormatCompactNumber(genome.TenderPlantAdaptation)}/{FormatCompactNumber(genome.RichPlantAdaptation)}/{FormatCompactNumber(genome.ToughPlantAdaptation)}"));
+            entries.Add(new("Combat genes", $"bite {FormatCompactNumber(genome.BiteStrength)}, resist {FormatCompactNumber(genome.DamageResistance)}"));
+            entries.Add(new("Digest genes", $"gut {FormatCompactNumber(genome.GutCapacityCalories)}, digest {FormatCompactNumber(genome.DigestionCaloriesPerSecond)}/s"));
+        }
+        else
+        {
+            entries.Add(new("Genome", "pruned or unavailable"));
+        }
+
+        if (state.TryGetBrain(segment.EndRecord.BrainId, out var brain) && brain is not null)
+        {
+            var architecture = state.GetBrainArchitectureKind(segment.EndRecord.BrainId);
+            var directMean = brain.Weights.Length > 0
+                ? brain.Weights.Take(NeuralBrainGenome.DirectWeightCount).Average(weight => Math.Abs(weight))
+                : 0f;
+            entries.Add(new("Brain", $"{FormatBrainArchitectureKind(architecture)}, hidden {brain.HiddenNodeCount}, weights {brain.Weights.Length}"));
+            entries.Add(new("Brain magnitude", $"direct mean |w| {FormatCompactNumber((float)directMean)}, hidden in {FormatCompactNumber(brain.SumAbsoluteHiddenInputWeights())}, hidden out {FormatCompactNumber(brain.SumAbsoluteHiddenOutputWeights())}"));
+            entries.Add(new("Forage weights", $"plant move {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.PlantForwardInput))}, meat move {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatForwardInput))}, eat freshness {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.VisibleMeatFreshnessInput))}"));
+            entries.Add(new("Risk weights", $"rot move {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentForwardInput))}, terrain drag {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.ForwardTerrainDragInput))}"));
+            entries.Add(new("Attack weights", $"creature ahead {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureForwardInput))}, close {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput))}, approach {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureApproachRateInput))}"));
+        }
+        else
+        {
+            entries.Add(new("Brain", "pruned or unavailable"));
+        }
+
+        return entries;
+    }
+
+    private static string FormatCompactNumber(float value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private static string LineageSegmentColor(SurvivorLineageSegment segment)
+    {
+        return segment.IsDominantPath
+            ? "#172015"
+            : segment.IsLivingEndpoint
+                ? "#2f8f43"
+                : segment.ChildSegmentCount > 1
+                    ? "#d69d2f"
+                    : "#6a8fce";
+    }
+
+    private static string FormatLineageSegmentGraphRole(SurvivorLineageSegment segment)
+    {
+        if (segment.IsDominantPath)
+        {
+            return "representative path from dominant founder";
+        }
+
+        if (segment.IsLivingEndpoint)
+        {
+            return "living endpoint segment";
+        }
+
+        return segment.ChildSegmentCount > 1
+            ? "branching segment"
+            : "linear segment";
+    }
+
+    private static void WriteLineageSegmentScript(TextWriter writer)
+    {
+        writer.WriteLine(
+            """
+            <script>
+            (() => {
+              for (const section of document.querySelectorAll('[data-lineage-section]')) {
+                const title = section.querySelector('[data-lineage-detail-title]');
+                const body = section.querySelector('[data-lineage-detail-body]');
+                const nodes = Array.from(section.querySelectorAll('.lineage-segment-node'));
+                const select = node => {
+                  for (const other of nodes) {
+                    other.classList.toggle('is-selected', other === node);
+                  }
+                  if (title) {
+                    title.textContent = node.getAttribute('data-lineage-title') || 'Lineage detail';
+                  }
+                  if (body) {
+                    body.replaceChildren();
+                    const parts = (node.getAttribute('data-lineage-detail') || '').split('||').filter(Boolean);
+                    for (const part of parts) {
+                      const index = part.indexOf('::');
+                      const label = index > 0 ? part.slice(0, index) : 'Detail';
+                      const value = index > 0 ? part.slice(index + 2) : part;
+                      const dt = document.createElement('dt');
+                      const dd = document.createElement('dd');
+                      dt.textContent = label;
+                      dd.textContent = value;
+                      body.append(dt, dd);
+                    }
+                  }
+                };
+                for (const node of nodes) {
+                  node.addEventListener('pointerdown', event => event.stopPropagation());
+                  node.addEventListener('click', event => {
+                    event.stopPropagation();
+                    select(node);
+                  });
+                  node.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      select(node);
+                    }
+                  });
+                }
+                const initial = section.querySelector('.lineage-segment-node.is-dominant') || nodes[0];
+                if (initial) {
+                  select(initial);
+                }
+
+                const resetButtons = Array.from(section.querySelectorAll('[data-lineage-reset]'));
+                const svgs = Array.from(section.querySelectorAll('[data-lineage-panzoom]'));
+                const resetSvg = svg => {
+                  const raw = svg.getAttribute('data-lineage-viewbox') || svg.getAttribute('viewBox');
+                  if (raw) {
+                    svg.setAttribute('viewBox', raw);
+                  }
+                };
+                resetButtons.forEach(button => {
+                  button.addEventListener('click', () => svgs.forEach(resetSvg));
+                });
+                for (const svg of svgs) {
+                  let viewBox = (svg.getAttribute('viewBox') || '0 0 1 1').split(/\s+/).map(Number);
+                  let dragStart = null;
+                  const apply = () => svg.setAttribute('viewBox', viewBox.map(value => Number.isFinite(value) ? value.toFixed(3) : '0').join(' '));
+                  const point = event => {
+                    const rect = svg.getBoundingClientRect();
+                    return {
+                      x: viewBox[0] + (event.clientX - rect.left) / Math.max(1, rect.width) * viewBox[2],
+                      y: viewBox[1] + (event.clientY - rect.top) / Math.max(1, rect.height) * viewBox[3]
+                    };
+                  };
+                  svg.addEventListener('wheel', event => {
+                    event.preventDefault();
+                    viewBox = (svg.getAttribute('viewBox') || '0 0 1 1').split(/\s+/).map(Number);
+                    const before = point(event);
+                    const factor = event.deltaY < 0 ? 0.82 : 1.22;
+                    const nextWidth = Math.min(Math.max(viewBox[2] * factor, 220), 12000);
+                    const nextHeight = Math.min(Math.max(viewBox[3] * factor, 180), 12000);
+                    viewBox[0] = before.x - (before.x - viewBox[0]) * (nextWidth / viewBox[2]);
+                    viewBox[1] = before.y - (before.y - viewBox[1]) * (nextHeight / viewBox[3]);
+                    viewBox[2] = nextWidth;
+                    viewBox[3] = nextHeight;
+                    apply();
+                  }, { passive: false });
+                  svg.addEventListener('pointerdown', event => {
+                    if (event.button !== 0) return;
+                    if (event.target.closest && event.target.closest('.lineage-segment-node')) return;
+                    viewBox = (svg.getAttribute('viewBox') || '0 0 1 1').split(/\s+/).map(Number);
+                    dragStart = { x: event.clientX, y: event.clientY, viewBox: [...viewBox] };
+                    svg.setPointerCapture(event.pointerId);
+                  });
+                  svg.addEventListener('pointermove', event => {
+                    if (!dragStart) return;
+                    const rect = svg.getBoundingClientRect();
+                    viewBox[0] = dragStart.viewBox[0] - (event.clientX - dragStart.x) / Math.max(1, rect.width) * dragStart.viewBox[2];
+                    viewBox[1] = dragStart.viewBox[1] - (event.clientY - dragStart.y) / Math.max(1, rect.height) * dragStart.viewBox[3];
+                    apply();
+                  });
+                  const clearDrag = () => { dragStart = null; };
+                  svg.addEventListener('pointerup', clearDrag);
+                  svg.addEventListener('pointercancel', clearDrag);
+                }
+              }
+            })();
+            </script>
+            """);
+    }
+
+    private sealed record LineageSegmentLayout(
+        IReadOnlyList<LineageSegmentLayoutItem> Items,
+        IReadOnlyDictionary<string, LineageSegmentLayoutItem> ById,
+        float Width,
+        float Height,
+        Func<int, float> YForGeneration);
+
+    private sealed record LineageSegmentLayoutItem(
+        SurvivorLineageSegment Segment,
+        float X,
+        float StartY,
+        float EndY,
+        float BoxX,
+        float BoxY,
+        float BoxWidth,
+        float BoxHeight)
+    {
+        public float BoxTopY => BoxY;
+
+        public float BoxBottomY => BoxY + BoxHeight;
+    }
+
+    private readonly record struct LineageDetailEntry(string Label, string Value);
+
+    private static string FormatLineageStatus(CreatureLineageRecord record)
+    {
+        if (record.IsAlive)
+        {
+            return "alive";
+        }
+
+        var reason = record.DeathReason?.ToString() ?? "dead";
+        return record.DeathTick.HasValue
+            ? $"{reason} at tick {record.DeathTick.Value}"
+            : reason;
     }
 
     private static void WriteSeasonPressureSection(
