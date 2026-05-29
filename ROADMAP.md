@@ -1,6 +1,6 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-05-26
+Last reviewed: 2026-05-29
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
@@ -172,6 +172,14 @@ Status: first pass implemented, future refinement needed
 - Improve species/cluster thresholds without implying false precision.
 - Distinguish lineage relatedness from behavioral convergence.
 - Use functional brain fingerprints for future richer brain architectures.
+- Keep current species interpretation layers separate:
+  - species identity comes from lineage plus genome/brain similarity
+  - current run role labels are diet/tactic/region, such as `plant-biased; searching; middle region`
+  - controlled behavior assays can disagree with realized run outcome, for example a species can be plant-heavy in the world while still testing as `scavenger-leaning` or `meat/egg-biased`
+- Add a future niche/life-history classification layer rather than overloading the existing role labels. Candidate labels include `r-selected`, `K-selected`, `stress-tolerant`, `competitive`, `ruderal/opportunist`, `generalist`, `specialist`, `efficient grazer`, `scavenger`, `predator`, `nomad/explorer`, `resident/patch holder`, and `defensive/durable`.
+- Suggested output shape: `life history / trophic role / habitat or behavior / trend`, for example `K-leaning / plant-biased grazer / middle-region / persistent dominant`.
+- Candidate life-history metrics: final and tail population, births/deaths, max and average generation, lifespan, stored creature energy, effective creature energy, body-area biomass proxy, energy per creature, offspring investment, egg count, egg energy per egg, maturity age, reproductive reserve, tail stability, calories per distance, and bottleneck/replacement history.
+- Recent balanced-foraging comparison note: after moving mutation pressure to the world, the higher-mutation run produced fewer survivors but higher energy per creature, larger body-area biomass proxy, higher offspring investment, fewer but more expensive eggs, and a shallower lineage. Treat that as a useful single-run K-leaning signal to validate with repeated seeds later.
 - Upgrade biome risk/reward reporting to use sampled creature-hour exposure for whole-run normalized metrics: births, deaths, plant calories, meat/egg calories, and attack damage per creature-hour, plus exposure index by biome. Use this before the next serious 500k+ natural/manual map biome tuning pass.
 - Add ecosystem health metrics:
   - energy flow
