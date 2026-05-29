@@ -12,12 +12,14 @@ public sealed class NeuralControllerSystem(
     bool enableLegacyNearestFoodVisionInputs = true,
     bool enableLegacyNearestCreatureVisionInputs = true,
     bool reuseActionsOnSkippedWorldSenses = false,
-    int maxActionReuseTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks) : ISimulationSystem
+    int maxActionReuseTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks,
+    int neuralControllerThreadCount = NeuralControllerSystem.DefaultNeuralControllerThreadCount) : ISimulationSystem
 {
     public const float DefaultAttackThreshold = 0.25f;
     public const float DefaultMemoryDecayPerSecond = 0.06f;
     public const float DefaultMemoryWriteRatePerSecond = 2.5f;
     public const int DefaultMaxActionReuseTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks;
+    public const int DefaultNeuralControllerThreadCount = 8;
 
     private const float MemoryWriteDeadZone = 0.02f;
     private const float InternalDecisionDeltaThreshold = 0.2f;
@@ -29,60 +31,191 @@ public sealed class NeuralControllerSystem(
     private readonly bool _enableLegacyNearestCreatureVisionInputs = enableLegacyNearestCreatureVisionInputs;
     private readonly bool _reuseActionsOnSkippedWorldSenses = reuseActionsOnSkippedWorldSenses;
     private readonly int _maxActionReuseTicks = ValidatePositive(maxActionReuseTicks, nameof(maxActionReuseTicks));
+    private readonly ParallelOptions _parallelOptions = new()
+    {
+        MaxDegreeOfParallelism = ValidatePositive(neuralControllerThreadCount, nameof(neuralControllerThreadCount))
+    };
+    private CreatureState[] _parallelCreatureBuffer = [];
+    private NeuralControllerProfileEvent[] _parallelProfileEvents = [];
+    private NeuralDecisionReason[] _parallelDecisionReasons = [];
 
     public void Update(WorldState state, float deltaSeconds)
     {
+        var creatureCount = state.Creatures.Count;
+        var profile = state.Profile?.NeuralController;
+        profile?.BeginUpdate(creatureCount);
+
+        if (_parallelOptions.MaxDegreeOfParallelism <= 1 || creatureCount <= 1)
+        {
+            UpdateSingleThreaded(state, deltaSeconds, profile, creatureCount);
+            return;
+        }
+
+        UpdateParallel(state, deltaSeconds, profile, creatureCount);
+    }
+
+    private void UpdateSingleThreaded(
+        WorldState state,
+        float deltaSeconds,
+        SimulationNeuralControllerProfile? profile,
+        int creatureCount)
+    {
         Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
         Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
-        var profile = state.Profile?.NeuralController;
-        profile?.BeginUpdate(state.Creatures.Count);
 
-        for (var i = 0; i < state.Creatures.Count; i++)
+        for (var i = 0; i < creatureCount; i++)
         {
-            var creature = state.Creatures[i];
-            var genome = state.GetGenome(creature.GenomeId);
+            var update = EvaluateCreature(state, state.Creatures[i], deltaSeconds, inputs, outputs);
+            state.Creatures[i] = update.Creature;
+            RecordProfileEvent(profile, update);
+        }
+    }
 
-            if (creature.BrainId < 0)
-            {
-                creature.Actions = default;
-                creature.DesiredVelocity = SimVector2.Zero;
-                state.Creatures[i] = creature;
-                profile?.RecordBrainlessCreature();
-                continue;
-            }
+    private void UpdateParallel(
+        WorldState state,
+        float deltaSeconds,
+        SimulationNeuralControllerProfile? profile,
+        int creatureCount)
+    {
+        EnsureParallelBufferCapacity(creatureCount);
 
-            var decisionReason = GetDecisionReason(state, creature);
-            if (decisionReason == NeuralDecisionReason.ReusedAction)
-            {
-                ApplyControllerOutputs(
-                    ref creature,
-                    genome,
-                    CreateCachedActionOutput(creature.Actions),
-                    new LegacyNeuralMemoryOutputFrame(creature.Actions.MemoryForward, creature.Actions.MemoryRight),
-                    deltaSeconds);
-                state.Creatures[i] = creature;
-                profile?.RecordReusedAction();
-                continue;
-            }
+        var creatureBuffer = _parallelCreatureBuffer;
+        var profileEvents = _parallelProfileEvents;
+        var decisionReasons = _parallelDecisionReasons;
+        Parallel.For(
+            0,
+            creatureCount,
+            _parallelOptions,
+            index => EvaluateCreatureForParallel(
+                state,
+                deltaSeconds,
+                index,
+                creatureBuffer,
+                profileEvents,
+                decisionReasons));
 
-            var brain = state.GetBrain(creature.BrainId);
-            var inputFrame = BrainInputFrame.FromSenses(creature.Senses, genome);
-            var legacyMemoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(creature.Senses);
-            LegacyNeuralBrainAdapter.FillInputs(
-                inputFrame,
-                legacyMemoryInputs,
-                inputs,
-                _enableLegacyNearestFoodVisionInputs,
-                _enableLegacyNearestCreatureVisionInputs);
-            outputs.Clear();
-            brain.Evaluate(inputs, outputs);
+        for (var i = 0; i < creatureCount; i++)
+        {
+            state.Creatures[i] = creatureBuffer[i];
+            RecordProfileEvent(profile, profileEvents[i], decisionReasons[i]);
+        }
+    }
 
-            var actionOutputs = LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs);
-            var memoryOutputs = LegacyNeuralBrainAdapter.ReadMemoryOutputs(outputs);
-            ApplyControllerOutputs(ref creature, genome, actionOutputs, memoryOutputs, deltaSeconds);
-            RecordNeuralDecision(ref creature, state.Tick);
-            state.Creatures[i] = creature;
-            profile?.RecordBrainEvaluation(decisionReason);
+    private void EvaluateCreatureForParallel(
+        WorldState state,
+        float deltaSeconds,
+        int index,
+        CreatureState[] creatureBuffer,
+        NeuralControllerProfileEvent[] profileEvents,
+        NeuralDecisionReason[] decisionReasons)
+    {
+        Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
+        Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
+        var update = EvaluateCreature(state, state.Creatures[index], deltaSeconds, inputs, outputs);
+        creatureBuffer[index] = update.Creature;
+        profileEvents[index] = update.ProfileEvent;
+        decisionReasons[index] = update.DecisionReason;
+    }
+
+    private NeuralControllerCreatureUpdate EvaluateCreature(
+        WorldState state,
+        CreatureState creature,
+        float deltaSeconds,
+        Span<float> inputs,
+        Span<float> outputs)
+    {
+        var genome = state.GetGenome(creature.GenomeId);
+
+        if (creature.BrainId < 0)
+        {
+            creature.Actions = default;
+            creature.DesiredVelocity = SimVector2.Zero;
+            return new NeuralControllerCreatureUpdate(
+                creature,
+                NeuralControllerProfileEvent.BrainlessCreature,
+                default);
+        }
+
+        var decisionReason = GetDecisionReason(state, creature);
+        if (decisionReason == NeuralDecisionReason.ReusedAction)
+        {
+            ApplyControllerOutputs(
+                ref creature,
+                genome,
+                CreateCachedActionOutput(creature.Actions),
+                new LegacyNeuralMemoryOutputFrame(creature.Actions.MemoryForward, creature.Actions.MemoryRight),
+                deltaSeconds);
+            return new NeuralControllerCreatureUpdate(
+                creature,
+                NeuralControllerProfileEvent.ReusedAction,
+                decisionReason);
+        }
+
+        var brain = state.GetBrain(creature.BrainId);
+        var inputFrame = BrainInputFrame.FromSenses(creature.Senses, genome);
+        var legacyMemoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(creature.Senses);
+        LegacyNeuralBrainAdapter.FillInputs(
+            inputFrame,
+            legacyMemoryInputs,
+            inputs,
+            _enableLegacyNearestFoodVisionInputs,
+            _enableLegacyNearestCreatureVisionInputs);
+        outputs.Clear();
+        brain.Evaluate(inputs, outputs);
+
+        var actionOutputs = LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs);
+        var memoryOutputs = LegacyNeuralBrainAdapter.ReadMemoryOutputs(outputs);
+        ApplyControllerOutputs(ref creature, genome, actionOutputs, memoryOutputs, deltaSeconds);
+        RecordNeuralDecision(ref creature, state.Tick);
+        return new NeuralControllerCreatureUpdate(
+            creature,
+            NeuralControllerProfileEvent.BrainEvaluation,
+            decisionReason);
+    }
+
+    private void EnsureParallelBufferCapacity(int creatureCount)
+    {
+        if (_parallelCreatureBuffer.Length >= creatureCount)
+        {
+            return;
+        }
+
+        var capacity = Math.Max(creatureCount, _parallelCreatureBuffer.Length * 2);
+        _parallelCreatureBuffer = new CreatureState[capacity];
+        _parallelProfileEvents = new NeuralControllerProfileEvent[capacity];
+        _parallelDecisionReasons = new NeuralDecisionReason[capacity];
+    }
+
+    private static void RecordProfileEvent(
+        SimulationNeuralControllerProfile? profile,
+        NeuralControllerCreatureUpdate update)
+    {
+        RecordProfileEvent(profile, update.ProfileEvent, update.DecisionReason);
+    }
+
+    private static void RecordProfileEvent(
+        SimulationNeuralControllerProfile? profile,
+        NeuralControllerProfileEvent profileEvent,
+        NeuralDecisionReason decisionReason)
+    {
+        if (profile is null)
+        {
+            return;
+        }
+
+        switch (profileEvent)
+        {
+            case NeuralControllerProfileEvent.BrainlessCreature:
+                profile.RecordBrainlessCreature();
+                break;
+            case NeuralControllerProfileEvent.ReusedAction:
+                profile.RecordReusedAction();
+                break;
+            case NeuralControllerProfileEvent.BrainEvaluation:
+                profile.RecordBrainEvaluation(decisionReason);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(profileEvent), profileEvent, "Unsupported neural controller profile event.");
         }
     }
 
@@ -263,3 +396,15 @@ internal enum NeuralDecisionReason
     InternalChange,
     MaxReuseAge
 }
+
+internal enum NeuralControllerProfileEvent
+{
+    BrainlessCreature,
+    ReusedAction,
+    BrainEvaluation
+}
+
+internal readonly record struct NeuralControllerCreatureUpdate(
+    CreatureState Creature,
+    NeuralControllerProfileEvent ProfileEvent,
+    NeuralDecisionReason DecisionReason);

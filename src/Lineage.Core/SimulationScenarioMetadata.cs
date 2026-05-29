@@ -139,6 +139,11 @@ public static class SimulationScenarioMetadata
             return "ticks";
         }
 
+        if (name.EndsWith("ThreadCount", StringComparison.Ordinal))
+        {
+            return "threads";
+        }
+
         if (name.Contains("Seconds", StringComparison.Ordinal)
             || name is "FixedDeltaSeconds")
         {
@@ -191,6 +196,7 @@ public static class SimulationScenarioMetadata
             "EnableLegacyNearestFoodVisionInputs" => "Keeps legacy nearest-food inputs available beside sector vision.",
             "EnableLegacyNearestCreatureVisionInputs" => "Keeps legacy nearest-creature inputs available beside sector vision.",
             "ReuseNeuralActionsOnSkippedWorldSenses" => "Reuses the previous neural action on ticks where expensive world senses were not refreshed, unless contact or internal-state changes force a new decision.",
+            "NeuralControllerThreadCount" => "Maximum worker threads used for neural controller evaluation. Defaults to 8; use 1 for the single-threaded deterministic path.",
             "CloseSenseRefreshMinimumTicks" => "Minimum age of stale world senses before proximity-only close cues can force an extra world refresh.",
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
             "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are no longer referenced by living creatures or eggs.",
@@ -280,6 +286,7 @@ public static class SimulationScenarioMetadata
         }
 
         if (name is "ReuseNeuralActionsOnSkippedWorldSenses"
+                or "NeuralControllerThreadCount"
             || name.Contains("Prune", StringComparison.Ordinal)
             || name.Contains("Pruning", StringComparison.Ordinal)
             || name.Contains("Payload", StringComparison.Ordinal))
@@ -370,6 +377,7 @@ public static class SimulationScenarioMetadata
             || name is "FixedDeltaSeconds"
                 or "CloseSenseRefreshProximity"
                 or "CloseSenseRefreshMinimumTicks"
-                or "ReuseNeuralActionsOnSkippedWorldSenses";
+                or "ReuseNeuralActionsOnSkippedWorldSenses"
+                or "NeuralControllerThreadCount";
     }
 }

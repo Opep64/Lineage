@@ -159,6 +159,7 @@ public static class SimulationPipelines
         bool enableLegacyNearestFoodVisionInputs = true,
         bool enableLegacyNearestCreatureVisionInputs = true,
         bool reuseNeuralActionsOnSkippedWorldSenses = false,
+        int neuralControllerThreadCount = NeuralControllerSystem.DefaultNeuralControllerThreadCount,
         float biteDamagePerSecond = 0.25f,
         float biteEnergyCostPerSecond = 0.12f,
         float biteRangePadding = 1f,
@@ -242,7 +243,8 @@ public static class SimulationPipelines
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,
                 enableLegacyNearestFoodVisionInputs: enableLegacyNearestFoodVisionInputs,
                 enableLegacyNearestCreatureVisionInputs: enableLegacyNearestCreatureVisionInputs,
-                reuseActionsOnSkippedWorldSenses: reuseNeuralActionsOnSkippedWorldSenses),
+                reuseActionsOnSkippedWorldSenses: reuseNeuralActionsOnSkippedWorldSenses,
+                neuralControllerThreadCount: neuralControllerThreadCount),
             new MovementSystem(
                 biomeMovementCostProfile,
                 biomeSpeedProfile,

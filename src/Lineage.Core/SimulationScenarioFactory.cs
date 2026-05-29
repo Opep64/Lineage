@@ -66,6 +66,7 @@ public static class SimulationScenarioFactory
                 scenario.EnableLegacyNearestFoodVisionInputs,
                 scenario.EnableLegacyNearestCreatureVisionInputs,
                 scenario.ReuseNeuralActionsOnSkippedWorldSenses,
+                scenario.NeuralControllerThreadCount,
                 scenario.BiteDamagePerSecond,
                 scenario.BiteEnergyCostPerSecond,
                 scenario.BiteRangePadding,

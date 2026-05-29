@@ -79,6 +79,8 @@ public sealed record SimulationScenario
 
     public bool ReuseNeuralActionsOnSkippedWorldSenses { get; init; }
 
+    public int NeuralControllerThreadCount { get; init; } = NeuralControllerSystem.DefaultNeuralControllerThreadCount;
+
     public int StatsSnapshotIntervalTicks { get; init; } = DefaultStatsSnapshotIntervalTicks;
 
     public bool EnableExtinctPayloadPruning { get; init; }
@@ -392,6 +394,7 @@ public sealed record SimulationScenario
         EnsureRange(CloseSenseRefreshProximity, 0f, 1f, nameof(CloseSenseRefreshProximity));
         EnsurePositive(CloseSenseRefreshMinimumTicks, nameof(CloseSenseRefreshMinimumTicks));
         EnsurePositive(PlantPayoffTraceHalfLifeSeconds, nameof(PlantPayoffTraceHalfLifeSeconds));
+        EnsurePositive(NeuralControllerThreadCount, nameof(NeuralControllerThreadCount));
         EnsurePositive(StatsSnapshotIntervalTicks, nameof(StatsSnapshotIntervalTicks));
         EnsurePositive(ExtinctPayloadPruneIntervalTicks, nameof(ExtinctPayloadPruneIntervalTicks));
         EnsureNonNegative(InitialCreatureCount, nameof(InitialCreatureCount));

@@ -101,6 +101,7 @@ static void PrintHelp()
           --close-sense-refresh-minimum-ticks <n> Minimum stale-world-sense age before proximity close refreshes.
           --reuse-neural-actions-on-skipped-world-senses Reuse prior neural outputs when world senses are stale.
           --no-reuse-neural-actions-on-skipped-world-senses Disable stale-world-sense neural action reuse.
+          --neural-controller-threads <n> Worker threads for neural controller evaluation. Default: scenario value.
           --prune-extinct-payloads   Compact genome/brain payloads not referenced by living creatures or eggs.
           --prune-extinct-payload-interval <n> Payload pruning interval in ticks. Default: scenario value.
           --inject-species <path>    Inject a species profile JSON, usually species/name.species.json. Can repeat.
@@ -964,6 +965,8 @@ internal sealed record RunOptions
 
     public bool? ReuseNeuralActionsOnSkippedWorldSensesOverride { get; init; }
 
+    public int? NeuralControllerThreadCountOverride { get; init; }
+
     public bool EnableExtinctPayloadPruning { get; init; }
 
     public int? ExtinctPayloadPruneIntervalTicksOverride { get; init; }
@@ -1087,6 +1090,8 @@ internal sealed record RunOptions
                 ?? scenario.CloseSenseRefreshMinimumTicks,
             ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
                 ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
+            NeuralControllerThreadCount = NeuralControllerThreadCountOverride
+                ?? scenario.NeuralControllerThreadCount,
             EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
             ExtinctPayloadPruneIntervalTicks = ExtinctPayloadPruneIntervalTicksOverride
                 ?? scenario.ExtinctPayloadPruneIntervalTicks
@@ -1122,6 +1127,8 @@ internal sealed record RunOptions
                 ?? scenario.CloseSenseRefreshMinimumTicks,
             ReuseNeuralActionsOnSkippedWorldSenses = ReuseNeuralActionsOnSkippedWorldSensesOverride
                 ?? scenario.ReuseNeuralActionsOnSkippedWorldSenses,
+            NeuralControllerThreadCount = NeuralControllerThreadCountOverride
+                ?? scenario.NeuralControllerThreadCount,
             EnableExtinctPayloadPruning = EnableExtinctPayloadPruning || scenario.EnableExtinctPayloadPruning,
             ExtinctPayloadPruneIntervalTicks = ExtinctPayloadPruneIntervalTicksOverride
                 ?? scenario.ExtinctPayloadPruneIntervalTicks
@@ -1337,6 +1344,9 @@ internal sealed record RunOptions
                     break;
                 case "--no-reuse-neural-actions-on-skipped-world-senses":
                     options = options with { ReuseNeuralActionsOnSkippedWorldSensesOverride = false };
+                    break;
+                case "--neural-controller-threads":
+                    options = options with { NeuralControllerThreadCountOverride = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
                     break;
                 case "--prune-extinct-payloads":
                     options = options with { EnableExtinctPayloadPruning = true };

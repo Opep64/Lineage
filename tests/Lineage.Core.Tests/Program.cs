@@ -91,6 +91,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
     ("Neural controller reuses actions on skipped world senses", NeuralControllerReusesActionsOnSkippedWorldSenses),
     ("Neural controller forces decisions on stale contact", NeuralControllerForcesDecisionsOnStaleContact),
+    ("Neural controller parallel path matches single-threaded path", NeuralControllerParallelPathMatchesSingleThreadedPath),
     ("Neural controller consumes sector vision inputs", NeuralControllerConsumesSectorVisionInputs),
     ("Neural controller writes spatial memory", NeuralControllerWritesSpatialMemory),
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
@@ -4009,6 +4010,102 @@ static void NeuralControllerForcesDecisionsOnStaleContact()
     creature = simulation.State.Creatures[0];
     AssertTrue(creature.Actions.MoveForward > 0.9f, "Food contact should force a fresh neural movement decision");
     AssertTrue(creature.Actions.WantsEat, "Food contact should force a fresh neural eat decision");
+}
+
+static void NeuralControllerParallelPathMatchesSingleThreadedPath()
+{
+    var singleThreaded = CreateNeuralControllerParallelProbe(threadCount: 1);
+    var parallel = CreateNeuralControllerParallelProbe(threadCount: 4);
+
+    singleThreaded.Step();
+    parallel.Step();
+
+    AssertEqual(singleThreaded.State.Creatures.Count, parallel.State.Creatures.Count, "Parallel probe creature count");
+    for (var i = 0; i < singleThreaded.State.Creatures.Count; i++)
+    {
+        var expected = singleThreaded.State.Creatures[i];
+        var actual = parallel.State.Creatures[i];
+        AssertClose(expected.HeadingRadians, actual.HeadingRadians, 0.000001, $"Parallel probe heading {i}");
+        AssertClose(expected.DesiredVelocity.X, actual.DesiredVelocity.X, 0.000001, $"Parallel probe desired velocity X {i}");
+        AssertClose(expected.DesiredVelocity.Y, actual.DesiredVelocity.Y, 0.000001, $"Parallel probe desired velocity Y {i}");
+        AssertClose(expected.MemoryVector.X, actual.MemoryVector.X, 0.000001, $"Parallel probe memory X {i}");
+        AssertClose(expected.MemoryVector.Y, actual.MemoryVector.Y, 0.000001, $"Parallel probe memory Y {i}");
+        AssertClose(expected.Actions.MoveForward, actual.Actions.MoveForward, 0.000001, $"Parallel probe move {i}");
+        AssertClose(expected.Actions.Turn, actual.Actions.Turn, 0.000001, $"Parallel probe turn {i}");
+        AssertClose(expected.Actions.EatOutput, actual.Actions.EatOutput, 0.000001, $"Parallel probe eat {i}");
+        AssertClose(expected.Actions.ReproduceOutput, actual.Actions.ReproduceOutput, 0.000001, $"Parallel probe reproduce {i}");
+        AssertClose(expected.Actions.AttackOutput, actual.Actions.AttackOutput, 0.000001, $"Parallel probe attack {i}");
+        AssertEqual(expected.Actions.WantsEat, actual.Actions.WantsEat, $"Parallel probe eat intent {i}");
+        AssertEqual(expected.Actions.WantsReproduce, actual.Actions.WantsReproduce, $"Parallel probe reproduce intent {i}");
+        AssertEqual(expected.Actions.WantsAttack, actual.Actions.WantsAttack, $"Parallel probe attack intent {i}");
+        AssertEqual(expected.LastNeuralDecisionTick, actual.LastNeuralDecisionTick, $"Parallel probe decision tick {i}");
+    }
+
+    AssertEqual(
+        singleThreaded.Profile?.NeuralController.BrainEvaluations ?? -1,
+        parallel.Profile?.NeuralController.BrainEvaluations ?? -2,
+        "Parallel probe brain evaluations");
+    AssertEqual(
+        singleThreaded.Profile?.NeuralController.CreaturesControlled ?? -1,
+        parallel.Profile?.NeuralController.CreaturesControlled ?? -2,
+        "Parallel probe creatures controlled");
+}
+
+static Simulation CreateNeuralControllerParallelProbe(int threadCount)
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 612,
+        systems: [new NeuralControllerSystem(neuralControllerThreadCount: threadCount)]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 11f,
+        MaxTurnRadiansPerSecond = 3.5f,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.35f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodProximityInput] = 2.2f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodRightInput] = 1.7f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodContactInput] = 2.4f;
+    weights[NeuralBrainSchema.ReproduceOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.ReproductionReadinessInput] = 1.9f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactInput] = 1.5f;
+    weights[NeuralBrainSchema.MemoryForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodForwardInput] = 1.1f;
+    weights[NeuralBrainSchema.MemoryRightOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodRightInput] = 1.1f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    for (var i = 0; i < 48; i++)
+    {
+        simulation.State.SpawnCreature(
+            genomeId,
+            new SimVector2(20f + i * 2f, 25f + i),
+            energy: 50f + i,
+            brainId: brainId);
+        var creature = simulation.State.Creatures[^1];
+        creature.HeadingRadians = i * 0.071f;
+        creature.MemoryVector = new SimVector2((i % 5) * 0.05f, (i % 7) * -0.03f);
+        creature.Senses = new CreatureSenseState
+        {
+            WorldSenseRefreshed = true,
+            WorldSenseTick = 0,
+            EnergyRatio = 0.35f + (i % 9) * 0.04f,
+            HealthRatio = 0.8f + (i % 4) * 0.05f,
+            Hunger = 0.2f + (i % 6) * 0.1f,
+            FoodProximity = (i % 10) / 10f,
+            FoodDirectionForward = i % 2 == 0 ? 0.75f : -0.15f,
+            FoodDirectionRight = ((i % 7) - 3) * 0.18f,
+            FoodContact = i % 11 == 0 ? 1f : 0f,
+            CreatureContact = i % 13 == 0 ? 1f : 0f,
+            ReproductionReadiness = (i % 8) / 8f
+        };
+        simulation.State.Creatures[^1] = creature;
+    }
+
+    return simulation;
 }
 
 static void NeuralControllerConsumesSectorVisionInputs()
@@ -9261,6 +9358,13 @@ static void ScenarioMetadataDescribesEditableJsonFields()
     AssertEqual("Performance", neuralReuse.Group, "Neural action reuse group");
     AssertTrue(neuralReuse.Advanced, "Neural action reuse should be advanced");
 
+    var neuralThreads = SimulationScenarioMetadata.FindByJsonName("neuralControllerThreadCount")
+        ?? throw new InvalidOperationException("Missing neural controller thread metadata.");
+    AssertEqual("number", neuralThreads.Type, "Neural controller thread type");
+    AssertEqual("Performance", neuralThreads.Group, "Neural controller thread group");
+    AssertEqual("threads", neuralThreads.Units, "Neural controller thread units");
+    AssertTrue(neuralThreads.Advanced, "Neural controller thread count should be advanced");
+
     var closeMinimum = SimulationScenarioMetadata.FindByJsonName("closeSenseRefreshMinimumTicks")
         ?? throw new InvalidOperationException("Missing close sense refresh minimum metadata.");
     AssertEqual("number", closeMinimum.Type, "Close sense refresh minimum type");
@@ -9297,6 +9401,7 @@ static void ScenarioJsonRoundTrips()
         PlantPayoffTraceHalfLifeSeconds = 31f,
         EnableSectorVision = true,
         ReuseNeuralActionsOnSkippedWorldSenses = true,
+        NeuralControllerThreadCount = 4,
         StatsSnapshotIntervalTicks = 12,
         InitialCreatureCount = 7,
         InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.RightThird,
@@ -9462,6 +9567,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"plantPayoffTraceHalfLifeSeconds\""), "JSON should serialize plant payoff trace half-life");
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
     AssertTrue(json.Contains("\"reuseNeuralActionsOnSkippedWorldSenses\""), "JSON should serialize neural action reuse toggle");
+    AssertTrue(json.Contains("\"neuralControllerThreadCount\""), "JSON should serialize neural controller thread count");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertTrue(json.Contains("\"plantSpecializationEnergyCostPerSecond\""), "JSON should serialize plant specialization cost");
     AssertTrue(json.Contains("\"tenderPlantAdaptation\""), "JSON should serialize tender plant adaptation");
@@ -9489,6 +9595,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.PlantPayoffTraceHalfLifeSeconds, roundTripped.PlantPayoffTraceHalfLifeSeconds, 0.000001, "Scenario plant payoff trace half-life");
     AssertEqual(scenario.EnableSectorVision, roundTripped.EnableSectorVision, "Scenario sector vision toggle");
     AssertEqual(scenario.ReuseNeuralActionsOnSkippedWorldSenses, roundTripped.ReuseNeuralActionsOnSkippedWorldSenses, "Scenario neural action reuse toggle");
+    AssertEqual(scenario.NeuralControllerThreadCount, roundTripped.NeuralControllerThreadCount, "Scenario neural controller thread count");
     AssertEqual(scenario.StatsSnapshotIntervalTicks, roundTripped.StatsSnapshotIntervalTicks, "Scenario snapshot interval");
     AssertEqual(scenario.InitialCreatureCount, roundTripped.InitialCreatureCount, "Scenario creature count");
     AssertEqual(scenario.InitialCreatureSpawnRegion, roundTripped.InitialCreatureSpawnRegion, "Scenario initial spawn region");
