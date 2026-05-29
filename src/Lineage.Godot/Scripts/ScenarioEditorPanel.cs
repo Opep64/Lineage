@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Godot;
 using Lineage.Core;
@@ -46,6 +47,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private readonly List<ScenarioFieldBinding> _bindings = [];
     private readonly Dictionary<string, Label> _scenarioGroupEmptyLabels = [];
     private readonly List<SpeciesScenarioSeed> _speciesSeedEntries = [];
+    private readonly List<ScenarioRecipeOption> _scenarioRecipes = [];
 
     private MarginContainer _expandedRoot = null!;
     private MarginContainer _collapsedRoot = null!;
@@ -54,6 +56,9 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private VBoxContainer _scenarioSearchResults = null!;
     private Label _scenarioSearchEmptyLabel = null!;
     private Label _statusLabel = null!;
+    private OptionButton _recipeInput = null!;
+    private Button _applyRecipeButton = null!;
+    private Label _recipeSummaryLabel = null!;
     private LineEdit _scenarioSearchInput = null!;
     private OptionButton _scenarioScopeInput = null!;
     private Label _lastReportLabel = null!;
@@ -130,6 +135,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _speciesSeedEntries.Clear();
         _speciesSeedEntries.AddRange((scenario.SpeciesSeeds ?? []).Select(seed => seed.Validated()));
         UpdateSpeciesRosterLabel();
+    }
+
+    public void SetScenarioRecipeDirectory(string recipeDirectory)
+    {
+        LoadScenarioRecipes(recipeDirectory);
     }
 
     public bool TryReadScenario(out SimulationScenario scenario, out string error)
@@ -337,6 +347,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         };
         root.AddThemeConstantOverride("separation", 8);
 
+        root.AddChild(BuildRecipeRow());
+
         _scenarioSearchInput = new LineEdit
         {
             PlaceholderText = "Find setting, group, or help text"
@@ -421,6 +433,266 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         RefreshScenarioFieldVisibility();
         return root;
+    }
+
+    private Control BuildRecipeRow()
+    {
+        var root = new VBoxContainer();
+        root.AddThemeConstantOverride("separation", 4);
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 8);
+
+        var label = new Label
+        {
+            Text = "Recipe",
+            CustomMinimumSize = new Vector2(FieldLabelWidth, 0f),
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        };
+        _recipeInput = new OptionButton
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        _recipeInput.ItemSelected += _ => UpdateRecipeControls();
+        _applyRecipeButton = CreateButton("Apply", ApplySelectedRecipe);
+        _applyRecipeButton.Disabled = true;
+
+        row.AddChild(label);
+        row.AddChild(_recipeInput);
+        row.AddChild(_applyRecipeButton);
+        root.AddChild(row);
+
+        _recipeSummaryLabel = new Label
+        {
+            Text = "No recipes loaded.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            CustomMinimumSize = new Vector2(320f, 0f)
+        };
+        root.AddChild(_recipeSummaryLabel);
+        RefreshRecipeOptions();
+        return root;
+    }
+
+    private void LoadScenarioRecipes(string recipeDirectory)
+    {
+        _scenarioRecipes.Clear();
+        if (System.IO.Directory.Exists(recipeDirectory))
+        {
+            foreach (var path in System.IO.Directory.EnumerateFiles(recipeDirectory, "*.json", System.IO.SearchOption.TopDirectoryOnly))
+            {
+                if (TryReadScenarioRecipe(path, out var recipe) && recipe is not null)
+                {
+                    _scenarioRecipes.Add(recipe);
+                }
+            }
+        }
+
+        _scenarioRecipes.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
+        RefreshRecipeOptions();
+    }
+
+    private static bool TryReadScenarioRecipe(string path, out ScenarioRecipeOption? recipe)
+    {
+        recipe = default;
+        try
+        {
+            using var document = JsonDocument.Parse(System.IO.File.ReadAllText(path));
+            var root = document.RootElement;
+            if (!root.TryGetProperty("changes", out var changesElement)
+                || changesElement.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            var name = root.TryGetProperty("name", out var nameElement)
+                ? nameElement.GetString()
+                : null;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = System.IO.Path.GetFileNameWithoutExtension(path);
+            }
+
+            var description = root.TryGetProperty("description", out var descriptionElement)
+                ? descriptionElement.GetString() ?? string.Empty
+                : string.Empty;
+            var tags = root.TryGetProperty("tags", out var tagsElement)
+                && tagsElement.ValueKind == JsonValueKind.Array
+                    ? tagsElement.EnumerateArray()
+                        .Where(element => element.ValueKind == JsonValueKind.String)
+                        .Select(element => element.GetString() ?? string.Empty)
+                        .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                        .ToArray()
+                    : [];
+            var changes = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+            foreach (var change in changesElement.EnumerateObject())
+            {
+                changes[change.Name] = change.Value.Clone();
+            }
+
+            recipe = new ScenarioRecipeOption(
+                name.Trim(),
+                path,
+                description.Trim(),
+                tags,
+                changes);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void RefreshRecipeOptions()
+    {
+        if (_recipeInput is null || _recipeSummaryLabel is null)
+        {
+            return;
+        }
+
+        _recipeInput.Clear();
+        _recipeInput.AddItem("Choose recipe");
+        foreach (var recipe in _scenarioRecipes)
+        {
+            var tagText = recipe.Tags.Count == 0
+                ? string.Empty
+                : $" [{string.Join(", ", recipe.Tags)}]";
+            _recipeInput.AddItem($"{recipe.Name}{tagText}");
+        }
+
+        _recipeInput.Selected = 0;
+        UpdateRecipeControls();
+    }
+
+    private void UpdateRecipeControls()
+    {
+        if (_recipeInput is null || _applyRecipeButton is null || _recipeSummaryLabel is null)
+        {
+            return;
+        }
+
+        var recipe = SelectedRecipe();
+        _applyRecipeButton.Disabled = recipe is null;
+        _recipeSummaryLabel.Text = recipe is null
+            ? _scenarioRecipes.Count == 0
+                ? "No recipes loaded."
+                : $"{_scenarioRecipes.Count} recipe{(_scenarioRecipes.Count == 1 ? string.Empty : "s")} available."
+            : $"{recipe.Changes.Count} setting{(recipe.Changes.Count == 1 ? string.Empty : "s")}: {string.Join(", ", recipe.Changes.Keys.Select(RecipeFieldLabel))}";
+    }
+
+    private ScenarioRecipeOption? SelectedRecipe()
+    {
+        if (_recipeInput is null || _recipeInput.Selected <= 0)
+        {
+            return null;
+        }
+
+        var index = _recipeInput.Selected - 1;
+        return index >= 0 && index < _scenarioRecipes.Count
+            ? _scenarioRecipes[index]
+            : null;
+    }
+
+    private string RecipeFieldLabel(string jsonName)
+    {
+        return _bindings.FirstOrDefault(binding =>
+            string.Equals(binding.Metadata.JsonName, jsonName, StringComparison.OrdinalIgnoreCase))?.Metadata.Label
+            ?? jsonName;
+    }
+
+    private void ApplySelectedRecipe()
+    {
+        var recipe = SelectedRecipe();
+        if (recipe is null)
+        {
+            SetStatus("Choose a recipe before applying it.");
+            return;
+        }
+
+        var applied = 0;
+        var skipped = 0;
+        try
+        {
+            foreach (var (jsonName, value) in recipe.Changes)
+            {
+                var binding = _bindings.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Metadata.JsonName, jsonName, StringComparison.OrdinalIgnoreCase));
+                if (binding is null)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                SetEditorValue(binding.Editor, ConvertRecipeValue(value, binding.Property.PropertyType, jsonName));
+                applied++;
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Recipe failed: {ex.Message}");
+            return;
+        }
+
+        RefreshScenarioFieldVisibility();
+        var skippedText = skipped == 0 ? string.Empty : $" Skipped {skipped} unsupported setting{(skipped == 1 ? string.Empty : "s")}.";
+        SetStatus($"Applied recipe {recipe.Name}: {applied} setting{(applied == 1 ? string.Empty : "s")}.{skippedText}");
+    }
+
+    private static object? ConvertRecipeValue(JsonElement value, Type targetType, string jsonName)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            return targetType == typeof(string)
+                ? string.Empty
+                : throw new InvalidOperationException($"{jsonName} cannot be null.");
+        }
+
+        if (targetType == typeof(string))
+        {
+            return value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? string.Empty
+                : value.GetRawText();
+        }
+
+        if (targetType == typeof(ulong))
+        {
+            return value.ValueKind == JsonValueKind.Number && value.TryGetUInt64(out var number)
+                ? number
+                : ulong.Parse(value.GetString() ?? value.GetRawText(), CultureInfo.InvariantCulture);
+        }
+
+        if (targetType == typeof(int))
+        {
+            return value.ValueKind == JsonValueKind.Number
+                ? value.GetInt32()
+                : int.Parse(value.GetString() ?? value.GetRawText(), CultureInfo.InvariantCulture);
+        }
+
+        if (targetType == typeof(float))
+        {
+            return value.ValueKind == JsonValueKind.Number
+                ? value.GetSingle()
+                : float.Parse(value.GetString() ?? value.GetRawText(), CultureInfo.InvariantCulture);
+        }
+
+        if (targetType == typeof(bool))
+        {
+            return value.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.String => bool.Parse(value.GetString() ?? string.Empty),
+                _ => throw new InvalidOperationException($"{jsonName} must be true or false.")
+            };
+        }
+
+        if (targetType.IsEnum)
+        {
+            return Enum.Parse(targetType, value.GetString() ?? value.GetRawText(), ignoreCase: true);
+        }
+
+        throw new InvalidOperationException($"Recipe field {jsonName} has unsupported type {targetType.Name}.");
     }
 
     private void RefreshScenarioFieldVisibility()
@@ -1034,6 +1306,13 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         Control Row,
         VBoxContainer GroupContainer,
         int GroupRowIndex);
+
+    private sealed record ScenarioRecipeOption(
+        string Name,
+        string Path,
+        string Description,
+        IReadOnlyList<string> Tags,
+        IReadOnlyDictionary<string, JsonElement> Changes);
 }
 
 public readonly record struct CliRunRequest(

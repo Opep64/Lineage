@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "lineage.runner.scenario-recipe.v1",
+  "name": "Long Run Performance",
+  "description": "Performance-oriented settings for larger long-running simulations.",
+  "tags": [
+    "performance",
+    "long-run"
+  ],
+  "changes": {
+    "statsSnapshotIntervalTicks": 54000,
+    "worldSenseIntervalTicks": 10,
+    "neuralControllerThreadCount": 8,
+    "sensingThreadCount": 4,
+    "reuseNeuralActionsOnSkippedWorldSenses": true,
+    "closeSenseRefreshMinimumTicks": 3,
+    "enableExtinctPayloadPruning": true,
+    "extinctPayloadPruneIntervalTicks": 1000,
+    "spatialCellSize": 128
+  },
+  "createdAtUtc": "2026-05-29T13:30:00Z",
+  "updatedAtUtc": "2026-05-29T13:30:00Z"
+}

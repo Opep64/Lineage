@@ -4114,6 +4114,7 @@ public partial class Main : Node2D
         AddChild(_scenarioEditor);
 
         var repositoryRoot = GetRepositoryRoot();
+        _scenarioEditor.SetScenarioRecipeDirectory(System.IO.Path.Combine(repositoryRoot, "scenarios", "recipes"));
         var scenarioDirectory = System.IO.Path.Combine(repositoryRoot, "scenarios");
         var outDirectory = System.IO.Path.Combine(repositoryRoot, "out");
         var speciesDirectory = System.IO.Path.Combine(repositoryRoot, SpeciesProfileDirectoryName);
