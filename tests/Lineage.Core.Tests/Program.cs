@@ -195,6 +195,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
+    ("Brain profile JSON round trips neural controllers", BrainProfileJsonRoundTripsNeuralControllers),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
     ("Species profile injection can override brain kind", SpeciesProfileInjectionCanOverrideBrainKind),
@@ -207,6 +208,7 @@ var tests = new (string Name, Action Body)[]
     ("Species behavior change highlights notable shifts", SpeciesBehaviorChangeHighlightsNotableShifts),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
     ("Scenario species roster injects brain overrides", ScenarioSpeciesRosterInjectsBrainOverrides),
+    ("Scenario species roster injects brain profile paths", ScenarioSpeciesRosterInjectsBrainProfilePaths),
     ("Roster lineage summaries group injected profile descendants", RosterLineageSummariesGroupInjectedProfileDescendants),
     ("Simulation snapshots restore exact continuation", SimulationSnapshotsRestoreExactContinuation),
     ("Simulation snapshot capture can sample stats history", SimulationSnapshotCaptureCanSampleStatsHistory),
@@ -8700,6 +8702,50 @@ static Simulation CreateIntentToggleSimulation(bool requireIntent)
     return simulation;
 }
 
+static void BrainProfileJsonRoundTripsNeuralControllers()
+{
+    var scenario = new SimulationScenario
+    {
+        Name = "Brain Source",
+        Seed = 898,
+        PipelineKind = SimulationPipelineKind.Neural,
+        BrainArchitectureKind = BrainArchitectureKind.HiddenLayerNeural,
+        BrainHiddenNodeCount = 8,
+        InitialBrainKind = InitialBrainKind.SectorForager,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var creature = simulation.State.Creatures[0];
+
+    var profile = BrainProfileExporter.ExportCreatureBrain(
+        scenario,
+        simulation.State,
+        creature.Id,
+        "Probe brain",
+        "Round-trip brain test");
+    var brainJson = BrainProfileJson.ToJson(profile);
+    var roundTripped = BrainProfileJson.FromJson(brainJson);
+
+    AssertTrue(brainJson.Contains("\"brainArchitectureKind\": \"hiddenLayerNeural\""), "Brain JSON should include architecture");
+    AssertTrue(brainJson.Contains("\"inputSchemaVersion\": 1"), "Brain JSON should include input schema version");
+    AssertTrue(brainJson.Contains("\"outputSchemaVersion\": 1"), "Brain JSON should include output schema version");
+    AssertEqual("Probe brain", roundTripped.Name, "Brain profile name");
+    AssertEqual("Round-trip brain test", roundTripped.Notes, "Brain profile notes");
+    AssertEqual(BrainArchitectureKind.HiddenLayerNeural, roundTripped.BrainArchitectureKind, "Brain profile architecture");
+    AssertEqual(NeuralBrainSchema.InputSchemaVersion, roundTripped.InputSchemaVersion, "Brain profile input schema");
+    AssertEqual(NeuralBrainSchema.OutputSchemaVersion, roundTripped.OutputSchemaVersion, "Brain profile output schema");
+    AssertEqual(NeuralBrainSchema.InputCount, roundTripped.InputCount, "Brain profile input count");
+    AssertEqual(NeuralBrainSchema.OutputCount, roundTripped.OutputCount, "Brain profile output count");
+    AssertEqual(8, roundTripped.HiddenNodeCount, "Brain profile hidden node count");
+    AssertEqual(creature.Id.Value, roundTripped.Source.CreatureId, "Brain profile source creature");
+    AssertEqual(creature.Generation, roundTripped.Source.Generation, "Brain profile source generation");
+
+    var sourceBrain = simulation.State.GetBrain(creature.BrainId);
+    var loadedBrain = roundTripped.CreateBrain();
+    AssertBrainsClose(sourceBrain, loadedBrain, "Brain profile weights");
+}
+
 static void SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains()
 {
     var scenario = new SimulationScenario
@@ -8721,13 +8767,18 @@ static void SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains()
         simulation.State,
         creature.Id,
         "Probe species",
-        "Round-trip test");
+        "Round-trip test") with
+    {
+        DefaultBrainPath = "brains/probe.brain.json"
+    };
     var profileJson = SpeciesProfileJson.ToJson(profile);
     var roundTripped = SpeciesProfileJson.FromJson(profileJson);
 
     AssertTrue(profileJson.Contains("\"brainArchitectureKind\": \"hybridNeural\""), "Profile JSON should include brain architecture");
+    AssertTrue(profileJson.Contains("\"defaultBrainPath\": \"brains/probe.brain.json\""), "Profile JSON should include default brain path");
     AssertEqual("Probe species", roundTripped.Name, "Profile name");
     AssertEqual("Round-trip test", roundTripped.Notes, "Profile notes");
+    AssertEqual("brains/probe.brain.json", roundTripped.DefaultBrainPath, "Profile default brain path");
     AssertEqual(creature.Id.Value, roundTripped.Source.CreatureId, "Profile source creature");
     AssertEqual(creature.Generation, roundTripped.Source.Generation, "Profile source generation");
     AssertEqual(BrainArchitectureKind.HybridNeural, roundTripped.BrainArchitectureKind, "Profile brain architecture");
@@ -9316,6 +9367,92 @@ static void ScenarioSpeciesRosterInjectsBrainOverrides()
     }
 }
 
+static void ScenarioSpeciesRosterInjectsBrainProfilePaths()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 808,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        InitialBrainKind = InitialBrainKind.ExplorerForager
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var sourceCreature = source.State.Creatures[0];
+    var speciesProfile = SpeciesProfileExporter.ExportCreature(
+        sourceScenario,
+        source.State,
+        sourceCreature.Id,
+        "Roster body");
+
+    var brainProfile = new BrainProfile
+    {
+        Name = "Roster transplanted brain",
+        BrainArchitectureKind = BrainArchitectureKind.HiddenLayerNeural,
+        Weights = BrainFactory.CreateStarter(
+                BrainArchitectureKind.HiddenLayerNeural,
+                InitialBrainKind.ForagerPredator,
+                hiddenNodeCount: 8)
+            .Weights
+            .ToArray()
+    }.Validated();
+
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_roster_brain_profile_{Guid.NewGuid():N}");
+    try
+    {
+        var profilePath = Path.Combine(tempRoot, "species", "roster-body.species.json");
+        var brainPath = Path.Combine(tempRoot, "brains", "transplant.brain.json");
+        SpeciesProfileJson.Save(profilePath, speciesProfile);
+        BrainProfileJson.Save(brainPath, brainProfile);
+
+        var scenarioPath = Path.Combine(tempRoot, "scenarios", "roster-brain-profile-scenario.json");
+        var scenario = new SimulationScenario
+        {
+            Seed = 809,
+            PipelineKind = SimulationPipelineKind.Neural,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f,
+            SpeciesSeeds =
+            [
+                new SpeciesScenarioSeed
+                {
+                    ProfilePath = "species/roster-body.species.json",
+                    BrainProfilePath = "brains/transplant.brain.json",
+                    Count = 2,
+                    EnergyOverride = 40f
+                }
+            ]
+        };
+        SimulationScenarioJson.Save(scenarioPath, scenario);
+
+        var loadedScenario = SimulationScenarioJson.Load(scenarioPath);
+        var simulation = SimulationScenarioFactory.CreateSimulation(loadedScenario);
+        var results = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+            loadedScenario,
+            simulation.State,
+            scenarioPath);
+
+        AssertEqual(1, results.Count, "Roster brain profile injection result count");
+        AssertEqual(2, results[0].CreatureIds.Count, "Roster brain profile creature count");
+        AssertEqual(
+            BrainArchitectureKind.HiddenLayerNeural,
+            simulation.State.GetBrainArchitectureKind(results[0].BrainId),
+            "Roster brain profile architecture");
+        AssertEqual(8, simulation.State.GetBrain(results[0].BrainId).HiddenNodeCount, "Roster brain profile hidden nodes");
+        foreach (var creature in simulation.State.Creatures)
+        {
+            AssertEqual(results[0].GenomeId, creature.GenomeId, "Roster brain profile should keep species body genome");
+            AssertEqual(results[0].BrainId, creature.BrainId, "Roster brain profile creature brain id");
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
 static void RosterLineageSummariesGroupInjectedProfileDescendants()
 {
     var sourceScenario = new SimulationScenario
@@ -9796,6 +9933,7 @@ static void ScenarioJsonRoundTrips()
                 ProfilePath = "species/disabled.species.json",
                 Count = 2,
                 SpawnRegion = InitialCreatureSpawnRegion.BottomThird,
+                BrainProfilePath = "brains/disabled.brain.json",
                 Enabled = false
             }
         ],
@@ -9924,6 +10062,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
     AssertTrue(json.Contains("\"spawnRegion\": \"leftThird\""), "JSON should serialize species seed spawn regions");
     AssertTrue(json.Contains("\"brainOverrideKind\": \"scavengerForager\""), "JSON should serialize species seed brain overrides");
+    AssertTrue(json.Contains("\"brainProfilePath\": \"brains/disabled.brain.json\""), "JSON should serialize species seed brain profile paths");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"enablePlantTypeHabitatAffinity\""), "JSON should serialize plant habitat affinity");
     AssertTrue(json.Contains("\"plantRespawnDelaySecondsMin\""), "JSON should serialize plant respawn delay");
@@ -9985,6 +10124,7 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(InitialCreatureSpawnRegion.LeftThird, roundTripped.SpeciesSeeds[0].SpawnRegion, "Scenario species seed spawn region");
     AssertClose(42f, roundTripped.SpeciesSeeds[0].EnergyOverride ?? 0f, 0.000001, "Scenario species seed energy override");
     AssertEqual(InitialBrainKind.ScavengerForager, roundTripped.SpeciesSeeds[0].BrainOverrideKind, "Scenario species seed brain override");
+    AssertEqual("brains/disabled.brain.json", roundTripped.SpeciesSeeds[1].BrainProfilePath, "Scenario species seed brain profile path");
     AssertTrue(!roundTripped.SpeciesSeeds[1].Enabled, "Scenario disabled species seed");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
     AssertClose(scenario.GenericPlantWeight, roundTripped.GenericPlantWeight, 0.000001, "Scenario generic plant weight");

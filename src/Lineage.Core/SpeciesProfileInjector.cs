@@ -56,7 +56,11 @@ public static class SpeciesProfileInjector
     {
         if (options.BrainOverrideKind is null)
         {
-            return state.AddBrain(profile.CreateBrain(), profile.BrainArchitectureKind);
+            return options.BrainOverrideProfile is null
+                ? state.AddBrain(profile.CreateBrain(), profile.BrainArchitectureKind)
+                : state.AddBrain(
+                    options.BrainOverrideProfile.CreateBrain(),
+                    options.BrainOverrideProfile.BrainArchitectureKind);
         }
 
         if (options.BrainOverrideKind == InitialBrainKind.RandomPerFounder)
@@ -165,6 +169,7 @@ public readonly record struct SpeciesInjectionOptions(
     InitialCreatureSpawnRegion SpawnRegion = InitialCreatureSpawnRegion.Uniform,
     float? EnergyOverride = null,
     InitialBrainKind? BrainOverrideKind = null,
+    BrainProfile? BrainOverrideProfile = null,
     BrainArchitectureKind BrainArchitectureKind = BrainArchitectureKind.HybridNeural,
     int BrainHiddenNodeCount = 0)
 {
@@ -187,6 +192,12 @@ public readonly record struct SpeciesInjectionOptions(
             throw new InvalidOperationException("Species injection brain override kind must be defined.");
         }
 
+        if (BrainOverrideKind is not null && BrainOverrideProfile is not null)
+        {
+            throw new InvalidOperationException("Species injection can choose either a starter brain override or a brain profile, not both.");
+        }
+
+        var brainOverrideProfile = BrainOverrideProfile?.Validated();
         _ = BrainFactory.Describe(BrainArchitectureKind);
         var resolvedHiddenNodeCount = BrainFactory.ResolveHiddenNodeCount(
             BrainArchitectureKind,
@@ -204,6 +215,7 @@ public readonly record struct SpeciesInjectionOptions(
         return this with
         {
             Energy = energy,
+            BrainOverrideProfile = brainOverrideProfile,
             BrainHiddenNodeCount = resolvedHiddenNodeCount
         };
     }

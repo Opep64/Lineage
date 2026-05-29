@@ -4328,6 +4328,7 @@ public partial class Main : Node2D
                     request.SpawnRegion,
                     request.EnergyOverride,
                     request.BrainOverrideKind,
+                    null,
                     _scenario.BrainArchitectureKind,
                     _scenario.BrainHiddenNodeCount));
 

@@ -5,6 +5,10 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
+    public const int InputSchemaVersion = 1;
+
+    public const int OutputSchemaVersion = 1;
+
     public const int DefaultHiddenNodeCount = 4;
 
     public const int DefaultHiddenLayerNodeCount = 8;

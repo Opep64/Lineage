@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260529-species-catalog2">
+  <link rel="stylesheet" href="/styles.css?v=20260529-brain-catalog1">
 </head>
 <body>
   <header class="app-header">
@@ -165,6 +165,25 @@
       <p id="formMessage" class="form-message" role="status"></p>
     </section>
 
+    <section class="brain-panel">
+      <div class="section-title">
+        <h2>Brain Catalog</h2>
+        <div class="section-actions">
+          <button id="refreshBrainCatalogButton" class="secondary" type="button">Refresh Catalog</button>
+          <button id="deleteBrainCatalogButton" class="danger" type="button" disabled>Delete Brain</button>
+        </div>
+      </div>
+      <div class="brain-tools">
+        <label>
+          Brain profile
+          <select id="brainCatalogSelect">
+            <option value="">No brain profiles loaded</option>
+          </select>
+        </label>
+      </div>
+      <div id="brainCatalogDetails" class="catalog-details">Choose a brain profile to inspect it.</div>
+    </section>
+
     <section class="species-panel">
       <div class="section-title">
         <h2>Species Catalog</h2>
@@ -181,7 +200,7 @@
           </select>
         </label>
         <label>
-          Brain
+          Starter brain
           <select id="speciesSeedBrain">
             <option value="">Profile brain</option>
             <option value="scenario">Scenario initial brain</option>
@@ -193,6 +212,12 @@
             <option value="freshnessAwareScavenger">Freshness-aware scavenger</option>
             <option value="foragerPredator">Forager predator</option>
             <option value="randomPerFounder">Random per founder</option>
+          </select>
+        </label>
+        <label>
+          Catalog brain
+          <select id="speciesSeedBrainProfile">
+            <option value="">No catalog brain</option>
           </select>
         </label>
         <label>
@@ -216,7 +241,7 @@
         </label>
         <button id="addSpeciesToScenarioButton" class="secondary" type="button" disabled>Add To Scenario Roster</button>
       </div>
-      <div id="speciesCatalogDetails" class="species-catalog-details">Choose a species profile to inspect it.</div>
+      <div id="speciesCatalogDetails" class="catalog-details">Choose a species profile to inspect it.</div>
     </section>
 
     <section>
@@ -281,6 +306,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=20260529-species-catalog2"></script>
+  <script src="/app.js?v=20260529-brain-catalog1"></script>
 </body>
 </html>

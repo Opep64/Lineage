@@ -23,6 +23,7 @@ public static class SimulationScenarioSpeciesSeeder
         {
             var profilePath = ResolveProfilePath(seed.ProfilePath, scenarioPath, workspaceRoot);
             var profile = SpeciesProfileJson.Load(profilePath);
+            var brainProfile = LoadBrainProfile(seed, profile, profilePath, scenarioPath, workspaceRoot);
             results.Add(SpeciesProfileInjector.Inject(
                 state,
                 profile,
@@ -31,6 +32,7 @@ public static class SimulationScenarioSpeciesSeeder
                     seed.SpawnRegion,
                     seed.EnergyOverride,
                     seed.BrainOverrideKind,
+                    brainProfile,
                     scenario.BrainArchitectureKind,
                     scenario.BrainHiddenNodeCount)));
         }
@@ -54,6 +56,69 @@ public static class SimulationScenarioSpeciesSeeder
         }
 
         return Path.GetFullPath(profilePath);
+    }
+
+    private static BrainProfile? LoadBrainProfile(
+        SpeciesScenarioSeed seed,
+        SpeciesProfile profile,
+        string speciesProfilePath,
+        string? scenarioPath,
+        string? workspaceRoot)
+    {
+        if (seed.BrainOverrideKind is not null)
+        {
+            return null;
+        }
+
+        var brainProfilePath = !string.IsNullOrWhiteSpace(seed.BrainProfilePath)
+            ? seed.BrainProfilePath
+            : profile.DefaultBrainPath;
+        return string.IsNullOrWhiteSpace(brainProfilePath)
+            ? null
+            : BrainProfileJson.Load(ResolveBrainProfilePath(brainProfilePath, speciesProfilePath, scenarioPath, workspaceRoot));
+    }
+
+    public static string ResolveBrainProfilePath(
+        string brainProfilePath,
+        string? speciesProfilePath = null,
+        string? scenarioPath = null,
+        string? workspaceRoot = null)
+    {
+        if (Path.IsPathRooted(brainProfilePath))
+        {
+            return Path.GetFullPath(brainProfilePath);
+        }
+
+        foreach (var candidate in EnumerateBrainCandidates(brainProfilePath, speciesProfilePath, scenarioPath, workspaceRoot))
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return Path.GetFullPath(brainProfilePath);
+    }
+
+    private static IEnumerable<string> EnumerateBrainCandidates(
+        string brainProfilePath,
+        string? speciesProfilePath,
+        string? scenarioPath,
+        string? workspaceRoot)
+    {
+        if (!string.IsNullOrWhiteSpace(speciesProfilePath))
+        {
+            var speciesDirectory = Path.GetDirectoryName(Path.GetFullPath(speciesProfilePath));
+            if (!string.IsNullOrWhiteSpace(speciesDirectory))
+            {
+                yield return Path.GetFullPath(Path.Combine(speciesDirectory, brainProfilePath));
+            }
+        }
+
+        foreach (var candidate in EnumerateCandidates(brainProfilePath, scenarioPath, workspaceRoot))
+        {
+            yield return candidate;
+        }
     }
 
     private static IEnumerable<string> EnumerateCandidates(

@@ -148,6 +148,7 @@ public sealed record SpeciesCatalogEntry(
     string Path,
     bool CanDelete,
     string Notes,
+    string? DefaultBrainPath,
     string BrainArchitectureKind,
     int BrainHiddenNodeCount,
     int BrainWeightCount,
@@ -168,6 +169,26 @@ public sealed record SpeciesCatalogEntry(
     int SourceGeneration,
     DateTimeOffset ExportedAtUtc);
 
+public sealed record BrainCatalogEntry(
+    string Name,
+    string Path,
+    bool CanDelete,
+    string Notes,
+    string BrainArchitectureKind,
+    int InputSchemaVersion,
+    int OutputSchemaVersion,
+    int InputCount,
+    int OutputCount,
+    int HiddenNodeCount,
+    int WeightCount,
+    string SourceScenarioName,
+    ulong SourceSeed,
+    long SourceTick,
+    int SourceCreatureId,
+    int SourceFounderId,
+    int SourceGeneration,
+    DateTimeOffset ExportedAtUtc);
+
 public sealed record SpeciesCatalogExportRequest(
     string Name,
     string? Notes,
@@ -178,10 +199,25 @@ public sealed record SpeciesCatalogExportRequest(
 public sealed record SpeciesCatalogExportResult(
     SpeciesCatalogEntry Species);
 
+public sealed record BrainCatalogExportRequest(
+    string Name,
+    string? Notes,
+    int? CreatureId);
+
+public sealed record BrainCatalogExportResult(
+    BrainCatalogEntry Brain);
+
 public sealed record SpeciesCatalogDeleteRequest(
     string Path);
 
 public sealed record SpeciesCatalogDeleteResult(
+    string Path,
+    string ArchivedPath);
+
+public sealed record BrainCatalogDeleteRequest(
+    string Path);
+
+public sealed record BrainCatalogDeleteResult(
     string Path,
     string ArchivedPath);
 

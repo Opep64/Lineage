@@ -1049,9 +1049,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 var energy = seed.EnergyOverride is null
                     ? "profile energy"
                     : $"{seed.EnergyOverride.Value:0.###} energy";
-                var brain = seed.BrainOverrideKind is null
-                    ? "profile brain"
-                    : FormatSpeciesBrain(seed.BrainOverrideKind);
+                var brain = !string.IsNullOrWhiteSpace(seed.BrainProfilePath)
+                    ? $"{System.IO.Path.GetFileName(seed.BrainProfilePath)} brain profile"
+                    : seed.BrainOverrideKind is null
+                        ? "profile brain"
+                        : FormatSpeciesBrain(seed.BrainOverrideKind);
                 return $"{index + 1}. {state}: {seed.Count} x {System.IO.Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
             }));
     }

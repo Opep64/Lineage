@@ -62,12 +62,17 @@ const duplicateMapArtifactButton = document.querySelector("#duplicateMapArtifact
 const deleteMapArtifactButton = document.querySelector("#deleteMapArtifactButton");
 const mapArtifactDetails = document.querySelector("#mapArtifactDetails");
 const paintBiomeMapButton = document.querySelector("#paintBiomeMapButton");
+const brainCatalogSelect = document.querySelector("#brainCatalogSelect");
+const brainCatalogDetails = document.querySelector("#brainCatalogDetails");
+const refreshBrainCatalogButton = document.querySelector("#refreshBrainCatalogButton");
+const deleteBrainCatalogButton = document.querySelector("#deleteBrainCatalogButton");
 const speciesCatalogSelect = document.querySelector("#speciesCatalogSelect");
 const speciesCatalogDetails = document.querySelector("#speciesCatalogDetails");
 const refreshSpeciesCatalogButton = document.querySelector("#refreshSpeciesCatalogButton");
 const deleteSpeciesCatalogButton = document.querySelector("#deleteSpeciesCatalogButton");
 const addSpeciesToScenarioButton = document.querySelector("#addSpeciesToScenarioButton");
 const speciesSeedBrainSelect = document.querySelector("#speciesSeedBrain");
+const speciesSeedBrainProfileSelect = document.querySelector("#speciesSeedBrainProfile");
 const speciesSeedCountInput = document.querySelector("#speciesSeedCount");
 const speciesSeedRegionSelect = document.querySelector("#speciesSeedRegion");
 const speciesSeedEnergyInput = document.querySelector("#speciesSeedEnergy");
@@ -77,6 +82,7 @@ let allRuns = [];
 let scenarioOptions = [];
 let mapArtifacts = [];
 let scenarioRecipes = [];
+let brainCatalog = [];
 let speciesCatalog = [];
 let appliedRecipes = [];
 let recipeBaseScenario = null;
@@ -135,6 +141,128 @@ async function loadSpeciesCatalog(selectedPath = speciesCatalogSelect?.value || 
   renderSpeciesCatalogDetails();
 }
 
+async function loadBrainCatalog(selectedPath = brainCatalogSelect?.value || "") {
+  const response = await fetch("/api/brain-catalog");
+  brainCatalog = response.ok ? await response.json() : [];
+  renderBrainCatalogOptions(selectedPath);
+  renderBrainCatalogDetails();
+  renderSpeciesBrainProfileOptions(speciesSeedBrainProfileSelect?.value || "");
+}
+
+function renderBrainCatalogOptions(selectedPath = "") {
+  if (!brainCatalogSelect) {
+    return;
+  }
+
+  brainCatalogSelect.innerHTML = "";
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = brainCatalog.length > 0 ? "Choose brain profile" : "No brain profiles";
+  brainCatalogSelect.append(empty);
+
+  for (const brain of brainCatalog) {
+    const option = document.createElement("option");
+    option.value = brain.path;
+    option.textContent = `${brain.name} (${brain.path})`;
+    option.title = [
+      `${brain.brainArchitectureKind}, hidden ${formatNumber(brain.hiddenNodeCount)}`,
+      `${formatNumber(brain.weightCount)} weights`,
+      brain.sourceScenarioName ? `source ${brain.sourceScenarioName}` : null
+    ].filter(Boolean).join(" | ");
+    brainCatalogSelect.append(option);
+  }
+
+  brainCatalogSelect.value = [...brainCatalogSelect.options].some((option) => option.value === selectedPath)
+    ? selectedPath
+    : "";
+  updateBrainCatalogButtons();
+}
+
+function renderSpeciesBrainProfileOptions(selectedPath = "") {
+  if (!speciesSeedBrainProfileSelect) {
+    return;
+  }
+
+  speciesSeedBrainProfileSelect.innerHTML = "";
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = brainCatalog.length > 0 ? "No catalog brain" : "No catalog brains";
+  speciesSeedBrainProfileSelect.append(empty);
+
+  for (const brain of brainCatalog) {
+    const option = document.createElement("option");
+    option.value = brain.path;
+    option.textContent = `${brain.name} (${brain.brainArchitectureKind})`;
+    option.title = `${brain.path} | hidden ${formatNumber(brain.hiddenNodeCount)} | ${formatNumber(brain.weightCount)} weights`;
+    speciesSeedBrainProfileSelect.append(option);
+  }
+
+  speciesSeedBrainProfileSelect.value = [...speciesSeedBrainProfileSelect.options].some((option) => option.value === selectedPath)
+    ? selectedPath
+    : "";
+}
+
+function selectedBrainCatalogEntry() {
+  return brainCatalog.find((candidate) => candidate.path === brainCatalogSelect?.value) ?? null;
+}
+
+function renderBrainCatalogDetails() {
+  if (!brainCatalogDetails) {
+    return;
+  }
+
+  const brain = selectedBrainCatalogEntry();
+  updateBrainCatalogButtons();
+  if (!brain) {
+    brainCatalogDetails.textContent = "Choose a brain profile to inspect it.";
+    return;
+  }
+
+  brainCatalogDetails.innerHTML = `
+    <div class="species-summary-grid">
+      <div><span>Name</span><strong>${escapeHtml(brain.name)}</strong></div>
+      <div><span>Path</span><strong>${escapeHtml(brain.path)}</strong></div>
+      <div><span>Architecture</span><strong>${escapeHtml(brain.brainArchitectureKind)}, hidden ${formatNumber(brain.hiddenNodeCount)}</strong></div>
+      <div><span>Weights</span><strong>${formatNumber(brain.weightCount)}</strong></div>
+      <div><span>Schema</span><strong>input v${formatNumber(brain.inputSchemaVersion)} (${formatNumber(brain.inputCount)}), output v${formatNumber(brain.outputSchemaVersion)} (${formatNumber(brain.outputCount)})</strong></div>
+      <div><span>Source</span><strong>${escapeHtml(formatBrainSource(brain))}</strong></div>
+    </div>
+    ${brain.notes ? `<div class="species-notes">${escapeHtml(brain.notes)}</div>` : ""}
+  `;
+}
+
+function updateBrainCatalogButtons() {
+  const brain = selectedBrainCatalogEntry();
+  if (deleteBrainCatalogButton) {
+    deleteBrainCatalogButton.disabled = !brain?.canDelete;
+  }
+}
+
+function formatBrainSource(brain) {
+  const bits = [];
+  if (brain.sourceScenarioName) {
+    bits.push(brain.sourceScenarioName);
+  }
+
+  if (brain.sourceSeed !== null && brain.sourceSeed !== undefined) {
+    bits.push(`seed ${formatSeed(brain.sourceSeed)}`);
+  }
+
+  if (brain.sourceTick !== null && brain.sourceTick !== undefined) {
+    bits.push(`tick ${formatNumber(brain.sourceTick)}`);
+  }
+
+  if (brain.sourceCreatureId) {
+    bits.push(`creature #${formatNumber(brain.sourceCreatureId)}`);
+  }
+
+  if (brain.sourceGeneration !== null && brain.sourceGeneration !== undefined) {
+    bits.push(`gen ${formatNumber(brain.sourceGeneration)}`);
+  }
+
+  return bits.join(", ");
+}
+
 function renderSpeciesCatalogOptions(selectedPath = "") {
   if (!speciesCatalogSelect) {
     return;
@@ -185,6 +313,7 @@ function renderSpeciesCatalogDetails() {
     <div class="species-summary-grid">
       <div><span>Name</span><strong>${escapeHtml(species.name)}</strong></div>
       <div><span>Path</span><strong>${escapeHtml(species.path)}</strong></div>
+      <div><span>Default brain</span><strong>${escapeHtml(species.defaultBrainPath || "embedded profile brain")}</strong></div>
       <div><span>Brain</span><strong>${escapeHtml(species.brainArchitectureKind)}, hidden ${formatNumber(species.brainHiddenNodeCount)}, ${formatNumber(species.brainWeightCount)} weights</strong></div>
       <div><span>Body</span><strong>radius ${formatDecimal(species.bodyRadius)}, speed ${formatDecimal(species.maxSpeed)}, sense ${formatDecimal(species.senseRadius)}</strong></div>
       <div><span>Vision</span><strong>${formatDecimal(species.visionAngleDegrees)} deg</strong></div>
@@ -2306,20 +2435,26 @@ function addSelectedSpeciesToScenario() {
   const roster = Array.isArray(scenarioEditor.scenario.speciesSeeds)
     ? cloneJson(scenarioEditor.scenario.speciesSeeds)
     : [];
-  const brainOverrideKind = selectedSpeciesBrainOverrideKind();
+  const brainProfilePath = selectedSpeciesBrainProfilePath();
+  const brainOverrideKind = brainProfilePath ? null : selectedSpeciesBrainOverrideKind();
   roster.push({
     profilePath: species.path,
     count: Math.round(count),
     spawnRegion: speciesSeedRegionSelect?.value || "uniform",
     energyOverride,
     brainOverrideKind,
+    brainProfilePath,
     enabled: true
   });
   scenarioEditor.scenario.speciesSeeds = roster;
 
   renderScenarioEditor();
   updateScenarioManagementButtons();
-  formMessage.textContent = `Added ${species.name} to the scenario species roster with ${formatSpeciesBrainChoice(brainOverrideKind)}. Save the scenario or start a run to use it.`;
+  formMessage.textContent = `Added ${species.name} to the scenario species roster with ${formatSpeciesBrainChoice(brainOverrideKind, brainProfilePath)}. Save the scenario or start a run to use it.`;
+}
+
+function selectedSpeciesBrainProfilePath() {
+  return speciesSeedBrainProfileSelect?.value || null;
 }
 
 function selectedSpeciesBrainOverrideKind() {
@@ -2335,7 +2470,12 @@ function selectedSpeciesBrainOverrideKind() {
   return value;
 }
 
-function formatSpeciesBrainChoice(brainOverrideKind) {
+function formatSpeciesBrainChoice(brainOverrideKind, brainProfilePath = null) {
+  if (brainProfilePath) {
+    const brain = brainCatalog.find((candidate) => candidate.path === brainProfilePath);
+    return `${brain?.name || brainProfilePath} brain profile`;
+  }
+
   return brainOverrideKind ? `${formatEnumLabel(brainOverrideKind)} brain` : "the profile brain";
 }
 
@@ -2368,6 +2508,37 @@ async function deleteSelectedSpeciesCatalogEntry() {
   const result = await response.json();
   await loadSpeciesCatalog();
   refreshStatus.textContent = `Archived species profile to ${result.archivedPath}.`;
+}
+
+async function deleteSelectedBrainCatalogEntry() {
+  const brain = selectedBrainCatalogEntry();
+  if (!brain?.canDelete) {
+    refreshStatus.textContent = "Built-in brain profiles are protected.";
+    return;
+  }
+
+  if (!confirm(`Archive brain profile "${brain.name}"?`)) {
+    return;
+  }
+
+  deleteBrainCatalogButton.disabled = true;
+  refreshStatus.textContent = "Archiving brain profile";
+  const response = await fetch("/api/brain-catalog/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: brain.path })
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Brain profile delete failed." }));
+    refreshStatus.textContent = problem.error || "Brain profile delete failed.";
+    renderBrainCatalogDetails();
+    return;
+  }
+
+  const result = await response.json();
+  await loadBrainCatalog();
+  refreshStatus.textContent = `Archived brain profile to ${result.archivedPath}.`;
 }
 
 async function saveSpeciesFromRun(id) {
@@ -2421,6 +2592,61 @@ async function saveSpeciesFromRun(id) {
   await loadSpeciesCatalog(result.species.path);
   refreshStatus.textContent = `Saved species profile ${result.species.name}.`;
   document.querySelector(".species-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function saveBrainFromRun(id) {
+  const run = allRuns.find((candidate) => candidate.id === id);
+  const defaultName = `${run?.scenarioName || "Run"} brain`;
+  const name = prompt("Brain profile name", defaultName);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    refreshStatus.textContent = "Brain profile name is required.";
+    return;
+  }
+
+  const selector = prompt("Optional creature id. Leave blank for the dominant living lineage representative.", "");
+  if (selector === null) {
+    return;
+  }
+
+  const notes = prompt("Brain notes", `Saved from run ${run?.name || id}.`);
+  if (notes === null) {
+    return;
+  }
+
+  let creatureId = null;
+  const selectorText = selector.trim();
+  if (selectorText) {
+    const match = selectorText.match(/^(creature)?\s*[:# ]?\s*(\d+)$/i);
+    if (!match) {
+      refreshStatus.textContent = "Brain selector must be blank or a creature id.";
+      return;
+    }
+
+    creatureId = Number(match[2]);
+  }
+
+  refreshStatus.textContent = "Saving brain profile";
+  const response = await fetch(`/api/runs/${encodeURIComponent(id)}/brain-exports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: trimmedName, notes: notes.trim(), creatureId })
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Brain export failed." }));
+    refreshStatus.textContent = problem.error || "Brain export failed.";
+    return;
+  }
+
+  const result = await response.json();
+  await loadBrainCatalog(result.brain.path);
+  refreshStatus.textContent = `Saved brain profile ${result.brain.name}.`;
+  document.querySelector(".brain-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function buildSpeciesExportPayload(name, notes, selectorText) {
@@ -2568,6 +2794,7 @@ function renderRuns() {
           <button class="secondary" data-action="details" data-id="${escapeHtml(run.id)}">${isExpanded ? "Hide" : "Details"}</button>
           <button class="secondary" data-action="rename" data-id="${escapeHtml(run.id)}">Rename</button>
           <button class="secondary" data-action="save-species" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Save Species</button>
+          <button class="secondary" data-action="save-brain" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "disabled" : ""}>Save Brain</button>
           <button class="secondary" data-action="checkpoint" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint</button>
           <button class="secondary" data-action="checkpoint-stop" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Checkpoint + Stop</button>
           <button class="secondary" data-action="stop" data-id="${escapeHtml(run.id)}" ${run.isRunning ? "" : "disabled"}>Stop</button>
@@ -2875,6 +3102,11 @@ runsBody.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "save-brain") {
+    await saveBrainFromRun(id);
+    return;
+  }
+
   if (action === "clone") {
     await cloneRunSettings(id);
     return;
@@ -3087,6 +3319,9 @@ speciesCatalogSelect.addEventListener("change", renderSpeciesCatalogDetails);
 refreshSpeciesCatalogButton.addEventListener("click", () => loadSpeciesCatalog());
 deleteSpeciesCatalogButton.addEventListener("click", deleteSelectedSpeciesCatalogEntry);
 addSpeciesToScenarioButton.addEventListener("click", addSelectedSpeciesToScenario);
+brainCatalogSelect.addEventListener("change", renderBrainCatalogDetails);
+refreshBrainCatalogButton.addEventListener("click", () => loadBrainCatalog());
+deleteBrainCatalogButton.addEventListener("click", deleteSelectedBrainCatalogEntry);
 
 scenarioTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-group]");
@@ -3518,6 +3753,7 @@ function escapeHtml(value) {
 async function boot() {
   setBiomePreviewCollapsed(readBiomePreviewCollapsed(), false);
   await loadMapArtifacts();
+  await loadBrainCatalog();
   await loadSpeciesCatalog();
   await loadScenarioRecipes();
   await loadScenarios();

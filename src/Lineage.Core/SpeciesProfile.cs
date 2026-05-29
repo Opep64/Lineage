@@ -20,6 +20,8 @@ public sealed record SpeciesProfile
 
     public SpeciesProfileSource Source { get; init; } = new();
 
+    public string? DefaultBrainPath { get; init; }
+
     public CreatureGenome Genome { get; init; } = CreatureGenome.Baseline;
 
     public BrainArchitectureKind BrainArchitectureKind { get; init; } = BrainArchitectureKind.HybridNeural;
@@ -56,6 +58,9 @@ public sealed record SpeciesProfile
         {
             Name = name,
             Notes = Notes.Trim(),
+            DefaultBrainPath = string.IsNullOrWhiteSpace(DefaultBrainPath)
+                ? null
+                : DefaultBrainPath.Trim(),
             Genome = genome,
             BrainArchitectureKind = BrainArchitectureKind,
             BrainHiddenNodeCount = brain.HiddenNodeCount,

@@ -132,6 +132,23 @@ public sealed partial class LineageRunManager
             .ToArray();
     }
 
+    public IReadOnlyList<BrainCatalogEntry> ListBrainCatalog()
+    {
+        var brainRoot = BrainCatalogRoot();
+        if (!Directory.Exists(brainRoot))
+        {
+            return Array.Empty<BrainCatalogEntry>();
+        }
+
+        return Directory
+            .EnumerateFiles(brainRoot, BrainProfileJson.FilePattern, SearchOption.AllDirectories)
+            .Select(TryReadBrainCatalogEntry)
+            .OfType<BrainCatalogEntry>()
+            .OrderBy(brain => brain.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(brain => brain.Path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public ScenarioRecipeSaveResult SaveScenarioRecipe(ScenarioRecipeSaveRequest request)
     {
         var name = (request.Name ?? string.Empty).Trim();
@@ -600,6 +617,51 @@ public sealed partial class LineageRunManager
         return new SpeciesCatalogExportResult(ToSpeciesCatalogEntry(path, profile));
     }
 
+    public BrainCatalogExportResult? ExportRunBrainProfile(string id, BrainCatalogExportRequest request)
+    {
+        if (!_runs.TryGetValue(id, out var run))
+        {
+            return null;
+        }
+
+        if (run.IsRunning)
+        {
+            throw new InvalidOperationException("Stop the run before exporting a brain profile from it.");
+        }
+
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Brain profile name is required.");
+        }
+
+        var snapshotPath = ResolveSpeciesExportSnapshotPath(run.Manifest);
+        var restored = SimulationSnapshotJson.LoadSimulation(snapshotPath);
+        var notes = string.IsNullOrWhiteSpace(request.Notes)
+            ? $"Exported from launcher run {run.Manifest.Id} using {NormalizeArtifactRelativePath(snapshotPath)}."
+            : request.Notes.Trim();
+
+        var profile = request.CreatureId is { } creatureId
+            ? BrainProfileExporter.ExportCreatureBrain(
+                restored.Scenario,
+                restored.Simulation.State,
+                new EntityId(creatureId),
+                name,
+                notes)
+            : BrainProfileExporter.ExportDominantLivingLineageBrain(
+                restored.Scenario,
+                restored.Simulation.State,
+                name,
+                notes);
+
+        var brainRoot = UserBrainCatalogRoot();
+        Directory.CreateDirectory(brainRoot);
+        var path = GetUniquePath(Path.Combine(brainRoot, $"{Slugify(name)}{BrainProfileJson.FileExtension}"));
+        EnsurePathInside(path, brainRoot);
+        BrainProfileJson.Save(path, profile);
+        return new BrainCatalogExportResult(ToBrainCatalogEntry(path, profile));
+    }
+
     public SpeciesCatalogDeleteResult DeleteSpeciesCatalogEntry(SpeciesCatalogDeleteRequest request)
     {
         var path = ResolveUserSpeciesCatalogPath(request.Path);
@@ -611,6 +673,21 @@ public sealed partial class LineageRunManager
         File.Move(path, archivePath);
 
         return new SpeciesCatalogDeleteResult(
+            NormalizeArtifactRelativePath(path),
+            NormalizeArtifactRelativePath(archivePath));
+    }
+
+    public BrainCatalogDeleteResult DeleteBrainCatalogEntry(BrainCatalogDeleteRequest request)
+    {
+        var path = ResolveUserBrainCatalogPath(request.Path);
+        var archiveRoot = Path.Combine(_repoRoot, "out", "brain-trash");
+        Directory.CreateDirectory(archiveRoot);
+        var archivePath = GetUniquePath(Path.Combine(
+            archiveRoot,
+            $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_{Path.GetFileName(path)}"));
+        File.Move(path, archivePath);
+
+        return new BrainCatalogDeleteResult(
             NormalizeArtifactRelativePath(path),
             NormalizeArtifactRelativePath(archivePath));
     }
@@ -2017,6 +2094,16 @@ public sealed partial class LineageRunManager
         return Path.Combine(SpeciesCatalogRoot(), UserScenarioFolderName);
     }
 
+    private string BrainCatalogRoot()
+    {
+        return Path.Combine(_repoRoot, "brains");
+    }
+
+    private string UserBrainCatalogRoot()
+    {
+        return Path.Combine(BrainCatalogRoot(), UserScenarioFolderName);
+    }
+
     private string ResolveUserMapArtifactPath(string artifactPath)
     {
         if (string.IsNullOrWhiteSpace(artifactPath))
@@ -2058,6 +2145,29 @@ public sealed partial class LineageRunManager
         if (!File.Exists(path))
         {
             throw new FileNotFoundException("Species profile was not found.", speciesPath);
+        }
+
+        return path;
+    }
+
+    private string ResolveUserBrainCatalogPath(string brainPath)
+    {
+        if (string.IsNullOrWhiteSpace(brainPath))
+        {
+            throw new ArgumentException("Brain profile path is required.");
+        }
+
+        var path = ResolveArtifactPath(brainPath);
+        var brainRoot = UserBrainCatalogRoot();
+        EnsurePathInside(path, brainRoot);
+        if (!path.EndsWith(BrainProfileJson.FileExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Only Lineage brain profile artifacts can be managed.");
+        }
+
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Brain profile was not found.", brainPath);
         }
 
         return path;
@@ -2196,6 +2306,18 @@ public sealed partial class LineageRunManager
         }
     }
 
+    private BrainCatalogEntry? TryReadBrainCatalogEntry(string path)
+    {
+        try
+        {
+            return ToBrainCatalogEntry(path, BrainProfileJson.Load(path));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private SpeciesCatalogEntry ToSpeciesCatalogEntry(string path, SpeciesProfile profile)
     {
         var validated = profile.Validated();
@@ -2205,6 +2327,7 @@ public sealed partial class LineageRunManager
             Path: NormalizeArtifactRelativePath(path),
             CanDelete: IsPathUnderDirectory(path, UserSpeciesCatalogRoot()),
             Notes: validated.Notes,
+            DefaultBrainPath: validated.DefaultBrainPath,
             BrainArchitectureKind: validated.BrainArchitectureKind.ToString(),
             BrainHiddenNodeCount: validated.BrainHiddenNodeCount,
             BrainWeightCount: validated.BrainWeights.Length,
@@ -2217,6 +2340,30 @@ public sealed partial class LineageRunManager
             EatCaloriesPerSecond: genome.EatCaloriesPerSecond,
             ReproductionEnergyThreshold: genome.ReproductionEnergyThreshold,
             OffspringEnergyInvestment: genome.OffspringEnergyInvestment,
+            SourceScenarioName: validated.Source.ScenarioName,
+            SourceSeed: validated.Source.Seed,
+            SourceTick: validated.Source.Tick,
+            SourceCreatureId: validated.Source.CreatureId,
+            SourceFounderId: validated.Source.FounderId,
+            SourceGeneration: validated.Source.Generation,
+            ExportedAtUtc: validated.Source.ExportedAtUtc);
+    }
+
+    private BrainCatalogEntry ToBrainCatalogEntry(string path, BrainProfile profile)
+    {
+        var validated = profile.Validated();
+        return new BrainCatalogEntry(
+            Name: validated.Name,
+            Path: NormalizeArtifactRelativePath(path),
+            CanDelete: IsPathUnderDirectory(path, UserBrainCatalogRoot()),
+            Notes: validated.Notes,
+            BrainArchitectureKind: validated.BrainArchitectureKind.ToString(),
+            InputSchemaVersion: validated.InputSchemaVersion,
+            OutputSchemaVersion: validated.OutputSchemaVersion,
+            InputCount: validated.InputCount,
+            OutputCount: validated.OutputCount,
+            HiddenNodeCount: validated.HiddenNodeCount,
+            WeightCount: validated.Weights.Length,
             SourceScenarioName: validated.Source.ScenarioName,
             SourceSeed: validated.Source.Seed,
             SourceTick: validated.Source.Tick,

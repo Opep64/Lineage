@@ -115,6 +115,10 @@ static void PrintHelp()
           --export-species-cluster <id|name> Export the closest living representative of this species cluster.
           --export-species-name <text> Name for the exported species profile.
           --export-species-notes <text> Notes for the exported species profile.
+          --export-brain <path>      Export a brain profile, usually brains/name.brain.json.
+          --export-brain-creature <id> Export this living creature brain instead of the dominant lineage.
+          --export-brain-name <text> Name for the exported brain profile.
+          --export-brain-notes <text> Notes for the exported brain profile.
           --batch-scenario <path>    Add a scenario to a batch comparison. Can repeat.
           --batch-report <path>      HTML comparison report output path.
           --batch-output-dir <dir>   Per-run batch output directory. Default: out/batch
@@ -174,6 +178,11 @@ static RunResult RunSingle(RunOptions options)
     {
         exportedSpecies = ExportSpeciesProfile(options, scenario, simulation.State);
         SpeciesProfileJson.Save(options.ExportSpeciesPath, exportedSpecies);
+    }
+
+    if (options.ExportBrainPath is not null)
+    {
+        BrainProfileJson.Save(options.ExportBrainPath, ExportBrainProfile(options, scenario, simulation.State));
     }
 
     return new RunResult(
@@ -274,17 +283,26 @@ static IReadOnlyList<SpeciesInjectionResult> InjectSpeciesProfiles(RunOptions op
     var results = new List<SpeciesInjectionResult>(options.InjectSpeciesPaths.Count);
     foreach (var path in options.InjectSpeciesPaths)
     {
-        var profile = SpeciesProfileJson.Load(SimulationScenarioSpeciesSeeder.ResolveProfilePath(
+        var resolvedProfilePath = SimulationScenarioSpeciesSeeder.ResolveProfilePath(
             path,
             options.ScenarioPath,
-            Directory.GetCurrentDirectory()));
+            Directory.GetCurrentDirectory());
+        var profile = SpeciesProfileJson.Load(resolvedProfilePath);
+        var brainProfile = string.IsNullOrWhiteSpace(profile.DefaultBrainPath)
+            ? null
+            : BrainProfileJson.Load(SimulationScenarioSpeciesSeeder.ResolveBrainProfilePath(
+                profile.DefaultBrainPath,
+                resolvedProfilePath,
+                options.ScenarioPath,
+                Directory.GetCurrentDirectory()));
         results.Add(SpeciesProfileInjector.Inject(
             simulation.State,
             profile,
             new SpeciesInjectionOptions(
                 options.InjectSpeciesCount,
                 options.InjectSpeciesRegion,
-                options.InjectSpeciesEnergy)));
+                options.InjectSpeciesEnergy,
+                BrainOverrideProfile: brainProfile)));
     }
 
     return results;
@@ -335,6 +353,25 @@ static SpeciesProfile ExportSpeciesProfile(RunOptions options, SimulationScenari
         state,
         options.ExportSpeciesName,
         options.ExportSpeciesNotes);
+}
+
+static BrainProfile ExportBrainProfile(RunOptions options, SimulationScenario scenario, WorldState state)
+{
+    if (options.ExportBrainCreatureId is not null)
+    {
+        return BrainProfileExporter.ExportCreatureBrain(
+            scenario,
+            state,
+            new EntityId(options.ExportBrainCreatureId.Value),
+            options.ExportBrainName,
+            options.ExportBrainNotes);
+    }
+
+    return BrainProfileExporter.ExportDominantLivingLineageBrain(
+        scenario,
+        state,
+        options.ExportBrainName,
+        options.ExportBrainNotes);
 }
 
 static SimulationRunResult RunSimulation(
@@ -994,6 +1031,14 @@ internal sealed record RunOptions
 
     public string? ExportSpeciesNotes { get; init; }
 
+    public string? ExportBrainPath { get; init; }
+
+    public int? ExportBrainCreatureId { get; init; }
+
+    public string? ExportBrainName { get; init; }
+
+    public string? ExportBrainNotes { get; init; }
+
     public string? BatchReportPath { get; init; }
 
     public string BatchOutputDirectory { get; init; } = Path.Combine("out", "batch");
@@ -1069,6 +1114,7 @@ internal sealed record RunOptions
             StdoutLogPath = ExpandProcessIdToken(StdoutLogPath),
             StderrLogPath = ExpandProcessIdToken(StderrLogPath),
             ExportSpeciesPath = ExpandProcessIdToken(ExportSpeciesPath),
+            ExportBrainPath = ExpandProcessIdToken(ExportBrainPath),
             BatchReportPath = ExpandProcessIdToken(BatchReportPath),
             BatchOutputDirectory = ExpandProcessIdToken(BatchOutputDirectory) ?? BatchOutputDirectory,
             ProbeOutputPath = ExpandProcessIdToken(ProbeOutputPath),
@@ -1393,6 +1439,18 @@ internal sealed record RunOptions
                     break;
                 case "--export-species-notes":
                     options = options with { ExportSpeciesNotes = ReadValue(args, ref i, arg) };
+                    break;
+                case "--export-brain":
+                    options = options with { ExportBrainPath = ReadValue(args, ref i, arg) };
+                    break;
+                case "--export-brain-creature":
+                    options = options with { ExportBrainCreatureId = ParsePositiveInt(ReadValue(args, ref i, arg), arg) };
+                    break;
+                case "--export-brain-name":
+                    options = options with { ExportBrainName = ReadValue(args, ref i, arg) };
+                    break;
+                case "--export-brain-notes":
+                    options = options with { ExportBrainNotes = ReadValue(args, ref i, arg) };
                     break;
                 case "--batch-report":
                     options = options with { BatchReportPath = ReadValue(args, ref i, arg) };
@@ -8371,9 +8429,11 @@ internal static class RunReportWriter
                 var energy = seed.EnergyOverride is null
                     ? "profile energy"
                     : $"{seed.EnergyOverride.Value:0.###} energy";
-                var brain = seed.BrainOverrideKind is null
-                    ? "profile brain"
-                    : $"{FormatInitialBrainKind(seed.BrainOverrideKind.Value)} brain";
+                var brain = !string.IsNullOrWhiteSpace(seed.BrainProfilePath)
+                    ? $"{Path.GetFileName(seed.BrainProfilePath)} brain profile"
+                    : seed.BrainOverrideKind is null
+                        ? "profile brain"
+                        : $"{FormatInitialBrainKind(seed.BrainOverrideKind.Value)} brain";
                 return $"{seed.Count} x {Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
             }));
     }

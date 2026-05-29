@@ -19,11 +19,25 @@ api.MapGet("/scenario-recipes", (LineageRunManager manager) => Results.Ok(manage
 
 api.MapGet("/species-catalog", (LineageRunManager manager) => Results.Ok(manager.ListSpeciesCatalog()));
 
+api.MapGet("/brain-catalog", (LineageRunManager manager) => Results.Ok(manager.ListBrainCatalog()));
+
 api.MapPost("/species-catalog/delete", (SpeciesCatalogDeleteRequest request, LineageRunManager manager) =>
 {
     try
     {
         return Results.Ok(manager.DeleteSpeciesCatalogEntry(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/brain-catalog/delete", (BrainCatalogDeleteRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.DeleteBrainCatalogEntry(request));
     }
     catch (Exception ex)
     {
@@ -200,6 +214,19 @@ api.MapPost("/runs/{id}/species-exports", (string id, SpeciesCatalogExportReques
     try
     {
         var result = manager.ExportRunSpeciesProfile(id, request);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/runs/{id}/brain-exports", (string id, BrainCatalogExportRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        var result = manager.ExportRunBrainProfile(id, request);
         return result is null ? Results.NotFound() : Results.Ok(result);
     }
     catch (Exception ex)

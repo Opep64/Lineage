@@ -20,6 +20,8 @@ public sealed record SpeciesScenarioSeed
 
     public InitialBrainKind? BrainOverrideKind { get; init; }
 
+    public string? BrainProfilePath { get; init; }
+
     public bool Enabled { get; init; } = true;
 
     public SpeciesScenarioSeed Validated()
@@ -50,6 +52,17 @@ public sealed record SpeciesScenarioSeed
             throw new InvalidOperationException("Species seed brain override kind must be defined.");
         }
 
-        return this with { ProfilePath = ProfilePath.Trim() };
+        if (BrainOverrideKind is not null && !string.IsNullOrWhiteSpace(BrainProfilePath))
+        {
+            throw new InvalidOperationException("Species seed can choose either a starter brain override or a brain profile path, not both.");
+        }
+
+        return this with
+        {
+            ProfilePath = ProfilePath.Trim(),
+            BrainProfilePath = string.IsNullOrWhiteSpace(BrainProfilePath)
+                ? null
+                : BrainProfilePath.Trim()
+        };
     }
 }
