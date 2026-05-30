@@ -141,9 +141,11 @@ Not implemented yet:
 
 The current flat neural schema has:
 
-- Inputs: `239`.
-- Outputs: `7`.
-- Outputs: move forward, turn, eat, reproduce, attack, memory forward, and memory right.
+- Inputs: `223`.
+- Dense adapter outputs: `7`.
+- Universal physical action outputs: move forward, turn, eat, reproduce, and attack.
+- Dense-adapter internal outputs: memory forward and memory right.
+- `BrainIoRegistry` records stable keys, flat indices, groups, ranges, neutral values, freshness policy, and physical-vs-internal scope for the active dense adapter schema.
 
 `HybridNeural`:
 

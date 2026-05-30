@@ -86,6 +86,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports reproductive context", CreatureSensingReportsReproductiveContext),
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Creature sector vision buckets visible categories", CreatureSectorVisionBucketsVisibleCategories),
+    ("Brain IO registry describes the dense adapter contract", BrainIoRegistryDescribesDenseAdapterContract),
     ("Legacy neural adapter maps grouped brain inputs", LegacyNeuralAdapterMapsGroupedBrainInputs),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
     ("Neural controller reuses actions on skipped world senses", NeuralControllerReusesActionsOnSkippedWorldSenses),
@@ -3710,6 +3711,41 @@ static void CreatureSectorVisionBucketsVisibleCategories()
         "Larger creature should appear in larger-size sector detail");
     AssertClose(0f, sectors.Get(0).PlantDensity, 0.000001, "Behind plant should not appear in leftmost visible sector");
     AssertTrue(sectors.Get(4).PlantProximity > 0.6f, "Center plant proximity should be high enough to guide approach");
+}
+
+static void BrainIoRegistryDescribesDenseAdapterContract()
+{
+    AssertEqual(NeuralBrainSchema.InputCount, BrainIoRegistry.Inputs.Count, "Input registry count");
+    AssertEqual(NeuralBrainSchema.OutputCount, BrainIoRegistry.Outputs.Count, "Output registry count");
+    AssertEqual(5, BrainIoRegistry.PhysicalActionOutputs.Count, "Physical action output count");
+    AssertEqual(2, BrainIoRegistry.ArchitectureInternalOutputs.Count, "Internal output count");
+
+    for (var i = 0; i < BrainIoRegistry.Inputs.Count; i++)
+    {
+        AssertEqual(i, BrainIoRegistry.Inputs[i].FlatIndex, $"Input registry index {i}");
+    }
+
+    for (var i = 0; i < BrainIoRegistry.Outputs.Count; i++)
+    {
+        AssertEqual(i, BrainIoRegistry.Outputs[i].FlatIndex, $"Output registry index {i}");
+    }
+
+    var moveOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.MoveForwardOutput);
+    var memoryOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.MemoryForwardOutput);
+    AssertEqual("action.move_forward", moveOutput.Key, "Move output key");
+    AssertEqual(BrainOutputScope.PhysicalAction, moveOutput.Scope, "Move output scope");
+    AssertEqual("dense_memory.write_forward", memoryOutput.Key, "Memory output key");
+    AssertEqual(BrainOutputScope.ArchitectureInternal, memoryOutput.Scope, "Memory output scope");
+
+    var memoryInput = BrainIoRegistry.GetInput(NeuralBrainSchema.MemoryForwardInput);
+    var sectorInput = BrainIoRegistry.GetInput(
+        NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex));
+    var contactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FoodContactInput);
+    AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
+    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
+    AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
+    AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
 }
 
 static void LegacyNeuralAdapterMapsGroupedBrainInputs()

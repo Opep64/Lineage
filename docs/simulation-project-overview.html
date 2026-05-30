@@ -411,8 +411,8 @@
             This page is a human-facing overview. It summarizes the current implementation, highlights the important option surfaces, and links back to the markdown files and source modules that should remain the source of truth.
           </p>
           <div class="status-grid" aria-label="Current project status">
-            <div class="metric"><strong>239</strong><span>current neural inputs</span></div>
-            <div class="metric"><strong>7</strong><span>neural action outputs</span></div>
+            <div class="metric"><strong>223</strong><span>current neural inputs</span></div>
+            <div class="metric"><strong>5</strong><span>physical action outputs</span></div>
             <div class="metric"><strong>9 x 18</strong><span>vision sector channels</span></div>
             <div class="metric"><strong>8</strong><span>default hidden-layer nodes</span></div>
           </div>
@@ -767,7 +767,7 @@
         <div class="diagram">
           <svg viewBox="0 0 1500 900" role="img" aria-labelledby="brain-current-title brain-current-desc">
             <title id="brain-current-title">Current Lineage creature brain schema.</title>
-            <desc id="brain-current-desc">Detailed diagram of 223 neural inputs grouped into base, sector vision, contact, quality, similarity, habitat, and health signals; direct and hidden weight paths; seven action outputs; and memory feedback.</desc>
+            <desc id="brain-current-desc">Detailed diagram of 223 neural inputs grouped into base, sector vision, contact, quality, similarity, habitat, and health signals; direct and hidden weight paths; five physical outputs; and two dense-adapter memory outputs.</desc>
             <defs>
               <radialGradient id="brain-bg" cx="50%" cy="46%" r="70%">
                 <stop offset="0%" stop-color="#0b2b22"/>
@@ -802,11 +802,11 @@
             </defs>
             <rect x="0" y="0" width="1500" height="900" fill="url(#brain-bg)"/>
             <text x="750" y="66" text-anchor="middle" font-size="42" font-weight="700" fill="#d7f3cd">Lineage Creature Brain Schema</text>
-            <text x="750" y="100" text-anchor="middle" font-size="19" fill="#9fc994">Current neural adapter: 223 inputs, 7 outputs, sector vision active, legacy nearest-target slots removed and migrated.</text>
+            <text x="750" y="100" text-anchor="middle" font-size="19" fill="#9fc994">Current neural adapter: 223 inputs, 5 physical outputs plus 2 dense memory outputs.</text>
 
             <text x="80" y="128" font-size="30" font-weight="700" fill="#9cdc84">223 Inputs</text>
             <text x="80" y="154" font-size="17" fill="#b8d8b1">30 base + 9 sectors x 18 + 31 extended cues</text>
-            <text x="1246" y="128" font-size="30" font-weight="700" fill="#9cdc84">7 Outputs</text>
+            <text x="1246" y="128" font-size="30" font-weight="700" fill="#9cdc84">5 + 2 Outputs</text>
 
             <g id="input-groups" font-size="18">
               <g>
@@ -898,7 +898,7 @@
               <text x="754" y="689" text-anchor="middle" font-size="17" font-weight="700" fill="#d7f3cd">H5</text>
               <text x="754" y="727" text-anchor="middle" font-size="17" font-weight="700" fill="#d7f3cd">H6</text>
               <text x="754" y="765" text-anchor="middle" font-size="17" font-weight="700" fill="#d7f3cd">H7</text>
-              <text x="520" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">239 x hidden</text>
+              <text x="520" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">223 x hidden</text>
               <text x="520" y="696" text-anchor="middle" font-size="18" fill="#9cdc84">input weights</text>
               <text x="988" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">hidden x 7</text>
               <text x="988" y="696" text-anchor="middle" font-size="18" fill="#9cdc84">output weights</text>
@@ -989,28 +989,31 @@
               <rect x="520" y="792" width="458" height="62" rx="10" fill="#071a17" stroke="#386b57"/>
               <text x="749" y="818" text-anchor="middle" fill="#d7f3cd" font-weight="700">HiddenLayerNeural mode</text>
               <text x="749" y="842" text-anchor="middle" fill="#bde5b4">8 hidden default: active 223 x 8 + 8 x 7 = 1,840 weights; direct weights stored but forced to zero.</text>
-              <text x="750" y="878" text-anchor="middle" fill="#55aee0" font-style="italic">memory write outputs feed the memory vector seen by the next tick</text>
+              <text x="750" y="878" text-anchor="middle" fill="#55aee0" font-style="italic">memory writes are dense-adapter internal state, not universal actions</text>
             </g>
           </svg>
         </div>
         <div class="grid-2">
           <div class="note">
-            <strong>HybridNeural:</strong> the default architecture. Direct input-to-output weights are active, optional hidden nodes can also contribute, and current starter profiles use 4 hidden nodes. With 223 inputs and 7 outputs, the direct layer has 1,561 weights; a 4-node hybrid starter stores 2,481 total weights.
+            <strong>HybridNeural:</strong> the default architecture. Direct input-to-output weights are active, optional hidden nodes can also contribute, and current starter profiles use 4 hidden nodes. With 223 inputs and 7 dense adapter outputs, the direct layer has 1,561 weights; a 4-node hybrid starter stores 2,481 total weights.
           </div>
           <div class="note">
             <strong>HiddenLayerNeural:</strong> optional architecture. Direct weights remain in the genome layout for compatibility, but behavior is routed through hidden nodes. The default is 8 hidden nodes, with 7 relay nodes created from starter outputs and one spare node available for mutation.
           </div>
         </div>
-        <h3>Action Outputs</h3>
+        <h3>Output Contract</h3>
         <ul class="pill-list">
           <li>Move forward</li>
           <li>Turn</li>
           <li>Eat intent</li>
           <li>Reproduce intent</li>
           <li>Attack intent</li>
-          <li>Memory write forward</li>
-          <li>Memory write right</li>
+          <li>Dense memory write forward</li>
+          <li>Dense memory write right</li>
         </ul>
+        <p>
+          The first five outputs are universal physical action intents. The two memory-write slots are architecture-owned internal outputs used by the current dense neural adapter; future recurrent, sparse, or plastic brains can own memory in their own runtime state.
+        </p>
         <p>
           Starter brain kinds include <code>SeedForager</code>, <code>SectorForager</code>, <code>ExplorerForager</code>, <code>OpportunisticForager</code>, <code>ScavengerForager</code>, <code>FreshnessAwareScavenger</code>, <code>ForagerPredator</code>, and <code>RandomPerFounder</code>.
         </p>

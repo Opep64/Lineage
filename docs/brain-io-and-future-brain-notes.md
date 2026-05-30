@@ -5,7 +5,7 @@ Status: temporary discussion notes
 
 These notes capture the current discussion about creature actions, senses, input/output schema cleanup, and future brain architecture experiments. Promote durable decisions into `DECISIONS.md`, implemented work into `IMPLEMENTED_STATE.md`, and future work into `ROADMAP.md` when this settles.
 
-## Current Action Outputs
+## Current Dense Adapter Outputs
 
 The current neural adapter exposes 7 outputs:
 
@@ -373,6 +373,14 @@ Catalog export implication:
 
 Before adding many new senses/actions, clean up the shared input/output contract so future architectures do not inherit accidental assumptions from the current flat dense neural adapter.
 
+Implementation status:
+
+- `BrainInputFrame` already groups simulation-facing inputs by meaning instead of flat neural index.
+- `BrainOutputFrame` now represents only physical action intents: move, turn, eat, reproduce, and attack.
+- `LegacyNeuralMemoryInputFrame` and `LegacyNeuralMemoryOutputFrame` keep the current dense adapter's controller-managed memory separate from the universal action frame.
+- `BrainIoRegistry` describes every active dense adapter input/output with a stable key, flat index, group, range, neutral value, freshness policy, and output scope.
+- The current dense schema remains the compatibility adapter for `HybridNeural` and `HiddenLayerNeural`; future brain types should consume the semantic frames or their own adapters.
+
 ## Current Inputs To Reconsider
 
 Do not remove more current inputs from the existing dense neural schema casually. Existing catalog brains, saved runs, and compatibility logic rely on the flat layout, and the nearest-target removal required an explicit schema-version migration. For near-term work, prefer deprecating inputs in a future semantic contract unless the cleanup is worth another migration.
@@ -411,6 +419,8 @@ Each input and output should have metadata:
 - freshness policy: always fresh, contact/internal fresh, or world-sense stale;
 - optional spatial coordinate metadata for future HyperNEAT-like substrates.
 
+Status: initial registry implemented for the active dense adapter. It is metadata-only and does not change behavior.
+
 ### 2. Separate Physical Actions From Internal Brain State
 
 Current outputs mix physical action intents with legacy memory writes.
@@ -421,6 +431,8 @@ Desired conceptual split:
 - architecture-owned internal outputs: memory writes, recurrence gates, plasticity modulators, or other brain-specific state controls.
 
 This keeps future rtNEAT and plastic brains from being forced to use legacy memory outputs.
+
+Status: implemented at the frame/adapter boundary. The dense network still has 7 output slots for compatibility, but only 5 feed the universal physical action frame.
 
 ### 3. Keep The Flat Neural Schema As An Adapter
 
