@@ -317,7 +317,18 @@ public sealed record RunScenarioSummary(
     double? DeathMeatEnergyFraction,
     double? MeatDecayCaloriesPerSecond,
     double? RottenMeatDamagePerRawKcal,
-    int SpeciesSeedCount);
+    int SpeciesSeedCount,
+    IReadOnlyList<RunScenarioSpeciesSeedSummary> SpeciesSeeds);
+
+public sealed record RunScenarioSpeciesSeedSummary(
+    string ProfilePath,
+    string ProfileName,
+    int Count,
+    string SpawnRegion,
+    double? EnergyOverride,
+    bool Enabled,
+    string Brain,
+    string? BrainProfilePath);
 
 public sealed record RunSummary(
     string Id,

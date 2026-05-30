@@ -4909,11 +4909,12 @@ internal static class RunReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Run</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
+        var hasSpeciesRoster = scenario.EnabledSpeciesSeeds().Any();
         WriteMetric(writer, "Scenario", scenario.Name);
         WriteMetric(writer, "Pipeline", scenario.PipelineKind.ToString());
-        WriteMetric(writer, "Brain architecture", FormatBrainArchitectureKind(scenario.BrainArchitectureKind));
-        WriteMetric(writer, "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
-        WriteMetric(writer, "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, hasSpeciesRoster ? "Default brain architecture" : "Brain architecture", FormatBrainArchitectureKind(scenario.BrainArchitectureKind));
+        WriteMetric(writer, hasSpeciesRoster ? "Default initial brain" : "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
+        WriteMetric(writer, hasSpeciesRoster ? "Default brain hidden nodes" : "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Legacy nearest food vision inputs", scenario.EnableLegacyNearestFoodVisionInputs ? "enabled" : "disabled");
         WriteMetric(writer, "Legacy nearest creature vision inputs", scenario.EnableLegacyNearestCreatureVisionInputs ? "enabled" : "disabled");
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
@@ -4940,9 +4941,11 @@ internal static class RunReportWriter
             WriteMetric(writer, "Scenario file", Path.GetFullPath(options.ScenarioPath));
         }
 
-        WriteMetric(writer, "Scenario species roster", FormatScenarioSpeciesSeeds(scenario));
+        WriteMetric(writer, "Starting roster", FormatScenarioSpeciesSeeds(scenario, options.ScenarioPath));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
+
+        WriteScenarioSpeciesRosterSection(writer, scenario, options.ScenarioPath);
 
         var startingGenome = CreatureGenome.Baseline with
         {
@@ -8541,7 +8544,36 @@ internal static class RunReportWriter
         };
     }
 
-    private static string FormatScenarioSpeciesSeeds(SimulationScenario scenario)
+    private static void WriteScenarioSpeciesRosterSection(StreamWriter writer, SimulationScenario scenario, string? scenarioPath)
+    {
+        var seeds = scenario.EnabledSpeciesSeeds().ToArray();
+        if (seeds.Length == 0)
+        {
+            return;
+        }
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Starting Roster</h2>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Profile</th><th>Brain</th><th>Count</th><th>Spawn region</th><th>Energy</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var seed in seeds)
+        {
+            writer.WriteLine("<tr>");
+            writer.WriteLine($"<td>{Html(FormatSpeciesProfileName(seed.ProfilePath, scenarioPath))}<br><small>{Html(seed.ProfilePath)}</small></td>");
+            writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedBrain(seed, scenarioPath))}</td>");
+            writer.WriteLine($"<td>{Html(seed.Count.ToString(CultureInfo.InvariantCulture))}</td>");
+            writer.WriteLine($"<td>{Html(seed.SpawnRegion.ToString())}</td>");
+            writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedEnergy(seed))}</td>");
+            writer.WriteLine("</tr>");
+        }
+
+        writer.WriteLine("</tbody>");
+        writer.WriteLine("</table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static string FormatScenarioSpeciesSeeds(SimulationScenario scenario, string? scenarioPath = null)
     {
         var seeds = scenario.EnabledSpeciesSeeds().ToArray();
         if (seeds.Length == 0)
@@ -8549,20 +8581,85 @@ internal static class RunReportWriter
             return "None";
         }
 
-        return string.Join(
-            ", ",
-            seeds.Select(seed =>
+        if (seeds.Length == 1)
+        {
+            var seed = seeds[0];
+            return $"{seed.Count} x {FormatSpeciesProfileName(seed.ProfilePath, scenarioPath)} using {FormatScenarioSpeciesSeedBrain(seed, scenarioPath)}";
+        }
+
+        var total = seeds.Sum(seed => seed.Count);
+        return $"{total} creatures across {seeds.Length} roster entries";
+    }
+
+    private static string FormatSpeciesProfileName(string profilePath, string? scenarioPath)
+    {
+        try
+        {
+            var profile = SpeciesProfileJson.Load(SimulationScenarioSpeciesSeeder.ResolveProfilePath(profilePath, scenarioPath));
+            return string.IsNullOrWhiteSpace(profile.Name)
+                ? Path.GetFileName(profilePath)
+                : profile.Name;
+        }
+        catch
+        {
+            return Path.GetFileName(profilePath);
+        }
+    }
+
+    private static string FormatScenarioSpeciesSeedBrain(SpeciesScenarioSeed seed, string? scenarioPath)
+    {
+        if (!string.IsNullOrWhiteSpace(seed.BrainProfilePath))
+        {
+            return $"{FormatBrainProfileName(seed.BrainProfilePath, seed.ProfilePath, scenarioPath)} brain profile";
+        }
+
+        if (seed.BrainOverrideKind is not null)
+        {
+            return $"{FormatInitialBrainKind(seed.BrainOverrideKind.Value)} generated brain";
+        }
+
+        try
+        {
+            var speciesPath = SimulationScenarioSpeciesSeeder.ResolveProfilePath(seed.ProfilePath, scenarioPath);
+            var profile = SpeciesProfileJson.Load(speciesPath);
+            if (!string.IsNullOrWhiteSpace(profile.DefaultBrainPath))
             {
-                var energy = seed.EnergyOverride is null
-                    ? "profile energy"
-                    : $"{seed.EnergyOverride.Value:0.###} energy";
-                var brain = !string.IsNullOrWhiteSpace(seed.BrainProfilePath)
-                    ? $"{Path.GetFileName(seed.BrainProfilePath)} brain profile"
-                    : seed.BrainOverrideKind is null
-                        ? "profile brain"
-                        : $"{FormatInitialBrainKind(seed.BrainOverrideKind.Value)} brain";
-                return $"{seed.Count} x {Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
-            }));
+                return $"{FormatBrainProfileName(profile.DefaultBrainPath, seed.ProfilePath, scenarioPath)} default brain profile";
+            }
+        }
+        catch
+        {
+            // Fall through to the embedded profile brain label.
+        }
+
+        return "embedded profile brain";
+    }
+
+    private static string FormatBrainProfileName(string brainProfilePath, string speciesProfilePath, string? scenarioPath)
+    {
+        try
+        {
+            var resolvedSpeciesPath = SimulationScenarioSpeciesSeeder.ResolveProfilePath(speciesProfilePath, scenarioPath);
+            var resolvedBrainPath = SimulationScenarioSpeciesSeeder.ResolveBrainProfilePath(
+                brainProfilePath,
+                resolvedSpeciesPath,
+                scenarioPath);
+            var profile = BrainProfileJson.Load(resolvedBrainPath);
+            return string.IsNullOrWhiteSpace(profile.Name)
+                ? Path.GetFileName(brainProfilePath)
+                : profile.Name;
+        }
+        catch
+        {
+            return Path.GetFileName(brainProfilePath);
+        }
+    }
+
+    private static string FormatScenarioSpeciesSeedEnergy(SpeciesScenarioSeed seed)
+    {
+        return seed.EnergyOverride is null
+            ? "profile default"
+            : seed.EnergyOverride.Value.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
     private static IReadOnlyList<FounderExplorationSummary> SummarizeFounderExploration(WorldState state, int maxRows)

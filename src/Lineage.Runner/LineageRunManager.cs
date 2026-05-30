@@ -1094,8 +1094,8 @@ public sealed partial class LineageRunManager
                 "Run",
                 "Status",
                 "Scenario",
-                "Brain",
-                "Starter",
+                "Brain / roster",
+                "Default starter",
                 "World",
                 "Plants/M",
                 "Seed",
@@ -1120,8 +1120,8 @@ public sealed partial class LineageRunManager
                         MarkdownCell(summary.Name),
                         MarkdownCell(summary.Status),
                         MarkdownCell(summary.ScenarioName),
-                        MarkdownCell(summary.ScenarioSummary?.BrainArchitectureKind),
-                        MarkdownCell(summary.ScenarioSummary?.InitialBrainKind),
+                        MarkdownCell(FormatScenarioBrain(summary.ScenarioSummary)),
+                        MarkdownCell(FormatInitialBrainKind(summary.ScenarioSummary?.InitialBrainKind)),
                         MarkdownCell(FormatScenarioWorld(summary.ScenarioSummary)),
                         MarkdownCell(FormatScenarioDensity(summary.ScenarioSummary)),
                         MarkdownCell(summary.Seed),
@@ -1177,7 +1177,7 @@ public sealed partial class LineageRunManager
             AppendDetail(builder, "Launch scenario", summary.LaunchScenarioPath);
             AppendDetail(builder, "Resolved scenario", summary.ResolvedScenarioPath);
             AppendDetail(builder, "Scenario source", summary.ScenarioSummary?.IsResolvedSnapshot == true ? "resolved run snapshot" : "current scenario file fallback");
-            AppendDetail(builder, "Scenario brain", FormatScenarioBrain(summary.ScenarioSummary));
+            AppendDetail(builder, "Scenario brain / roster", FormatScenarioBrain(summary.ScenarioSummary));
             AppendDetail(builder, "Scenario vision", FormatScenarioVision(summary.ScenarioSummary));
             AppendDetail(builder, "Scenario world", FormatScenarioWorld(summary.ScenarioSummary));
             AppendDetail(builder, "Scenario resources", FormatScenarioResources(summary.ScenarioSummary));
@@ -1665,6 +1665,7 @@ public sealed partial class LineageRunManager
             var initialBrainKind = GetString(root, "initialBrainKind") ?? "sectorForager";
             var brainHiddenNodeCount = GetInt32(root, "brainHiddenNodeCount")
                 ?? (string.Equals(brainArchitectureKind, "hiddenLayerNeural", StringComparison.OrdinalIgnoreCase) ? 8 : 4);
+            var speciesSeeds = ReadScenarioSpeciesSeeds(root, path);
 
             return new RunScenarioSummary(
                 Path: path,
@@ -1695,7 +1696,8 @@ public sealed partial class LineageRunManager
                 DeathMeatEnergyFraction: GetDouble(root, "deathMeatEnergyFraction"),
                 MeatDecayCaloriesPerSecond: GetDouble(root, "meatDecayCaloriesPerSecond"),
                 RottenMeatDamagePerRawKcal: GetDouble(root, "rottenMeatDamagePerRawKcal"),
-                SpeciesSeedCount: CountEnabledSpeciesSeeds(root));
+                SpeciesSeedCount: speciesSeeds.Count(seed => seed.Enabled),
+                SpeciesSeeds: speciesSeeds);
         }
         catch
         {
@@ -2923,12 +2925,48 @@ public sealed partial class LineageRunManager
             return string.Empty;
         }
 
+        if (summary.SpeciesSeeds.Any(seed => seed.Enabled))
+        {
+            return $"species roster ({FormatScenarioSpeciesRosterBrief(summary)})";
+        }
+
         var brain = summary.BrainArchitectureKind ?? "unknown";
-        var starter = summary.InitialBrainKind ?? "unknown";
+        var starter = FormatInitialBrainKind(summary.InitialBrainKind);
         var hidden = summary.BrainHiddenNodeCount is null
             ? string.Empty
             : $", hidden {summary.BrainHiddenNodeCount.Value.ToString(CultureInfo.InvariantCulture)}";
         return $"{brain}, {starter}{hidden}";
+    }
+
+    private static string FormatScenarioSpeciesRosterBrief(RunScenarioSummary? summary)
+    {
+        var seeds = summary?.SpeciesSeeds.Where(seed => seed.Enabled).ToArray() ?? [];
+        if (seeds.Length == 0)
+        {
+            return "none";
+        }
+
+        var total = seeds.Sum(seed => seed.Count);
+        return seeds.Length == 1
+            ? $"{total.ToString(CultureInfo.InvariantCulture)} x {seeds[0].ProfileName} using {seeds[0].Brain}"
+            : $"{total.ToString(CultureInfo.InvariantCulture)} creatures across {seeds.Length.ToString(CultureInfo.InvariantCulture)} roster entries";
+    }
+
+    private static string FormatInitialBrainKind(string? value)
+    {
+        return value switch
+        {
+            "seedForager" => "Seed forager",
+            "explorerForager" => "Explorer forager",
+            "sectorForager" => "Sector forager",
+            "opportunisticForager" => "Opportunistic forager",
+            "scavengerForager" => "Scavenger forager",
+            "freshnessAwareScavenger" => "Freshness-aware scavenger",
+            "foragerPredator" => "Forager predator",
+            "randomPerFounder" => "Per-founder random weights",
+            null or "" => "unknown",
+            _ => value
+        };
     }
 
     private static string FormatScenarioVision(RunScenarioSummary? summary)
@@ -2978,7 +3016,11 @@ public sealed partial class LineageRunManager
                 summary.InitialResourcesPerMillionArea is null ? null : $"{summary.InitialResourcesPerMillionArea.Value.ToString("0.###", CultureInfo.InvariantCulture)}/M",
                 summary.InitialResourceCount is null ? null : $"{summary.InitialResourceCount.Value.ToString(CultureInfo.InvariantCulture)} initial plants",
                 summary.ResourceVoidBorderWidth is null ? null : $"{summary.ResourceVoidBorderWidth.Value.ToString("0.###", CultureInfo.InvariantCulture)} void border",
-                summary.InitialCreatureCount is null ? null : $"{summary.InitialCreatureCount.Value.ToString(CultureInfo.InvariantCulture)} starting creatures",
+                summary.SpeciesSeeds.Any(seed => seed.Enabled)
+                    ? $"{summary.SpeciesSeeds.Where(seed => seed.Enabled).Sum(seed => seed.Count).ToString(CultureInfo.InvariantCulture)} roster creatures"
+                    : summary.InitialCreatureCount is null
+                        ? null
+                        : $"{summary.InitialCreatureCount.Value.ToString(CultureInfo.InvariantCulture)} starting creatures",
                 summary.SpeciesSeedCount == 0 ? null : $"{summary.SpeciesSeedCount.ToString(CultureInfo.InvariantCulture)} species seed(s)"
             }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
@@ -3186,6 +3228,123 @@ public sealed partial class LineageRunManager
         }
 
         return count;
+    }
+
+    private static IReadOnlyList<RunScenarioSpeciesSeedSummary> ReadScenarioSpeciesSeeds(
+        JsonElement element,
+        string scenarioPath)
+    {
+        if (!TryGetProperty(element, "speciesSeeds", out var speciesSeeds)
+            || speciesSeeds.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<RunScenarioSpeciesSeedSummary>();
+        }
+
+        var summaries = new List<RunScenarioSpeciesSeedSummary>();
+        foreach (var speciesSeed in speciesSeeds.EnumerateArray())
+        {
+            if (speciesSeed.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var profilePath = GetString(speciesSeed, "profilePath") ?? string.Empty;
+            var count = Math.Max(0, GetInt32(speciesSeed, "count") ?? 0);
+            var spawnRegion = GetString(speciesSeed, "spawnRegion") ?? "uniform";
+            var energyOverride = GetDouble(speciesSeed, "energyOverride");
+            var enabled = GetBoolean(speciesSeed, "enabled") != false;
+            var brainProfilePath = GetString(speciesSeed, "brainProfilePath");
+            var brainOverrideKind = GetString(speciesSeed, "brainOverrideKind");
+            var speciesProfile = TryLoadSpeciesProfile(profilePath, scenarioPath);
+            var profileName = speciesProfile?.Name;
+            if (string.IsNullOrWhiteSpace(profileName))
+            {
+                profileName = Path.GetFileNameWithoutExtension(profilePath);
+            }
+
+            summaries.Add(new RunScenarioSpeciesSeedSummary(
+                ProfilePath: profilePath,
+                ProfileName: profileName ?? string.Empty,
+                Count: count,
+                SpawnRegion: spawnRegion,
+                EnergyOverride: energyOverride,
+                Enabled: enabled,
+                Brain: FormatSpeciesSeedBrain(
+                    speciesProfile,
+                    brainProfilePath,
+                    brainOverrideKind,
+                    profilePath,
+                    scenarioPath),
+                BrainProfilePath: brainProfilePath));
+        }
+
+        return summaries;
+    }
+
+    private static SpeciesProfile? TryLoadSpeciesProfile(string profilePath, string scenarioPath)
+    {
+        if (string.IsNullOrWhiteSpace(profilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return SpeciesProfileJson.Load(SimulationScenarioSpeciesSeeder.ResolveProfilePath(
+                profilePath,
+                scenarioPath));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string FormatSpeciesSeedBrain(
+        SpeciesProfile? speciesProfile,
+        string? brainProfilePath,
+        string? brainOverrideKind,
+        string profilePath,
+        string scenarioPath)
+    {
+        if (!string.IsNullOrWhiteSpace(brainProfilePath))
+        {
+            return $"{ReadBrainProfileName(brainProfilePath, profilePath, scenarioPath)} brain profile";
+        }
+
+        if (!string.IsNullOrWhiteSpace(brainOverrideKind))
+        {
+            return $"{FormatInitialBrainKind(brainOverrideKind)} generated brain";
+        }
+
+        if (!string.IsNullOrWhiteSpace(speciesProfile?.DefaultBrainPath))
+        {
+            return $"{ReadBrainProfileName(speciesProfile.DefaultBrainPath, profilePath, scenarioPath)} default brain profile";
+        }
+
+        return "embedded profile brain";
+    }
+
+    private static string ReadBrainProfileName(string brainProfilePath, string speciesProfilePath, string scenarioPath)
+    {
+        try
+        {
+            var resolvedSpeciesPath = string.IsNullOrWhiteSpace(speciesProfilePath)
+                ? null
+                : SimulationScenarioSpeciesSeeder.ResolveProfilePath(speciesProfilePath, scenarioPath);
+            var resolvedBrainPath = SimulationScenarioSpeciesSeeder.ResolveBrainProfilePath(
+                brainProfilePath,
+                resolvedSpeciesPath,
+                scenarioPath);
+            var brainProfile = BrainProfileJson.Load(resolvedBrainPath);
+            return string.IsNullOrWhiteSpace(brainProfile.Name)
+                ? Path.GetFileName(brainProfilePath)
+                : brainProfile.Name;
+        }
+        catch
+        {
+            return Path.GetFileName(brainProfilePath);
+        }
     }
 
     private static IReadOnlyList<ScenarioFieldDefinition> BuildScenarioFieldDefinitions()

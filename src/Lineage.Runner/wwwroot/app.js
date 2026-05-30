@@ -2935,7 +2935,7 @@ function renderRuns() {
       <td>
         <div class="run-name">${escapeHtml(run.name)}</div>
         <div class="run-sub">${escapeHtml(run.scenarioPath)}</div>
-        ${run.scenarioSummary ? `<div class="run-sub">brain ${escapeHtml(formatScenarioInline(run.scenarioSummary))}</div>` : ""}
+        ${run.scenarioSummary ? `<div class="run-sub">setup ${escapeHtml(formatScenarioInline(run.scenarioSummary))}</div>` : ""}
         <div class="run-sub">seed ${escapeHtml(formatSeed(run.seed))}</div>
         <div class="run-sub">${escapeHtml(run.id)}</div>
       </td>
@@ -3023,7 +3023,7 @@ function renderDetailsRow(run) {
           <div><span>Started</span><strong>${escapeHtml(formatDateTime(details.run.startedAtUtc))}</strong></div>
           <div><span>Ended</span><strong>${escapeHtml(formatDateTime(details.run.endedAtUtc))}</strong></div>
           <div><span>Seed</span><strong>${escapeHtml(formatSeed(details.run.seed))}</strong></div>
-          <div><span>Brain</span><strong>${escapeHtml(formatScenarioBrain(details.run.scenarioSummary))}</strong></div>
+          <div><span>Brain / roster</span><strong>${escapeHtml(formatScenarioBrainOrRoster(details.run.scenarioSummary))}</strong></div>
           <div><span>Vision</span><strong>${escapeHtml(formatScenarioVision(details.run.scenarioSummary))}</strong></div>
           <div><span>World</span><strong>${escapeHtml(formatScenarioWorld(details.run.scenarioSummary))}</strong></div>
           <div><span>Resources</span><strong>${escapeHtml(formatScenarioResources(details.run.scenarioSummary))}</strong></div>
@@ -3032,6 +3032,7 @@ function renderDetailsRow(run) {
           <div><span>Launch scenario</span><strong>${escapeHtml(details.run.launchScenarioPath || "")}</strong></div>
           <div><span>Resolved scenario</span><strong>${escapeHtml(details.run.resolvedScenarioPath)}</strong></div>
         </div>
+        ${renderRunScenarioRoster(details.run.scenarioSummary)}
         ${details.error ? `<div class="detail-error">${escapeHtml(details.error)}</div>` : ""}
         ${renderArtifactsPanel(details)}
         <div class="command-line">${escapeHtml(details.commandLine || "")}</div>
@@ -3049,6 +3050,43 @@ function renderDetailsRow(run) {
     </td>
   `;
   return row;
+}
+
+function renderRunScenarioRoster(summary) {
+  const seeds = scenarioEnabledSpeciesSeeds(summary);
+  if (seeds.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="artifacts-panel">
+      <div class="log-title">Starting roster</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Profile</th>
+              <th>Brain</th>
+              <th>Count</th>
+              <th>Region</th>
+              <th>Energy</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${seeds.map((seed) => `
+              <tr>
+                <td>${escapeHtml(seed.profileName || seed.profilePath || "species")}<div class="run-sub">${escapeHtml(seed.profilePath || "")}</div></td>
+                <td>${escapeHtml(seed.brain || "profile brain")}${seed.brainProfilePath ? `<div class="run-sub">${escapeHtml(seed.brainProfilePath)}</div>` : ""}</td>
+                <td>${formatNumber(seed.count || 0)}</td>
+                <td>${escapeHtml(formatEnumLabel(seed.spawnRegion || "uniform"))}</td>
+                <td>${seed.energyOverride === null || seed.energyOverride === undefined ? "profile" : formatNumber(seed.energyOverride)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
 function renderArtifactsPanel(details) {
@@ -3843,10 +3881,36 @@ function formatScenarioInline(summary) {
   }
 
   return [
-    formatScenarioBrain(summary),
+    formatScenarioBrainOrRoster(summary),
     formatScenarioWorld(summary),
     formatScenarioResources(summary)
   ].filter(Boolean).join(" | ");
+}
+
+function formatScenarioBrainOrRoster(summary) {
+  if (scenarioEnabledSpeciesSeeds(summary).length > 0) {
+    return `roster ${formatScenarioRosterBrief(summary)}`;
+  }
+
+  return formatScenarioBrain(summary);
+}
+
+function scenarioEnabledSpeciesSeeds(summary) {
+  return Array.isArray(summary?.speciesSeeds)
+    ? summary.speciesSeeds.filter((seed) => seed.enabled !== false)
+    : [];
+}
+
+function formatScenarioRosterBrief(summary) {
+  const seeds = scenarioEnabledSpeciesSeeds(summary);
+  if (seeds.length === 0) {
+    return "";
+  }
+
+  const total = seeds.reduce((sum, seed) => sum + Number(seed.count || 0), 0);
+  return seeds.length === 1
+    ? `${formatNumber(total)} x ${seeds[0].profileName || seeds[0].profilePath || "species"} using ${seeds[0].brain || "profile brain"}`
+    : `${formatNumber(total)} creatures across ${formatNumber(seeds.length)} entries`;
 }
 
 function formatScenarioBrain(summary) {
@@ -3907,8 +3971,11 @@ function formatScenarioResources(summary) {
     bits.push(`${formatNumber(summary.initialResourceCount)} initial`);
   }
 
-  if (summary.initialCreatureCount !== null && summary.initialCreatureCount !== undefined) {
-    bits.push(`${formatNumber(summary.initialCreatureCount)} creatures`);
+  const seeds = scenarioEnabledSpeciesSeeds(summary);
+  if (seeds.length > 0) {
+    bits.push(`${formatNumber(seeds.reduce((sum, seed) => sum + Number(seed.count || 0), 0))} roster creatures`);
+  } else if (summary.initialCreatureCount !== null && summary.initialCreatureCount !== undefined) {
+      bits.push(`${formatNumber(summary.initialCreatureCount)} creatures`);
   }
 
   return bits.join(", ");
