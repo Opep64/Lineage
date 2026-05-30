@@ -130,20 +130,22 @@
   "speciesSeeds": [
     {
       "profilePath": "species/rookie-sector-forager.species.json",
-      "count": 60,
+      "count": 50,
       "spawnRegion": "uniform",
       "enabled": true
     },
     {
       "profilePath": "species/rookie-explorer-forager.species.json",
-      "count": 15,
+      "count": 20,
       "spawnRegion": "uniform",
+      "energyOverride": 115,
       "enabled": true
     },
     {
       "profilePath": "species/rookie-scavenger-forager.species.json",
-      "count": 5,
+      "count": 10,
       "spawnRegion": "uniform",
+      "energyOverride": 115,
       "enabled": true
     }
   ]
