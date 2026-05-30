@@ -90,6 +90,9 @@ public partial class Main : Node2D
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
     private readonly Color _memoryColor = new(0.55f, 0.8f, 1.0f, 0.78f);
     private readonly Color _grabLinkColor = new(1.0f, 0.48f, 0.08f, 0.82f);
+    private readonly Color _creatureScentRangeColor = new(0.86f, 0.54f, 1.0f, 0.20f);
+    private readonly Color _meatScentRangeColor = new(0.96f, 0.34f, 0.24f, 0.23f);
+    private readonly Color _soundSenseRangeColor = new(0.38f, 0.86f, 1.0f, 0.24f);
     private readonly Color _visionSectorPlantColor = new(0.32f, 0.92f, 0.45f, 0.92f);
     private readonly Color _visionSectorMeatColor = new(0.94f, 0.28f, 0.22f, 0.9f);
     private readonly Color _visionSectorEggColor = new(0.94f, 0.86f, 0.42f, 0.9f);
@@ -1211,6 +1214,7 @@ public partial class Main : Node2D
             ? $"Season {season.Phase * 100f:0}%  Here {season.FertilityMultiplier:0.00}x  Biome {biomeSeason:0.00}x\n"
             : string.Empty;
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
+        var grabStats = CalculateLiveGrabStats(state.Creatures);
 
         _hud.Text =
             $"Lineage\n" +
@@ -1259,6 +1263,8 @@ public partial class Main : Node2D
             $"Contact {FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount))}  intent {FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount))}  touch+intent {FormatPercent(Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount))}\n" +
             $"Similar touch intent {FormatPercent(Share(snapshot.AttackIntentWhileTouchingSimilarCreatureCount, snapshot.CreatureCount))}  avg touch similarity {snapshot.AverageCreatureContactSimilarity:0.00}\n" +
             $"Attack raw {snapshot.AverageAttackOutput:0.00}  near touch {FormatPercent(Share(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount))}  dmg {snapshot.TotalAttackDamagePerSecond:0.00}/s\n" +
+            $"Grab raw {grabStats.AverageOutput:0.00}  intent {FormatPercent(grabStats.IntentShare)}  can {FormatPercent(grabStats.CanGrabShare)}\n" +
+            $"Grab held {grabStats.HoldingCount} grabbed {grabStats.GrabbedCount}  pressure {grabStats.AveragePressure:0.00}/{grabStats.MaxPressure:0.00}  strength {grabStats.AverageStrength:0.00}/{grabStats.MaxStrength:0.00}\n" +
             $"Meal gap {snapshot.AverageSecondsSinceLastMeal:0.0}s  Vision {snapshot.AverageVisionRange:0}/{ToDegrees(snapshot.AverageVisionAngleRadians):0}deg\n" +
             $"Search {snapshot.TotalDistanceTraveledPerSecond:0}u/s  meal dist {snapshot.AverageDistanceSinceLastMeal:0}u  kcal/u {snapshot.CaloriesEatenPerDistance:0.00}\n" +
             $"Zoom {_viewZoom:0.00}x  Follow {(_followSelected ? "on" : "off")}  Map {(_renderMap ? "on" : "off")}\n" +
@@ -1309,6 +1315,64 @@ public partial class Main : Node2D
         }
 
         return count;
+    }
+
+    private static LiveGrabStats CalculateLiveGrabStats(IReadOnlyList<CreatureState> creatures)
+    {
+        if (creatures.Count == 0)
+        {
+            return default;
+        }
+
+        var intentCount = 0;
+        var canGrabCount = 0;
+        var holdingCount = 0;
+        var grabbedCount = 0;
+        var totalOutput = 0f;
+        var totalPressure = 0f;
+        var totalStrength = 0f;
+        var maxPressure = 0f;
+        var maxStrength = 0f;
+
+        for (var i = 0; i < creatures.Count; i++)
+        {
+            var creature = creatures[i];
+            totalOutput += creature.Actions.GrabOutput;
+            if (creature.Actions.WantsGrab)
+            {
+                intentCount++;
+            }
+
+            if (creature.Senses.CanGrabCreature > 0f)
+            {
+                canGrabCount++;
+            }
+
+            if (creature.HeldCreatureId != default)
+            {
+                holdingCount++;
+                totalStrength += creature.GrabStrength;
+                maxStrength = MathF.Max(maxStrength, creature.GrabStrength);
+            }
+
+            if (creature.GrabbedByCreatureId != default)
+            {
+                grabbedCount++;
+                totalPressure += creature.GrabPressure;
+                maxPressure = MathF.Max(maxPressure, creature.GrabPressure);
+            }
+        }
+
+        return new LiveGrabStats(
+            totalOutput / creatures.Count,
+            intentCount / (float)creatures.Count,
+            canGrabCount / (float)creatures.Count,
+            holdingCount,
+            grabbedCount,
+            grabbedCount > 0 ? totalPressure / grabbedCount : 0f,
+            maxPressure,
+            holdingCount > 0 ? totalStrength / holdingCount : 0f,
+            maxStrength);
     }
 
     private string FormatGraphTickSpan(IReadOnlyList<SimulationStatsSnapshot> snapshots, GraphMetric metric)
@@ -1673,9 +1737,17 @@ public partial class Main : Node2D
     {
         var genome = _simulation.State.GetGenome(creature.GenomeId);
         var senses = creature.Senses;
+        var senseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
+        var biome = _simulation.State.Biomes.GetKindAt(creature.Position);
+        var visionRadius = senseRadius * _scenario.CreateBiomeVisionRangeProfile().For(biome);
+        var creatureScentRadius = senseRadius * CreatureSensingSystem.CreatureSimilarityScentRangeMultiplier;
+        var meatScentRadius = senseRadius * _scenario.MeatScentRangeMultiplier;
+        var soundRadius = senseRadius * _scenario.SoundRangeMultiplier;
 
         return
             $"Vision\n" +
+            $"Ranges vision {visionRadius:0}   sound {soundRadius:0}\n" +
+            $"Scent ranges creature {creatureScentRadius:0}   meat/rot {meatScentRadius:0}\n" +
             $"Sector hits {BuildVisionSectorHitSummary(senses.VisionSectors)}\n" +
             $"Food {(senses.FoodDetected ? "yes" : "no")}   density {senses.VisibleFoodDensity:0.00}\n" +
             $"Food prox {senses.FoodProximity:0.00}   fwd {senses.FoodDirectionForward:0.00}   right {senses.FoodDirectionRight:0.00}\n" +
@@ -2583,7 +2655,10 @@ public partial class Main : Node2D
         var screenPosition = ToScreen(selected.Position);
         var radius = MathF.Max(4f, CreatureGrowth.EffectiveBodyRadius(selected, genome) * _worldScale);
         var senseRadius = CreatureGrowth.EffectiveSenseRadius(selected, genome);
-        if (!IsVisibleInWorldRect(screenPosition, senseRadius * _worldScale + 8f))
+        var maxRangeRadius = senseRadius * MathF.Max(
+            _scenario.SoundRangeMultiplier,
+            MathF.Max(_scenario.MeatScentRangeMultiplier, CreatureSensingSystem.CreatureSimilarityScentRangeMultiplier));
+        if (!IsVisibleInWorldRect(screenPosition, maxRangeRadius * _worldScale + 8f))
         {
             return;
         }
@@ -2604,14 +2679,46 @@ public partial class Main : Node2D
         Vector2 screenPosition,
         float radius)
     {
+        DrawSelectedSenseRangeRings(creature, genome, screenPosition);
         DrawVisionCone(creature, genome, screenPosition);
         DrawVisionSectorDebug(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
         DrawSelectedMemoryVector(creature, screenPosition);
         DrawSelectedSoundOverlay(creature, genome, screenPosition);
-        DrawSelectedGrabLinks(creature, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
+        DrawSelectedGrabLinks(creature, screenPosition);
+    }
+
+    private void DrawSelectedSenseRangeRings(CreatureState creature, CreatureGenome genome, Vector2 screenPosition)
+    {
+        var senseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
+        DrawSelectedRangeRing(
+            screenPosition,
+            senseRadius * CreatureSensingSystem.CreatureSimilarityScentRangeMultiplier,
+            _creatureScentRangeColor,
+            0.9f);
+        DrawSelectedRangeRing(
+            screenPosition,
+            senseRadius * _scenario.MeatScentRangeMultiplier,
+            _meatScentRangeColor,
+            1.0f);
+        DrawSelectedRangeRing(
+            screenPosition,
+            senseRadius * _scenario.SoundRangeMultiplier,
+            _soundSenseRangeColor,
+            1.15f);
+    }
+
+    private void DrawSelectedRangeRing(Vector2 screenPosition, float worldRadius, Color color, float width)
+    {
+        var radiusPixels = worldRadius * _worldScale;
+        if (radiusPixels <= 3f || radiusPixels >= 12000f)
+        {
+            return;
+        }
+
+        DrawArc(screenPosition, radiusPixels, 0f, MathF.Tau, 128, color, width: width);
     }
 
     private void DrawSelectedMemoryVector(CreatureState creature, Vector2 screenPosition)
@@ -2910,12 +3017,18 @@ public partial class Main : Node2D
     {
         var targetGenome = _simulation.State.GetGenome(target.GenomeId);
         var targetScreenPosition = ToScreen(target.Position);
-        var targetRadius = MathF.Max(4f, CreatureGrowth.EffectiveBodyRadius(target, targetGenome) * _worldScale + 5f);
+        var targetRadius = MathF.Max(4f, CreatureGrowth.EffectiveBodyRadius(target, targetGenome) * _worldScale + 7f);
         var clampedPressure = Math.Clamp(pressure, 0f, 1f);
-        var lineColor = WithAlpha(color, 0.60f + clampedPressure * 0.35f);
+        var signal = Math.Clamp(0.35f + clampedPressure * 0.65f, 0f, 1f);
+        var lineColor = WithAlpha(color, 0.72f + signal * 0.23f);
+        var shadowColor = new Color(0f, 0f, 0f, 0.46f);
+        var midpoint = (holderScreenPosition + targetScreenPosition) * 0.5f;
 
-        DrawLine(holderScreenPosition, targetScreenPosition, lineColor, width: 2.0f + clampedPressure * 2.4f);
-        DrawArc(targetScreenPosition, targetRadius, 0f, MathF.Tau, 32, lineColor, width: 2.0f);
+        DrawLine(holderScreenPosition, targetScreenPosition, shadowColor, width: 5.0f + signal * 3.0f);
+        DrawLine(holderScreenPosition, targetScreenPosition, lineColor, width: 2.6f + signal * 3.2f);
+        DrawArc(targetScreenPosition, targetRadius + 1f, 0f, MathF.Tau, 36, shadowColor, width: 4.8f);
+        DrawArc(targetScreenPosition, targetRadius, 0f, MathF.Tau, 36, lineColor, width: 3.0f + signal * 1.8f);
+        DrawCircle(midpoint, 2.5f + signal * 2.5f, lineColor);
     }
 
     private void DrawSelectedFoodContact(CreatureState creature, Vector2 creatureScreenPosition)
@@ -5484,6 +5597,17 @@ public partial class Main : Node2D
 
         public int MaxGeneration;
     }
+
+    private readonly record struct LiveGrabStats(
+        float AverageOutput,
+        float IntentShare,
+        float CanGrabShare,
+        int HoldingCount,
+        int GrabbedCount,
+        float AveragePressure,
+        float MaxPressure,
+        float AverageStrength,
+        float MaxStrength);
 
     private enum CreatureColorMode
     {

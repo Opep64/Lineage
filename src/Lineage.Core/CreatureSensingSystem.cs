@@ -18,7 +18,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumExpectedFoodTransfer = 0.001f;
     private const float MinimumExpectedPlantDigestiveYield = 0.001f;
     private const float MinimumPlantQualityClarity = 0.04f;
-    private const float CreatureSimilarityScentRangeMultiplier = 1.5f;
+    public const float CreatureSimilarityScentRangeMultiplier = 1.5f;
     private const float CreatureSimilarityScentDensitySaturation = 1f;
     public const int DefaultWorldSenseIntervalTicks = 10;
     public const float DefaultSoundRangeMultiplier = 2.5f;
