@@ -694,6 +694,78 @@ button.scenario-tab.is-active {
   margin-bottom: 12px;
 }
 
+.species-roster-panel {
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.species-roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.species-roster-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.species-roster-details {
+  overflow-x: auto;
+}
+
+.species-roster-empty {
+  padding: 12px;
+  color: var(--muted);
+}
+
+.species-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.species-roster-table th,
+.species-roster-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.species-roster-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.species-roster-table td strong,
+.species-roster-table td span {
+  display: block;
+}
+
+.species-roster-table td span {
+  margin-top: 2px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.species-roster-table tr.is-disabled {
+  opacity: 0.62;
+}
+
+.species-roster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .brain-tools {
   display: grid;
   grid-template-columns: minmax(260px, 1fr);
