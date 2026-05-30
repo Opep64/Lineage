@@ -15,11 +15,15 @@ public struct CreatureActionState
 
     public float AttackOutput { get; set; }
 
+    public float GrabOutput { get; set; }
+
     public bool WantsEat { get; set; }
 
     public bool WantsReproduce { get; set; }
 
     public bool WantsAttack { get; set; }
+
+    public bool WantsGrab { get; set; }
 
     public float MemoryForward { get; set; }
 

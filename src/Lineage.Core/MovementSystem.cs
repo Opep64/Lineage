@@ -26,6 +26,7 @@ public sealed class MovementSystem(
             var previousPosition = creature.Position;
             var biome = state.Biomes.GetKindAt(previousPosition);
             var desiredVelocity = creature.DesiredVelocity.ClampedLength(effectiveMaxSpeed);
+            desiredVelocity *= CreatureGrabSystem.MovementMultiplierForGrabPressure(creature.GrabPressure);
             var biomeSpeedMultiplier = _biomeSpeedProfile.For(biome);
             var terrainAdjustedVelocity = desiredVelocity * biomeSpeedMultiplier;
             var intendedPosition = state.Bounds.Clamp(previousPosition + terrainAdjustedVelocity * deltaSeconds);

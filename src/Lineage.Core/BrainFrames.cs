@@ -92,7 +92,12 @@ public readonly record struct BrainInputFrame(
                 senses.MeatFoodContact,
                 senses.EggFoodContact,
                 senses.CreatureContact,
-                senses.CreatureContactSimilarity),
+                senses.CreatureContactSimilarity,
+                senses.GrabPressure,
+                senses.GrabDirectionForward,
+                senses.GrabDirectionRight,
+                senses.CanGrabCreature,
+                senses.IsHoldingCreature),
             new InternalInputFrame(
                 senses.EnergyRatio,
                 senses.HealthRatio,
@@ -185,7 +190,12 @@ public readonly record struct BodyInputFrame(
     float MeatFoodContact,
     float EggFoodContact,
     float CreatureContact,
-    float CreatureContactSimilarity);
+    float CreatureContactSimilarity,
+    float GrabPressure,
+    float GrabDirectionForward,
+    float GrabDirectionRight,
+    float CanGrabCreature,
+    float IsHoldingCreature);
 
 /// <summary>
 /// Internal body condition and drives available to the brain.
@@ -217,7 +227,8 @@ public readonly record struct BrainOutputFrame(
     float Turn,
     float Eat,
     float Reproduce,
-    float Attack);
+    float Attack,
+    float Grab);
 
 /// <summary>
 /// Temporary bridge for the current fixed neural brain's controller-managed memory.

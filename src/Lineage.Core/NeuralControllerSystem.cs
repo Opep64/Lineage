@@ -7,6 +7,7 @@ public sealed class NeuralControllerSystem(
     float eatThreshold = 0f,
     float reproduceThreshold = 0.25f,
     float attackThreshold = 0.25f,
+    float grabThreshold = 0.35f,
     float memoryDecayPerSecond = 0.06f,
     float memoryWriteRatePerSecond = 2.5f,
     bool reuseActionsOnSkippedWorldSenses = false,
@@ -14,6 +15,7 @@ public sealed class NeuralControllerSystem(
     int neuralControllerThreadCount = NeuralControllerSystem.DefaultNeuralControllerThreadCount) : ISimulationSystem
 {
     public const float DefaultAttackThreshold = 0.25f;
+    public const float DefaultGrabThreshold = 0.35f;
     public const float DefaultMemoryDecayPerSecond = 0.06f;
     public const float DefaultMemoryWriteRatePerSecond = 2.5f;
     public const int DefaultMaxActionReuseTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks;
@@ -256,9 +258,14 @@ public sealed class NeuralControllerSystem(
             || creature.LastMovementBlocked
             || creature.LastAttackDamageDealt > 0f
             || creature.LastAttackDamageTaken > 0f
+            || creature.GrabbedByCreatureId != default
+            || creature.HeldCreatureId != default
             || creature.LastRottenMeatDamage > 0f
             || senses.FoodContact > 0f
             || senses.CreatureContact > 0f
+            || senses.GrabPressure > 0f
+            || senses.CanGrabCreature > 0f
+            || senses.IsHoldingCreature > 0f
             || senses.MovementBlocked > 0f;
     }
 
@@ -303,9 +310,11 @@ public sealed class NeuralControllerSystem(
             EatOutput = actionOutputs.Eat,
             ReproduceOutput = actionOutputs.Reproduce,
             AttackOutput = actionOutputs.Attack,
+            GrabOutput = actionOutputs.Grab,
             WantsEat = actionOutputs.Eat > eatThreshold,
             WantsReproduce = actionOutputs.Reproduce > reproduceThreshold,
             WantsAttack = actionOutputs.Attack > attackThreshold,
+            WantsGrab = actionOutputs.Grab > grabThreshold,
             MemoryForward = memoryOutputs.DirectionForward,
             MemoryRight = memoryOutputs.DirectionRight
         };
@@ -318,7 +327,8 @@ public sealed class NeuralControllerSystem(
             Math.Clamp(actions.Turn, -1f, 1f),
             actions.EatOutput,
             actions.ReproduceOutput,
-            actions.AttackOutput);
+            actions.AttackOutput,
+            actions.GrabOutput);
     }
 
     private static void RecordNeuralDecision(ref CreatureState creature, long tick)

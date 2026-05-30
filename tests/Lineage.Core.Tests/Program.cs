@@ -136,6 +136,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates plant preference bridge inputs", NeuralBrainMigratesPlantPreferenceBridgeInputs),
     ("Neural brain migrates creature similarity inputs", NeuralBrainMigratesCreatureSimilarityInputs),
     ("Neural brain migrates habitat quality inputs", NeuralBrainMigratesHabitatQualityInputs),
+    ("Neural brain migrates grab output and inputs", NeuralBrainMigratesGrabOutputAndInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -144,6 +145,7 @@ var tests = new (string Name, Action Body)[]
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
+    ("Creature grab slows contact targets", CreatureGrabSlowsContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
     ("Sparse mutation rates gate genome and brain changes", SparseMutationRatesGateGenomeAndBrainChanges),
     ("World mutation policy overrides inherited genome mutation settings", WorldMutationPolicyOverridesInheritedGenomeMutationSettings),
@@ -3717,7 +3719,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
 {
     AssertEqual(NeuralBrainSchema.InputCount, BrainIoRegistry.Inputs.Count, "Input registry count");
     AssertEqual(NeuralBrainSchema.OutputCount, BrainIoRegistry.Outputs.Count, "Output registry count");
-    AssertEqual(5, BrainIoRegistry.PhysicalActionOutputs.Count, "Physical action output count");
+    AssertEqual(6, BrainIoRegistry.PhysicalActionOutputs.Count, "Physical action output count");
     AssertEqual(2, BrainIoRegistry.ArchitectureInternalOutputs.Count, "Internal output count");
 
     for (var i = 0; i < BrainIoRegistry.Inputs.Count; i++)
@@ -3731,9 +3733,13 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     }
 
     var moveOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.MoveForwardOutput);
+    var grabOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.GrabOutput);
     var memoryOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.MemoryForwardOutput);
     AssertEqual("action.move_forward", moveOutput.Key, "Move output key");
     AssertEqual(BrainOutputScope.PhysicalAction, moveOutput.Scope, "Move output scope");
+    AssertEqual("action.grab", grabOutput.Key, "Grab output key");
+    AssertEqual(BrainOutputScope.PhysicalAction, grabOutput.Scope, "Grab output scope");
+    AssertEqual(2, grabOutput.IntroducedVersion, "Grab output introduced version");
     AssertEqual("dense_memory.write_forward", memoryOutput.Key, "Memory output key");
     AssertEqual(BrainOutputScope.ArchitectureInternal, memoryOutput.Scope, "Memory output scope");
 
@@ -3741,9 +3747,12 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var sectorInput = BrainIoRegistry.GetInput(
         NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex));
     var contactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FoodContactInput);
+    var grabInput = BrainIoRegistry.GetInput(NeuralBrainSchema.GrabPressureInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, grabInput.Freshness, "Grab input freshness");
+    AssertEqual(3, grabInput.IntroducedVersion, "Grab input introduced version");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
 }
@@ -3825,6 +3834,11 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         EggFoodContact = 0.5f,
         CreatureContact = 0.75f,
         CreatureContactSimilarity = 0.85f,
+        GrabPressure = 0.65f,
+        GrabDirectionForward = -0.45f,
+        GrabDirectionRight = 0.35f,
+        CanGrabCreature = 1f,
+        IsHoldingCreature = 1f,
         MemoryDirectionForward = 0.11f,
         MemoryDirectionRight = -0.21f,
         MemoryStrength = 0.31f
@@ -3874,6 +3888,11 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.5f, inputs[NeuralBrainSchema.EggFoodContactInput], 0.000001, "Egg food contact input");
     AssertClose(0.75f, inputs[NeuralBrainSchema.CreatureContactInput], 0.000001, "Creature contact input");
     AssertClose(0.85f, inputs[NeuralBrainSchema.CreatureContactSimilarityInput], 0.000001, "Creature contact similarity input");
+    AssertClose(0.65f, inputs[NeuralBrainSchema.GrabPressureInput], 0.000001, "Grab pressure input");
+    AssertClose(-0.45f, inputs[NeuralBrainSchema.GrabDirectionForwardInput], 0.000001, "Grab direction forward input");
+    AssertClose(0.35f, inputs[NeuralBrainSchema.GrabDirectionRightInput], 0.000001, "Grab direction right input");
+    AssertClose(1f, inputs[NeuralBrainSchema.CanGrabCreatureInput], 0.000001, "Can grab creature input");
+    AssertClose(1f, inputs[NeuralBrainSchema.IsHoldingCreatureInput], 0.000001, "Is holding creature input");
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentPlantRawYieldInput], 0.000001, "Recent plant raw yield input");
     AssertClose(0.46f, inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput], 0.000001, "Recent plant energy yield input");
     AssertClose(0.56f, inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput], 0.000001, "Recent food energy yield input");
@@ -3914,6 +3933,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     outputs[NeuralBrainSchema.EatOutput] = 0.25f;
     outputs[NeuralBrainSchema.ReproduceOutput] = 0.5f;
     outputs[NeuralBrainSchema.AttackOutput] = -0.5f;
+    outputs[NeuralBrainSchema.GrabOutput] = 2f;
     outputs[NeuralBrainSchema.MemoryForwardOutput] = 3f;
     outputs[NeuralBrainSchema.MemoryRightOutput] = -3f;
 
@@ -3925,6 +3945,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.25f, actionOutputs.Eat, 0.000001, "Eat output remains raw");
     AssertClose(0.5f, actionOutputs.Reproduce, 0.000001, "Reproduce output remains raw");
     AssertClose(-0.5f, actionOutputs.Attack, 0.000001, "Attack output remains raw");
+    AssertClose(1f, actionOutputs.Grab, 0.000001, "Grab output is clamped");
     AssertClose(1f, memoryOutputs.DirectionForward, 0.000001, "Memory forward output is clamped");
     AssertClose(-1f, memoryOutputs.DirectionRight, 0.000001, "Memory right output is clamped");
 }
@@ -5035,6 +5056,7 @@ static void NeuralBrainMigratesRottenMeatSensingInputs()
     const int legacyInputCount = 38;
     const int legacyOutputCount = 7;
     const int hiddenNodeCount = 4;
+    const int oldMemoryForwardOutput = 5;
     const int oldRecentFoodSuccessInput = 34;
     const int oldMemoryStrengthInput = 37;
     var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
@@ -5044,7 +5066,7 @@ static void NeuralBrainMigratesRottenMeatSensingInputs()
 
     legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldMemoryStrengthInput] = 0.8f;
     legacyWeights[legacyHiddenInputOffset + oldRecentFoodSuccessInput] = -1.5f;
-    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MemoryForwardOutput * hiddenNodeCount] = 2.25f;
+    legacyWeights[legacyHiddenOutputOffset + oldMemoryForwardOutput * hiddenNodeCount] = 2.25f;
 
     var brain = new NeuralBrainGenome(legacyWeights);
 
@@ -5067,6 +5089,7 @@ static void NeuralBrainMigratesObstacleSensingInputs()
     const int legacyInputCount = 42;
     const int legacyOutputCount = 7;
     const int hiddenNodeCount = 4;
+    const int oldMemoryRightOutput = 6;
     const int oldVisibleMeatFreshnessInput = 38;
     const int oldRottenMeatScentRightInput = 41;
     var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
@@ -5076,7 +5099,7 @@ static void NeuralBrainMigratesObstacleSensingInputs()
 
     legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldRottenMeatScentRightInput] = -0.9f;
     legacyWeights[legacyHiddenInputOffset + oldVisibleMeatFreshnessInput] = 1.2f;
-    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MemoryRightOutput * hiddenNodeCount] = -2.1f;
+    legacyWeights[legacyHiddenOutputOffset + oldMemoryRightOutput * hiddenNodeCount] = -2.1f;
 
     var brain = new NeuralBrainGenome(legacyWeights);
 
@@ -5824,6 +5847,58 @@ static void NeuralBrainMigratesHabitatQualityInputs()
         "New right habitat quality hidden input starts neutral");
 }
 
+static void NeuralBrainMigratesGrabOutputAndInputs()
+{
+    const int legacyInputCount = NeuralBrainSchema.RightHabitatQualityInput + 1;
+    const int legacyOutputCount = 7;
+    const int hiddenNodeCount = 3;
+    const int oldMemoryForwardOutput = 5;
+    const int oldMemoryRightOutput = 6;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[oldMemoryForwardOutput * legacyInputCount + NeuralBrainSchema.BiasInput] = 1.25f;
+    legacyWeights[oldMemoryRightOutput * legacyInputCount + NeuralBrainSchema.BiasInput] = -1.5f;
+    legacyWeights[NeuralBrainSchema.AttackOutput * legacyInputCount + NeuralBrainSchema.RightHabitatQualityInput] = 0.8f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.RightHabitatQualityInput] = -0.4f;
+    legacyWeights[legacyHiddenOutputOffset + oldMemoryForwardOutput * hiddenNodeCount] = 2.5f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Grab migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Grab migrated weight count");
+    AssertClose(
+        1.25f,
+        brain.GetWeight(NeuralBrainSchema.MemoryForwardOutput, NeuralBrainSchema.BiasInput),
+        0.000001,
+        "Old memory-forward output shifts past grab");
+    AssertClose(
+        -1.5f,
+        brain.GetWeight(NeuralBrainSchema.MemoryRightOutput, NeuralBrainSchema.BiasInput),
+        0.000001,
+        "Old memory-right output shifts past grab");
+    AssertClose(
+        0.8f,
+        brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.RightHabitatQualityInput),
+        0.000001,
+        "Existing action output remains in place");
+    AssertClose(
+        -0.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RightHabitatQualityInput),
+        0.000001,
+        "Existing hidden habitat input remains in place");
+    AssertClose(
+        2.5f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MemoryForwardOutput, 0),
+        0.000001,
+        "Old hidden memory output shifts past grab");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.GrabOutput, NeuralBrainSchema.BiasInput), 0.000001, "New grab output starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.GrabPressureInput), 0.000001, "New grab pressure input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.IsHoldingCreatureInput), 0.000001, "New holding input starts neutral");
+}
+
 static void NeuralBrainSupportsHiddenNodes()
 {
     const int hiddenNodeCount = 4;
@@ -6298,6 +6373,48 @@ static void CreatureAttackDamagesContactTargets()
     AssertClose(0.25f, attacker.LastAttackDamageDealt, 0.000001, "Attack damage dealt");
     AssertClose(9.8f, attacker.Energy, 0.000001, "Attack energy cost");
     AssertClose(0.75f, target.Health, 0.000001, "Target health after bite");
+}
+
+static void CreatureGrabSlowsContactTargets()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 331,
+        systems:
+        [
+            new CreatureGrabSystem(),
+            new MovementSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        MaxSpeed = 10f,
+        MovementEnergyPerSecond = 0f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    var targetId = simulation.State.SpawnCreature(genomeId, new SimVector2(26f, 20f), energy: 10f);
+    var grabber = simulation.State.Creatures[0];
+    grabber.IsTouchingCreature = true;
+    grabber.CreatureContactId = targetId;
+    grabber.Actions = new CreatureActionState { WantsGrab = true, GrabOutput = 1f };
+    simulation.State.Creatures[0] = grabber;
+
+    var target = simulation.State.Creatures[1];
+    target.DesiredVelocity = new SimVector2(10f, 0f);
+    simulation.State.Creatures[1] = target;
+
+    simulation.Step();
+
+    grabber = simulation.State.Creatures[0];
+    target = simulation.State.Creatures[1];
+    AssertEqual(target.Id, grabber.HeldCreatureId, "Grabber should hold target");
+    AssertEqual(grabber.Id, target.GrabbedByCreatureId, "Target should know grabber");
+    AssertClose(1f, target.GrabPressure, 0.000001, "Same-size full grab pressure");
+    AssertClose(-1f, target.GrabDirection.X, 0.000001, "Grab direction points toward grabber");
+    AssertClose(27.5f, target.Position.X, 0.000001, "Grabbed target movement should be slowed");
 }
 
 static void CreatureAttackDeathsBecomeInjuryMeat()
@@ -8802,8 +8919,8 @@ static void BrainProfileJsonRoundTripsNeuralControllers()
     var roundTripped = BrainProfileJson.FromJson(brainJson);
 
     AssertTrue(brainJson.Contains("\"brainArchitectureKind\": \"hiddenLayerNeural\""), "Brain JSON should include architecture");
-    AssertTrue(brainJson.Contains("\"inputSchemaVersion\": 2"), "Brain JSON should include input schema version");
-    AssertTrue(brainJson.Contains("\"outputSchemaVersion\": 1"), "Brain JSON should include output schema version");
+    AssertTrue(brainJson.Contains("\"inputSchemaVersion\": 3"), "Brain JSON should include input schema version");
+    AssertTrue(brainJson.Contains("\"outputSchemaVersion\": 2"), "Brain JSON should include output schema version");
     AssertEqual("Probe brain", roundTripped.Name, "Brain profile name");
     AssertEqual("Round-trip brain test", roundTripped.Notes, "Brain profile notes");
     AssertEqual(BrainArchitectureKind.HiddenLayerNeural, roundTripped.BrainArchitectureKind, "Brain profile architecture");

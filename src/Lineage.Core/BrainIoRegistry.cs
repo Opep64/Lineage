@@ -177,7 +177,12 @@ public static class BrainIoRegistry
             Input("habitat.current_quality", "Current habitat quality", NeuralBrainSchema.CurrentHabitatQualityInput, BrainIoSignalGroup.Habitat, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Productive habitat quality under the creature."),
             Input("habitat.forward_quality", "Forward habitat quality", NeuralBrainSchema.ForwardHabitatQualityInput, BrainIoSignalGroup.Habitat, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Productive habitat quality sampled ahead."),
             Input("habitat.left_quality", "Left habitat quality", NeuralBrainSchema.LeftHabitatQualityInput, BrainIoSignalGroup.Habitat, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Productive habitat quality sampled to the left."),
-            Input("habitat.right_quality", "Right habitat quality", NeuralBrainSchema.RightHabitatQualityInput, BrainIoSignalGroup.Habitat, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Productive habitat quality sampled to the right.")
+            Input("habitat.right_quality", "Right habitat quality", NeuralBrainSchema.RightHabitatQualityInput, BrainIoSignalGroup.Habitat, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Productive habitat quality sampled to the right."),
+            Input("contact.grab_pressure", "Grab pressure", NeuralBrainSchema.GrabPressureInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Strength of another creature's hold on this creature.", introducedVersion: 3),
+            Input("contact.grab_forward", "Grab direction forward", NeuralBrainSchema.GrabDirectionForwardInput, BrainIoSignalGroup.Contact, -1f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Direction toward the grabbing creature projected forward.", introducedVersion: 3),
+            Input("contact.grab_right", "Grab direction right", NeuralBrainSchema.GrabDirectionRightInput, BrainIoSignalGroup.Contact, -1f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Direction toward the grabbing creature projected right.", introducedVersion: 3),
+            Input("contact.can_grab_creature", "Can grab creature", NeuralBrainSchema.CanGrabCreatureInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "A creature is close enough to grab.", introducedVersion: 3),
+            Input("contact.is_holding_creature", "Is holding creature", NeuralBrainSchema.IsHoldingCreatureInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "This creature is currently holding another creature.", introducedVersion: 3)
         });
 
         return ValidateInputs(inputs);
@@ -215,6 +220,7 @@ public static class BrainIoRegistry
             Output("action.eat", "Eat intent", NeuralBrainSchema.EatOutput, BrainIoSignalGroup.Action, -1f, 1f, 0f, BrainOutputScope.PhysicalAction, "Gate for eating when touching food."),
             Output("action.reproduce", "Reproduce intent", NeuralBrainSchema.ReproduceOutput, BrainIoSignalGroup.Action, -1f, 1f, 0f, BrainOutputScope.PhysicalAction, "Gate for laying an egg when reproduction rules allow it."),
             Output("action.attack", "Attack intent", NeuralBrainSchema.AttackOutput, BrainIoSignalGroup.Action, -1f, 1f, 0f, BrainOutputScope.PhysicalAction, "Gate for biting/damaging a contacted creature."),
+            Output("action.grab", "Grab intent", NeuralBrainSchema.GrabOutput, BrainIoSignalGroup.Action, 0f, 1f, 0f, BrainOutputScope.PhysicalAction, "Continuous hold strength for grabbing a contacted creature.", introducedVersion: 2),
             Output("dense_memory.write_forward", "Dense memory write forward", NeuralBrainSchema.MemoryForwardOutput, BrainIoSignalGroup.Memory, -1f, 1f, 0f, BrainOutputScope.ArchitectureInternal, "Legacy dense-adapter memory write along the creature's forward axis."),
             Output("dense_memory.write_right", "Dense memory write right", NeuralBrainSchema.MemoryRightOutput, BrainIoSignalGroup.Memory, -1f, 1f, 0f, BrainOutputScope.ArchitectureInternal, "Legacy dense-adapter memory write along the creature's right axis.")
         };
@@ -231,7 +237,8 @@ public static class BrainIoRegistry
         float maximum,
         float neutral,
         BrainInputFreshnessPolicy freshness,
-        string meaning)
+        string meaning,
+        int introducedVersion = 1)
     {
         return new BrainInputDefinition(
             key,
@@ -241,7 +248,7 @@ public static class BrainIoRegistry
             minimum,
             maximum,
             neutral,
-            1,
+            introducedVersion,
             freshness,
             meaning);
     }
@@ -280,7 +287,8 @@ public static class BrainIoRegistry
         float maximum,
         float neutral,
         BrainOutputScope scope,
-        string meaning)
+        string meaning,
+        int introducedVersion = 1)
     {
         return new BrainOutputDefinition(
             key,
@@ -290,7 +298,7 @@ public static class BrainIoRegistry
             minimum,
             maximum,
             neutral,
-            1,
+            introducedVersion,
             scope,
             meaning);
     }

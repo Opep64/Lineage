@@ -55,8 +55,10 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutHabitatQuality = 235;
     private const int LegacyInputCountWithoutPlantPayoffTrace = 224;
     private const int LegacyInputCountWithoutTypedPlantEnergyYield = 221;
+    private const int LegacyInputCountWithoutGrab = NeuralBrainSchema.RightHabitatQualityInput + 1;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
+    private const int LegacyOutputCountWithoutGrab = 7;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
     {
@@ -891,14 +893,29 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutGrab,
+            LegacyOutputCountWithoutGrab,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutGrab,
+                LegacyOutputCountWithoutGrab,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithNearestAggregates,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithNearestAggregates,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -907,13 +924,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutHabitatQuality,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutHabitatQuality,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -922,13 +939,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutCreatureSimilarityScent,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutCreatureSimilarityScent,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -937,13 +954,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutPlantPreferenceBridge,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutPlantPreferenceBridge,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -952,13 +969,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutPlantPayoffTrace,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutPlantPayoffTrace,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -967,13 +984,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutTypedPlantEnergyYield,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutTypedPlantEnergyYield,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -982,13 +999,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutSectorPlantQuality,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutSectorPlantQuality,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -997,13 +1014,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutFoodEnergyYield,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutFoodEnergyYield,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1012,13 +1029,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutPlantQuality,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutPlantQuality,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1027,13 +1044,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutCreatureContact,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutCreatureContact,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1042,13 +1059,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutCreatureSectorMotion,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutCreatureSectorMotion,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1057,13 +1074,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutCreatureSectorSize,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutCreatureSectorSize,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1072,13 +1089,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutHealthRatio,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutHealthRatio,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1087,13 +1104,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutFoodContactKinds,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutFoodContactKinds,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1102,13 +1119,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutFoodContact,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutFoodContact,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1117,13 +1134,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutSectorVision,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutSectorVision,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1132,13 +1149,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutObstacleSensing,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutObstacleSensing,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1147,13 +1164,13 @@ public sealed class NeuralBrainGenome
         if (TryInferLegacyWeightLayout(
             weights.Length,
             LegacyInputCountWithoutRottenMeatSensing,
-            NeuralBrainSchema.OutputCount,
+            LegacyOutputCountWithoutGrab,
             out hiddenNodeCount))
         {
             return (NormalizeLegacyWeights(
                 weights,
                 LegacyInputCountWithoutRottenMeatSensing,
-                NeuralBrainSchema.OutputCount,
+                LegacyOutputCountWithoutGrab,
                 oldEggReserveInput: LegacyNearestEggReserveInput,
                 oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
@@ -1313,8 +1330,14 @@ public sealed class NeuralBrainGenome
         var migrated = new float[GetExpectedWeightCount(hiddenNodeCount)];
         for (var output = 0; output < legacyOutputCount; output++)
         {
+            var targetOutput = MapLegacyOutput(output, legacyOutputCount);
+            if (targetOutput < 0)
+            {
+                continue;
+            }
+
             var legacyOffset = output * legacyInputCount;
-            var newOffset = output * NeuralBrainSchema.InputCount;
+            var newOffset = targetOutput * NeuralBrainSchema.InputCount;
 
             for (var input = 0; input < legacyInputCount; input++)
             {
@@ -1361,8 +1384,14 @@ public sealed class NeuralBrainGenome
             var newHiddenOutputOffset = DirectWeightCount + hiddenNodeCount * NeuralBrainSchema.InputCount;
             for (var output = 0; output < legacyOutputCount; output++)
             {
+                var targetOutput = MapLegacyOutput(output, legacyOutputCount);
+                if (targetOutput < 0)
+                {
+                    continue;
+                }
+
                 var legacyOffset = legacyHiddenOutputOffset + output * hiddenNodeCount;
-                var newOffset = newHiddenOutputOffset + output * hiddenNodeCount;
+                var newOffset = newHiddenOutputOffset + targetOutput * hiddenNodeCount;
                 for (var hidden = 0; hidden < hiddenNodeCount; hidden++)
                 {
                     migrated[newOffset + hidden] = weights[legacyOffset + hidden];
@@ -1371,6 +1400,16 @@ public sealed class NeuralBrainGenome
         }
 
         return migrated;
+    }
+
+    private static int MapLegacyOutput(int output, int legacyOutputCount)
+    {
+        if (legacyOutputCount == LegacyOutputCountWithoutGrab && output >= NeuralBrainSchema.GrabOutput)
+        {
+            return output + 1;
+        }
+
+        return output < NeuralBrainSchema.OutputCount ? output : -1;
     }
 
     private static int MapLegacyInput(
@@ -1387,6 +1426,11 @@ public sealed class NeuralBrainGenome
         if (input == oldReproductionReadinessInput)
         {
             return NeuralBrainSchema.ReproductionReadinessInput;
+        }
+
+        if (legacyInputCount == LegacyInputCountWithoutGrab)
+        {
+            return input;
         }
 
         if (legacyInputCount >= LegacyInputCountWithoutTypedPlantEnergyYield)

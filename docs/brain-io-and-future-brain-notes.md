@@ -7,7 +7,7 @@ These notes capture the current discussion about creature actions, senses, input
 
 ## Current Dense Adapter Outputs
 
-The current neural adapter exposes 7 outputs:
+The current neural adapter exposes 8 outputs:
 
 | Output | Role |
 | --- | --- |
@@ -16,25 +16,26 @@ The current neural adapter exposes 7 outputs:
 | `Eat` | Gate for eating when touching food: plant, meat, or egg. |
 | `Reproduce` | Gate for laying an egg when egg reserve, maturity, cooldown, and scenario rules allow it. |
 | `Attack` | Gate for biting/damaging a contacted creature. |
+| `Grab` | Continuous hold strength for grabbing or keeping hold of a contacted creature. |
 | `MemoryForward` | Legacy memory-vector write in the creature's forward direction. |
 | `MemoryRight` | Legacy memory-vector write in the creature's right direction. |
 
-The real physical actions are move, turn, eat, reproduce, and attack. Memory writes are internal controller actions. Creatures do not currently grab, carry, latch, guard, choose mates, emit signals, rest intentionally, or choose a specific target directly.
+The real physical actions are move, turn, eat, reproduce, attack, and grab. Memory writes are internal controller actions. Creatures do not currently carry resources, latch through a separate action, guard, choose mates, emit signals, rest intentionally, or choose a specific target directly.
 
 ## Future Output Discussion
 
 ### Grab
 
-Add a future universal physical output for grabbing.
+First-pass creature grabbing is implemented as a universal physical output.
 
-Working direction:
+Current implementation:
 
-- `Grab` should be a continuous output, probably `0..1`, resolved with a threshold rather than a pure binary.
-- Below the release threshold means no grab/release.
-- Above the grab threshold means grab or keep holding.
-- Higher output means stronger grip, higher energy cost, better chance to hold, and stronger slowing/carrying effect.
-- Use hysteresis to prevent flicker, for example grab above `0.35` and release below `0.15`.
-- Grabs should be stateful: a creature keeps holding the same target until it releases, grip fails, energy runs out, target disappears/dies, or another rule breaks the hold.
+- `Grab` is a continuous `0..1` dense-adapter output.
+- Above the grab threshold (`0.35`) means grab or keep holding; below it releases.
+- The first target type is contacted creatures only.
+- Higher output and larger grabber size create stronger grab pressure.
+- Grabbed creatures receive a movement multiplier penalty and contact-fresh `GrabPressure` plus local grab direction inputs.
+- A simple deterministic break check lets larger/high-effort targets shake off weak holds.
 
 Possible first effects:
 
@@ -45,7 +46,7 @@ Possible first effects:
 | Egg | Drag/carry if small enough. |
 | Meat | Drag/carry if small enough. |
 
-This can support parasites without a separate latch output: grab plus attack lets a small creature hold onto a larger creature while feeding. It can also support carrying without a separate carry output: grab plus movement is carry/drag.
+Creature targets are implemented. Plant/resource, egg, and meat carrying are not yet implemented. This can eventually support parasites without a separate latch output: grab plus attack lets a small creature hold onto a larger creature while feeding. It can also support carrying without a separate carry output: grab plus movement is carry/drag.
 
 Current attack interaction:
 
@@ -61,20 +62,19 @@ Recommended first grab-related inputs:
 | `GrabPressure` | Continuous pressure/restraint from being held. `0` means not grabbed. |
 | `GrabDirectionForward` | Direction to the grabber or net grab force in local forward/back terms. |
 | `GrabDirectionRight` | Direction to the grabber or net grab force in local right/left terms. |
-| `CanGrabTarget` | Whether there is a viable target in grab range/arc. |
-| `GrabTargetKind` | Compact target type: creature, plant, egg, meat, or none. |
-| `GrabTargetRelativeSize` | Whether the nearby grab target is small/equal/large relative to the creature. |
-| `IsHolding` | Whether this creature currently has a grab attached. |
+| `CanGrabCreature` | Whether a creature is currently close enough to grab. |
+| `GrabTargetKind` | Future compact target type: creature, plant, egg, meat, or none. |
+| `GrabTargetRelativeSize` | Future cue for whether the nearby grab target is small/equal/large relative to the creature. |
+| `IsHoldingCreature` | Whether this creature currently has a creature grab attached. |
 | `HeldTargetKind` | What kind of thing is currently held. |
 
 `IsGrabbed` is probably redundant if `GrabPressure` exists, because `GrabPressure > 0` implies being grabbed. If UI/debug readability matters, `IsGrabbed` can be derived outside the brain input schema.
 
 Cheap shake-off model:
 
-- Avoid full physics. Model grab escape with a deterministic strain/break check.
-- A grab has `holdStrength`, based on grabber size, grab output strength, energy, and eventually a grip trait.
-- The grabbed creature produces `escapeForce` from normal actions: moving away from grab direction, rapid turning, sudden acceleration/high movement effort, and size advantage.
-- Accumulate strain while escape force exceeds hold strength, decay it while pressure is low, and break the grab when strain crosses a threshold.
+- Avoid full physics. Model grab escape with deterministic strain/break checks.
+- Current first pass uses instantaneous size and movement/turning effort to break weak holds.
+- A later richer pass can add accumulated strain, energy cost, a grip trait, and direction-aware escape force.
 
 Example:
 
@@ -264,9 +264,11 @@ Current architectures:
 - `HybridNeural`: direct input-output weights plus optional hidden nodes.
 - `HiddenLayerNeural`: one hidden layer; direct weights are stored for compatibility but forced to zero behaviorally.
 
-The current neural schema is 223 inputs and 7 outputs.
+The current neural schema is 228 inputs and 8 outputs.
 
 Schema v2 removed the old nearest-food and nearest-creature aggregate direction/proximity slots from the active brain contract. Older 239-input dense neural brains still load through migration: the removed nearest-target slots are dropped, and sector, density, contact, scent, terrain, quality, similarity, memory, and habitat weights are shifted into the current layout.
+
+Schema v3 adds the grab contact inputs: grab pressure, grab direction forward/right, can-grab-creature, and is-holding-creature. Output schema v2 inserts the `Grab` physical output before dense-memory writes. Older 7-output brains migrate by leaving `Grab` neutral and shifting memory-write weights to the new memory indices.
 
 Hidden nodes:
 
@@ -432,7 +434,7 @@ Desired conceptual split:
 
 This keeps future rtNEAT and plastic brains from being forced to use legacy memory outputs.
 
-Status: implemented at the frame/adapter boundary. The dense network still has 7 output slots for compatibility, but only 5 feed the universal physical action frame.
+Status: implemented at the frame/adapter boundary. The dense network now has 8 output slots: 6 feed the universal physical action frame and 2 remain dense-adapter memory writes.
 
 ### 3. Keep The Flat Neural Schema As An Adapter
 

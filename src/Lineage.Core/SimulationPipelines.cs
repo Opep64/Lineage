@@ -253,6 +253,7 @@ public static class SimulationPipelines
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,
                 reuseActionsOnSkippedWorldSenses: reuseNeuralActionsOnSkippedWorldSenses,
                 neuralControllerThreadCount: neuralControllerThreadCount),
+            new CreatureGrabSystem(),
             new MovementSystem(
                 biomeMovementCostProfile,
                 biomeSpeedProfile,

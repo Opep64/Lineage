@@ -237,6 +237,21 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             senses.CreatureContactSimilarity = 0f;
         }
 
+        senses.GrabPressure = Math.Clamp(creature.GrabPressure, 0f, 1f);
+        senses.CanGrabCreature = creature.IsTouchingCreature ? 1f : 0f;
+        senses.IsHoldingCreature = creature.HeldCreatureId != default ? 1f : 0f;
+        if (senses.GrabPressure > 0f && creature.GrabDirection.IsFinite)
+        {
+            var grabDirection = creature.GrabDirection.ClampedLength(1f);
+            senses.GrabDirectionForward = SimVector2.Dot(grabDirection, forward);
+            senses.GrabDirectionRight = SimVector2.Dot(grabDirection, right);
+        }
+        else
+        {
+            senses.GrabDirectionForward = 0f;
+            senses.GrabDirectionRight = 0f;
+        }
+
         var memorySenseStartedAt = sensingProfile is not null
             ? Stopwatch.GetTimestamp()
             : 0L;

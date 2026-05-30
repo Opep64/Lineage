@@ -83,6 +83,11 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.EggFoodContactInput] = frame.Body.EggFoodContact;
         inputs[NeuralBrainSchema.CreatureContactInput] = frame.Body.CreatureContact;
         inputs[NeuralBrainSchema.CreatureContactSimilarityInput] = frame.Body.CreatureContactSimilarity;
+        inputs[NeuralBrainSchema.GrabPressureInput] = frame.Body.GrabPressure;
+        inputs[NeuralBrainSchema.GrabDirectionForwardInput] = frame.Body.GrabDirectionForward;
+        inputs[NeuralBrainSchema.GrabDirectionRightInput] = frame.Body.GrabDirectionRight;
+        inputs[NeuralBrainSchema.CanGrabCreatureInput] = frame.Body.CanGrabCreature;
+        inputs[NeuralBrainSchema.IsHoldingCreatureInput] = frame.Body.IsHoldingCreature;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {
@@ -125,7 +130,8 @@ public static class LegacyNeuralBrainAdapter
             Math.Clamp(outputs[NeuralBrainSchema.TurnOutput], -1f, 1f),
             outputs[NeuralBrainSchema.EatOutput],
             outputs[NeuralBrainSchema.ReproduceOutput],
-            outputs[NeuralBrainSchema.AttackOutput]);
+            outputs[NeuralBrainSchema.AttackOutput],
+            Math.Clamp(outputs[NeuralBrainSchema.GrabOutput], 0f, 1f));
     }
 
     public static LegacyNeuralMemoryOutputFrame ReadMemoryOutputs(ReadOnlySpan<float> outputs)

@@ -121,8 +121,8 @@ Status: first pass implemented, not final ecology
 - Future interactions:
   - guarding eggs;
   - carrying resources or eggs;
-  - grabbing/attaching to creatures;
-  - parasite-like small-creature strategies;
+  - richer grabbing/attaching behavior with grip costs, accumulated escape strain, and held-target sensing;
+  - parasite-like small-creature strategies built on grab plus attack;
   - social tolerance or aggression based on imperfect similarity cues.
 
 ## Terrain, Biomes, Climate, And World Generation

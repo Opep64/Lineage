@@ -218,6 +218,31 @@ public struct CreatureSenseState
     /// </summary>
     public float CreatureContactSimilarity { get; set; }
 
+    /// <summary>
+    /// Strength of another creature's current hold on this creature, clamped to [0, 1].
+    /// </summary>
+    public float GrabPressure { get; set; }
+
+    /// <summary>
+    /// Direction toward the creature currently grabbing this creature, projected onto the forward axis.
+    /// </summary>
+    public float GrabDirectionForward { get; set; }
+
+    /// <summary>
+    /// Direction toward the creature currently grabbing this creature, projected onto the right axis.
+    /// </summary>
+    public float GrabDirectionRight { get; set; }
+
+    /// <summary>
+    /// Contact cue indicating that a creature is close enough to grab.
+    /// </summary>
+    public float CanGrabCreature { get; set; }
+
+    /// <summary>
+    /// Body-state cue indicating that this creature is currently holding another creature.
+    /// </summary>
+    public float IsHoldingCreature { get; set; }
+
     // Legacy aliases kept populated for older report/snapshot readers and tests in progress.
     public bool PreyDetected { get; set; }
 

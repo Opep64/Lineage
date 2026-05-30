@@ -35,7 +35,7 @@ The Long Run Performance recipe applies the more aggressive long-run bundle: sna
 
 ## Core Entities
 
-- Creatures have position, velocity, heading, energy, health, age, generation, parent/founder lineage, genome ID, brain ID, gut contents, senses, action outputs, reproduction cooldown, egg reserve, and a legacy spatial memory vector.
+- Creatures have position, velocity, heading, energy, health, age, generation, parent/founder lineage, genome ID, brain ID, gut contents, senses, action outputs, reproduction cooldown, egg reserve, grab/held state, and a legacy spatial memory vector.
 - Eggs are first-class entities with parent, generation, genome, brain, energy, health, max health, investment ratio, age, incubation time, and pending death reason.
 - Resources are plant or meat patches.
 - Plants have a coarse type: generic, tender, rich, or tough.
@@ -88,6 +88,7 @@ Initial creatures and roster entries can spawn uniformly, in left/middle/right t
 - Eggs can be eaten as meat-like nutrition.
 - Creature attacks can damage contact targets, create injury deaths, and produce meat resources.
 - Attack intent remains threshold-gated, so near-threshold attack exploration is still a design concern.
+- Creature grabs can hold a contacted creature, slow the grabbed target's movement, and expose grab pressure/direction as contact-fresh senses. First-pass grab only targets creatures; resource/egg carrying and richer latch/escape rules remain future work.
 
 ## Current Senses
 
@@ -118,6 +119,7 @@ Implemented terrain/body/contact inputs include:
 - food, plant, meat, egg, and creature contact;
 - plant contact quality/ease/preference;
 - creature contact similarity.
+- grab pressure, grab direction, whether a creature is close enough to grab, and whether this creature is holding another creature.
 
 Implemented internal inputs include:
 
@@ -141,9 +143,9 @@ Not implemented yet:
 
 The current flat neural schema has:
 
-- Inputs: `223`.
-- Dense adapter outputs: `7`.
-- Universal physical action outputs: move forward, turn, eat, reproduce, and attack.
+- Inputs: `228`.
+- Dense adapter outputs: `8`.
+- Universal physical action outputs: move forward, turn, eat, reproduce, attack, and grab.
 - Dense-adapter internal outputs: memory forward and memory right.
 - `BrainIoRegistry` records stable keys, flat indices, groups, ranges, neutral values, freshness policy, and physical-vs-internal scope for the active dense adapter schema.
 
@@ -217,4 +219,4 @@ Recent validation and evidence is spread across `PERFORMANCE_BASELINES.md`, `doc
 - The 16k x 16k Balanced profiling pass found sensing and neural evaluation dominate carrying-capacity runtime.
 - Parallel neural and sensing execution are now implemented and configurable.
 - Long Run Performance settings improve 16k tail throughput substantially but still do not make 960 ticks/s realistic at the profiled carrying capacity.
-- Recent local core test runs during the catalog/map/roster work passed 216 tests; rerun tests before relying on that number for a release note.
+- Recent local core test runs during the brain I/O and grab work passed 218 tests; rerun tests before relying on that number for a release note.

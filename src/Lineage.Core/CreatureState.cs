@@ -100,6 +100,16 @@ public struct CreatureState
 
     public float CreatureContactEdgeDistance { get; set; }
 
+    public EntityId HeldCreatureId { get; set; }
+
+    public EntityId GrabbedByCreatureId { get; set; }
+
+    public float GrabPressure { get; set; }
+
+    public float GrabStrength { get; set; }
+
+    public SimVector2 GrabDirection { get; set; }
+
     /// <summary>
     /// Raw calories transferred from food into the gut during the most recent eating pass.
     /// </summary>

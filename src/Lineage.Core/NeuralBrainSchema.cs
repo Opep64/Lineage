@@ -5,9 +5,9 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 2;
+    public const int InputSchemaVersion = 3;
 
-    public const int OutputSchemaVersion = 1;
+    public const int OutputSchemaVersion = 2;
 
     public const int DefaultHiddenNodeCount = 4;
 
@@ -81,9 +81,19 @@ public static class NeuralBrainSchema
 
     public const int RightHabitatQualityInput = LeftHabitatQualityInput + 1;
 
-    public const int InputCount = RightHabitatQualityInput + 1;
+    public const int GrabPressureInput = RightHabitatQualityInput + 1;
 
-    public const int OutputCount = 7;
+    public const int GrabDirectionForwardInput = GrabPressureInput + 1;
+
+    public const int GrabDirectionRightInput = GrabDirectionForwardInput + 1;
+
+    public const int CanGrabCreatureInput = GrabDirectionRightInput + 1;
+
+    public const int IsHoldingCreatureInput = CanGrabCreatureInput + 1;
+
+    public const int InputCount = IsHoldingCreatureInput + 1;
+
+    public const int OutputCount = 8;
 
     public const int BiasInput = 0;
 
@@ -193,9 +203,11 @@ public static class NeuralBrainSchema
 
     public const int AttackOutput = 4;
 
-    public const int MemoryForwardOutput = 5;
+    public const int GrabOutput = 5;
 
-    public const int MemoryRightOutput = 6;
+    public const int MemoryForwardOutput = 6;
+
+    public const int MemoryRightOutput = 7;
 
     public static int VisionSectorPlantDensityInput(int sectorIndex)
     {
