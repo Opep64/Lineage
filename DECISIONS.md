@@ -190,11 +190,11 @@ Status: active.
 Decision:
 
 - Use 9 angular vision sectors with compact per-sector category signals.
-- Authored scenarios enable sector vision and disable legacy nearest-food/nearest-creature vision inputs.
+- Authored scenarios use sector vision, and the legacy nearest-food/nearest-creature brain input slots have been removed from the active schema.
 
 Rationale:
 
-- Nearest-object summaries granted too much abstract targeting power.
+- Nearest-object summaries granted too much abstract targeting power, so old 239-input brains now migrate by dropping those slots.
 - Sector vision lets creatures perceive multiple objects directionally while keeping input count bounded.
 
 Status: active.

@@ -22,7 +22,7 @@ offspring is applied by the scenario/world policy at reproduction time.
 
 Current starter profiles:
 
-- `starter-seed-forager.species.json`: legacy nearest-cue plant forager.
+- `starter-seed-forager.species.json`: seed plant forager; older embedded weights are normalized to the current sector-vision schema on load.
 - `starter-sector-forager.species.json`: current sector-vision plant forager baseline.
 - `starter-explorer-forager.species.json`: terrain-aware exploratory forager.
 - `starter-scavenger-forager.species.json`: meat-scent scavenger forager.

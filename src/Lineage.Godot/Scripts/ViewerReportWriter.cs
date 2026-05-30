@@ -109,8 +109,6 @@ public static class ViewerReportWriter
         WriteMetric(writer, hasSpeciesRoster ? "Default brain architecture" : "Brain architecture", FormatBrainArchitectureKind(scenario.BrainArchitectureKind));
         WriteMetric(writer, hasSpeciesRoster ? "Default initial brain" : "Initial brain", FormatInitialBrainKind(scenario.InitialBrainKind));
         WriteMetric(writer, hasSpeciesRoster ? "Default brain hidden nodes" : "Brain hidden nodes", scenario.BrainHiddenNodeCount.ToString(CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Legacy nearest food vision inputs", scenario.EnableLegacyNearestFoodVisionInputs ? "enabled" : "disabled");
-        WriteMetric(writer, "Legacy nearest creature vision inputs", scenario.EnableLegacyNearestCreatureVisionInputs ? "enabled" : "disabled");
         WriteMetric(writer, "Seed", scenario.Seed.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "World size", $"{state.Bounds.Width:0} x {state.Bounds.Height:0}");
         WriteMetric(writer, "Resources per 1M area", resourceDensity.ToString("0.###", CultureInfo.InvariantCulture));
@@ -2016,9 +2014,9 @@ public static class ViewerReportWriter
                 : 0f;
             entries.Add(new("Brain", $"{FormatBrainArchitectureKind(architecture)}, hidden {brain.HiddenNodeCount}, weights {brain.Weights.Length}"));
             entries.Add(new("Brain magnitude", $"direct mean |w| {FormatCompactNumber((float)directMean)}, hidden in {FormatCompactNumber(brain.SumAbsoluteHiddenInputWeights())}, hidden out {FormatCompactNumber(brain.SumAbsoluteHiddenOutputWeights())}"));
-            entries.Add(new("Forage weights", $"plant move {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.PlantForwardInput))}, meat move {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatForwardInput))}, eat freshness {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.VisibleMeatFreshnessInput))}"));
+            entries.Add(new("Forage weights", $"plant center {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex)))}, meat center {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisionSectorMeatProximityInput(VisionSectorSet.CenterSectorIndex)))}, eat freshness {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.VisibleMeatFreshnessInput))}"));
             entries.Add(new("Risk weights", $"rot move {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RottenMeatScentForwardInput))}, terrain drag {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.ForwardTerrainDragInput))}"));
-            entries.Add(new("Attack weights", $"creature ahead {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureForwardInput))}, close {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput))}, approach {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureApproachRateInput))}"));
+            entries.Add(new("Attack weights", $"small center {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)))}, contact {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureContactInput))}, approach {FormatSignedBrainWeight(brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)))}"));
         }
         else
         {

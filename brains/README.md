@@ -6,9 +6,9 @@ These files store one reusable neural controller without the creature body/genom
 point at a brain profile to run body/brain transplant experiments while keeping the same shared sense and action schema.
 
 Profiles exported from runs are saved under `brains/user/`. A brain profile records the architecture, input/output schema
-versions, input/output counts, hidden node count, and weights. The current schema is input version `1`, output version `1`,
-with `239` inputs and `7` outputs. When older dense neural layouts can be recognized, loading a brain profile normalizes it
-into the current schema with newly added inputs or outputs left neutral.
+versions, input/output counts, hidden node count, and weights. The current schema is input version `2`, output version `1`,
+with `223` inputs and `7` outputs. Older dense neural layouts, including the former 239-input nearest-target schema, are
+normalized on load by dropping removed inputs and leaving newly added inputs or outputs neutral where possible.
 
 Built-in starter brain profiles live under `brains/starter/`:
 

@@ -75,10 +75,6 @@ public sealed record SimulationScenario
 
     public bool EnableSectorVision { get; init; } = true;
 
-    public bool EnableLegacyNearestFoodVisionInputs { get; init; } = true;
-
-    public bool EnableLegacyNearestCreatureVisionInputs { get; init; } = true;
-
     public bool ReuseNeuralActionsOnSkippedWorldSenses { get; init; }
 
     public int NeuralControllerThreadCount { get; init; } = NeuralControllerSystem.DefaultNeuralControllerThreadCount;

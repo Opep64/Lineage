@@ -13,9 +13,7 @@ public static class LegacyNeuralBrainAdapter
     public static void FillInputs(
         in BrainInputFrame frame,
         in LegacyNeuralMemoryInputFrame memory,
-        Span<float> inputs,
-        bool enableLegacyNearestFoodVisionInputs = true,
-        bool enableLegacyNearestCreatureVisionInputs = true)
+        Span<float> inputs)
     {
         if (inputs.Length < NeuralBrainSchema.InputCount)
         {
@@ -33,32 +31,10 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.VisiblePlantEnergyQualityInput] = frame.Vision.PlantEnergyQuality;
         inputs[NeuralBrainSchema.VisiblePlantBiteEaseInput] = frame.Vision.PlantBiteEase;
         inputs[NeuralBrainSchema.VisibleMeatDensityInput] = frame.Vision.Meat.Density;
-        if (enableLegacyNearestFoodVisionInputs)
-        {
-            inputs[NeuralBrainSchema.FoodProximityInput] = frame.Vision.Food.Proximity;
-            inputs[NeuralBrainSchema.FoodForwardInput] = frame.Vision.Food.DirectionForward;
-            inputs[NeuralBrainSchema.FoodRightInput] = frame.Vision.Food.DirectionRight;
-            inputs[NeuralBrainSchema.PlantProximityInput] = frame.Vision.Plant.Proximity;
-            inputs[NeuralBrainSchema.PlantForwardInput] = frame.Vision.Plant.DirectionForward;
-            inputs[NeuralBrainSchema.PlantRightInput] = frame.Vision.Plant.DirectionRight;
-            inputs[NeuralBrainSchema.MeatProximityInput] = frame.Vision.Meat.Proximity;
-            inputs[NeuralBrainSchema.MeatForwardInput] = frame.Vision.Meat.DirectionForward;
-            inputs[NeuralBrainSchema.MeatRightInput] = frame.Vision.Meat.DirectionRight;
-        }
         inputs[NeuralBrainSchema.DietaryMeatBiasInput] = frame.Internal.DietaryMeatBias;
         inputs[NeuralBrainSchema.EggReserveRatioInput] = frame.Internal.EggReserveRatio;
         inputs[NeuralBrainSchema.ReproductionReadinessInput] = frame.Internal.ReproductionReadiness;
         inputs[NeuralBrainSchema.VisibleCreatureDensityInput] = frame.Vision.Creature.Density;
-        if (enableLegacyNearestCreatureVisionInputs)
-        {
-            inputs[NeuralBrainSchema.CreatureProximityInput] = frame.Vision.Creature.Proximity;
-            inputs[NeuralBrainSchema.CreatureForwardInput] = frame.Vision.Creature.DirectionForward;
-            inputs[NeuralBrainSchema.CreatureRightInput] = frame.Vision.Creature.DirectionRight;
-            inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput] = frame.Vision.CreatureRelativeBodySize;
-            inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = frame.Vision.CreatureRelativeSpeed;
-            inputs[NeuralBrainSchema.CreatureApproachRateInput] = frame.Vision.CreatureApproachRate;
-            inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = frame.Vision.CreatureFacingAlignment;
-        }
         inputs[NeuralBrainSchema.MeatScentDensityInput] = frame.Scent.Meat.Density;
         inputs[NeuralBrainSchema.MeatScentForwardInput] = frame.Scent.Meat.DirectionForward;
         inputs[NeuralBrainSchema.MeatScentRightInput] = frame.Scent.Meat.DirectionRight;

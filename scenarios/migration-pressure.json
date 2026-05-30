@@ -14,8 +14,6 @@
   "spatialCellSize": 64,
   "worldSenseIntervalTicks": 10,
   "enableSectorVision": true,
-  "enableLegacyNearestFoodVisionInputs": false,
-  "enableLegacyNearestCreatureVisionInputs": false,
   "statsSnapshotIntervalTicks": 300,
   "initialCreatureCount": 120,
   "initialCreatureSpawnRegion": "leftThird",

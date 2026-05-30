@@ -193,8 +193,6 @@ public static class SimulationScenarioMetadata
             "InitialCreatureCount" => "Number of founders spawned when no species roster is enabled.",
             "InitialResourcesPerMillionArea" => "Plant density scaled by world area.",
             "EnableSectorVision" => "Enables grouped sector vision inputs for the neural controller.",
-            "EnableLegacyNearestFoodVisionInputs" => "Keeps legacy nearest-food inputs available beside sector vision.",
-            "EnableLegacyNearestCreatureVisionInputs" => "Keeps legacy nearest-creature inputs available beside sector vision.",
             "ReuseNeuralActionsOnSkippedWorldSenses" => "Reuses the previous neural action on ticks where expensive world senses were not refreshed, unless contact or internal-state changes force a new decision.",
             "SensingThreadCount" => "Maximum worker threads used for creature sensing. Use 1 for the fully detailed single-threaded path.",
             "NeuralControllerThreadCount" => "Maximum worker threads used for neural controller evaluation. Defaults to 8; use 1 for the single-threaded deterministic path.",

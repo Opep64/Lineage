@@ -30,6 +30,10 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutRottenMeatSensing = 38;
     private const int LegacyInputCountWithoutObstacleSensing = 42;
     private const int LegacyInputCountWithoutSectorVision = 46;
+    private const int LegacyInputCountWithNearestAggregates = 239;
+    private const int LegacyNearestEggReserveInput = 16;
+    private const int LegacyNearestReproductionReadinessInput = 17;
+    private const int LegacyNearestVisionSectorInputStart = 46;
     private const int LegacyVisionSectorChannelCount = 8;
     private const int LegacyInputCountWithoutFoodContact = 118;
     private const int LegacyInputCountWithoutFoodContactKinds = 119;
@@ -37,18 +41,18 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutCreatureSectorSize = 123;
     private const int LegacyCreatureSectorSizeChannelCount = 14;
     private const int LegacyCreatureSectorMotionFoodContactInput =
-        NeuralBrainSchema.VisionSectorInputStart + VisionSectorSet.SectorCount * LegacyCreatureSectorSizeChannelCount;
+        LegacyNearestVisionSectorInputStart + VisionSectorSet.SectorCount * LegacyCreatureSectorSizeChannelCount;
     private const int LegacyInputCountWithoutCreatureSectorMotion = LegacyCreatureSectorMotionFoodContactInput + 5;
     private const int LegacyInputCountWithoutCreatureContact = 195;
     private const int LegacyInputCountWithoutPlantQuality = 196;
     private const int LegacyInputCountWithoutFoodEnergyYield = 202;
     private const int LegacyVisionSectorChannelCountWithoutPlantQuality = 16;
     private const int LegacySectorPlantQualityFoodContactInput =
-        NeuralBrainSchema.VisionSectorInputStart + VisionSectorSet.SectorCount * LegacyVisionSectorChannelCountWithoutPlantQuality;
+        LegacyNearestVisionSectorInputStart + VisionSectorSet.SectorCount * LegacyVisionSectorChannelCountWithoutPlantQuality;
     private const int LegacyInputCountWithoutSectorPlantQuality = LegacySectorPlantQualityFoodContactInput + 13;
     private const int LegacyInputCountWithoutPlantPreferenceBridge = 227;
     private const int LegacyInputCountWithoutCreatureSimilarityScent = 231;
-    private const int LegacyInputCountWithoutHabitatQuality = NeuralBrainSchema.CurrentHabitatQualityInput;
+    private const int LegacyInputCountWithoutHabitatQuality = 235;
     private const int LegacyInputCountWithoutPlantPayoffTrace = 224;
     private const int LegacyInputCountWithoutTypedPlantEnergyYield = 221;
     private const int LegacyOutputCountWithoutAttack = 4;
@@ -181,11 +185,8 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.BiasInput, 0.9f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.EnergyRatioInput, 0.15f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 1.15f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -2.2f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 0.85f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RecentFoodSuccessInput, -0.9f);
 
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.LeftTerrainDragInput, 0.25f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.RightTerrainDragInput, -0.25f);
 
@@ -251,30 +252,21 @@ public sealed class NeuralBrainGenome
         SeedSectorCreatureHuntingWeights(weights);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 5.0f);
-        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatProximityInput, 4.0f);
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureForwardInput, 1.2f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureProximityInput, -0.6f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureContactInput, -0.7f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureSimilarityScentDensityInput, -0.05f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureSimilarityScentForwardInput, -0.25f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 0.8f);
 
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.CreatureRightInput, 2.8f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.CreatureSimilarityScentRightInput, -0.35f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 1.4f);
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.EnergyRatioInput, -1.5f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.HungerInput, 2f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 4f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureContactInput, 4.5f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureContactSimilarityInput, -4f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.8f);
-        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureFacingAlignmentInput, -0.3f);
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.DietaryMeatBiasInput, 1.5f);
 
         if (hiddenNodeCount > SeedTerrainDragHiddenNode)
@@ -299,7 +291,6 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MovementBlockedInput, -1.5f);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.BiasInput, -2.5f);
-        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantProximityInput, 4.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
@@ -344,13 +335,8 @@ public sealed class NeuralBrainGenome
         var weights = new float[GetExpectedWeightCount(hiddenNodeCount)];
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.35f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.4f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.6f);
-
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 3.5f);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.BiasInput, -2.5f);
-        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.FoodProximityInput, 4f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
@@ -381,17 +367,11 @@ public sealed class NeuralBrainGenome
         SeedSectorMeatForagingWeights(weights);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 5.0f);
-        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatProximityInput, 4.0f);
 
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.45f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodProximityInput, -1.3f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FoodForwardInput, 1.25f);
-        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatForwardInput, 0.9f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentDensityInput, 0.2f);
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatScentForwardInput, 1.15f);
 
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.FoodRightInput, 2.4f);
-        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatRightInput, 1.8f);
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 2.5f);
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
@@ -408,8 +388,8 @@ public sealed class NeuralBrainGenome
 
             Set(weights, NeuralBrainSchema.TurnOutput, plantDensityInput, side * 1.4f);
             Set(weights, NeuralBrainSchema.TurnOutput, plantProximityInput, side * 2.4f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantDensityInput, centerBias * 0.2f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantProximityInput, centerBias * 0.75f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantDensityInput, centerBias * 11.0f);
+            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantProximityInput, -centerBias * 1.1f);
         }
     }
 
@@ -472,9 +452,13 @@ public sealed class NeuralBrainGenome
         {
             SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.BiasInput, -0.3f);
             SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.HungerInput, 0.9f);
-            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.FoodForwardInput, 1.2f);
-            SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.FoodProximityInput, 0.8f);
             SetHiddenInput(weights, hiddenNodeCount, SeedFoodOpportunityHiddenNode, NeuralBrainSchema.VisibleFoodDensityInput, 0.5f);
+            SetHiddenInput(
+                weights,
+                hiddenNodeCount,
+                SeedFoodOpportunityHiddenNode,
+                NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex),
+                0.8f);
         }
 
         if (hiddenNodeCount > SeedReproductionOpportunityHiddenNode)
@@ -489,11 +473,20 @@ public sealed class NeuralBrainGenome
         if (hiddenNodeCount > SeedCreatureCueHiddenNode)
         {
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.BiasInput, -0.2f);
-            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureForwardInput, 1.0f);
-            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureProximityInput, 1.1f);
+            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.VisibleCreatureDensityInput, 0.5f);
+            SetHiddenInput(
+                weights,
+                hiddenNodeCount,
+                SeedCreatureCueHiddenNode,
+                NeuralBrainSchema.VisionSectorCreatureProximityInput(VisionSectorSet.CenterSectorIndex),
+                1.1f);
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureContactInput, 1.0f);
-            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.4f);
-            SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureApproachRateInput, 0.4f);
+            SetHiddenInput(
+                weights,
+                hiddenNodeCount,
+                SeedCreatureCueHiddenNode,
+                NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex),
+                0.4f);
         }
 
         if (hiddenNodeCount > SeedTerrainDragHiddenNode)
@@ -898,6 +891,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithNearestAggregates,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithNearestAggregates,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutHabitatQuality,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -906,8 +914,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutHabitatQuality,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -921,8 +929,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutCreatureSimilarityScent,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -936,8 +944,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutPlantPreferenceBridge,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -951,8 +959,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutPlantPayoffTrace,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -966,8 +974,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutTypedPlantEnergyYield,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -981,8 +989,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutSectorPlantQuality,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -996,8 +1004,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutFoodEnergyYield,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1011,8 +1019,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutPlantQuality,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1026,8 +1034,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutCreatureContact,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1041,8 +1049,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutCreatureSectorMotion,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1056,8 +1064,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutCreatureSectorSize,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1071,8 +1079,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutHealthRatio,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1086,8 +1094,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutFoodContactKinds,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1101,8 +1109,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutFoodContact,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1116,8 +1124,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutSectorVision,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1131,8 +1139,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutObstacleSensing,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1146,8 +1154,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutRottenMeatSensing,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1161,8 +1169,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutMemory,
                 LegacyOutputCountWithoutMemory,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1172,8 +1180,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutReproductiveContext,
                 LegacyOutputCountWithoutMemory,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutLateralTerrainDrag * LegacyOutputCountWithoutMemory)
@@ -1182,8 +1190,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutLateralTerrainDrag,
                 LegacyOutputCountWithoutMemory,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutTerrainDrag * LegacyOutputCountWithoutMemory)
@@ -1192,8 +1200,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutTerrainDrag,
                 LegacyOutputCountWithoutMemory,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutCreatureRelations * LegacyOutputCountWithoutMemory)
@@ -1202,8 +1210,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutCreatureRelations,
                 LegacyOutputCountWithoutMemory,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutMeatScent * LegacyOutputCountWithoutMemory)
@@ -1212,8 +1220,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutMeatScent,
                 LegacyOutputCountWithoutMemory,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutPreySenses * LegacyOutputCountWithoutAttack)
@@ -1222,8 +1230,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutPreySenses,
                 LegacyOutputCountWithoutAttack,
-                oldEggReserveInput: NeuralBrainSchema.EggReserveRatioInput,
-                oldReproductionReadinessInput: NeuralBrainSchema.ReproductionReadinessInput), 0);
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput), 0);
         }
 
         if (weights.Length == LegacyInputCountWithoutDietSenses * LegacyOutputCountWithoutAttack)
@@ -1316,7 +1324,10 @@ public sealed class NeuralBrainGenome
                     oldEggReserveInput,
                     oldReproductionReadinessInput);
 
-                migrated[newOffset + targetInput] = weights[legacyOffset + input];
+                if (targetInput >= 0)
+                {
+                    migrated[newOffset + targetInput] = weights[legacyOffset + input];
+                }
             }
         }
 
@@ -1339,7 +1350,10 @@ public sealed class NeuralBrainGenome
                         oldEggReserveInput,
                         oldReproductionReadinessInput);
 
-                    migrated[newOffset + targetInput] = weights[legacyOffset + input];
+                    if (targetInput >= 0)
+                    {
+                        migrated[newOffset + targetInput] = weights[legacyOffset + input];
+                    }
                 }
             }
 
@@ -1375,21 +1389,32 @@ public sealed class NeuralBrainGenome
             return NeuralBrainSchema.ReproductionReadinessInput;
         }
 
-        if (legacyInputCount == LegacyInputCountWithoutCreatureSimilarityScent
-            || legacyInputCount == LegacyInputCountWithoutHabitatQuality
-            || legacyInputCount == LegacyInputCountWithoutPlantPreferenceBridge
-            || legacyInputCount == LegacyInputCountWithoutPlantPayoffTrace
-            || legacyInputCount == LegacyInputCountWithoutTypedPlantEnergyYield)
+        if (legacyInputCount >= LegacyInputCountWithoutTypedPlantEnergyYield)
         {
-            return input;
+            var foodContactInput = LegacyNearestVisionSectorInputStart
+                + VisionSectorSet.SectorCount * NeuralBrainSchema.VisionSectorChannelCount;
+
+            if (input >= LegacyNearestVisionSectorInputStart
+                && input < foodContactInput)
+            {
+                var sectorOffset = input - LegacyNearestVisionSectorInputStart;
+                var sectorIndex = sectorOffset / NeuralBrainSchema.VisionSectorChannelCount;
+                var channelOffset = sectorOffset % NeuralBrainSchema.VisionSectorChannelCount;
+                return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, channelOffset);
+            }
+
+            if (input >= foodContactInput)
+            {
+                return NeuralBrainSchema.FoodContactInput + input - foodContactInput;
+            }
         }
 
         if (legacyInputCount >= LegacyInputCountWithoutCreatureContact)
         {
-            if (input >= NeuralBrainSchema.VisionSectorInputStart
+            if (input >= LegacyNearestVisionSectorInputStart
                 && input < LegacySectorPlantQualityFoodContactInput)
             {
-                var sectorOffset = input - NeuralBrainSchema.VisionSectorInputStart;
+                var sectorOffset = input - LegacyNearestVisionSectorInputStart;
                 var sectorIndex = sectorOffset / LegacyVisionSectorChannelCountWithoutPlantQuality;
                 var channelOffset = sectorOffset % LegacyVisionSectorChannelCountWithoutPlantQuality;
                 return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, MapLegacySectorChannelOffset(channelOffset));
@@ -1409,10 +1434,10 @@ public sealed class NeuralBrainGenome
 
         if (legacyInputCount >= LegacyInputCountWithoutCreatureSectorMotion)
         {
-            if (input >= NeuralBrainSchema.VisionSectorInputStart
+            if (input >= LegacyNearestVisionSectorInputStart
                 && input < LegacyCreatureSectorMotionFoodContactInput)
             {
-                var sectorOffset = input - NeuralBrainSchema.VisionSectorInputStart;
+                var sectorOffset = input - LegacyNearestVisionSectorInputStart;
                 var sectorIndex = sectorOffset / LegacyCreatureSectorSizeChannelCount;
                 var channelOffset = sectorOffset % LegacyCreatureSectorSizeChannelCount;
                 return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, MapLegacySectorChannelOffset(channelOffset));
@@ -1445,10 +1470,10 @@ public sealed class NeuralBrainGenome
         }
 
         if (legacyInputCount >= LegacyInputCountWithoutFoodContact
-            && input >= NeuralBrainSchema.VisionSectorInputStart
+            && input >= LegacyNearestVisionSectorInputStart
             && input < LegacyInputCountWithoutFoodContact)
         {
-            var sectorOffset = input - NeuralBrainSchema.VisionSectorInputStart;
+            var sectorOffset = input - LegacyNearestVisionSectorInputStart;
             var sectorIndex = sectorOffset / LegacyVisionSectorChannelCount;
             var channelOffset = sectorOffset % LegacyVisionSectorChannelCount;
             return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, MapLegacySectorChannelOffset(channelOffset));
@@ -1484,7 +1509,34 @@ public sealed class NeuralBrainGenome
             return NeuralBrainSchema.HealthRatioInput;
         }
 
-        return input;
+        return MapLegacyPrefixInput(input);
+    }
+
+    private static int MapLegacyPrefixInput(int input)
+    {
+        return input switch
+        {
+            0 => NeuralBrainSchema.BiasInput,
+            1 => NeuralBrainSchema.EnergyRatioInput,
+            2 => NeuralBrainSchema.HungerInput,
+            3 or 4 or 5 => -1,
+            6 => NeuralBrainSchema.VisibleFoodDensityInput,
+            7 => NeuralBrainSchema.VisiblePlantDensityInput,
+            8 or 9 or 10 => -1,
+            11 => NeuralBrainSchema.VisibleMeatDensityInput,
+            12 or 13 or 14 => -1,
+            15 => NeuralBrainSchema.DietaryMeatBiasInput,
+            16 => NeuralBrainSchema.EggReserveRatioInput,
+            17 => NeuralBrainSchema.ReproductionReadinessInput,
+            18 => NeuralBrainSchema.VisibleCreatureDensityInput,
+            19 or 20 or 21 => -1,
+            22 => NeuralBrainSchema.MeatScentDensityInput,
+            23 => NeuralBrainSchema.MeatScentForwardInput,
+            24 => NeuralBrainSchema.MeatScentRightInput,
+            25 or 26 or 27 or 28 => -1,
+            >= 29 and < LegacyNearestVisionSectorInputStart => input - 16,
+            _ => -1
+        };
     }
 
     private static int MapLegacySectorChannelOffset(int channelOffset)

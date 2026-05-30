@@ -4098,14 +4098,6 @@ function formatScenarioVision(summary) {
     bits.push(`sector ${formatOnOff(summary.enableSectorVision)}`);
   }
 
-  if (summary.enableLegacyNearestFoodVisionInputs !== null && summary.enableLegacyNearestFoodVisionInputs !== undefined) {
-    bits.push(`legacy food ${formatOnOff(summary.enableLegacyNearestFoodVisionInputs)}`);
-  }
-
-  if (summary.enableLegacyNearestCreatureVisionInputs !== null && summary.enableLegacyNearestCreatureVisionInputs !== undefined) {
-    bits.push(`legacy creature ${formatOnOff(summary.enableLegacyNearestCreatureVisionInputs)}`);
-  }
-
   if (summary.visionAngleDegrees !== null && summary.visionAngleDegrees !== undefined) {
     bits.push(`${formatDecimal(summary.visionAngleDegrees)} deg`);
   }

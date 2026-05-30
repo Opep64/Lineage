@@ -64,8 +64,6 @@ public static class SimulationScenarioFactory
                 scenario.EnableSectorVision,
                 scenario.PlantPayoffTraceHalfLifeSeconds,
                 scenario.SensingThreadCount,
-                scenario.EnableLegacyNearestFoodVisionInputs,
-                scenario.EnableLegacyNearestCreatureVisionInputs,
                 scenario.ReuseNeuralActionsOnSkippedWorldSenses,
                 scenario.NeuralControllerThreadCount,
                 scenario.BiteDamagePerSecond,

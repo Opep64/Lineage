@@ -300,8 +300,6 @@ public sealed record RunScenarioSummary(
     string? InitialBrainKind,
     int? BrainHiddenNodeCount,
     bool? EnableSectorVision,
-    bool? EnableLegacyNearestFoodVisionInputs,
-    bool? EnableLegacyNearestCreatureVisionInputs,
     double? WorldWidth,
     double? WorldHeight,
     int? InitialCreatureCount,

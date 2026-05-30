@@ -295,9 +295,7 @@ public static class BehaviorAssay
         LegacyNeuralBrainAdapter.FillInputs(
             inputFrame,
             legacyMemoryInputs,
-            inputs,
-            enableLegacyNearestFoodVisionInputs: false,
-            enableLegacyNearestCreatureVisionInputs: false);
+            inputs);
         outputs.Clear();
         brain.Evaluate(inputs, outputs);
         var actionOutputs = LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs);

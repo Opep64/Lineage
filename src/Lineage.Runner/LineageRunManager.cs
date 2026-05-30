@@ -1677,8 +1677,6 @@ public sealed partial class LineageRunManager
                 InitialBrainKind: initialBrainKind,
                 BrainHiddenNodeCount: brainHiddenNodeCount,
                 EnableSectorVision: GetBoolean(root, "enableSectorVision"),
-                EnableLegacyNearestFoodVisionInputs: GetBoolean(root, "enableLegacyNearestFoodVisionInputs"),
-                EnableLegacyNearestCreatureVisionInputs: GetBoolean(root, "enableLegacyNearestCreatureVisionInputs"),
                 WorldWidth: worldWidth,
                 WorldHeight: worldHeight,
                 InitialCreatureCount: GetInt32(root, "initialCreatureCount"),
@@ -2981,8 +2979,6 @@ public sealed partial class LineageRunManager
             new[]
             {
                 summary.EnableSectorVision is null ? null : $"sector {FormatBoolean(summary.EnableSectorVision.Value)}",
-                summary.EnableLegacyNearestFoodVisionInputs is null ? null : $"legacy food {FormatBoolean(summary.EnableLegacyNearestFoodVisionInputs.Value)}",
-                summary.EnableLegacyNearestCreatureVisionInputs is null ? null : $"legacy creature {FormatBoolean(summary.EnableLegacyNearestCreatureVisionInputs.Value)}",
                 summary.VisionAngleDegrees is null ? null : $"vision {summary.VisionAngleDegrees.Value.ToString("0.#", CultureInfo.InvariantCulture)} deg"
             }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }

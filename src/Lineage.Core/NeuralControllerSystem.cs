@@ -9,8 +9,6 @@ public sealed class NeuralControllerSystem(
     float attackThreshold = 0.25f,
     float memoryDecayPerSecond = 0.06f,
     float memoryWriteRatePerSecond = 2.5f,
-    bool enableLegacyNearestFoodVisionInputs = true,
-    bool enableLegacyNearestCreatureVisionInputs = true,
     bool reuseActionsOnSkippedWorldSenses = false,
     int maxActionReuseTicks = CreatureSensingSystem.DefaultWorldSenseIntervalTicks,
     int neuralControllerThreadCount = NeuralControllerSystem.DefaultNeuralControllerThreadCount) : ISimulationSystem
@@ -27,8 +25,6 @@ public sealed class NeuralControllerSystem(
 
     private readonly float _memoryDecayPerSecond = ValidateNonNegative(memoryDecayPerSecond, nameof(memoryDecayPerSecond));
     private readonly float _memoryWriteRatePerSecond = ValidateNonNegative(memoryWriteRatePerSecond, nameof(memoryWriteRatePerSecond));
-    private readonly bool _enableLegacyNearestFoodVisionInputs = enableLegacyNearestFoodVisionInputs;
-    private readonly bool _enableLegacyNearestCreatureVisionInputs = enableLegacyNearestCreatureVisionInputs;
     private readonly bool _reuseActionsOnSkippedWorldSenses = reuseActionsOnSkippedWorldSenses;
     private readonly int _maxActionReuseTicks = ValidatePositive(maxActionReuseTicks, nameof(maxActionReuseTicks));
     private readonly ParallelOptions _parallelOptions = new()
@@ -157,9 +153,7 @@ public sealed class NeuralControllerSystem(
         LegacyNeuralBrainAdapter.FillInputs(
             inputFrame,
             legacyMemoryInputs,
-            inputs,
-            _enableLegacyNearestFoodVisionInputs,
-            _enableLegacyNearestCreatureVisionInputs);
+            inputs);
         outputs.Clear();
         brain.Evaluate(inputs, outputs);
 

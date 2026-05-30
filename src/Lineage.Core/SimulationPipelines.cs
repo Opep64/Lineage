@@ -164,8 +164,6 @@ public static class SimulationPipelines
         bool enableSectorVision = CreatureSensingSystem.DefaultEnableSectorVision,
         float plantPayoffTraceHalfLifeSeconds = CreatureSensingSystem.DefaultPlantPayoffTraceHalfLifeSeconds,
         int sensingThreadCount = CreatureSensingSystem.DefaultSensingThreadCount,
-        bool enableLegacyNearestFoodVisionInputs = true,
-        bool enableLegacyNearestCreatureVisionInputs = true,
         bool reuseNeuralActionsOnSkippedWorldSenses = false,
         int neuralControllerThreadCount = NeuralControllerSystem.DefaultNeuralControllerThreadCount,
         float biteDamagePerSecond = 0.25f,
@@ -253,8 +251,6 @@ public static class SimulationPipelines
             new NeuralControllerSystem(
                 memoryDecayPerSecond: memoryDecayPerSecond,
                 memoryWriteRatePerSecond: memoryWriteRatePerSecond,
-                enableLegacyNearestFoodVisionInputs: enableLegacyNearestFoodVisionInputs,
-                enableLegacyNearestCreatureVisionInputs: enableLegacyNearestCreatureVisionInputs,
                 reuseActionsOnSkippedWorldSenses: reuseNeuralActionsOnSkippedWorldSenses,
                 neuralControllerThreadCount: neuralControllerThreadCount),
             new MovementSystem(

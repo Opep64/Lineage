@@ -264,7 +264,9 @@ Current architectures:
 - `HybridNeural`: direct input-output weights plus optional hidden nodes.
 - `HiddenLayerNeural`: one hidden layer; direct weights are stored for compatibility but forced to zero behaviorally.
 
-The current neural schema is 239 inputs and 7 outputs.
+The current neural schema is 223 inputs and 7 outputs.
+
+Schema v2 removed the old nearest-food and nearest-creature aggregate direction/proximity slots from the active brain contract. Older 239-input dense neural brains still load through migration: the removed nearest-target slots are dropped, and sector, density, contact, scent, terrain, quality, similarity, memory, and habitat weights are shifted into the current layout.
 
 Hidden nodes:
 
@@ -373,14 +375,14 @@ Before adding many new senses/actions, clean up the shared input/output contract
 
 ## Current Inputs To Reconsider
 
-Do not remove current inputs from the existing dense neural schema casually. Existing catalog brains, saved runs, and compatibility logic rely on the stable flat layout. For near-term work, prefer deprecating inputs in a future semantic contract while keeping them alive in the legacy dense adapter.
+Do not remove more current inputs from the existing dense neural schema casually. Existing catalog brains, saved runs, and compatibility logic rely on the flat layout, and the nearest-target removal required an explicit schema-version migration. For near-term work, prefer deprecating inputs in a future semantic contract unless the cleanup is worth another migration.
 
 Inputs most worth reconsidering:
 
 | Input group | Recommendation | Reason |
 | --- | --- | --- |
-| Legacy nearest food inputs | Keep for old dense brains; consider excluding from new architectures by default. | Sector vision mostly supersedes single nearest-food direction/proximity, and the scenario already has a toggle for legacy nearest-food inputs. |
-| Legacy nearest creature inputs | Keep for old dense brains; consider excluding from new architectures by default. | Sector creature vision gives richer spatial information. The nearest-creature aggregate is convenient but partly redundant. |
+| Legacy nearest food inputs | Removed from schema v2; old brains migrate by dropping them. | Sector vision supersedes single nearest-food direction/proximity without giving a perfect target shortcut. |
+| Legacy nearest creature inputs | Removed from schema v2; old brains migrate by dropping them. | Sector creature vision gives richer spatial information without a perfect nearest-creature aggregate. |
 | Legacy memory inputs/outputs | Move out of universal I/O and into `HybridNeural` / legacy dense adapters. | Memory writes are architecture-owned controller state, not universal physical senses/actions. Future rtNEAT, two-layer, and plastic brains should define their own recurrence or memory state. |
 | Aggregate plant quality inputs | Keep for now; possibly derive from sector/target selection later. | Visible plant energy/bite quality duplicates some sector information, but it is cheap and likely useful for current foraging brains. |
 | Detection booleans implied by density/proximity | Avoid adding more; derive in reports/UI where possible. | `density > 0` or `pressure > 0` can often replace a binary flag. For grab, prefer `GrabPressure` over a separate `IsGrabbed` brain input. |
@@ -394,7 +396,7 @@ Inputs to keep:
 - creature size, approach, and facing signals;
 - plant payoff traces/recent food yield, at least while we are still learning whether creatures use them.
 
-Working stance: no immediate input removals. The cleanup target is to create a semantic input registry, then let new brain architectures opt into a cleaner contract while old dense brains remain compatible.
+Working stance: after the nearest-target removal, do not remove additional current inputs until a semantic input registry exists. New brain architectures should opt into that cleaner contract while old dense brains remain compatible through adapters/migration.
 
 ### 1. Formalize An I/O Registry
 
