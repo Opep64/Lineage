@@ -688,7 +688,7 @@ button.scenario-tab.is-active {
 
 .species-tools {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(150px, 0.5fr) minmax(180px, 0.7fr) minmax(80px, 0.25fr) minmax(140px, 0.45fr) minmax(120px, 0.35fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.8fr) minmax(80px, 0.25fr) minmax(140px, 0.45fr) minmax(120px, 0.35fr) auto;
   gap: 12px;
   align-items: end;
   margin-bottom: 12px;
@@ -758,6 +758,39 @@ button.scenario-tab.is-active {
 
 .species-roster-table tr.is-disabled {
   opacity: 0.62;
+}
+
+.species-roster-select,
+.species-roster-number {
+  width: 100%;
+  min-width: 96px;
+}
+
+.species-roster-table td:nth-child(2) {
+  min-width: 220px;
+}
+
+.species-roster-number {
+  max-width: 110px;
+}
+
+.species-roster-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.species-roster-check input {
+  width: auto;
+}
+
+.species-roster-table .species-roster-check span {
+  display: inline;
+  margin-top: 0;
+  color: var(--text);
 }
 
 .species-roster-actions {

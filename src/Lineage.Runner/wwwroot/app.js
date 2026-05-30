@@ -73,7 +73,6 @@ const refreshSpeciesCatalogButton = document.querySelector("#refreshSpeciesCatal
 const deleteSpeciesCatalogButton = document.querySelector("#deleteSpeciesCatalogButton");
 const addSpeciesToScenarioButton = document.querySelector("#addSpeciesToScenarioButton");
 const speciesSeedBrainSelect = document.querySelector("#speciesSeedBrain");
-const speciesSeedBrainProfileSelect = document.querySelector("#speciesSeedBrainProfile");
 const speciesSeedCountInput = document.querySelector("#speciesSeedCount");
 const speciesSeedRegionSelect = document.querySelector("#speciesSeedRegion");
 const speciesSeedEnergyInput = document.querySelector("#speciesSeedEnergy");
@@ -90,6 +89,18 @@ let recipeBaseScenario = null;
 let recipeDiffCheckpoint = null;
 let pendingRecipeSave = null;
 let selectedRunIds = new Set();
+
+const speciesGeneratedBrainChoices = [
+  ["scenario", "Scenario initial brain"],
+  ["seedForager", "Seed forager"],
+  ["explorerForager", "Explorer forager"],
+  ["sectorForager", "Sector forager"],
+  ["opportunisticForager", "Opportunistic forager"],
+  ["scavengerForager", "Scavenger forager"],
+  ["freshnessAwareScavenger", "Freshness-aware scavenger"],
+  ["foragerPredator", "Forager predator"],
+  ["randomPerFounder", "Random per founder"]
+];
 let expandedRunId = null;
 let runDetailsById = new Map();
 let sortKey = "createdAtUtc";
@@ -140,6 +151,7 @@ async function loadSpeciesCatalog(selectedPath = speciesCatalogSelect?.value || 
   speciesCatalog = response.ok ? await response.json() : [];
   renderSpeciesCatalogOptions(selectedPath);
   renderSpeciesCatalogDetails();
+  renderSpeciesRoster();
 }
 
 async function loadBrainCatalog(selectedPath = brainCatalogSelect?.value || "") {
@@ -147,8 +159,9 @@ async function loadBrainCatalog(selectedPath = brainCatalogSelect?.value || "") 
   brainCatalog = response.ok ? await response.json() : [];
   renderBrainCatalogOptions(selectedPath);
   renderBrainCatalogDetails();
-  renderSpeciesBrainProfileOptions(speciesSeedBrainProfileSelect?.value || "");
+  renderSpeciesBrainChoiceOptions();
   renderSpeciesCatalogDetails();
+  renderSpeciesRoster();
 }
 
 function renderBrainCatalogOptions(selectedPath = "") {
@@ -181,29 +194,56 @@ function renderBrainCatalogOptions(selectedPath = "") {
   updateBrainCatalogButtons();
 }
 
-function renderSpeciesBrainProfileOptions(selectedPath = "") {
-  if (!speciesSeedBrainProfileSelect) {
+function renderSpeciesBrainChoiceOptions(selectedValue = speciesSeedBrainSelect?.value || "profile") {
+  if (!speciesSeedBrainSelect) {
     return;
   }
 
-  speciesSeedBrainProfileSelect.innerHTML = "";
-  const empty = document.createElement("option");
-  empty.value = "";
-  empty.textContent = brainCatalog.length > 0 ? "No catalog brain" : "No catalog brains";
-  speciesSeedBrainProfileSelect.append(empty);
+  speciesSeedBrainSelect.innerHTML = brainChoiceOptionsHtml(selectedValue, null, true);
+  if (![...speciesSeedBrainSelect.options].some((option) => option.value === selectedValue && !option.disabled)) {
+    speciesSeedBrainSelect.value = "profile";
+  }
+}
 
-  for (const brain of brainCatalog) {
-    const option = document.createElement("option");
-    option.value = brain.path;
-    option.textContent = `${brain.name} (${brain.brainArchitectureKind})${brain.isCompatible === false ? " [incompatible]" : ""}`;
-    option.disabled = brain.isCompatible === false;
-    option.title = `${brain.path} | hidden ${formatNumber(brain.hiddenNodeCount)} | ${formatNumber(brain.weightCount)} weights | ${brainCompatibilityStatus(brain)}`;
-    speciesSeedBrainProfileSelect.append(option);
+function brainChoiceOptionsHtml(selectedValue = "profile", missingBrainPath = null, includeScenario = false) {
+  const selected = selectedValue || "profile";
+  const pieces = [
+    `<option value="profile"${selected === "profile" ? " selected" : ""}>Profile/default brain</option>`
+  ];
+
+  pieces.push(`<optgroup label="Generated starter brain">`);
+  for (const [kind, label] of speciesGeneratedBrainChoices) {
+    if (!includeScenario && kind === "scenario") {
+      continue;
+    }
+
+    const value = `generated:${kind}`;
+    pieces.push(`<option value="${escapeHtml(value)}"${selected === value ? " selected" : ""}>${escapeHtml(label)}</option>`);
+  }
+  pieces.push(`</optgroup>`);
+
+  if (brainCatalog.length > 0 || missingBrainPath) {
+    pieces.push(`<optgroup label="Catalog brain profile">`);
+    for (const brain of brainCatalog) {
+      const value = `catalog:${brain.path}`;
+      pieces.push([
+        `<option value="${escapeHtml(value)}"`,
+        selected === value ? " selected" : "",
+        brain.isCompatible === false ? " disabled" : "",
+        ` title="${escapeHtml(`${brain.path} | hidden ${formatNumber(brain.hiddenNodeCount)} | ${formatNumber(brain.weightCount)} weights | ${brainCompatibilityStatus(brain)}`)}">`,
+        `${escapeHtml(brain.name)} (${escapeHtml(brain.brainArchitectureKind)})${brain.isCompatible === false ? " [incompatible]" : ""}`,
+        `</option>`
+      ].join(""));
+    }
+
+    if (missingBrainPath && !findBrainCatalogEntryByPath(missingBrainPath)) {
+      const value = `catalog:${missingBrainPath}`;
+      pieces.push(`<option value="${escapeHtml(value)}"${selected === value ? " selected" : ""}>Missing catalog brain: ${escapeHtml(missingBrainPath)}</option>`);
+    }
+    pieces.push(`</optgroup>`);
   }
 
-  const selectedOption = [...speciesSeedBrainProfileSelect.options]
-    .find((option) => option.value === selectedPath && !option.disabled);
-  speciesSeedBrainProfileSelect.value = selectedOption ? selectedPath : "";
+  return pieces.join("");
 }
 
 function selectedBrainCatalogEntry() {
@@ -393,12 +433,12 @@ function renderSpeciesRoster() {
       <thead>
         <tr>
           <th>Profile</th>
-          <th>Brain</th>
+          <th>Brain for starters</th>
           <th>Count</th>
           <th>Region</th>
           <th>Energy</th>
-          <th>Status</th>
-          <th>Actions</th>
+          <th>Enabled</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -411,23 +451,56 @@ function renderSpeciesRoster() {
 function renderSpeciesRosterRow(seed, index) {
   const enabled = seed?.enabled !== false;
   const profile = findSpeciesCatalogEntryByPath(seed?.profilePath);
+  const energyValue = seed?.energyOverride === null || seed?.energyOverride === undefined
+    ? ""
+    : String(seed.energyOverride);
   return `
     <tr class="${enabled ? "" : "is-disabled"}">
       <td>
         <strong>${escapeHtml(profile?.name || seed?.profilePath || "Missing species profile")}</strong>
         <span>${escapeHtml(seed?.profilePath || "")}</span>
       </td>
-      <td>${escapeHtml(formatSpeciesRosterBrain(seed))}</td>
-      <td>${formatNumber(seed?.count ?? 0)}</td>
-      <td>${escapeHtml(formatEnumLabel(seed?.spawnRegion || "uniform"))}</td>
-      <td>${seed?.energyOverride === null || seed?.energyOverride === undefined ? "profile" : formatNumber(seed.energyOverride)}</td>
-      <td>${enabled ? "Enabled" : "Disabled"}</td>
+      <td>
+        <select class="species-roster-select" data-species-roster-field="brain" data-index="${index}">
+          ${brainChoiceOptionsHtml(speciesSeedBrainChoiceValue(seed), seed?.brainProfilePath || null, false)}
+        </select>
+      </td>
+      <td>
+        <input class="species-roster-number" type="number" min="1" step="1" value="${escapeHtml(String(seed?.count ?? 0))}" data-species-roster-field="count" data-index="${index}">
+      </td>
+      <td>
+        <select class="species-roster-select" data-species-roster-field="spawnRegion" data-index="${index}">
+          ${spawnRegionOptionsHtml(seed?.spawnRegion || "uniform")}
+        </select>
+      </td>
+      <td>
+        <input class="species-roster-number" type="number" min="1" step="1" placeholder="profile" value="${escapeHtml(energyValue)}" data-species-roster-field="energyOverride" data-index="${index}">
+      </td>
+      <td>
+        <label class="species-roster-check">
+          <input type="checkbox" ${enabled ? "checked" : ""} data-species-roster-field="enabled" data-index="${index}">
+          <span>Enabled</span>
+        </label>
+      </td>
       <td class="species-roster-actions">
-        <button class="secondary" type="button" data-species-roster-action="toggle" data-index="${index}">${enabled ? "Disable" : "Enable"}</button>
         <button class="danger" type="button" data-species-roster-action="remove" data-index="${index}">Remove</button>
       </td>
     </tr>
   `;
+}
+
+function spawnRegionOptionsHtml(selectedValue = "uniform") {
+  const options = [
+    ["uniform", "Uniform"],
+    ["leftThird", "Left third"],
+    ["middleThird", "Middle third"],
+    ["rightThird", "Right third"],
+    ["topThird", "Top third"],
+    ["bottomThird", "Bottom third"]
+  ];
+  return options.map(([value, label]) =>
+    `<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(label)}</option>`
+  ).join("");
 }
 
 function currentSpeciesRoster() {
@@ -440,21 +513,41 @@ function findSpeciesCatalogEntryByPath(path) {
   return speciesCatalog.find((candidate) => candidate.path === path) ?? null;
 }
 
-function formatSpeciesRosterBrain(seed) {
-  if (!seed) {
-    return "Profile brain";
+function speciesSeedBrainChoiceValue(seed) {
+  if (seed?.brainProfilePath) {
+    return `catalog:${seed.brainProfilePath}`;
   }
 
-  if (seed.brainProfilePath) {
-    const brain = findBrainCatalogEntryByPath(seed.brainProfilePath);
-    return `Catalog: ${brain?.name || seed.brainProfilePath}`;
+  if (seed?.brainOverrideKind) {
+    return `generated:${seed.brainOverrideKind}`;
   }
 
-  if (seed.brainOverrideKind) {
-    return `Generated: ${formatEnumLabel(seed.brainOverrideKind)}`;
+  return "profile";
+}
+
+function parseSpeciesBrainChoice(value) {
+  const selected = value || "profile";
+  if (selected.startsWith("catalog:")) {
+    return {
+      brainOverrideKind: null,
+      brainProfilePath: selected.slice("catalog:".length)
+    };
   }
 
-  return "Profile/default brain";
+  if (selected.startsWith("generated:")) {
+    const kind = selected.slice("generated:".length);
+    return {
+      brainOverrideKind: kind === "scenario"
+        ? scenarioEditor?.scenario?.initialBrainKind || "sectorForager"
+        : kind,
+      brainProfilePath: null
+    };
+  }
+
+  return {
+    brainOverrideKind: null,
+    brainProfilePath: null
+  };
 }
 
 function updateSpeciesRoster(action, index) {
@@ -495,6 +588,74 @@ function updateSpeciesRoster(action, index) {
     updateScenarioManagementButtons();
     formMessage.textContent = `${roster[index].enabled === false ? "Disabled" : "Enabled"} ${roster[index].profilePath || "species profile"} in the starting roster.`;
   }
+}
+
+function updateSpeciesRosterField(control) {
+  if (!scenarioEditor || !control) {
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    formMessage.textContent = error.message;
+    return;
+  }
+
+  const index = Number(control.dataset.index);
+  const field = control.dataset.speciesRosterField;
+  const roster = Array.isArray(scenarioEditor.scenario.speciesSeeds)
+    ? cloneJson(scenarioEditor.scenario.speciesSeeds)
+    : [];
+  if (index < 0 || index >= roster.length || !field) {
+    return;
+  }
+
+  const next = { ...roster[index] };
+  if (field === "count") {
+    const count = Math.round(Number(control.value));
+    if (!Number.isFinite(count) || count <= 0) {
+      formMessage.textContent = "Roster count must be a positive whole number.";
+      renderSpeciesRoster();
+      return;
+    }
+
+    next.count = count;
+  } else if (field === "spawnRegion") {
+    next.spawnRegion = control.value || "uniform";
+  } else if (field === "energyOverride") {
+    const raw = control.value.trim();
+    const energyOverride = raw === "" ? null : Number(raw);
+    if (raw !== "" && (!Number.isFinite(energyOverride) || energyOverride <= 0)) {
+      formMessage.textContent = "Roster energy override must be blank or a positive number.";
+      renderSpeciesRoster();
+      return;
+    }
+
+    next.energyOverride = energyOverride;
+  } else if (field === "brain") {
+    const brainChoice = parseSpeciesBrainChoice(control.value);
+    const selectedBrainProfile = brainChoice.brainProfilePath
+      ? findBrainCatalogEntryByPath(brainChoice.brainProfilePath)
+      : null;
+    if (brainChoice.brainProfilePath && selectedBrainProfile?.isCompatible === false) {
+      formMessage.textContent = `${selectedBrainProfile.name} is not compatible with the current runtime: ${brainCompatibilityStatus(selectedBrainProfile)}`;
+      renderSpeciesRoster();
+      return;
+    }
+
+    next.brainOverrideKind = brainChoice.brainOverrideKind;
+    next.brainProfilePath = brainChoice.brainProfilePath;
+  } else if (field === "enabled") {
+    next.enabled = Boolean(control.checked);
+  }
+
+  roster[index] = next;
+  scenarioEditor.scenario.speciesSeeds = roster;
+  renderSpeciesRoster();
+  updateScenarioEditorStatus();
+  updateScenarioManagementButtons();
+  formMessage.textContent = `Updated ${next.profilePath || "species profile"} in the starting roster.`;
 }
 
 function updateSpeciesCatalogButtons() {
@@ -2609,21 +2770,22 @@ function addSelectedSpeciesToScenario() {
   const roster = Array.isArray(scenarioEditor.scenario.speciesSeeds)
     ? cloneJson(scenarioEditor.scenario.speciesSeeds)
     : [];
-  const brainProfilePath = selectedSpeciesBrainProfilePath();
-  const selectedBrainProfile = brainProfilePath ? findBrainCatalogEntryByPath(brainProfilePath) : null;
-  if (brainProfilePath && selectedBrainProfile?.isCompatible === false) {
+  const brainChoice = parseSpeciesBrainChoice(speciesSeedBrainSelect?.value || "profile");
+  const selectedBrainProfile = brainChoice.brainProfilePath
+    ? findBrainCatalogEntryByPath(brainChoice.brainProfilePath)
+    : null;
+  if (brainChoice.brainProfilePath && selectedBrainProfile?.isCompatible === false) {
     formMessage.textContent = `${selectedBrainProfile.name} is not compatible with the current runtime: ${brainCompatibilityStatus(selectedBrainProfile)}`;
     return;
   }
 
-  const brainOverrideKind = brainProfilePath ? null : selectedSpeciesBrainOverrideKind();
   roster.push({
     profilePath: species.path,
     count: Math.round(count),
     spawnRegion: speciesSeedRegionSelect?.value || "uniform",
     energyOverride,
-    brainOverrideKind,
-    brainProfilePath,
+    brainOverrideKind: brainChoice.brainOverrideKind,
+    brainProfilePath: brainChoice.brainProfilePath,
     enabled: true
   });
   scenarioEditor.scenario.speciesSeeds = roster;
@@ -2631,33 +2793,16 @@ function addSelectedSpeciesToScenario() {
   renderScenarioEditor();
   updateScenarioManagementButtons();
   renderSpeciesRoster();
-  formMessage.textContent = `Added ${species.name} to the scenario species roster with ${formatSpeciesBrainChoice(brainOverrideKind, brainProfilePath)}. Save the scenario or start a run to use it.`;
-}
-
-function selectedSpeciesBrainProfilePath() {
-  return speciesSeedBrainProfileSelect?.value || null;
-}
-
-function selectedSpeciesBrainOverrideKind() {
-  const value = speciesSeedBrainSelect?.value || "";
-  if (!value) {
-    return null;
-  }
-
-  if (value === "scenario") {
-    return scenarioEditor?.scenario?.initialBrainKind || "sectorForager";
-  }
-
-  return value;
+  formMessage.textContent = `Added ${species.name} to the scenario species roster with ${formatSpeciesBrainChoice(brainChoice.brainOverrideKind, brainChoice.brainProfilePath)}. Save the scenario or start a run to use it.`;
 }
 
 function formatSpeciesBrainChoice(brainOverrideKind, brainProfilePath = null) {
   if (brainProfilePath) {
     const brain = brainCatalog.find((candidate) => candidate.path === brainProfilePath);
-    return `${brain?.name || brainProfilePath} brain profile`;
+    return `catalog brain ${brain?.name || brainProfilePath}`;
   }
 
-  return brainOverrideKind ? `${formatEnumLabel(brainOverrideKind)} brain` : "the profile brain";
+  return brainOverrideKind ? `generated ${formatEnumLabel(brainOverrideKind)} brain` : "the profile/default brain";
 }
 
 async function deleteSelectedSpeciesCatalogEntry() {
@@ -3553,6 +3698,14 @@ if (speciesRosterDetails) {
     }
 
     updateSpeciesRoster(button.dataset.speciesRosterAction, Number(button.dataset.index));
+  });
+  speciesRosterDetails.addEventListener("change", (event) => {
+    const control = event.target.closest("[data-species-roster-field]");
+    if (!control) {
+      return;
+    }
+
+    updateSpeciesRosterField(control);
   });
 }
 brainCatalogSelect.addEventListener("change", renderBrainCatalogDetails);
