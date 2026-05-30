@@ -89,6 +89,7 @@ public partial class Main : Node2D
     private readonly Color _selectedColor = new(1.0f, 0.94f, 0.42f);
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
     private readonly Color _memoryColor = new(0.55f, 0.8f, 1.0f, 0.78f);
+    private readonly Color _grabLinkColor = new(1.0f, 0.48f, 0.08f, 0.82f);
     private readonly Color _visionSectorPlantColor = new(0.32f, 0.92f, 0.45f, 0.92f);
     private readonly Color _visionSectorMeatColor = new(0.94f, 0.28f, 0.22f, 0.9f);
     private readonly Color _visionSectorEggColor = new(0.94f, 0.86f, 0.42f, 0.9f);
@@ -163,6 +164,7 @@ public partial class Main : Node2D
     private CreatureRenderCache _creatureRenderCache = new();
     private ulong _creatureCacheLastRefreshMilliseconds;
     private CreatureRenderMode _creatureRenderMode = CreatureRenderMode.Individual;
+    private readonly Dictionary<EntityId, CreatureState> _drawCreatureById = [];
     private ImageTexture? _biomeOverlayTexture;
     private BiomeMap? _biomeOverlaySource;
     private int _biomeOverlayPixelsPerCell = 1;
@@ -1607,7 +1609,12 @@ public partial class Main : Node2D
             $"Movement\n" +
             $"Actual speed {creature.Velocity.Length:0.0}   desired {creature.DesiredVelocity.Length:0.0}\n" +
             $"Max speed {CreatureGrowth.EffectiveMaxSpeed(creature, genome):0.0}/{genome.MaxSpeed:0.0}\n" +
-            $"Speed cost {MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, _scenario.MovementSpeedCostExponent):0.00}x\n\n" +
+            $"Speed cost {MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, _scenario.MovementSpeedCostExponent):0.00}x   grab move {CreatureGrabSystem.MovementMultiplierForGrabPressure(creature.GrabPressure):0.00}x\n\n" +
+            $"Creature Interaction\n" +
+            $"Contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
+            $"Grab output {creature.Actions.GrabOutput:0.00}   intent {(creature.Actions.WantsGrab ? "yes" : "no")}\n" +
+            $"Holding {FormatCreatureReference(creature.HeldCreatureId)}   strength {creature.GrabStrength:0.00}\n" +
+            $"Grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n\n" +
             $"Food\n" +
             $"Last meal {BuildLastMealSourceText(creature)}\n" +
             $"Since meal {creature.SecondsSinceLastMeal:0.0}s   distance {creature.DistanceSinceLastMeal:0.0}u\n" +
@@ -1651,6 +1658,8 @@ public partial class Main : Node2D
             $"Bite strength {CreatureGrowth.EffectiveBiteStrength(creature, genome):0.00}/{genome.BiteStrength:0.00}\n" +
             $"Damage resistance {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Creature contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
+            $"Holding {FormatCreatureReference(creature.HeldCreatureId)}   strength {creature.GrabStrength:0.00}\n" +
+            $"Grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n" +
             $"Attack damage last tick {creature.LastAttackDamageDealt:0.000}\n\n" +
             $"Development & Mutation\n" +
             $"Mature at {genome.MaturityAgeSeconds:0.0}s   egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
@@ -1688,6 +1697,8 @@ public partial class Main : Node2D
             $"Touch & Terrain\n" +
             $"Food contact {(creature.IsTouchingFood ? "yes" : "no")}\n" +
             BuildFoodContactText(creature, genome) +
+            $"Creature contact {senses.CreatureContact:0.00}   can grab {senses.CanGrabCreature:0.00}   holding {senses.IsHoldingCreature:0.00}\n" +
+            $"Grab pressure {senses.GrabPressure:0.00}   fwd {senses.GrabDirectionForward:0.00}   right {senses.GrabDirectionRight:0.00}\n" +
             $"Plant taste energy {senses.PlantFoodContactEnergyQuality:0.00}   bite {senses.PlantFoodContactBiteEase:0.00}\n" +
             $"Terrain now {senses.CurrentTerrainDrag:0.00}   ahead {senses.ForwardTerrainDrag:0.00}   L {senses.LeftTerrainDrag:0.00}   R {senses.RightTerrainDrag:0.00}\n" +
             $"Habitat now {senses.CurrentHabitatQuality:0.00}   ahead {senses.ForwardHabitatQuality:0.00}   L {senses.LeftHabitatQuality:0.00}   R {senses.RightHabitatQuality:0.00}\n" +
@@ -1715,10 +1726,12 @@ public partial class Main : Node2D
             $"Eat output {creature.Actions.EatOutput:0.00}   intent {creature.Actions.WantsEat}\n" +
             $"Repro output {creature.Actions.ReproduceOutput:0.00}   intent {creature.Actions.WantsReproduce}\n" +
             $"Attack output {creature.Actions.AttackOutput:0.00}   intent {creature.Actions.WantsAttack}\n" +
+            $"Grab output {creature.Actions.GrabOutput:0.00}   intent {creature.Actions.WantsGrab}\n" +
             $"Memory write fwd {creature.Actions.MemoryForward:0.00}   right {creature.Actions.MemoryRight:0.00}\n\n" +
             $"Action Context\n" +
             $"Touching food {(creature.IsTouchingFood ? "yes" : "no")}   touching creature {(creature.IsTouchingCreature ? "yes" : "no")}\n" +
             $"Repro ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}   egg reserve {senses.EggReserveRatio:P0}\n" +
+            $"Holding {FormatCreatureReference(creature.HeldCreatureId)}   grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n" +
             $"Attack near gate {creature.Actions.AttackOutput:0.00}   last damage {creature.LastAttackDamageDealt:0.000}\n\n" +
             $"Recent Reward Signals\n" +
             $"Food success {senses.RecentFoodSuccess:0.00}   food energy {senses.RecentFoodEnergyYield:0.00}\n" +
@@ -2331,6 +2344,7 @@ public partial class Main : Node2D
 
         if (_creatureRenderMode == CreatureRenderMode.Individual)
         {
+            DrawCreatureGrabLinks(visibleWorldRect);
             DrawIndividualCreatures(visibleWorldRect);
         }
         else
@@ -2452,6 +2466,43 @@ public partial class Main : Node2D
         }
     }
 
+    private void DrawCreatureGrabLinks(Rect2 visibleWorldRect)
+    {
+        var creatures = _simulation.State.Creatures;
+        _drawCreatureById.Clear();
+        for (var i = 0; i < creatures.Count; i++)
+        {
+            _drawCreatureById[creatures[i].Id] = creatures[i];
+        }
+
+        for (var i = 0; i < creatures.Count; i++)
+        {
+            var grabber = creatures[i];
+            if (grabber.HeldCreatureId == default || !_drawCreatureById.TryGetValue(grabber.HeldCreatureId, out var target))
+            {
+                continue;
+            }
+
+            if (!WorldRectIntersectsCircle(visibleWorldRect, grabber.Position, 8f)
+                && !WorldRectIntersectsCircle(visibleWorldRect, target.Position, 8f))
+            {
+                continue;
+            }
+
+            var grabberScreenPosition = ToScreen(grabber.Position);
+            var targetScreenPosition = ToScreen(target.Position);
+            if (!IsVisibleInWorldRect(grabberScreenPosition, 16f) && !IsVisibleInWorldRect(targetScreenPosition, 16f))
+            {
+                continue;
+            }
+
+            var pressure = Math.Clamp(target.GrabPressure, 0f, 1f);
+            var color = WithAlpha(_grabLinkColor, 0.42f + pressure * 0.42f);
+            DrawLine(grabberScreenPosition, targetScreenPosition, color, width: 1.2f + pressure * 2.2f);
+            DrawCircle(targetScreenPosition, 2.5f + pressure * 3.5f, WithAlpha(color, 0.60f));
+        }
+    }
+
     private bool DrawCreature(CreatureState creature)
     {
         var genome = _simulation.State.GetGenome(creature.GenomeId);
@@ -2519,6 +2570,7 @@ public partial class Main : Node2D
         DrawVisionSectorDebug(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
         DrawSelectedMemoryVector(creature, screenPosition);
+        DrawSelectedGrabLinks(creature, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
     }
@@ -2733,6 +2785,31 @@ public partial class Main : Node2D
         return new Color(color.R, color.G, color.B, Math.Clamp(alpha, 0f, 1f));
     }
 
+    private void DrawSelectedGrabLinks(CreatureState creature, Vector2 creatureScreenPosition)
+    {
+        if (creature.HeldCreatureId != default && TryGetCreature(creature.HeldCreatureId, out var held))
+        {
+            DrawSelectedGrabLink(creatureScreenPosition, held, creature.GrabStrength, _grabLinkColor);
+        }
+
+        if (creature.GrabbedByCreatureId != default && TryGetCreature(creature.GrabbedByCreatureId, out var holder))
+        {
+            DrawSelectedGrabLink(ToScreen(holder.Position), creature, creature.GrabPressure, new Color(1f, 0.28f, 0.08f, 0.92f));
+        }
+    }
+
+    private void DrawSelectedGrabLink(Vector2 holderScreenPosition, CreatureState target, float pressure, Color color)
+    {
+        var targetGenome = _simulation.State.GetGenome(target.GenomeId);
+        var targetScreenPosition = ToScreen(target.Position);
+        var targetRadius = MathF.Max(4f, CreatureGrowth.EffectiveBodyRadius(target, targetGenome) * _worldScale + 5f);
+        var clampedPressure = Math.Clamp(pressure, 0f, 1f);
+        var lineColor = WithAlpha(color, 0.60f + clampedPressure * 0.35f);
+
+        DrawLine(holderScreenPosition, targetScreenPosition, lineColor, width: 2.0f + clampedPressure * 2.4f);
+        DrawArc(targetScreenPosition, targetRadius, 0f, MathF.Tau, 32, lineColor, width: 2.0f);
+    }
+
     private void DrawSelectedFoodContact(CreatureState creature, Vector2 creatureScreenPosition)
     {
         if (!creature.IsTouchingFood || creature.FoodContactResourceId == default)
@@ -2813,6 +2890,11 @@ public partial class Main : Node2D
     {
         var fixedDelta = MathF.Max(_simulation.Config.FixedDeltaSeconds, 0.0001f);
         return (value / fixedDelta).ToString("0.0", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatCreatureReference(EntityId id)
+    {
+        return id == default ? "none" : $"#{id.Value}";
     }
 
     private string FormatBrainText(int brainId)
@@ -3840,9 +3922,14 @@ public partial class Main : Node2D
 
     private bool TryGetSelectedCreature(out CreatureState selected)
     {
+        return TryGetCreature(_selectedCreatureId, out selected);
+    }
+
+    private bool TryGetCreature(EntityId id, out CreatureState selected)
+    {
         for (var i = 0; i < _simulation.State.Creatures.Count; i++)
         {
-            if (_simulation.State.Creatures[i].Id == _selectedCreatureId)
+            if (_simulation.State.Creatures[i].Id == id)
             {
                 selected = _simulation.State.Creatures[i];
                 return true;
