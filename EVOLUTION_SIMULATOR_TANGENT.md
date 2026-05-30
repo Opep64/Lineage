@@ -1,6 +1,9 @@
 # Evolution Simulator Tangent
 
 Created: 2026-05-19
+Last reviewed: 2026-05-30
+
+Current status note: this is an idea archive, not the current project overview. Use `DOCS_INDEX.md`, `IMPLEMENTED_STATE.md`, and `ROADMAP.md` for the current source of truth.
 
 This note is a project tangent inspired by discussions around The Bibites. It is not direct information about The Bibites simulator, its file formats, its current mechanics, or its author's roadmap. Treat it as early design thinking for a possible separate evolution simulator.
 

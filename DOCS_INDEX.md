@@ -1,5 +1,7 @@
 # Lineage Documentation Index
 
+Last reviewed: 2026-05-30
+
 This is the starting point for future Codex threads. Read this file first, then choose the narrow document that matches the task.
 
 ## Read Order
@@ -14,35 +16,38 @@ This is the starting point for future Codex threads. Read this file first, then 
 
 3. `DECISIONS.md`
    - Active design decisions and why they were made.
-   - Use this before reversing architecture, brain, ecology, or performance choices.
+   - Use this before reversing architecture, brain, ecology, map, catalog, mutation, or performance choices.
 
 4. `PERFORMANCE_BASELINES.md`
    - Current and historical timing baselines.
    - Use this before and after performance work.
 
-5. `PROJECT_PLAN.md`
-   - Historical project plan and broad development narrative.
-   - Useful, but no longer the fastest source of truth for current state.
+5. `RUN_TOOLS_PLAN.md`
+   - Current launcher/run-library state and remaining workflow-tooling plans.
 
-6. `docs/experiments/`
+6. `PROJECT_PLAN.md`
+   - High-level development direction and practical next-step framing.
+
+7. `docs/experiments/`
    - Detailed experiment and branch logs.
    - Use these as evidence trails when a decision references a probe or tuning pass.
 
 ## Other Useful Files
 
 - `docs/simulation-project-overview.html`: visual HTML overview of the current simulation systems, options, brain structures, tools, and documentation links.
-- `RUN_TOOLS_PLAN.md`: design plan for the future local run launcher/library.
 - `EVOLUTION_SIMULATOR_TANGENT.md`: early idea capture; treat as inspiration, not current spec.
 - `species/README.md`: species profile format and usage notes.
-- `tools/ablation/README.md`: ablation tool notes.
+- `brains/README.md`: brain profile format and catalog notes.
+- `tools/catalog-assay/README.md`: catalog species/brain viability assay notes.
+- `tools/ablation/README.md`: snapshot ablation tool notes.
 
-## Current Branch Context
+## Current Mainline Context
 
 - Branch: `main`
-- Status: brain rework and sparse-balance work merged; mainline baseline refreshed.
-- Main branch outcome: sector vision, BrainFactory, optional hidden-layer brain, lower-density sparse ecology, habitat-constrained plant relocation, long-run export fixes, and refreshed post-merge stability/performance baselines.
-- Detailed branch log: `docs/experiments/2026-05-brain-rework-balance.md`
-- Latest mainline baseline log: `docs/experiments/2026-05-main-baseline-stability.md`
+- Current world direction: natural/manual biome maps, reusable map artifacts, eight canonical biomes, biome-level forest/wetland pressure, and no individual tree layer.
+- Current creature direction: sector vision, rich local senses, body/brain catalog split, starter and rookie profiles, species roster injection, and world-bound mutation pressure.
+- Current performance direction: configurable parallel neural and sensing systems, optional stale-sense action reuse, optional extinct payload pruning, and Long Run Performance recipe for large CLI runs.
+- Current analysis direction: spatial/biome reporting, starting-roster reporting, and a panning/zooming survivor ancestry graph.
 
 ## Maintenance Rules
 
@@ -50,5 +55,6 @@ This is the starting point for future Codex threads. Read this file first, then 
 - Put unimplemented ideas in `ROADMAP.md`.
 - Put why/why-not choices in `DECISIONS.md`.
 - Put timings in `PERFORMANCE_BASELINES.md`.
+- Put launcher/run workflow state in `RUN_TOOLS_PLAN.md`.
 - Put long probe tables and branch narratives in `docs/experiments/`.
-- Keep `PROJECT_PLAN.md` as a historical planning document unless doing a deliberate cleanup pass.
+- Keep generated `out/` Markdown as run evidence, not as the main source of truth.

@@ -1,36 +1,49 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-05-29
+Last reviewed: 2026-05-30
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
-## Merge And Baseline Follow-Up
+## Highest-Value Next Work
 
-Status: completed enough for current mainline
+- Report layout and interactivity pass.
+- Catalog assay and starter/rookie tuning.
+- Map-artifact polish and reusable map workflows.
+- Next measured performance experiment.
+- Brain architecture experiments once catalog/body-brain separation settles.
 
-- `codex-brain-rework-balance-pass` has been merged back to `main`.
-- Mainline performance and balance baselines were refreshed on 2026-05-25.
-- Current baseline details live in `PERFORMANCE_BASELINES.md`.
-- Evidence log: `docs/experiments/2026-05-main-baseline-stability.md`.
-- Decide whether `docs/experiments/2026-05-brain-rework-balance.md` should stay as a full research log or be compressed later.
+The user has postponed quadrant-map scenario work for now.
+
+## Species, Brains, And Catalogs
+
+Status: active
+
+- Continue treating species profiles as bodies plus embedded compatibility fallback brains.
+- Continue treating brain profiles as separate reusable controllers.
+- Improve catalog UX around body/brain selection, compatibility warnings, labels, and saved profile provenance.
+- Add stronger catalog assays for:
+  - profile default brain viability;
+  - body/brain transplant viability;
+  - rookie starters that survive but leave more room for evolution;
+  - predator/prey starter balance.
+- Add a catalog comparison report that summarizes viability, final population, births/deaths, meal gaps, brain architecture, body traits, and behavior assays.
+- Add explicit profile/schema version migration notes whenever senses or outputs change.
+- Consider brain editors later, starting with inspection and manual weight nudge tools before full visual editing.
+- Keep starter bodies and starter brains easy to export from runs so successful or interesting lineages can become future scenario founders.
 
 ## Brain Architecture
 
 Status: active design direction
 
-- Keep `HybridNeural` default until hidden-layer and sector-vision behavior has more long-run evidence.
-- Continue comparing `HiddenLayerNeural`; the 8-node architecture passed the earlier 150k weak-scenario matrix. Rerun comparisons after the Harsh/Predation 300k stability tuning if hidden-layer defaults become active again.
-- Consider a fully generic brain interface beyond `BrainFactory`, where specific brain implementations own opaque genome/state payloads.
-- Future brain candidates:
-  - fixed layered neural net with no direct path
-  - current hybrid neural net
-  - rt-NEAT-like graph topology
-  - hand-coded C# policy brain for probes
-  - later recurrent or memory-owning variants
-- Do not prewire memory into starters unless explicitly creating a probe brain.
+- Keep `HybridNeural` default until hidden-layer and catalog starter behavior has more long-run evidence.
+- Continue comparing `HiddenLayerNeural`; the 8-node architecture remains viable but not clearly superior.
+- Explore an rt-NEAT-like graph topology as a real architecture experiment, not only a performance optimization.
+- Explore a less dense or modular controller architecture that avoids evaluating every possible connection every tick.
+- Keep all current senses unless a specific experiment shows a sense is actively harmful. Rich behavior is more important than saving time by making creatures poorer.
+- Do not do sparse-weight pruning on the current dense controller unless it is introduced as a separate architecture or thoroughly proven safe.
+- Record and test lower brain decision frequency as an optional performance mode; the first accepted version reuses all neural outputs when world senses are stale and remains configurable.
 - Consider evolvable hidden node count later, with explicit costs and serialization/clustering rules.
 - Add brain complexity costs based on active hidden nodes, active connections, expensive function nodes, sensory channels, memory/recurrent state, and possibly connection activity.
-- Investigate whether the hidden-layer default should remain 8, drop to 7 for pure efficiency, or keep one spare concept node for evolvability.
 
 ## Memory
 
@@ -39,11 +52,11 @@ Status: partially implemented, future redesign likely
 - Current memory is a single controller-managed world-space vector.
 - Future architectures should own memory internally.
 - Possible future model:
-  - several small continuous memory slots
-  - decay over time
-  - brain-controlled writes
-  - optional write/erase/decay gates
-  - explicit energy/brain/maturity costs
+  - several small continuous memory slots;
+  - decay over time;
+  - brain-controlled writes;
+  - optional write/erase/decay gates;
+  - explicit energy/brain/maturity costs.
 - Avoid perfect coordinate memory and hard-coded home vectors.
 - Useful future memories might represent recent food, danger, failed target, successful eating, local depletion, egg-laying mode, or short-term movement tendency.
 
@@ -56,8 +69,8 @@ Status: active design direction
 - Scent identity should be an evolvable continuous value/domain, not a perfect species ID.
 - Add "own scent" or scent signature as an internal body signal so creatures can compare nearby signatures.
 - Add distance-dependent visual clarity later:
-  - far objects appear as broad categories
-  - close objects reveal freshness, type, size, or identity details
+  - far objects appear as broad categories;
+  - close objects reveal freshness, type, size, or identity details.
 - Decide whether vision should remain fixed sectors or move toward a small preprocessed visual field layer.
 - Add obstacle/terrain/plant occlusion only after basic sector vision is stable and benchmarked.
 - Avoid one brain input per resource instance or real plant species; use broad channels, compact top-K candidates, or compressed field representations.
@@ -69,14 +82,12 @@ Status: first plant diversity slice implemented, broader ecology future
 
 - Coarse plant types exist now: generic, tender, rich, and tough.
 - Creatures can sense compressed plant quality/ease at close range, taste contacted plant quality/ease, and receive recent plant raw/digested yield feedback.
-- Add richer plant/resource types beyond the first coarse food categories.
-- Add food traits such as toxicity, water content, fruit/leaf/root distinction, seasonal availability, or richer digestible payoff.
-- Decide whether future plant type recognition should remain broad and compressed or add a small top-K visible food candidate model.
+- Keep checking that every enabled plant type has viable biome habitat after biome-list changes.
+- Add richer plant/resource traits beyond the first coarse categories: toxicity, water content, fruit/leaf/root distinction, seasonal availability, and richer digestible payoff.
+- Decide whether future plant recognition should remain broad and compressed or add a small top-K visible food candidate model.
 - Add seed dispersal and delayed germination rather than instant plant relocation/respawn.
 - Consider plant populations or field/patch summaries for very large worlds instead of one entity per plant everywhere.
-- Add persistent habitat features such as trees, large bushes, shade, or plant-obstacles.
-- Add static insect resources such as mounds, grub logs, swarms, or hives.
-- Explore richer nutrient ecology only after current energy/digestion loops are stable.
+- Add persistent habitat features such as large bushes, shade, logs, or plant-obstacles later if they become mechanically important.
 - Explore self-sustaining plant ecology later, but keep scenario-controlled spawning for now.
 
 ## Population Stability And Evolutionary Pressure
@@ -84,117 +95,92 @@ Status: first plant diversity slice implemented, broader ecology future
 Status: ongoing tuning
 
 - Continue seeking lower but stable populations for large worlds.
-- Harsh and Predation have a 300k stability tune; confirm Predation with broader seeds or 500k+ before adding stronger scarcity or predator-specific pressure.
-- Predator Prey now has explicit efficient-prey and meat-biased-predator profiles, but one of five 150k sampled seeds still washed out into a grazer endpoint.
+- Harsh and Predation are viable but still thin in worst seeds; keep watching 500k+ behavior before adding stronger scarcity.
+- Predator Prey has explicit efficient-prey and meat-biased-predator profiles, but sustained predator/prey loops are not reliable yet.
 - Keep birth rates controlled through egg reserve, maturity, investment, cooldown, crowding, fertility, and resource scarcity.
 - Add stronger search pressure without causing frequent long-run extinction.
 - Watch for scarcity boom-crash cycles.
 - Potential future stabilizers:
-  - fat reserves
-  - idle/low-speed conservation payoffs
-  - reproduction suppression in poor local food conditions
-  - better local depletion memory
-  - seasonal/disturbance cues
-  - richer bottleneck and overshoot reporting
+  - fat reserves;
+  - idle/low-speed conservation payoffs;
+  - reproduction suppression in poor local food conditions;
+  - better local depletion memory;
+  - seasonal/disturbance cues;
+  - richer bottleneck and overshoot reporting.
 
-## Carrion And Meat Specialization
-
-Status: parked for now
-
-- Carrion mechanics exist, but normal starters do not strongly discover freshness/rot avoidance in short runs.
-- Future work could make freshness-aware behavior discoverable without prewiring every founder.
-- Candidate paths:
-  - mixed-species competition where a freshness-aware mutant/profile can appear alongside normal scavengers
-  - stronger diagnostics for freshness-input wiring by lineage
-  - more viable long-run Carrion Pressure windows
-  - better mutation routes into freshness and rot-scent inputs
-- Avoid making carrion pressure only more punishing; it must also provide evolutionary opportunity.
-
-## Predation, Combat, And Interaction
+## Carrion, Predation, Combat, And Interaction
 
 Status: first pass implemented, not final ecology
 
+- Make freshness-aware and carrion-aware behavior more discoverable without prewiring every founder.
 - Improve predation-specific diagnostics and long-run stability.
-- Tune predator/prey starter behavior through scenario or species rosters rather than globally increasing bite damage; the efficient-prey roster is viable but not yet a reliable sustained predator/prey loop.
-- Roster diagnostics now confirm species-blind aggression can cause predator-line attrition: in the seed-45 predator/prey run, Meat Predator dealt `102` cross-profile kills but also suffered `96` same-profile injury deaths before extinction.
-- Next likely experiment: add imperfect similarity/species cues or a predator social-tolerance gate, then compare same-profile injury deaths and cross-profile kills.
+- Tune predator/prey starter behavior through scenario rosters and catalog profiles rather than globally increasing bite damage.
+- Add imperfect similarity/species cues or social-tolerance gates before expecting stable predator-only populations.
 - Investigate hard action gates, especially attack intent, because partial progress toward rare actions may not be rewarded.
 - Add generic intent/progress/frustration feedback so brains can learn when intended effort is not producing results.
 - Future interactions:
-  - guarding eggs
-  - carrying resources or eggs
-  - grabbing/attaching to creatures
-  - parasite-like small-creature strategies
-  - social tolerance or aggression based on imperfect similarity cues
+  - guarding eggs;
+  - carrying resources or eggs;
+  - grabbing/attaching to creatures;
+  - parasite-like small-creature strategies;
+  - social tolerance or aggression based on imperfect similarity cues.
 
 ## Terrain, Biomes, Climate, And World Generation
 
-Status: first biome/obstacle systems exist, richer terrain is future
+Status: natural biome generation and reusable maps have a first pass
 
-- Build a more believable world generator using layers such as elevation, water, moisture, temperature, fertility, terrain cost, and hazards.
-- Derive biome labels from those layers instead of treating biome labels as the only underlying truth.
-- Add lakes/seas as impassable or near-impassable barriers.
-- Later add wetlands, shallow water, seasonal ice, drying corridors, mountains, forests, swamps, deserts, tundra, and fertile valleys.
+- Current canonical biomes are Desert, Scrubland, Grassland, Fertile, Forest, Wetland, Tundra, and Highland.
+- Natural climate generation exists, but map realism and biome adjacency can still improve.
 - Keep generated layers deterministic and editable.
-- Add Godot map/world painting later for terrain, biomes, obstacles, hazards, fertility, and corridors.
-- Large migration scenarios likely need larger maps, broader biome bands, and possibly memory or long-term cues.
+- Make map artifacts more first-class:
+  - thumbnails and metadata;
+  - better import/export;
+  - clearer saved-map lifecycle;
+  - better Godot/launcher handoff.
+- Later, derive biome labels from elevation, water, moisture, temperature, fertility, terrain cost, and hazards rather than treating biome labels as the only underlying truth.
+- Add lakes/seas as impassable or near-impassable barriers later.
+- Add temperature and water survival mechanics before making Desert/Tundra fully distinct climate extremes.
+- Add manual quadrant/walled scenarios later; quadrant spawn regions are implemented, but the maps and test scenarios are deferred.
 
 ## Performance
 
 Status: always relevant
 
-- Preserve deterministic single-threaded mode if multithreading is added.
-- Multicore may help per-creature sensing and brain evaluation, but current design should first keep sensing/query work efficient.
-- Consider lazy or active-region spatial indexing for huge maps with sparse active populations; avoid this for small fully inhabited worlds unless profiling supports it.
-- Revisit spatial cell size after new large-world baselines.
-- Survivor-ancestry genome/brain payload pruning now retains full payloads for living creatures, eggs, and the current survivor ancestor chain back to founders; extinct side-branch payloads can be pruned while lineage rows are preserved with pruned payload IDs, IDs remap safely, and checkpoints reload. Remaining work is row-level extinct-branch compaction plus aggregate side-branch summaries for richer post-prune history.
-- Future performance ideas:
-  - chunk-level resource/plant summaries
-  - active-region updates for dormant/far ecology
-  - field/patch plant models
-  - better report/export streaming
-  - Godot graphics/rendering polish after core behavior work
+- Preserve deterministic single-threaded mode through thread count settings.
+- Parallel neural and sensing systems are implemented; keep testing default thread counts against behavior and wall-clock performance.
+- The first resource-regrowth active-list attempt was not kept. Revisit only with careful profiling and correctness checks.
+- Try trait/effective-body caches to reduce repeated growth/body calculations across metabolism, sensing, neural, movement, eating, and attack.
+- Consider chunk-level resource/plant summaries for huge sparse worlds.
+- Consider compact history mode that keeps full ancestor paths and heatmap/death positions while pruning dead side-branch brain/genome payloads and summarizing side branches.
+- Improve report/export streaming for very long runs.
+- Continue Godot render decoupling and draw aggregation when visual refresh lags simulation speed.
 
-## Godot UI And Run Tools
-
-Status: Godot launcher exists; separate run manager is planned
-
-- Improve scenario editor organization; the current one-long-list layout is functional but unwieldy.
-- Add scenario schema metadata so Godot and future run tools can group settings consistently.
-- Build the local run launcher/library described in `RUN_TOOLS_PLAN.md`.
-- Future run tool should catalog runs, show live status, manage checkpoints, compare runs, open reports, and export compact context for Codex analysis threads.
-- Godot should remain the place for spatial editing, map painting, and live visual inspection.
-
-## Analysis And Taxonomy
+## Reports, Analysis, And Taxonomy
 
 Status: first pass implemented, future refinement needed
 
+- Make the report use wide screens better; the current layout still leaves too much unused space.
+- Improve population-over-time charts with labels, legends, hover/click details, and filtering.
+- Continue improving the survivor ancestry graph:
+  - clearer explanation that cards are survivor-ancestry segments, not species;
+  - better card spacing and branch layout;
+  - richer selected segment details;
+  - easier ancestor comparison along dominant and side branches.
+- Add spatial heatmaps for occupancy, deaths by cause, food consumption, births/eggs, and successful lineages.
 - Improve species/cluster thresholds without implying false precision.
 - Distinguish lineage relatedness from behavioral convergence.
 - Use functional brain fingerprints for future richer brain architectures.
-- Keep current species interpretation layers separate:
-  - species identity comes from lineage plus genome/brain similarity
-  - current run role labels are diet/tactic/region, such as `plant-biased; searching; middle region`
-  - controlled behavior assays can disagree with realized run outcome, for example a species can be plant-heavy in the world while still testing as `scavenger-leaning` or `meat/egg-biased`
-- Add a future niche/life-history classification layer rather than overloading the existing role labels. Candidate labels include `r-selected`, `K-selected`, `stress-tolerant`, `competitive`, `ruderal/opportunist`, `generalist`, `specialist`, `efficient grazer`, `scavenger`, `predator`, `nomad/explorer`, `resident/patch holder`, and `defensive/durable`.
-- Suggested output shape: `life history / trophic role / habitat or behavior / trend`, for example `K-leaning / plant-biased grazer / middle-region / persistent dominant`.
-- Candidate life-history metrics: final and tail population, births/deaths, max and average generation, lifespan, stored creature energy, effective creature energy, body-area biomass proxy, energy per creature, offspring investment, egg count, egg energy per egg, maturity age, reproductive reserve, tail stability, calories per distance, and bottleneck/replacement history.
-- Recent balanced-foraging comparison note: after moving mutation pressure to the world, the higher-mutation run produced fewer survivors but higher energy per creature, larger body-area biomass proxy, higher offspring investment, fewer but more expensive eggs, and a shallower lineage. Treat that as a useful single-run K-leaning signal to validate with repeated seeds later.
-- Upgrade biome risk/reward reporting to use sampled creature-hour exposure for whole-run normalized metrics: births, deaths, plant calories, meat/egg calories, and attack damage per creature-hour, plus exposure index by biome. Use this before the next serious 500k+ natural/manual map biome tuning pass.
-- Add ecosystem health metrics:
-  - energy flow
-  - biomass
-  - reproductive reserve
-  - plant/meat resource ratios
-  - tail-window stability
-  - repeated bottlenecks and overshoot crashes
+- Add a future niche/life-history classification layer rather than overloading existing role labels.
+- Candidate life-history labels include `r-selected`, `K-selected`, `stress-tolerant`, `competitive`, `ruderal/opportunist`, `generalist`, `specialist`, `efficient grazer`, `scavenger`, `predator`, `nomad/explorer`, `resident/patch holder`, and `defensive/durable`.
+- Suggested output shape: `life history / trophic role / habitat or behavior / trend`.
+- Candidate metrics: final and tail population, births/deaths, max and average generation, lifespan, stored creature energy, effective creature energy, body-area biomass proxy, energy per creature, offspring investment, egg count, egg energy per egg, maturity age, reproductive reserve, tail stability, calories per distance, and bottleneck/replacement history.
 
 ## Open Questions
 
 - Should vision remain fixed sectors or become a small visual field preprocessing layer?
 - Should visual categories blur by distance, freshness, size, or type?
-- What minimum long-run stability target makes a scenario "viable"?
-- How large should the first serious large-world baseline be after performance refresh: `4k x 4k`, `8k x 8k`, or larger?
+- What minimum long-run stability target makes a scenario viable?
 - Should future plant ecology use discrete plant entities, patch-level populations, continuous fields, or a hybrid?
 - How should memory-heavy or large-brain lineages pay costs without making useful cognition impossible?
 - When should hidden-layer brains become default, if ever?
+- How should a future rt-NEAT architecture represent old catalog brains and reports?

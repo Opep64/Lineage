@@ -1,6 +1,6 @@
 # Lineage Decision Log
 
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-30
 
 This file records active design decisions. It is not a changelog; it exists so future work understands why the current shape exists.
 
@@ -286,6 +286,114 @@ Rationale:
 
 - Very long Godot exports could fail from memory pressure when serializing one giant snapshot string with full stats history.
 - Reloadable snapshots do not need every stats sample if the CSV sidecars preserve detailed analysis history.
+
+Status: active.
+
+## 2026-05-28: Reusable Maps Are First-Class Artifacts
+
+Decision:
+
+- Manual biome and obstacle maps should be saved as reusable map artifacts under `maps/`, not embedded only as scenario-specific manual map files.
+- `worldMapPath` is the preferred scenario pointer for reusable maps.
+- Old manual biome/obstacle map path fields remain compatibility-only.
+
+Rationale:
+
+- Users should be able to paint or seed a map once, then reuse it across scenarios and runs.
+- A single map artifact can carry both biome and obstacle layers.
+- Keeping the old fields loadable avoids breaking saved scenarios while making the new workflow cleaner.
+
+Status: active.
+
+## 2026-05-28: Forests Use Biome-Level Pressure, Not Individual Trees
+
+Decision:
+
+- Remove the individual simulated/rendered tree layer for now.
+- Represent forest cost through biome-level movement, basal, speed, vision, resource, and seasonal properties.
+
+Rationale:
+
+- Dense tree rendering hurt Godot performance and made the map visually noisy.
+- The near-term goal is biome preference/avoidance, not individual tree collision ecology.
+- Forest penalties are cheaper, easier to tune, and easier for creatures to sense through terrain/habitat channels.
+
+Status: active, revisit only if individual tree obstacles become mechanically important.
+
+## 2026-05-28: World/Scenario Owns Mutation Pressure
+
+Decision:
+
+- Effective mutation strength, trait mutation rate, and brain mutation rate are controlled by the scenario/world at reproduction time.
+- Legacy genome/profile mutation fields remain for compatibility and historical payloads but are not the authority for effective mutation pressure.
+- Birth and lineage records should keep the effective mutation values used.
+
+Rationale:
+
+- Creature-inherited mutation rates can select toward low-variance stagnation in stable worlds.
+- World-bound mutation pressure makes catalog species portable across experiments.
+- This supports future radiation or instability zones without changing species identity.
+- Recording effective values preserves interpretability.
+
+Status: active.
+
+## 2026-05-29: Split Species Bodies From Brain Profiles
+
+Decision:
+
+- Species profiles remain body/genome artifacts with an embedded fallback brain for compatibility.
+- Brain profiles are separate reusable `.brain.json` artifacts.
+- Species profiles may point to a default brain profile, and scenario roster entries may override that with either a starter brain or catalog brain.
+
+Rationale:
+
+- Enables body/brain transplant experiments.
+- Lets starter bodies be paired with Hybrid, HiddenLayer, and future rt-NEAT-like brains.
+- Gives successful run creatures a path into reusable catalogs without freezing every experiment to one embedded controller.
+
+Status: active.
+
+## 2026-05-29: Preserve Single-Threaded Control While Adding Parallelism
+
+Decision:
+
+- Neural controller and sensing evaluation can run in parallel with configurable thread counts.
+- Keep thread count settings available so controlled tests can run single-threaded.
+
+Rationale:
+
+- Large worlds need parallel speedups.
+- Reproducible mechanics testing still needs a conservative execution mode.
+- Tick boundaries remain synchronous; a tick fully completes before the next tick begins.
+
+Status: active.
+
+## 2026-05-29: Keep Riskier Performance Changes Optional
+
+Decision:
+
+- Stale-sense neural action reuse remains optional and off by default.
+- Close-sense refresh minimum is configurable and defaults to old behavior.
+- Extinct payload pruning remains optional and off by default.
+- Long Run Performance recipe opts into the performance bundle deliberately.
+
+Rationale:
+
+- Some performance changes can alter behavior or final populations.
+- They are valuable for long exploratory runs, but baseline mechanics should stay conservative unless a change proves behavior-neutral.
+
+Status: active.
+
+## 2026-05-30: Roster Spawn Regions Include Quadrants
+
+Decision:
+
+- Initial and roster creature spawn regions include upper-left, upper-right, lower-left, and lower-right quadrants in addition to uniform and third-based regions.
+
+Rationale:
+
+- Future authored maps may be divided into quadrants or walled arenas.
+- The spawn-region option should be available anywhere creature distribution is configured.
 
 Status: active.
 

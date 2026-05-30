@@ -31,3 +31,9 @@ dotnet run --project .\tools\ablation -- --snapshot .\out\godot_launcher_snapsho
 ```
 
 This is a single-tick ablation. It does not prove long-term survival value. For that, add a replay mode that runs the same saved population forward with memory enabled versus memory disabled.
+
+Future ablation targets:
+
+- zero or stale selected sense groups from the standardized input frame;
+- compare sector vision, scent, terrain/habitat, and internal/body groups;
+- replay a saved population with one group disabled to estimate long-run behavioral value.

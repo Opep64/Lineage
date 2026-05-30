@@ -402,10 +402,10 @@
     <main>
       <header class="hero" id="overview">
         <div class="hero-copy">
-          <p class="eyebrow">Project snapshot - reviewed 2026-05-27</p>
+          <p class="eyebrow">Project snapshot - reviewed 2026-05-30</p>
           <h2>Lineage is an evolving ecology sandbox with local perception, heritable bodies, neural behavior, and repeatable experiments.</h2>
           <p>
-            The project combines a deterministic C# simulation core, a headless CLI runner, and a Godot viewer. Creatures live in continuous 2D worlds, sense food and neighbors through limited local cues, make decisions through evolvable neural brains, reproduce through eggs, and leave behind lineage, species, and behavior reports.
+            The project combines a deterministic C# simulation core, a headless CLI runner, a Godot viewer, and a local web launcher. Creatures live in continuous 2D worlds, sense food and neighbors through limited local cues, make decisions through evolvable neural brains, reproduce through eggs, and leave behind lineage, species, geography, and behavior reports.
           </p>
           <p>
             This page is a human-facing overview. It summarizes the current implementation, highlights the important option surfaces, and links back to the markdown files and source modules that should remain the source of truth.
@@ -630,7 +630,7 @@
       <section id="world">
         <h2>World And Ecology</h2>
         <p>
-          Worlds are bounded continuous 2D spaces. Biomes are grid-backed lookup layers with eight canonical categories: Desert, Scrubland, Grassland, Fertile, Forest, Wetland, Tundra, and Highland. Generated noise, natural-climate maps, bands, edge ladders, corridors, and manual map files can all drive the layout. Biomes influence food density, regrowth, movement cost, speed, vision range, basal cost, seasonal response, habitat quality, and egg environmental exposure. Obstacles can be generated or loaded from manual maps and block or deflect movement.
+          Worlds are bounded continuous 2D spaces. Biomes are grid-backed lookup layers with eight canonical categories: Desert, Scrubland, Grassland, Fertile, Forest, Wetland, Tundra, and Highland. Generated noise, natural-climate maps, bands, edge ladders, corridors, and reusable manual map artifacts can all drive the layout. Biomes influence food density, regrowth, movement cost, speed, vision range, basal cost, seasonal response, habitat quality, and egg environmental exposure. Obstacles can be generated or loaded from reusable maps and block or deflect movement.
         </p>
         <div class="grid-2">
           <div>
@@ -663,14 +663,14 @@
           </div>
         </div>
         <p class="note">
-          Future world work is planned around richer water, lakes/seas, hazards, authored map painting, more plant types, and seed dispersal.
+          Reusable map artifacts and launcher-side map painting now exist. Future world work is planned around richer water, lakes/seas, hazards, better map libraries, richer terrain layers, more plant types, and seed dispersal.
         </p>
       </section>
 
       <section id="creatures">
         <h2>Creatures And Genes</h2>
         <p>
-          A creature's genome is compact but already covers body, movement, sensing, metabolism, reproduction, diet, combat, and mutation. Juveniles scale toward adult traits through the growth helper, so offspring investment and maturity age affect early survival.
+          A creature's genome is compact but already covers body, movement, sensing, metabolism, reproduction, diet, and combat. Juveniles scale toward adult traits through the growth helper, so offspring investment and maturity age affect early survival. Effective mutation pressure is now owned by the scenario/world at reproduction time, while older genome mutation fields remain compatibility data.
         </p>
         <table>
           <thead><tr><th>Group</th><th>Current genes and scenario knobs</th><th>Selection pressure</th></tr></thead>
@@ -681,7 +681,7 @@
             <tr><td>Reproduction</td><td>Threshold, offspring investment, egg production, incubation, maturity age, cooldown</td><td>r/K-style tradeoffs between many fragile offspring and fewer sturdier young.</td></tr>
             <tr><td>Diet</td><td><code>DietaryAdaptation</code>, <code>CarrionAdaptation</code></td><td>Plant digestion, meat digestion, and tolerance of stale or rotten meat.</td></tr>
             <tr><td>Combat</td><td><code>BiteStrength</code>, <code>DamageResistance</code></td><td>Predation, defense, injury deaths, and meat creation from kills.</td></tr>
-            <tr><td>Mutation</td><td><code>MutationStrength</code>, <code>TraitMutationRate</code>, <code>BrainMutationRate</code></td><td>How quickly lineages explore the trait and brain space.</td></tr>
+            <tr><td>Mutation</td><td>Scenario/world <code>MutationStrength</code>, <code>TraitMutationRate</code>, <code>BrainMutationRate</code></td><td>How quickly births explore the trait and brain space in this world.</td></tr>
           </tbody>
         </table>
       </section>
@@ -1020,7 +1020,7 @@
       <section id="scenarios">
         <h2>Scenarios And Starter Profiles</h2>
         <p>
-          Checked-in primary scenarios now favor 4000 x 4000 worlds, density-based resources, sector vision, legacy nearest-target inputs disabled, and sampled stats every 300 ticks. Balanced Foraging now uses the natural-climate biome generator; larger scenarios still cover migration, obstacle, and terrain pressure. Roster files can inject saved species profiles into a run, including the predator/prey mix.
+          Checked-in primary scenarios now favor 4000 x 4000 worlds, density-based resources, sector vision, legacy nearest-target inputs disabled, and sampled stats every 300 ticks. Balanced Foraging uses the natural-climate biome generator; larger scenarios still cover migration, obstacle, and terrain pressure. Roster files can inject saved species bodies with profile/default, starter, or catalog brains, including predator/prey and rookie transplant mixes.
         </p>
         <div class="grid-2">
           <div>
@@ -1075,19 +1075,23 @@
           <li>starter-explorer-forager</li>
           <li>starter-scavenger-forager</li>
           <li>starter-forager-predator</li>
+          <li>rookie-sector-forager</li>
+          <li>rookie-explorer-forager</li>
+          <li>rookie-scavenger-forager</li>
         </ul>
       </section>
 
       <section id="reports">
         <h2>Reports And Tools</h2>
         <p>
-          CLI and Godot exports produce CSV sidecars, HTML reports, snapshots, checkpoint folders, scenario JSON, species summaries, lineage/founder/generation summaries, roster summaries, and optional profiling output.
+          CLI and Godot exports produce CSV sidecars, HTML reports, snapshots, checkpoint folders, scenario JSON, species summaries, lineage/founder/generation summaries, roster summaries, biome/spatial summaries, and optional profiling output. The local launcher manages run history, recipes, reusable maps, species catalogs, and brain catalogs.
         </p>
         <div class="grid-3">
-          <div class="mini-panel"><strong>HTML reports</strong><br>Population, resources, deaths, traits, species clusters, behavior assays, brain diagnostics, terrain, memory, combat, and freshness metrics.</div>
+          <div class="mini-panel"><strong>HTML reports</strong><br>Population, resources, deaths, traits, species clusters, behavior assays, brain diagnostics, biome exposure, survivor ancestry, terrain, memory, combat, and freshness metrics.</div>
           <div class="mini-panel"><strong>Snapshots</strong><br>Reloadable world state with creatures, eggs, resources, genomes, brains, lineage records, biome maps, obstacles, fertility, and sampled stats.</div>
-          <div class="mini-panel"><strong>Species profiles</strong><br>Portable representative genome and brain stored as <code>.species.json</code> for injection, cataloging, and scenario rosters.</div>
-          <div class="mini-panel"><strong>Run tools plan</strong><br>A future local dashboard will launch, monitor, compact, catalog, compare, stop, and export CLI runs.</div>
+          <div class="mini-panel"><strong>Species profiles</strong><br>Portable representative body profiles stored as <code>.species.json</code> for injection, cataloging, and scenario rosters.</div>
+          <div class="mini-panel"><strong>Brain profiles</strong><br>Reusable controllers stored as <code>.brain.json</code> for body/brain transplant experiments.</div>
+          <div class="mini-panel"><strong>Launcher</strong><br>Local run library for launching, monitoring, cataloging, recipes, reusable maps, reports, checkpoints, species, and brains.</div>
           <div class="mini-panel"><strong>Ablation tool</strong><br>Reusable snapshot analysis for memory-enabled versus memory-zeroed single-tick behavior.</div>
           <div class="mini-panel"><strong>Profiling</strong><br>System timing and sensing profiles help track performance changes across branches.</div>
         </div>
@@ -1096,14 +1100,14 @@
       <section id="performance">
         <h2>Performance And Scaling</h2>
         <p>
-          Recent performance work moved the simulator from dense resource scans toward time-sliced sensing, array-backed spatial cells, persistent dirty resource/egg indexing, dormant plant exclusion, compact report sampling, and hidden-layer short-circuiting where possible.
+          Recent performance work moved the simulator from dense resource scans toward time-sliced sensing, array-backed spatial cells, persistent dirty resource/egg indexing, dormant plant exclusion, compact report sampling, configurable neural and sensing parallelism, optional stale-sense neural action reuse, optional extinct payload pruning, and hidden-layer short-circuiting where possible.
         </p>
         <div class="grid-2">
           <div class="diagram">
             <svg viewBox="0 0 560 300" role="img" aria-labelledby="perf-title">
               <title id="perf-title">Balanced tail profile timing shares.</title>
               <text x="24" y="30" font-size="18" font-weight="700" fill="#17211b">Balanced Tail Profile Share</text>
-              <text x="24" y="54" fill="#526050">Major system time shares in current baseline.</text>
+              <text x="24" y="54" fill="#526050">Major system time shares in the 2026-05-25 baseline.</text>
               <g font-size="13" fill="#526050">
                 <text x="24" y="90">Creature sensing</text><rect x="180" y="78" width="260" height="14" fill="#427aa1"/><text x="450" y="90">39.9%</text>
                 <text x="24" y="120">Neural controller</text><rect x="180" y="108" width="182" height="14" fill="#8d5578"/><text x="372" y="120">27.9%</text>
@@ -1117,17 +1121,18 @@
           <div>
             <h3>Current Scaling Notes</h3>
             <ul>
-              <li>Default spatial cell size is <code>64</code>.</li>
+              <li>Default spatial cell size is <code>64</code>; Long Run Performance uses <code>128</code>.</li>
               <li>Expensive world sensing refreshes every <code>WorldSenseIntervalTicks</code>, default 10, with close-range exceptions.</li>
               <li>Stats snapshots default to <code>statsSnapshotIntervalTicks</code> 300 in checked-in scenarios.</li>
+              <li>Neural controller evaluation defaults to 8 worker threads; sensing defaults to 4.</li>
               <li>Plants, meat, eggs, and creatures use spatial indexing for local queries.</li>
               <li>Creature cells still rebuild each tick; static and semi-static resource indexing has been optimized more heavily.</li>
-              <li>Multicore is deferred; deterministic single-threaded mode should be preserved if parallelism is added.</li>
+              <li>Set neural and sensing thread counts to 1 for conservative single-threaded comparisons.</li>
             </ul>
           </div>
         </div>
         <div class="note">
-          <strong>Long-run stats cadence:</strong> for very long unattended experiments, a practical starting point is <code>statsSnapshotIntervalTicks</code> <code>9000</code>, which is about 5 simulated minutes at the current 30 Hz fixed step. Use <code>3000</code> when diagnosing a mechanic, <code>9000</code> as the normal long-run balance, <code>18000</code> for multi-day wall-clock runs, and <code>54000</code> only for extreme trend-focused runs. Coarser values reduce CSV, report, and saved-snapshot history size, but make graphs, species trends, lineage trends, and latest-snapshot diagnostics less temporally precise; they do not change simulation behavior or lineage recording.
+          <strong>Long-run stats cadence:</strong> checked-in scenarios default to <code>statsSnapshotIntervalTicks</code> <code>300</code>. Use lower values when diagnosing a mechanic, and use <code>54000</code> for performance-focused long runs where trend precision is less important. Coarser values reduce CSV, report, and saved-snapshot history size, but make graphs, species trends, lineage trends, and latest-snapshot diagnostics less temporally precise; they do not change simulation behavior or lineage recording.
         </div>
       </section>
 
@@ -1140,9 +1145,9 @@
           <div class="mini-panel"><strong>Brain evolution</strong><br>Generic brain interface, recurrent/memory-owning brains, topology evolution, brain complexity costs, and better behavior fingerprints.</div>
           <div class="mini-panel"><strong>Ecology</strong><br>Multiple plant types, seed dispersal, water as survival pressure, insects, hives, plant toughness/toxicity, nutrient categories, and eventually self-sustaining plant communities.</div>
           <div class="mini-panel"><strong>Interaction</strong><br>Kin scent, egg identity, guarding, carrying, grabbing, parasites, social tolerance, aggression, and imperfect recognition.</div>
-          <div class="mini-panel"><strong>World generation</strong><br>Elevation, moisture, richer water, temperature, hazards, hex-grid exploration, authored map painting, and editable terrain layers.</div>
+          <div class="mini-panel"><strong>World generation</strong><br>Reusable map polish, elevation, moisture, richer water, temperature, hazards, authored maps, and editable terrain layers.</div>
           <div class="mini-panel"><strong>Population health</strong><br>Biomass, energy flow, reproductive reserve, bottleneck reporting, overshoot crashes, and stability windows.</div>
-          <div class="mini-panel"><strong>Run management</strong><br>Local web dashboard, compact long-run retention, species catalog, lineage tree, comparison packets, tags, notes, and Godot handoff.</div>
+          <div class="mini-panel"><strong>Run management</strong><br>Launcher polish, compact long-run retention, species/brain catalogs, lineage tree, comparison packets, tags, notes, and Godot handoff.</div>
         </div>
       </section>
 
@@ -1156,10 +1161,12 @@
           <li><a href="../ROADMAP.md">Roadmap<span>Unimplemented plans and active design directions.</span></a></li>
           <li><a href="../DECISIONS.md">Decision Log<span>Why important architecture and ecology decisions exist.</span></a></li>
           <li><a href="../PERFORMANCE_BASELINES.md">Performance Baselines<span>Repeatable timing and profiling references.</span></a></li>
-          <li><a href="../RUN_TOOLS_PLAN.md">Run Tools Plan<span>Future local dashboard and CLI run library.</span></a></li>
-          <li><a href="../PROJECT_PLAN.md">Project Plan<span>Historical broad plan and long-form notes.</span></a></li>
+          <li><a href="../RUN_TOOLS_PLAN.md">Run Tools Plan<span>Current launcher state and run-library plans.</span></a></li>
+          <li><a href="../PROJECT_PLAN.md">Project Plan<span>High-level direction and practical next-step framing.</span></a></li>
           <li><a href="experiments/2026-05-brain-rework-balance.md">Brain Rework Experiment<span>Detailed evidence trail for sector vision and sparse-balance work.</span></a></li>
           <li><a href="../species/README.md">Species Profiles<span>Starter profile names and usage notes.</span></a></li>
+          <li><a href="../brains/README.md">Brain Profiles<span>Reusable brain catalog format and compatibility notes.</span></a></li>
+          <li><a href="../tools/catalog-assay/README.md">Catalog Assay<span>Species and brain viability assay workflow.</span></a></li>
           <li><a href="../tools/ablation/README.md">Ablation Tools<span>Snapshot analysis tools for memory and future ablations.</span></a></li>
           <li><a href="../EVOLUTION_SIMULATOR_TANGENT.md">Evolution Tangent<span>Early long-range design inspiration.</span></a></li>
         </ul>

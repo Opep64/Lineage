@@ -1,15 +1,81 @@
 # Lineage Performance Baselines
 
 Created: 2026-05-22
-Updated: 2026-05-27
+Updated: 2026-05-30
 
 This file records performance baselines for repeatable CLI runs. Use these numbers as reference points when judging whether future performance work changes behavior or speed.
 
 ## Baseline Cadence Note
 
-As of 2026-05-27, checked-in scenarios now default to `worldSenseIntervalTicks: 10` and `statsSnapshotIntervalTicks: 300`. Baselines recorded before this note used the scenario values checked in at the time, usually `worldSenseIntervalTicks: 4` and snapshot intervals of `10` or `30` ticks, with a few diagnostic scenarios using `1`. When comparing against those older baselines, use the recorded scenario files or pass explicit overrides for the older cadence.
+As of 2026-05-30, checked-in scenarios default to `worldSenseIntervalTicks: 10` and `statsSnapshotIntervalTicks: 300`. Baselines recorded before 2026-05-27 used the scenario values checked in at the time, usually `worldSenseIntervalTicks: 4` and snapshot intervals of `10` or `30` ticks, with a few diagnostic scenarios using `1`. When comparing against those older baselines, use the recorded scenario files or pass explicit overrides for the older cadence.
 
-## Current Baseline
+For large performance runs, use an explicit high snapshot interval such as `54000` so stats/report accumulation does not dominate the profile. The Long Run Performance recipe uses that setting.
+
+## 2026-05-29 Large-World Performance Pass
+
+Context:
+
+- Scenario: Balanced Foraging.
+- World size: `16000 x 16000`.
+- Ticks: `500000` for the full carrying-capacity profile, plus shorter `150000` comparison runs.
+- Stats snapshot interval: `54000`.
+- World sense interval: `10`.
+- Purpose: measure carrying-capacity runtime and identify realistic performance targets for future 16k worlds.
+
+Full 500k reference:
+
+- Output folder: `out\perf_16k_balanced`.
+- Final population: `1043` creatures, `112` eggs, `7473` resources.
+- Max generation: `41`.
+- Overall throughput was about `168` ticks/s.
+- Tail profiled system time over ticks `450000-500000` was about `6.22ms/tick`, or roughly `161` profiled ticks/s.
+- Brain plus sensing accounted for about `4.26ms/tick`; everything else together was about `1.96ms/tick`.
+
+Tail bottlenecks from the 500k run:
+
+| Area | Readout |
+| --- | --- |
+| Neural controller | Major cost; dense controller evaluation made 960 ticks/s unrealistic before any other systems were considered. |
+| Sensing | Major cost; candidate counts were modest, but query count was high. |
+| Resource regrowth | Moderate cost; a later active-list attempt was not kept because it introduced unacceptable slowdown/behavior risk. |
+| Spatial indexing | Worth tuning, but not the first bottleneck once sensing/neural dominate. |
+| History/snapshot size | Long full snapshots can become very large because genome/brain/lineage payloads accumulate. |
+
+Accepted or retained performance options:
+
+| Setting | Default | Long Run Performance | Notes |
+| --- | ---: | ---: | --- |
+| `statsSnapshotIntervalTicks` | `300` | `54000` | Reduces stats/report overhead during long exploratory runs. |
+| `worldSenseIntervalTicks` | `10` | `10` | Values up to 10 have shown little result impact; much larger values can cause extinction. |
+| `neuralControllerThreadCount` | `8` | `8` | Parallel neural evaluation is enabled by default. Set to 1 for conservative deterministic comparisons. |
+| `sensingThreadCount` | `4` | `4` | Parallel sensing is enabled by default. Set to 1 for conservative deterministic comparisons. |
+| `reuseNeuralActionsOnSkippedWorldSenses` | `false` | `true` | Optional behavior-changing performance mode. Reuses all outputs while world senses are stale. |
+| `closeSenseRefreshMinimumTicks` | `1` | `3` | Optional stale-close-sense mode; test before using for baseline comparisons. |
+| `enableExtinctPayloadPruning` | `false` | `true` | Prunes heavy extinct side-branch payloads, not dead positions used by heatmaps. |
+| `extinctPayloadPruneIntervalTicks` | `1000` | `1000` | Applies only when payload pruning is enabled. |
+| `spatialCellSize` | `64` | `128` | 128 was best in the tested combined 16k short-run matrix. |
+
+150k comparison runs:
+
+| Run | Key settings | Final creatures | Eggs | Resources | Births | Deaths | Max gen | Tail profiled system time | Approx profiled ticks/s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Clean baseline | defaults, `statsSnapshotIntervalTicks=54000` | 851 | 79 | 7382 | 11640 | 10789 | 14 | `5.49ms/tick` | 182 |
+| Parallel neural 4 | neural threads 4 | 851 | 79 | 7382 | 11640 | 10789 | 14 | `4.46ms/tick` | 224 |
+| Parallel neural 8 | neural threads 8 | 851 | 79 | 7382 | 11640 | 10789 | 14 | `3.52ms/tick` | 284 |
+| Parallel sensing 4 | neural threads 8, sensing threads 4 | 851 | 79 | 7382 | 11640 | 10789 | 14 | `2.67ms/tick` | 374 |
+| Combined, cell 64 | long-run bundle except cell 64 | 969 | 68 | 7430 | 11771 | 10802 | 14 | `2.21ms/tick` | 453 |
+| Combined, cell 128 | long-run bundle, cell 128 | 900 | 90 | 7420 | 11695 | 10795 | 14 | `2.05ms/tick` | 487 |
+| Combined, cell 192 | long-run bundle, cell 192 | 937 | 82 | 7393 | 11836 | 10899 | 15 | `2.34ms/tick` | 427 |
+
+Interpretation:
+
+- The 16k goal of `960` ticks/s is not realistic with the current dense neural/sensing architecture at carrying capacity.
+- Parallel neural and sensing work are worth keeping.
+- The combined performance bundle materially improves throughput but can alter outcome counts, so it should remain an explicit recipe or scenario choice rather than silently becoming the scientific baseline.
+- `spatialCellSize=128` is the current large-run recipe choice, while `64` remains the conservative default.
+- The next low-risk performance idea to revisit is effective trait/body caching. The next larger architectural ideas are chunk-level resource summaries and alternative brain architectures.
+
+## 2026-05-25 Mainline Scenario Baseline
 
 Context:
 

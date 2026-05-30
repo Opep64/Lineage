@@ -1,363 +1,172 @@
-# Lineage Run Tools Plan
+# Lineage Run Tools State And Plan
 
 Created: 2026-05-23
-Updated: 2026-05-25
+Last reviewed: 2026-05-30
 
-This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Start with `DOCS_INDEX.md` for the full documentation map. Keep current implemented mechanics in `IMPLEMENTED_STATE.md`, future mechanics in `ROADMAP.md`, and use this file only for workflow tooling around runs.
+This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Start with `DOCS_INDEX.md` for the full documentation map.
 
 ## Goal
 
-Build a separate tool surface that makes CLI simulation runs easier to start, watch, compare, reopen, and explain.
+The run tools should make long simulation work practical: start runs, watch progress, reopen artifacts, compare outcomes, manage reusable maps, curate species/brain catalogs, and export enough context for later analysis.
 
-The first version should act as a launcher and live status view for `Lineage.Cli` runs. Later versions should become a run library that can track completed simulations, index outputs, query across runs, open reports and checkpoints, launch checkpoints into Godot, manage artifacts, and export compact cross-run context for Codex analysis threads.
+The first version is now implemented as a local web launcher/run library in `src/Lineage.Runner`.
 
-## Product Shape
+## Implemented Product Shape
 
-Chosen initial direction:
-
-- Build a local web dashboard with a .NET backend.
-- Keep the backend close to the existing C#/.NET codebase so it can manage `Lineage.Cli` processes and share core types or schema metadata where appropriate.
-- Use a web UI because the tool needs dense operational screens: run forms, active-run cards, tables, filters, logs, progress bars, reports, bulk actions, and later cross-run dashboards.
-- Start as a browser-opened local app. If a more native feel is wanted later, wrap the same dashboard in WebView2 rather than rebuilding the UI.
-- Launch `Lineage.Cli` with selected scenario, seed, tick count, output paths, report path, snapshot path, and checkpoint settings.
-- Show active run status without needing to inspect a terminal manually.
-- Keep enough run metadata that finished simulations can be found again.
-- Avoid duplicating simulation logic; call the existing CLI and read its outputs.
-
-Likely technical shape:
-
-- ASP.NET Core local app.
-- Server-rendered Razor/HTMX or another lightweight web UI first; move to React/Vite only if the UI complexity calls for it.
-- SQLite for durable run history once the first launcher/status slice works.
-- Managed child processes for active `Lineage.Cli` runs.
-- SignalR or simple polling for live status updates.
+- Local ASP.NET Core web app.
+- Launches Release `Lineage.Cli` runs with selected scenario, seed, tick count, output paths, report paths, snapshot/checkpoint paths, and scenario overrides.
+- Records run history and active/completed/failed status.
+- Shows live metrics from status JSON.
+- Opens reports, artifacts, checkpoints, logs, snapshots, and resolved scenarios.
+- Supports rerun, continue, checkpoint, checkpoint-and-stop, stop, rename, delete, and bulk export/delete workflows.
+- Provides a scenario editor with grouped settings and Basic/All views.
+- Supports scenario recipes such as Long Run Performance and Double Mutation.
+- Supports saved scenarios under `scenarios/user/`.
+- Supports reusable map artifacts under `maps/` with preview, painting, save, duplicate, rename, and delete.
+- Supports species and brain catalogs with starting roster editing, body/brain selection, spawn regions, labels, counts, and starting-energy overrides.
+- Supports Save Species and Save Brain from completed runs.
 
 ## Scope Boundaries
 
-The run tools should own:
+The launcher should own:
 
-- CLI process launching and management.
-- Active run status and logs.
-- Run manifests and run history.
-- Finished-run library, filtering, rename/delete/bulk management, and report opening.
-- Cross-run aggregation and exports for analysis.
-- Selecting final snapshots or checkpoints for Godot inspection.
+- CLI process launching and management;
+- active run status and logs;
+- run manifests and run history;
+- finished-run library, filtering, rename/delete/bulk management, and report opening;
+- reusable scenario recipes;
+- reusable map artifact management;
+- species/brain catalog browsing and roster assembly;
+- cross-run exports for Codex analysis.
 
 Godot should continue to own:
 
-- Visual simulation inspection.
-- Live map/camera interaction.
-- Future map/world painting and spatial editing.
-- Loading snapshots/checkpoints for visual debugging and exploration.
+- live visual simulation inspection;
+- camera, overlays, selected entity panels, and debug visualization;
+- loading snapshots/checkpoints for visual exploration;
+- Godot-side report/export parity with CLI artifacts.
 
 `Lineage.Core` should own:
 
-- Simulation scenario data.
-- Scenario validation.
-- Scenario schema/metadata used by both Godot and the external launcher.
-- Snapshot and species profile formats.
+- scenario schema and defaults;
+- scenario validation;
+- map, species, and brain artifact formats;
+- snapshot/report/profile serialization;
+- simulation behavior.
 
 ## Main Workflows
 
-### Launch A Run
+### Launch And Monitor Runs
 
-- Pick a scenario file.
-- Choose seed, tick count, output folder, snapshot/checkpoint options, and optional probe/batch settings.
-- Save a resolved run manifest before launch.
-- Start `Lineage.Cli` as a managed child process.
-- Capture stdout, stderr, exit code, start time, end time, and command line.
-- Support any number of active CLI instances, constrained only by machine resources and an optional launcher-side concurrency limit.
+Implemented:
 
-### Monitor Active Runs
+- Pick scenario or saved scenario.
+- Edit scenario options and apply recipes.
+- Set seed, tick count, checkpoint interval, and stop-on-extinction.
+- Launch a CLI run as a managed child process.
+- Show progress, current tick, final/live counts, status, PID, exit code, and artifact sizes.
+- Stop or checkpoint active runs.
 
-- Show running/finished/failed/canceled state.
-- Show elapsed time, current tick, requested tick count, progress percentage when possible, latest stats snapshot, and output paths.
-- Show population, egg count, current species/cluster count, death counters, max generation, and other high-signal live metrics as the CLI exposes them.
-- Show a progress bar for fixed-tick runs using `currentTick / requestedTicks`.
-- Surface recent log lines.
-- Allow canceling a run cleanly.
-- Allow requesting a snapshot/checkpoint now.
-- Allow requesting a snapshot/checkpoint and then stopping the run.
-- Detect missing/stalled outputs.
-- Support a CLI stop condition for extinction: stop when no creatures and no eggs remain alive.
+Remaining:
+
+- Better concurrency controls.
+- Better stalled-run detection and recovery hints.
+- More compact active-run dashboard for many simultaneous runs.
 
 ### Catalog Finished Runs
 
-- Store one durable run record per launched run.
-- Index scenario path, scenario name, seed, tick count, created outputs, final status, duration, final population, deaths, generation, report path, snapshot path, checkpoint folder, and tags/notes.
-- Keep run records stable even if output folders are moved later, if practical.
-- Support manual import of existing runs from `out/`.
-- Rename runs.
-- Delete a run record and optionally delete its artifacts.
-- Bulk delete or bulk archive selected runs.
-- View the HTML report for completed runs from the library.
+Implemented:
 
-### Query And Compare Runs
+- Durable run records.
+- Search/filter by status and scenario.
+- Rename, delete, rerun, continue, and open report.
+- Show detail panel with artifacts, command line, paths, and final metadata.
 
-- Filter by scenario, seed, date, status, tags, final population, extinction/runaway outcomes, max generation, meat/fresh-kill/stale-carcass metrics, memory usage, terrain crossing, and other high-signal columns.
-- Compare runs in a table.
-- Open linked HTML reports, CSVs, snapshots, and checkpoint folders.
-- Aggregate repeated seeds or variants.
-- Future HTML reports should add spatial heatmaps for occupancy, deaths by cause, food consumption, births/eggs, and successful lineages so authored map layouts can be judged by where risk and reward actually occurred.
+Remaining:
 
-### Reopen In Godot
+- Manual import of existing `out/` runs.
+- Tags/notes.
+- Cross-run comparison screens beyond ad hoc reports and exported artifacts.
+- Safer artifact move/archive workflows.
 
-- Launch Godot with the project path.
-- Load a final snapshot or selected checkpoint for inspection.
-- Prefer a direct handoff format or command if Godot exposes one later.
-- Until then, track the exact snapshot/checkpoint path and make it easy to select from Godot.
-- Possible future handoff: the launcher writes a small handoff file containing the snapshot/checkpoint path, then launches Godot; Godot checks that file on startup and offers to load it.
+### Scenario Recipes
 
-### Export For Codex Analysis
+Implemented:
 
-- Export a compact Markdown or JSON bundle summarizing selected runs.
-- Include scenario names, seeds, command lines, final metrics, tail-window metrics, relevant output paths, and notes.
-- Keep exports small enough for a Codex thread to analyze without reading every full CSV/report.
-- Optionally include links to the full artifacts for follow-up.
+- Recipes live under `scenarios/recipes/`.
+- Long Run Performance applies the current long-run performance bundle.
+- Double Mutation applies a controlled higher-mutation world pressure.
+- Recipes are available from the launcher and Godot scenario tools.
 
-## Data Model Sketch
+Remaining:
 
-A run record should probably include:
+- Recipe diff preview and undo.
+- User-created recipe management from the UI.
+- Better warnings when a recipe changes behavior-sensitive settings.
 
-- Run ID.
-- Display name.
-- Status: queued, running, completed, failed, canceled, imported.
-- Scenario path and scenario display name.
-- Seed and tick count.
-- Full command line.
-- Working directory.
-- Start/end timestamps.
-- Duration.
-- Output directory.
-- Stats CSV path.
-- Report HTML path.
-- Final snapshot path.
-- Checkpoint directory.
-- Derived sidecar CSV paths.
-- Exit code and short error text.
-- Final summary metrics.
-- Tail-window summary metrics.
-- User tags and notes.
+### Reusable Maps
 
-Storage options to discuss:
+Implemented:
 
-- One JSON manifest per run beside its outputs.
-- A central SQLite database plus per-run manifests.
-- A central JSON index for early development, then SQLite when querying grows.
+- Map artifacts use `.lineage-map.json`.
+- Maps store biome cells and obstacle blocked cells in one reusable artifact.
+- `worldMapPath` is the preferred scenario pointer.
+- Old manual biome/obstacle map path fields remain compatibility-only.
+- Launcher map preview and painting can edit biomes and walls.
 
-Current preference:
+Remaining:
 
-- Write one per-run manifest beside outputs from the start.
-- Add SQLite for the launcher library once listing, filtering, rename, delete, and imports become important.
-- Keep per-run manifests useful without the database so run folders remain portable.
+- Better map-artifact library UI.
+- Thumbnails and metadata.
+- Import/export and duplication polish.
+- Godot map editing parity if needed.
+- More authored maps for quadrant, corridor, island, and risk/reward experiments.
 
-## Run Folder Sketch
+### Species And Brain Catalogs
 
-Each launched run should get its own folder, likely under `out/runs/<run-id>/`:
+Implemented:
 
-```text
-out/runs/<run-id>/
-  run.manifest.json
-  resolved_scenario.json
-  status.json
-  events.jsonl
-  control.json
-  stdout.log
-  stderr.log
-  stats.csv
-  report.html
-  final_snapshot.json
-  checkpoints/
-```
+- Species profiles live under `species/` with `.species.json`.
+- Brain profiles live under `brains/` with `.brain.json`.
+- Built-in starter, rookie, prey, predator, hybrid, and hidden profiles exist.
+- Launcher roster entries can select profile/default brain, scenario starter brain, or catalog brain.
+- Roster entries can choose count, spawn region, optional label, and optional starting energy.
+- Spawn regions include thirds and quadrants.
 
-`run.manifest.json` should describe what was requested and where outputs live.
-`resolved_scenario.json` should capture the exact scenario after CLI overrides such as seed, density, or brain architecture have been applied.
-`status.json` should be periodically overwritten by the running CLI with current state.
-`events.jsonl` can hold append-only lifecycle and telemetry events.
-`control.json` can be written by the launcher to request actions such as stop, checkpoint now, or checkpoint and stop.
+Remaining:
 
-## CLI Telemetry And Control
+- More curated starter profiles.
+- Catalog assay integration in the launcher.
+- Better body/brain transplant summaries.
+- Brain editor or weight inspection tooling.
+- Profile migration UX when input/output schemas change.
 
-The launcher should not rely on terminal text parsing as its main source of truth.
+### Reports And Analysis
 
-Needed `Lineage.Cli` additions:
+Implemented:
 
-- Periodically write a machine-readable status file during a run.
-- Include current tick, requested ticks, current simulated time, population, egg count, species/cluster count when available, deaths, max generation, output paths, latest checkpoint, and stop reason.
-- Accept a run manifest or status/control paths from the launcher.
-- Poll for control requests at safe intervals.
-- Support graceful cancellation.
-- Support `checkpoint-now`.
-- Support `checkpoint-and-stop`.
-- Support `--stop-on-extinction` for no living creatures and no viable eggs.
-- Write a compact final summary JSON or include final summary fields in the run manifest/status at completion.
+- CLI and Godot can generate the same report style.
+- Reports include run settings, pressure settings, starting roster, charts, ecology summaries, biome outcomes, lineage summaries, behavior assays, brain diagnostics, and survivor ancestry.
+- Spatial reporting captures plant payoff traces and biome exposure; heatmap-style reports are planned but not fully built.
 
-This control protocol should be simple file-based at first. It is easy to debug, works across process boundaries, survives launcher restarts, and keeps the CLI independent from a long-running server.
+Remaining:
 
-## Scenario And Option Synchronization
+- Spatial heatmaps for occupancy, deaths, food, births, eggs, and lineage success.
+- Population chart labels/legend/hover/click details.
+- Better wide-screen layout.
+- Cross-run comparison views in the launcher.
 
-Scenario JSON should remain the canonical simulation configuration. The launcher should not mirror every ecology option as separate CLI flags.
+## Export For Codex Analysis
 
-Preferred model:
+Remaining useful workflow:
 
-- `Lineage.Core` owns `SimulationScenario`.
-- `Lineage.Core` also exposes scenario schema metadata for each configurable scenario field.
-- `Lineage.Cli`, Godot, and the external launcher all consume the same metadata.
-- The launcher edits or composes scenario JSON, then launches the CLI with that scenario or a generated resolved scenario.
+- Export compact Markdown or JSON bundles summarizing selected runs.
+- Include scenario names, seeds, command lines, settings, final metrics, tail-window metrics, output paths, and notes.
+- Keep exports small enough for future Codex threads to analyze without loading every full CSV/report.
 
-Scenario metadata should include:
+## Maintenance Notes
 
-- Field name and JSON name.
-- Display label.
-- Category, such as World, Food, Meat, Reproduction, Combat, Brain, Memory, Terrain, Reporting.
-- Type, such as number, integer, boolean, enum, path, or nested object.
-- Default, minimum, maximum, step, units, and help text where useful.
-- Basic/advanced visibility.
-- Whether changing the value requires a restart.
-
-This same metadata should be used later to improve Godot's unwieldy one-long-list scenario editor into grouped, searchable sections with basic/advanced filtering.
-
-Current launcher slice:
-
-- `Lineage.Core` exposes shared scenario field metadata for field names, JSON names, scalar/enum/JSON types, initial grouping, basic/advanced flags, selected units, numeric hints, and short descriptions for high-signal fields.
-- This keeps new scalar scenario options visible in the launcher as soon as they are added to the core scenario type.
-- The runner consumes the shared metadata for its grouped scenario-options editor.
-- The next cleanup should make Godot consume the same metadata and expand the metadata over time with richer ranges, units, and help text.
-
-Separate option categories:
-
-- Scenario options: actual simulation/ecology settings stored in `SimulationScenario` and shared by Godot, CLI, and the launcher.
-- Run options: execution settings such as seed override, ticks, output folder, report path, checkpoint interval, profiling, stop-on-extinction, process status, and history. These belong to the launcher/CLI contract.
-
-When a new ecology feature is added, update `SimulationScenario` plus schema metadata once. Godot and the launcher should then pick it up through the shared schema rather than separate hand-maintained forms.
-
-## Authored Worlds And Map Painting
-
-Future map painting/world editing should happen in Godot first. Godot is the natural place for pan/zoom, overlays, brush previews, terrain visualization, spatial selection, and immediate feedback.
-
-The launcher should select, launch, catalog, and compare authored worlds rather than edit them directly.
-
-Preferred artifact split:
-
-```text
-scenarios/my-experiment.json
-worlds/my-painted-world.lineage-world.json
-```
-
-The scenario references the authored world:
-
-```json
-{
-  "name": "Painted Corridor Experiment",
-  "worldSource": {
-    "kind": "authored",
-    "path": "../worlds/painted-corridor.lineage-world.json",
-    "worldId": "painted-corridor-2026-05-24"
-  }
-}
-```
-
-Do not treat authored worlds as simply "no seed." Track separate identities:
-
-- World identity: authored world ID, generator seed/settings if generated, and edit revision.
-- Run seed: simulation randomness for creature placement, mutations, stochastic events, and experiment repetition.
-
-The launcher should eventually:
-
-- Discover authored worlds.
-- Show world metadata and possibly thumbnails exported by Godot.
-- Track world ID/revision in run records.
-- Compare runs by scenario and authored world revision.
-
-## Design Principles
-
-- Treat the CLI as the source of truth for simulation execution.
-- Make every launched run reproducible from its manifest.
-- Treat scenario JSON plus shared schema metadata as the source of truth for simulation options.
-- Prefer append-only run records over fragile inferred state.
-- Keep paths visible and easy to copy into Godot, terminal commands, or Codex prompts.
-- Make importing old `out/` runs possible, even if imported records are less complete.
-- Avoid requiring a long-running service for basic run records.
-- Keep future batch/probe workflows in mind, but make single-run launch/status useful first.
-- Keep Godot focused on spatial editing and visual inspection, not long operational run management.
-
-## Phase 1: Launcher And Status
-
-- Create the local web dashboard shell with a .NET backend.
-- Define the per-run manifest format.
-- Define the first status/control JSON contract.
-- Add minimal CLI status writing.
-- Add minimal CLI stop-on-extinction and control polling.
-- Launch one CLI run with generated output paths.
-- Capture stdout/stderr and exit status.
-- Show active run status and recent logs.
-- Show progress, current tick, creatures, eggs, and current species/cluster count if available.
-- Support clean stop and checkpoint-and-stop.
-- Write a completed/failed run record.
-
-### Current Phase 1 Behavior
-
-- Dashboard-launched runs get a per-run manifest and output folder under `out/runs/<run-id>/`.
-- Run ids end with the launched CLI process id so the dashboard display, manifest, and operating-system process line up.
-- The runner reloads manifests on startup and reattaches to still-live CLI processes by process id.
-- Reattached runs remain controllable through the file-based `control.json` protocol.
-- If a manifest says a run was active but the recorded CLI process is gone, the runner marks the run `lost`.
-- The CLI can write stdout/stderr logs directly via launcher-supplied log paths, so a runner restart does not leave the simulation dependent on an old redirected pipe.
-- The dashboard supports basic run-library management: status/scenario/search filters, sorting, seed display, expandable details/log tails, renaming, single-run delete, and selected-run bulk delete.
-- Failed, lost, and unknown runs surface a concise failure reason from runner diagnostics or the last stderr line when available.
-- Selected runs can be exported to a compact Markdown comparison packet with final/live metrics, command line, and artifact paths for Codex analysis.
-- New dashboard-launched runs save a resolved scenario JSON beside the run manifest and surface compact scenario identity: brain architecture, starter brain, vision mode, world size, resource density, terrain, and meat-pressure knobs.
-- The launcher has a first grouped scenario-options editor. It builds tabs from `SimulationScenario` fields, lets a run start from edited scenario JSON, writes the generated launch scenario under `out/runs/_launch_scenarios/`, and still saves the CLI-resolved scenario beside the run manifest.
-- The launcher has a first scenario-recipe overlay flow. Sparse recipe JSON files live under `scenarios/recipes/`, can be searched and applied as an ordered stack, and can be created from the current scenario-option diff or only new changes since the last recipe save/apply point. Later recipes win when recipes set the same field; direct option edits remain part of the final working launch scenario. The runner can preview recipe saves, summarize the full launch diff, archive recipe files to `out/recipe-trash/`, and permanently delete recipes.
-- Run rows can clone settings back into the launch form. The clone path prefers the run's `resolved_scenario.json`, falls back to the generated launch scenario, then falls back to the original scenario file so users can duplicate an experiment and make small changes.
-- Non-running rows can be rerun after a confirmation prompt. The replacement run uses the prior resolved/launch settings, starts with a fresh process-id-based run id, and then removes the old run artifacts if the replacement starts.
-- Non-running rows can continue in place from the latest checkpoint, final snapshot, or a selected checkpoint in the run details artifact picker, reusing the same run record and output folder.
-- Run details include an artifact/checkpoint table with paths, file metadata, copy-path actions, report open actions, and per-snapshot Continue actions.
-- The scenario-options editor supports search, basic/all filtering, changed-field highlighting, and reset actions for the current group or all loaded scenario options.
-- Edited launcher settings can be saved as managed user scenarios under `scenarios/user/`.
-- Scenarios directly under `scenarios/` are protected development presets. The dashboard can archive launcher-created user scenarios to `out/scenario-trash/`, but it does not delete protected project scenarios or manually dropped-in user files.
-
-## Phase 2: Run Library
-
-- List completed and failed runs.
-- Open reports and output folders.
-- Rename runs.
-- Delete selected completed/failed/lost runs in bulk.
-- Add sortable columns and compact run details/log views.
-- Parse final summary metrics and scenario identity from run artifacts.
-- Add tags and notes.
-- Import existing runs from `out/`.
-
-## Phase 3: Query And Aggregation
-
-- Add filters and sortable columns.
-- Aggregate multiple seeds/variants.
-- Summarize tail-window metrics.
-- Extend the selected-run Markdown export with JSON output and richer cross-run/tail-window summaries.
-
-## Phase 4: Godot Handoff
-
-- Make final snapshots and checkpoints easy to launch or load in Godot.
-- Build on the runner's checkpoint/artifact picker for a Godot handoff action.
-- Consider adding a lightweight Godot startup argument or shared handoff file if needed.
-- Track authored world IDs/revisions in run records once map painting exists.
-
-## Phase 5: Deeper Analysis Tools
-
-- Cross-run trend dashboards.
-- Scenario family comparisons.
-- Species/profile lineage comparisons.
-- Memory, terrain, carrion, predation, and taxonomy-focused query presets.
-- Artifact cleanup/archive workflows.
-
-## Open Questions
-
-- Should the first web UI use Razor/HTMX, Blazor, or React/Vite?
-- Should SQLite be added immediately, or should Phase 1 use only per-run manifests and add SQLite in Phase 2?
-- What exact live metrics should the CLI put in `status.json` for the first slice?
-- Should species/cluster count be computed live every status interval, or only when cheap enough from existing stats/reporting paths?
-- How much should the tool parse from existing CSV/HTML outputs versus asking `Lineage.Cli` to write a dedicated final summary JSON?
-- How many parallel runs should be allowed by default?
-- How should cancellation work so partial outputs remain inspectable and distinguishable from failed runs?
-- What is the cleanest way to hand a snapshot/checkpoint path to Godot: startup args, a handoff file, or a launcher-managed scenario/snapshot picker?
-- What information does a Codex analysis export need to be genuinely useful without becoming huge?
+- Keep launcher and Godot scenario controls aligned with scenario schema changes.
+- Add new scenario options to Basic/All grouping intentionally.
+- Make performance-sensitive options visible enough that a user can tell which recipe or roster setting changed a run.
+- When map or catalog formats change, preserve compatibility readers and update this file.

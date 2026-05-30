@@ -13,3 +13,5 @@ Use these files as evidence trails, not as the primary source of current truth:
 
 - `2026-05-main-baseline-stability.md`: post-merge mainline performance baseline, 60k stability pass, and 90k weak-scenario check.
 - `2026-05-brain-rework-balance.md`: sector vision, BrainFactory, hidden-layer brain, sparse ecology rebalance, habitat-constrained plant relocation, and Godot export sanity work.
+
+Generated Markdown under `out/` can also be useful evidence, especially catalog assay summaries and performance discussion notes, but those files are run artifacts rather than maintained docs.
