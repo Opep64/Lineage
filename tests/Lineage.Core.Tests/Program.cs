@@ -200,6 +200,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
+    ("Species profile injection honors quadrant spawn region", SpeciesProfileInjectionHonorsQuadrantSpawnRegion),
     ("Species profile injection can override brain kind", SpeciesProfileInjectionCanOverrideBrainKind),
     ("Species profile injection can randomize brains per founder", SpeciesProfileInjectionCanRandomizeBrainsPerFounder),
     ("Species clustering groups injected profile founders", SpeciesClusteringGroupsInjectedProfileFounders),
@@ -209,6 +210,7 @@ var tests = new (string Name, Action Body)[]
     ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
     ("Species behavior change highlights notable shifts", SpeciesBehaviorChangeHighlightsNotableShifts),
     ("Scenario species roster injects profile founders", ScenarioSpeciesRosterInjectsProfileFounders),
+    ("Scenario species roster label names injection groups", ScenarioSpeciesRosterLabelNamesInjectionGroups),
     ("Scenario species roster injects brain overrides", ScenarioSpeciesRosterInjectsBrainOverrides),
     ("Scenario species roster injects brain profile paths", ScenarioSpeciesRosterInjectsBrainProfilePaths),
     ("Roster lineage summaries group injected profile descendants", RosterLineageSummariesGroupInjectedProfileDescendants),
@@ -7608,6 +7610,21 @@ static void ScenarioFactoryHonorsInitialSpawnRegion()
         AssertTrue(creature.Position.Y >= 30f, $"Creature {creature.Id.Value} should avoid top resource void");
         AssertTrue(creature.Position.Y <= 570f, $"Creature {creature.Id.Value} should avoid bottom resource void");
     }
+
+    var quadrantScenario = scenario with
+    {
+        Seed = 142,
+        InitialCreatureSpawnRegion = InitialCreatureSpawnRegion.LowerRightQuadrant
+    };
+    var quadrantSimulation = SimulationScenarioFactory.CreateSimulation(quadrantScenario);
+    AssertEqual(20, quadrantSimulation.State.Creatures.Count, "Quadrant spawn-region creature count");
+    foreach (var creature in quadrantSimulation.State.Creatures)
+    {
+        AssertTrue(creature.Position.X >= 450f, $"Creature {creature.Id.Value} should spawn in right half");
+        AssertTrue(creature.Position.X <= 870f, $"Creature {creature.Id.Value} should avoid right resource void");
+        AssertTrue(creature.Position.Y >= 300f, $"Creature {creature.Id.Value} should spawn in lower half");
+        AssertTrue(creature.Position.Y <= 570f, $"Creature {creature.Id.Value} should avoid bottom resource void");
+    }
 }
 
 static void ScenarioResourceDensityScalesWithWorldArea()
@@ -8936,6 +8953,46 @@ static void SpeciesProfileInjectionCreatesFounderCreatures()
     }
 }
 
+static void SpeciesProfileInjectionHonorsQuadrantSpawnRegion()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Name = "Species Source",
+        Seed = 903,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ExplorerForager,
+        InitialCreatureCount = 3,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(sourceScenario, source.State, "Quadrant sample");
+
+    var targetScenario = new SimulationScenario
+    {
+        Seed = 904,
+        PipelineKind = SimulationPipelineKind.Neural,
+        WorldWidth = 1_000f,
+        WorldHeight = 800f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        ResourceVoidBorderWidth = 40f
+    };
+    var target = SimulationScenarioFactory.CreateSimulation(targetScenario);
+    var result = SpeciesProfileInjector.Inject(
+        target.State,
+        profile,
+        new SpeciesInjectionOptions(20, InitialCreatureSpawnRegion.UpperLeftQuadrant, EnergyOverride: 33f));
+
+    AssertEqual(20, result.CreatureIds.Count, "Injected quadrant creature count");
+    foreach (var creature in target.State.Creatures)
+    {
+        AssertTrue(creature.Position.X >= 40f, $"Injected creature {creature.Id.Value} should avoid left resource void");
+        AssertTrue(creature.Position.X < 500f, $"Injected creature {creature.Id.Value} should spawn in left half");
+        AssertTrue(creature.Position.Y >= 40f, $"Injected creature {creature.Id.Value} should avoid top resource void");
+        AssertTrue(creature.Position.Y < 400f, $"Injected creature {creature.Id.Value} should spawn in upper half");
+    }
+}
+
 static void SpeciesProfileInjectionCanOverrideBrainKind()
 {
     var sourceScenario = new SimulationScenario
@@ -9373,6 +9430,80 @@ static void ScenarioSpeciesRosterInjectsProfileFounders()
             AssertClose(44f, creature.Energy, 0.000001, "Roster energy override");
             AssertTrue(creature.Position.X > simulation.State.Bounds.Width * 2f / 3f, "Roster creature should spawn in right third");
         }
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+static void ScenarioSpeciesRosterLabelNamesInjectionGroups()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Seed = 813,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        InitialBrainKind = InitialBrainKind.ExplorerForager
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(
+        sourceScenario,
+        source.State,
+        "Reusable body");
+
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_roster_label_{Guid.NewGuid():N}");
+    try
+    {
+        var profilePath = Path.Combine(tempRoot, "species", "reusable-body.species.json");
+        SpeciesProfileJson.Save(profilePath, profile);
+
+        var scenarioPath = Path.Combine(tempRoot, "scenarios", "roster-label-scenario.json");
+        var scenario = new SimulationScenario
+        {
+            Seed = 814,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f,
+            SpeciesSeeds =
+            [
+                new SpeciesScenarioSeed
+                {
+                    Label = "Reusable body control",
+                    ProfilePath = "species/reusable-body.species.json",
+                    Count = 2,
+                    Enabled = true
+                },
+                new SpeciesScenarioSeed
+                {
+                    Label = "Reusable body transplant",
+                    ProfilePath = "species/reusable-body.species.json",
+                    Count = 3,
+                    BrainOverrideKind = InitialBrainKind.ScavengerForager,
+                    Enabled = true
+                }
+            ]
+        };
+        SimulationScenarioJson.Save(scenarioPath, scenario);
+
+        var loadedScenario = SimulationScenarioJson.Load(scenarioPath);
+        var simulation = SimulationScenarioFactory.CreateSimulation(loadedScenario);
+        var results = SimulationScenarioSpeciesSeeder.InjectScenarioSpecies(
+            loadedScenario,
+            simulation.State,
+            scenarioPath);
+
+        AssertEqual(2, results.Count, "Labeled roster injection result count");
+        AssertEqual("Reusable body control", results[0].SpeciesName, "First roster label");
+        AssertEqual("Reusable body transplant", results[1].SpeciesName, "Second roster label");
+
+        var summaries = RosterLineageAnalyzer
+            .Analyze(simulation.State.LineageRecords, results, simulation.State.Tick)
+            .ToDictionary(summary => summary.ProfileName);
+        AssertEqual(2, summaries["Reusable body control"].FounderCount, "Control founder count");
+        AssertEqual(3, summaries["Reusable body transplant"].FounderCount, "Transplant founder count");
     }
     finally
     {

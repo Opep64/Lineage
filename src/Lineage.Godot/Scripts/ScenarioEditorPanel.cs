@@ -1244,7 +1244,10 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                     : seed.BrainOverrideKind is null
                         ? "profile/default brain"
                         : FormatSpeciesBrain(seed.BrainOverrideKind);
-                return $"{index + 1}. {state}: {seed.Count} x {System.IO.Path.GetFileName(seed.ProfilePath)} in {seed.SpawnRegion} ({energy}, {brain})";
+                var name = string.IsNullOrWhiteSpace(seed.Label)
+                    ? System.IO.Path.GetFileName(seed.ProfilePath)
+                    : seed.Label;
+                return $"{index + 1}. {state}: {seed.Count} x {name} in {seed.SpawnRegion} ({energy}, {brain})";
             }));
     }
 

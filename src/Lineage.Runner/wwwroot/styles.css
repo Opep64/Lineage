@@ -761,12 +761,13 @@ button.scenario-tab.is-active {
 }
 
 .species-roster-select,
-.species-roster-number {
+.species-roster-number,
+.species-roster-text {
   width: 100%;
   min-width: 96px;
 }
 
-.species-roster-table td:nth-child(2) {
+.species-roster-table td:nth-child(3) {
   min-width: 220px;
 }
 

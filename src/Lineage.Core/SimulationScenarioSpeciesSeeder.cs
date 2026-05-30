@@ -24,7 +24,7 @@ public static class SimulationScenarioSpeciesSeeder
             var profilePath = ResolveProfilePath(seed.ProfilePath, scenarioPath, workspaceRoot);
             var profile = SpeciesProfileJson.Load(profilePath);
             var brainProfile = LoadBrainProfile(seed, profile, profilePath, scenarioPath, workspaceRoot);
-            results.Add(SpeciesProfileInjector.Inject(
+            var result = SpeciesProfileInjector.Inject(
                 state,
                 profile,
                 new SpeciesInjectionOptions(
@@ -35,7 +35,10 @@ public static class SimulationScenarioSpeciesSeeder
                     brainProfile,
                     scenario.BrainArchitectureKind,
                     scenario.BrainHiddenNodeCount,
-                    MutationProfile.FromScenario(scenario))));
+                    MutationProfile.FromScenario(scenario)));
+            results.Add(string.IsNullOrWhiteSpace(seed.Label)
+                ? result
+                : result with { SpeciesName = seed.Label });
         }
 
         return results;

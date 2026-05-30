@@ -125,6 +125,8 @@ public static class SpeciesProfileInjector
         var bottom = state.Bounds.Height;
         var thirdWidth = state.Bounds.Width / 3f;
         var thirdHeight = state.Bounds.Height / 3f;
+        var halfWidth = state.Bounds.Width * 0.5f;
+        var halfHeight = state.Bounds.Height * 0.5f;
 
         switch (spawnRegion)
         {
@@ -143,6 +145,22 @@ public static class SpeciesProfileInjector
                 break;
             case InitialCreatureSpawnRegion.BottomThird:
                 top = thirdHeight * 2f;
+                break;
+            case InitialCreatureSpawnRegion.UpperLeftQuadrant:
+                right = halfWidth;
+                bottom = halfHeight;
+                break;
+            case InitialCreatureSpawnRegion.UpperRightQuadrant:
+                left = halfWidth;
+                bottom = halfHeight;
+                break;
+            case InitialCreatureSpawnRegion.LowerLeftQuadrant:
+                right = halfWidth;
+                top = halfHeight;
+                break;
+            case InitialCreatureSpawnRegion.LowerRightQuadrant:
+                left = halfWidth;
+                top = halfHeight;
                 break;
         }
 

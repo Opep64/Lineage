@@ -10,5 +10,9 @@ public enum InitialCreatureSpawnRegion
     MiddleThird,
     RightThird,
     TopThird,
-    BottomThird
+    BottomThird,
+    UpperLeftQuadrant,
+    UpperRightQuadrant,
+    LowerLeftQuadrant,
+    LowerRightQuadrant
 }

@@ -321,6 +321,7 @@ public sealed record RunScenarioSummary(
     IReadOnlyList<RunScenarioSpeciesSeedSummary> SpeciesSeeds);
 
 public sealed record RunScenarioSpeciesSeedSummary(
+    string? Label,
     string ProfilePath,
     string ProfileName,
     int Count,

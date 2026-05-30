@@ -433,6 +433,7 @@ function renderSpeciesRoster() {
       <thead>
         <tr>
           <th>Profile</th>
+          <th>Label</th>
           <th>Brain for starters</th>
           <th>Count</th>
           <th>Region</th>
@@ -459,6 +460,9 @@ function renderSpeciesRosterRow(seed, index) {
       <td>
         <strong>${escapeHtml(profile?.name || seed?.profilePath || "Missing species profile")}</strong>
         <span>${escapeHtml(seed?.profilePath || "")}</span>
+      </td>
+      <td>
+        <input class="species-roster-text" type="text" placeholder="optional" value="${escapeHtml(seed?.label || "")}" data-species-roster-field="label" data-index="${index}">
       </td>
       <td>
         <select class="species-roster-select" data-species-roster-field="brain" data-index="${index}">
@@ -496,7 +500,11 @@ function spawnRegionOptionsHtml(selectedValue = "uniform") {
     ["middleThird", "Middle third"],
     ["rightThird", "Right third"],
     ["topThird", "Top third"],
-    ["bottomThird", "Bottom third"]
+    ["bottomThird", "Bottom third"],
+    ["upperLeftQuadrant", "Upper-left quadrant"],
+    ["upperRightQuadrant", "Upper-right quadrant"],
+    ["lowerLeftQuadrant", "Lower-left quadrant"],
+    ["lowerRightQuadrant", "Lower-right quadrant"]
   ];
   return options.map(([value, label]) =>
     `<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(label)}</option>`
@@ -633,6 +641,9 @@ function updateSpeciesRosterField(control) {
     }
 
     next.energyOverride = energyOverride;
+  } else if (field === "label") {
+    const label = control.value.trim();
+    next.label = label === "" ? null : label;
   } else if (field === "brain") {
     const brainChoice = parseSpeciesBrainChoice(control.value);
     const selectedBrainProfile = brainChoice.brainProfilePath
@@ -3220,7 +3231,7 @@ function renderRunScenarioRoster(summary) {
           <tbody>
             ${seeds.map((seed) => `
               <tr>
-                <td>${escapeHtml(seed.profileName || seed.profilePath || "species")}<div class="run-sub">${escapeHtml(seed.profilePath || "")}</div></td>
+                <td>${escapeHtml(seed.label || seed.profileName || seed.profilePath || "species")}<div class="run-sub">${escapeHtml(seed.profilePath || "")}</div></td>
                 <td>${escapeHtml(seed.brain || "profile brain")}${seed.brainProfilePath ? `<div class="run-sub">${escapeHtml(seed.brainProfilePath)}</div>` : ""}</td>
                 <td>${formatNumber(seed.count || 0)}</td>
                 <td>${escapeHtml(formatEnumLabel(seed.spawnRegion || "uniform"))}</td>
@@ -4062,7 +4073,7 @@ function formatScenarioRosterBrief(summary) {
 
   const total = seeds.reduce((sum, seed) => sum + Number(seed.count || 0), 0);
   return seeds.length === 1
-    ? `${formatNumber(total)} x ${seeds[0].profileName || seeds[0].profilePath || "species"} using ${seeds[0].brain || "profile brain"}`
+    ? `${formatNumber(total)} x ${seeds[0].label || seeds[0].profileName || seeds[0].profilePath || "species"} using ${seeds[0].brain || "profile brain"}`
     : `${formatNumber(total)} creatures across ${formatNumber(seeds.length)} entries`;
 }
 

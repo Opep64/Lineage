@@ -8560,7 +8560,7 @@ internal static class RunReportWriter
         foreach (var seed in seeds)
         {
             writer.WriteLine("<tr>");
-            writer.WriteLine($"<td>{Html(FormatSpeciesProfileName(seed.ProfilePath, scenarioPath))}<br><small>{Html(seed.ProfilePath)}</small></td>");
+            writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedName(seed, scenarioPath))}<br><small>{Html(seed.ProfilePath)}</small></td>");
             writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedBrain(seed, scenarioPath))}</td>");
             writer.WriteLine($"<td>{Html(seed.Count.ToString(CultureInfo.InvariantCulture))}</td>");
             writer.WriteLine($"<td>{Html(seed.SpawnRegion.ToString())}</td>");
@@ -8584,7 +8584,7 @@ internal static class RunReportWriter
         if (seeds.Length == 1)
         {
             var seed = seeds[0];
-            return $"{seed.Count} x {FormatSpeciesProfileName(seed.ProfilePath, scenarioPath)} using {FormatScenarioSpeciesSeedBrain(seed, scenarioPath)}";
+            return $"{seed.Count} x {FormatScenarioSpeciesSeedName(seed, scenarioPath)} using {FormatScenarioSpeciesSeedBrain(seed, scenarioPath)}";
         }
 
         var total = seeds.Sum(seed => seed.Count);
@@ -8604,6 +8604,13 @@ internal static class RunReportWriter
         {
             return Path.GetFileName(profilePath);
         }
+    }
+
+    private static string FormatScenarioSpeciesSeedName(SpeciesScenarioSeed seed, string? scenarioPath)
+    {
+        return string.IsNullOrWhiteSpace(seed.Label)
+            ? FormatSpeciesProfileName(seed.ProfilePath, scenarioPath)
+            : seed.Label;
     }
 
     private static string FormatScenarioSpeciesSeedBrain(SpeciesScenarioSeed seed, string? scenarioPath)

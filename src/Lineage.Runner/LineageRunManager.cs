@@ -3249,6 +3249,7 @@ public sealed partial class LineageRunManager
             }
 
             var profilePath = GetString(speciesSeed, "profilePath") ?? string.Empty;
+            var label = GetString(speciesSeed, "label");
             var count = Math.Max(0, GetInt32(speciesSeed, "count") ?? 0);
             var spawnRegion = GetString(speciesSeed, "spawnRegion") ?? "uniform";
             var energyOverride = GetDouble(speciesSeed, "energyOverride");
@@ -3263,6 +3264,7 @@ public sealed partial class LineageRunManager
             }
 
             summaries.Add(new RunScenarioSpeciesSeedSummary(
+                Label: label,
                 ProfilePath: profilePath,
                 ProfileName: profileName ?? string.Empty,
                 Count: count,
