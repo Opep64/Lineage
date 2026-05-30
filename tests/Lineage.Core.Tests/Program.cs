@@ -197,6 +197,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Brain profile JSON round trips neural controllers", BrainProfileJsonRoundTripsNeuralControllers),
+    ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
     ("Species profile injection can override brain kind", SpeciesProfileInjectionCanOverrideBrainKind),
@@ -8796,6 +8797,41 @@ static void BrainProfileJsonRoundTripsNeuralControllers()
     var sourceBrain = simulation.State.GetBrain(creature.BrainId);
     var loadedBrain = roundTripped.CreateBrain();
     AssertBrainsClose(sourceBrain, loadedBrain, "Brain profile weights");
+}
+
+static void BrainProfileCompatibilityReportsSchemaStatus()
+{
+    var brain = BrainFactory.CreateStarter(
+        BrainArchitectureKind.HybridNeural,
+        InitialBrainKind.SeedForager,
+        NeuralBrainSchema.DefaultHiddenNodeCount);
+    var profile = new BrainProfile
+    {
+        Name = "Compatibility probe",
+        Weights = brain.Weights.ToArray()
+    };
+
+    var current = BrainProfileCompatibility.Assess(profile);
+    AssertTrue(current.IsCompatible, "Current brain profile should be compatible");
+    AssertTrue(!current.RequiresNormalization, "Current brain profile should not need normalization");
+    AssertEqual(0, current.Warnings.Count, "Current brain profile warning count");
+
+    var staleCounts = BrainProfileCompatibility.Assess(profile with
+    {
+        InputCount = NeuralBrainSchema.InputCount - 1
+    });
+    AssertTrue(staleCounts.IsCompatible, "Stale schema counts should remain loadable");
+    AssertTrue(staleCounts.RequiresNormalization, "Stale schema counts should be reported as normalized");
+    AssertTrue(staleCounts.Warnings.Count > 0, "Stale schema counts should produce a warning");
+
+    var futureSchema = BrainProfileCompatibility.Assess(profile with
+    {
+        InputSchemaVersion = NeuralBrainSchema.InputSchemaVersion + 1
+    });
+    AssertTrue(!futureSchema.IsCompatible, "Future brain input schema should be incompatible");
+    AssertTrue(
+        futureSchema.Status.Contains("newer than supported", StringComparison.OrdinalIgnoreCase),
+        "Future brain schema warning should explain the version mismatch");
 }
 
 static void SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains()

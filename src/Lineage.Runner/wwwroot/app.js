@@ -147,6 +147,7 @@ async function loadBrainCatalog(selectedPath = brainCatalogSelect?.value || "") 
   renderBrainCatalogOptions(selectedPath);
   renderBrainCatalogDetails();
   renderSpeciesBrainProfileOptions(speciesSeedBrainProfileSelect?.value || "");
+  renderSpeciesCatalogDetails();
 }
 
 function renderBrainCatalogOptions(selectedPath = "") {
@@ -163,10 +164,11 @@ function renderBrainCatalogOptions(selectedPath = "") {
   for (const brain of brainCatalog) {
     const option = document.createElement("option");
     option.value = brain.path;
-    option.textContent = `${brain.name} (${brain.path})`;
+    option.textContent = `${brain.name} (${brain.path})${brain.isCompatible === false ? " [incompatible]" : ""}`;
     option.title = [
       `${brain.brainArchitectureKind}, hidden ${formatNumber(brain.hiddenNodeCount)}`,
       `${formatNumber(brain.weightCount)} weights`,
+      brain.compatibilityStatus || null,
       brain.sourceScenarioName ? `source ${brain.sourceScenarioName}` : null
     ].filter(Boolean).join(" | ");
     brainCatalogSelect.append(option);
@@ -192,18 +194,48 @@ function renderSpeciesBrainProfileOptions(selectedPath = "") {
   for (const brain of brainCatalog) {
     const option = document.createElement("option");
     option.value = brain.path;
-    option.textContent = `${brain.name} (${brain.brainArchitectureKind})`;
-    option.title = `${brain.path} | hidden ${formatNumber(brain.hiddenNodeCount)} | ${formatNumber(brain.weightCount)} weights`;
+    option.textContent = `${brain.name} (${brain.brainArchitectureKind})${brain.isCompatible === false ? " [incompatible]" : ""}`;
+    option.disabled = brain.isCompatible === false;
+    option.title = `${brain.path} | hidden ${formatNumber(brain.hiddenNodeCount)} | ${formatNumber(brain.weightCount)} weights | ${brainCompatibilityStatus(brain)}`;
     speciesSeedBrainProfileSelect.append(option);
   }
 
-  speciesSeedBrainProfileSelect.value = [...speciesSeedBrainProfileSelect.options].some((option) => option.value === selectedPath)
-    ? selectedPath
-    : "";
+  const selectedOption = [...speciesSeedBrainProfileSelect.options]
+    .find((option) => option.value === selectedPath && !option.disabled);
+  speciesSeedBrainProfileSelect.value = selectedOption ? selectedPath : "";
 }
 
 function selectedBrainCatalogEntry() {
   return brainCatalog.find((candidate) => candidate.path === brainCatalogSelect?.value) ?? null;
+}
+
+function findBrainCatalogEntryByPath(path) {
+  return brainCatalog.find((candidate) => candidate.path === path) ?? null;
+}
+
+function brainCompatibilityStatus(brain) {
+  if (!brain) {
+    return "No catalog brain profile found.";
+  }
+
+  return brain.compatibilityStatus || (brain.isCompatible === false
+    ? "Brain profile is not compatible with the current runtime."
+    : "Compatible with the current sense/action schema.");
+}
+
+function renderBrainCompatibilityWarnings(brain) {
+  const warnings = Array.isArray(brain?.compatibilityWarnings)
+    ? brain.compatibilityWarnings.filter(Boolean)
+    : [];
+  if (warnings.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="map-artifact-compatibility ${brain.isCompatible === false ? "map-artifact-warning" : "map-artifact-ok"}">
+      <ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>
+    </div>
+  `;
 }
 
 function renderBrainCatalogDetails() {
@@ -225,9 +257,11 @@ function renderBrainCatalogDetails() {
       <div><span>Architecture</span><strong>${escapeHtml(brain.brainArchitectureKind)}, hidden ${formatNumber(brain.hiddenNodeCount)}</strong></div>
       <div><span>Weights</span><strong>${formatNumber(brain.weightCount)}</strong></div>
       <div><span>Schema</span><strong>input v${formatNumber(brain.inputSchemaVersion)} (${formatNumber(brain.inputCount)}), output v${formatNumber(brain.outputSchemaVersion)} (${formatNumber(brain.outputCount)})</strong></div>
+      <div><span>Compatibility</span><strong class="${brain.isCompatible === false ? "map-artifact-warning" : "map-artifact-ok"}">${escapeHtml(brainCompatibilityStatus(brain))}</strong></div>
       <div><span>Source</span><strong>${escapeHtml(formatBrainSource(brain))}</strong></div>
     </div>
     ${brain.notes ? `<div class="species-notes">${escapeHtml(brain.notes)}</div>` : ""}
+    ${renderBrainCompatibilityWarnings(brain)}
   `;
 }
 
@@ -309,11 +343,22 @@ function renderSpeciesCatalogDetails() {
     return;
   }
 
+  const defaultBrain = species.defaultBrainPath
+    ? findBrainCatalogEntryByPath(species.defaultBrainPath)
+    : null;
+  const defaultBrainMissing = Boolean(species.defaultBrainPath && !defaultBrain);
+  const defaultBrainStatus = species.defaultBrainPath
+    ? defaultBrain
+      ? brainCompatibilityStatus(defaultBrain)
+      : "Default brain path is not present in the catalog."
+    : "Uses embedded profile brain.";
+
   speciesCatalogDetails.innerHTML = `
     <div class="species-summary-grid">
       <div><span>Name</span><strong>${escapeHtml(species.name)}</strong></div>
       <div><span>Path</span><strong>${escapeHtml(species.path)}</strong></div>
       <div><span>Default brain</span><strong>${escapeHtml(species.defaultBrainPath || "embedded profile brain")}</strong></div>
+      <div><span>Default brain status</span><strong class="${defaultBrain?.isCompatible === false || defaultBrainMissing ? "map-artifact-warning" : "map-artifact-ok"}">${escapeHtml(defaultBrainStatus)}</strong></div>
       <div><span>Brain</span><strong>${escapeHtml(species.brainArchitectureKind)}, hidden ${formatNumber(species.brainHiddenNodeCount)}, ${formatNumber(species.brainWeightCount)} weights</strong></div>
       <div><span>Body</span><strong>radius ${formatDecimal(species.bodyRadius)}, speed ${formatDecimal(species.maxSpeed)}, sense ${formatDecimal(species.senseRadius)}</strong></div>
       <div><span>Vision</span><strong>${formatDecimal(species.visionAngleDegrees)} deg</strong></div>
@@ -322,6 +367,7 @@ function renderSpeciesCatalogDetails() {
       <div><span>Source</span><strong>${escapeHtml(formatSpeciesSource(species))}</strong></div>
     </div>
     ${species.notes ? `<div class="species-notes">${escapeHtml(species.notes)}</div>` : ""}
+    ${defaultBrain ? renderBrainCompatibilityWarnings(defaultBrain) : ""}
   `;
 }
 
@@ -2436,6 +2482,12 @@ function addSelectedSpeciesToScenario() {
     ? cloneJson(scenarioEditor.scenario.speciesSeeds)
     : [];
   const brainProfilePath = selectedSpeciesBrainProfilePath();
+  const selectedBrainProfile = brainProfilePath ? findBrainCatalogEntryByPath(brainProfilePath) : null;
+  if (brainProfilePath && selectedBrainProfile?.isCompatible === false) {
+    formMessage.textContent = `${selectedBrainProfile.name} is not compatible with the current runtime: ${brainCompatibilityStatus(selectedBrainProfile)}`;
+    return;
+  }
+
   const brainOverrideKind = brainProfilePath ? null : selectedSpeciesBrainOverrideKind();
   roster.push({
     profilePath: species.path,

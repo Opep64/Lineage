@@ -2330,11 +2330,15 @@ public sealed partial class LineageRunManager
     {
         try
         {
-            return ToBrainCatalogEntry(path, BrainProfileJson.Load(path));
+            var rawProfile = BrainProfileJson.LoadRaw(path);
+            var compatibility = BrainProfileCompatibility.Assess(rawProfile);
+            return compatibility.IsCompatible
+                ? ToBrainCatalogEntry(path, rawProfile.Validated(), compatibility)
+                : ToIncompatibleBrainCatalogEntry(path, rawProfile, compatibility);
         }
-        catch
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or JsonException or IOException)
         {
-            return null;
+            return ToUnreadableBrainCatalogEntry(path, ex.Message);
         }
     }
 
@@ -2369,9 +2373,13 @@ public sealed partial class LineageRunManager
             ExportedAtUtc: validated.Source.ExportedAtUtc);
     }
 
-    private BrainCatalogEntry ToBrainCatalogEntry(string path, BrainProfile profile)
+    private BrainCatalogEntry ToBrainCatalogEntry(
+        string path,
+        BrainProfile profile,
+        BrainProfileCompatibility? compatibility = null)
     {
         var validated = profile.Validated();
+        compatibility ??= BrainProfileCompatibility.Assess(profile);
         return new BrainCatalogEntry(
             Name: validated.Name,
             Path: NormalizeArtifactRelativePath(path),
@@ -2390,7 +2398,72 @@ public sealed partial class LineageRunManager
             SourceCreatureId: validated.Source.CreatureId,
             SourceFounderId: validated.Source.FounderId,
             SourceGeneration: validated.Source.Generation,
-            ExportedAtUtc: validated.Source.ExportedAtUtc);
+            ExportedAtUtc: validated.Source.ExportedAtUtc,
+            IsCompatible: compatibility.IsCompatible,
+            RequiresNormalization: compatibility.RequiresNormalization,
+            CompatibilityStatus: compatibility.Status,
+            CompatibilityWarnings: compatibility.Warnings);
+    }
+
+    private BrainCatalogEntry ToIncompatibleBrainCatalogEntry(
+        string path,
+        BrainProfile profile,
+        BrainProfileCompatibility compatibility)
+    {
+        var name = string.IsNullOrWhiteSpace(profile.Name)
+            ? Path.GetFileNameWithoutExtension(path)
+            : profile.Name.Trim();
+        return new BrainCatalogEntry(
+            Name: name,
+            Path: NormalizeArtifactRelativePath(path),
+            CanDelete: IsPathUnderDirectory(path, UserBrainCatalogRoot()),
+            Notes: profile.Notes?.Trim() ?? string.Empty,
+            BrainArchitectureKind: profile.BrainArchitectureKind.ToString(),
+            InputSchemaVersion: profile.InputSchemaVersion,
+            OutputSchemaVersion: profile.OutputSchemaVersion,
+            InputCount: profile.InputCount,
+            OutputCount: profile.OutputCount,
+            HiddenNodeCount: profile.HiddenNodeCount,
+            WeightCount: profile.Weights.Length,
+            SourceScenarioName: profile.Source.ScenarioName,
+            SourceSeed: profile.Source.Seed,
+            SourceTick: profile.Source.Tick,
+            SourceCreatureId: profile.Source.CreatureId,
+            SourceFounderId: profile.Source.FounderId,
+            SourceGeneration: profile.Source.Generation,
+            ExportedAtUtc: profile.Source.ExportedAtUtc,
+            IsCompatible: false,
+            RequiresNormalization: false,
+            CompatibilityStatus: compatibility.Status,
+            CompatibilityWarnings: compatibility.Warnings);
+    }
+
+    private BrainCatalogEntry ToUnreadableBrainCatalogEntry(string path, string error)
+    {
+        var compatibility = BrainProfileCompatibility.Incompatible($"Cannot load brain profile: {error}");
+        return new BrainCatalogEntry(
+            Name: Path.GetFileNameWithoutExtension(path),
+            Path: NormalizeArtifactRelativePath(path),
+            CanDelete: IsPathUnderDirectory(path, UserBrainCatalogRoot()),
+            Notes: string.Empty,
+            BrainArchitectureKind: "unknown",
+            InputSchemaVersion: 0,
+            OutputSchemaVersion: 0,
+            InputCount: 0,
+            OutputCount: 0,
+            HiddenNodeCount: 0,
+            WeightCount: 0,
+            SourceScenarioName: string.Empty,
+            SourceSeed: 0,
+            SourceTick: 0,
+            SourceCreatureId: 0,
+            SourceFounderId: 0,
+            SourceGeneration: 0,
+            ExportedAtUtc: DateTimeOffset.MinValue,
+            IsCompatible: false,
+            RequiresNormalization: false,
+            CompatibilityStatus: compatibility.Status,
+            CompatibilityWarnings: compatibility.Warnings);
     }
 
     private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)

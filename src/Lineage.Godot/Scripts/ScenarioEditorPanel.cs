@@ -52,6 +52,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private readonly List<SpeciesScenarioSeed> _speciesSeedEntries = [];
     private readonly List<ScenarioRecipeOption> _scenarioRecipes = [];
     private readonly List<BrainCatalogOption> _brainCatalogOptions = [];
+    private int _incompatibleBrainCatalogProfileCount;
 
     private MarginContainer _expandedRoot = null!;
     private MarginContainer _collapsedRoot = null!;
@@ -524,6 +525,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private void LoadBrainCatalog(string brainCatalogDirectory)
     {
         _brainCatalogOptions.Clear();
+        _incompatibleBrainCatalogProfileCount = 0;
         if (System.IO.Directory.Exists(brainCatalogDirectory))
         {
             var workspaceRoot = System.IO.Directory.GetParent(System.IO.Path.GetFullPath(brainCatalogDirectory))?.FullName
@@ -536,6 +538,10 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 if (TryReadBrainCatalogOption(path, workspaceRoot, out var option) && option is not null)
                 {
                     _brainCatalogOptions.Add(option);
+                    if (!option.IsCompatible)
+                    {
+                        _incompatibleBrainCatalogProfileCount++;
+                    }
                 }
             }
         }
@@ -549,19 +555,36 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         option = default;
         try
         {
-            var profile = BrainProfileJson.Load(path);
+            var profile = BrainProfileJson.LoadRaw(path);
+            var compatibility = BrainProfileCompatibility.Assess(profile);
+            var catalogProfile = compatibility.IsCompatible
+                ? profile.Validated()
+                : profile;
             var relativePath = System.IO.Path.GetRelativePath(workspaceRoot, path).Replace('\\', '/');
             option = new BrainCatalogOption(
-                profile.Name,
+                string.IsNullOrWhiteSpace(catalogProfile.Name)
+                    ? System.IO.Path.GetFileNameWithoutExtension(path)
+                    : catalogProfile.Name.Trim(),
                 relativePath,
-                profile.BrainArchitectureKind,
-                profile.HiddenNodeCount,
-                profile.Weights.Length);
+                catalogProfile.BrainArchitectureKind.ToString(),
+                catalogProfile.HiddenNodeCount,
+                catalogProfile.Weights.Length,
+                compatibility.IsCompatible,
+                compatibility.Status);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            var relativePath = System.IO.Path.GetRelativePath(workspaceRoot, path).Replace('\\', '/');
+            option = new BrainCatalogOption(
+                System.IO.Path.GetFileNameWithoutExtension(path),
+                relativePath,
+                "unknown",
+                0,
+                0,
+                false,
+                $"Cannot load brain profile: {ex.Message}");
+            return true;
         }
     }
 
@@ -577,7 +600,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         foreach (var brain in _brainCatalogOptions)
         {
             _speciesBrainProfileInput.AddItem(
-                $"{brain.Name} ({brain.BrainArchitectureKind}, hidden {brain.HiddenNodeCount})");
+                $"{brain.Name} ({brain.BrainArchitectureKind}, hidden {brain.HiddenNodeCount}){(brain.IsCompatible ? string.Empty : " [incompatible]")}");
+            if (!brain.IsCompatible)
+            {
+                _speciesBrainProfileInput.SetItemDisabled(_speciesBrainProfileInput.ItemCount - 1, true);
+            }
         }
 
         _speciesBrainProfileInput.Selected = 0;
@@ -595,8 +622,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _brainCatalogSummaryLabel.Text = selected is null
             ? _brainCatalogOptions.Count == 0
                 ? "No brain catalog profiles loaded."
-                : $"{_brainCatalogOptions.Count} catalog brain{(_brainCatalogOptions.Count == 1 ? string.Empty : "s")} available. Leaving this unset uses the species default/profile brain unless a starter brain is selected."
-            : $"Catalog override: {selected.Path} | {selected.WeightCount} weights";
+                : $"{_brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount} compatible brain catalog profile{(_brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount == 1 ? string.Empty : "s")} available. {_incompatibleBrainCatalogProfileCount} incompatible profile{(_incompatibleBrainCatalogProfileCount == 1 ? string.Empty : "s")} shown but disabled."
+            : $"Catalog override: {selected.Path} | {selected.WeightCount} weights | {selected.CompatibilityStatus}";
     }
 
     private static bool TryReadScenarioRecipe(string path, out ScenarioRecipeOption? recipe)
@@ -1120,7 +1147,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         }
 
         LoadBrainCatalog(_brainCatalogDirectory);
-        SetStatus($"Loaded {_brainCatalogOptions.Count} brain catalog profile{(_brainCatalogOptions.Count == 1 ? string.Empty : "s")}.");
+        var compatibleCount = _brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount;
+        SetStatus($"Loaded {compatibleCount} compatible brain catalog profile{(compatibleCount == 1 ? string.Empty : "s")}.");
     }
 
     private InitialBrainKind? ReadSpeciesBrainOverrideKind()
@@ -1147,9 +1175,13 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         }
 
         var index = _speciesBrainProfileInput.Selected - 1;
-        return index >= 0 && index < _brainCatalogOptions.Count
-            ? _brainCatalogOptions[index]
-            : null;
+        if (index < 0 || index >= _brainCatalogOptions.Count)
+        {
+            return null;
+        }
+
+        var option = _brainCatalogOptions[index];
+        return option.IsCompatible ? option : null;
     }
 
     private string? SelectedSpeciesBrainProfilePath()
@@ -1531,9 +1563,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private sealed record BrainCatalogOption(
         string Name,
         string Path,
-        BrainArchitectureKind BrainArchitectureKind,
+        string BrainArchitectureKind,
         int HiddenNodeCount,
-        int WeightCount);
+        int WeightCount,
+        bool IsCompatible,
+        string CompatibilityStatus);
 }
 
 public readonly record struct CliRunRequest(

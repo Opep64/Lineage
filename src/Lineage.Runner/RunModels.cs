@@ -187,7 +187,11 @@ public sealed record BrainCatalogEntry(
     int SourceCreatureId,
     int SourceFounderId,
     int SourceGeneration,
-    DateTimeOffset ExportedAtUtc);
+    DateTimeOffset ExportedAtUtc,
+    bool IsCompatible,
+    bool RequiresNormalization,
+    string CompatibilityStatus,
+    IReadOnlyList<string> CompatibilityWarnings);
 
 public sealed record SpeciesCatalogExportRequest(
     string Name,

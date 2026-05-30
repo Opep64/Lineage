@@ -26,9 +26,20 @@ public static class BrainProfileJson
         return profile.Validated();
     }
 
+    public static BrainProfile FromJsonRaw(string json)
+    {
+        return JsonSerializer.Deserialize<BrainProfile>(json, JsonOptions)
+            ?? throw new InvalidOperationException("Brain profile JSON did not contain a profile object.");
+    }
+
     public static BrainProfile Load(string path)
     {
         return FromJson(File.ReadAllText(path));
+    }
+
+    public static BrainProfile LoadRaw(string path)
+    {
+        return FromJsonRaw(File.ReadAllText(path));
     }
 
     public static void Save(string path, BrainProfile profile)
