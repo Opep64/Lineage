@@ -115,6 +115,8 @@ static void PrintHelp()
           --export-species-cluster <id|name> Export the closest living representative of this species cluster.
           --export-species-name <text> Name for the exported species profile.
           --export-species-notes <text> Notes for the exported species profile.
+          --export-species-paired-brain Save the exported representative's brain and make it the species default.
+          --export-species-paired-brain-path <path> Override paired brain output path.
           --export-brain <path>      Export a brain profile, usually brains/name.brain.json.
           --export-brain-creature <id> Export this living creature brain instead of the dominant lineage.
           --export-brain-name <text> Name for the exported brain profile.
@@ -145,6 +147,11 @@ static void PrintHelp()
 
 static RunResult RunSingle(RunOptions options)
 {
+    if (options.ExportSpeciesPairedBrainEnabled && options.ExportSpeciesPath is null)
+    {
+        throw new ArgumentException("--export-species-paired-brain requires --export-species.");
+    }
+
     var (scenario, simulation) = CreateSimulationRun(options);
     if (options.SaveScenarioPath is not null)
     {
@@ -174,9 +181,22 @@ static RunResult RunSingle(RunOptions options)
     runFiles.WriteStatus("completed", simulation, runResult.CompletedSteps, checkpoints, runResult.StopReason);
 
     SpeciesProfile? exportedSpecies = null;
+    BrainProfile? exportedSpeciesPairedBrain = null;
+    string? exportedSpeciesPairedBrainPath = null;
     if (options.ExportSpeciesPath is not null)
     {
         exportedSpecies = ExportSpeciesProfile(options, scenario, simulation.State);
+        if (options.ExportSpeciesPairedBrainEnabled)
+        {
+            exportedSpeciesPairedBrain = ExportPairedSpeciesBrainProfile(exportedSpecies, scenario, simulation.State);
+            exportedSpeciesPairedBrainPath = ResolvePairedSpeciesBrainPath(options, exportedSpecies);
+            BrainProfileJson.Save(exportedSpeciesPairedBrainPath, exportedSpeciesPairedBrain);
+            exportedSpecies = exportedSpecies with
+            {
+                DefaultBrainPath = NormalizeCatalogReference(exportedSpeciesPairedBrainPath)
+            };
+        }
+
         SpeciesProfileJson.Save(options.ExportSpeciesPath, exportedSpecies);
     }
 
@@ -194,7 +214,9 @@ static RunResult RunSingle(RunOptions options)
         checkpoints,
         speciesInjections,
         options.ExportSpeciesPath,
-        exportedSpecies);
+        exportedSpecies,
+        exportedSpeciesPairedBrainPath,
+        exportedSpeciesPairedBrain);
 }
 
 static void ExportBiomeMap(RunOptions options)
@@ -376,6 +398,84 @@ static BrainProfile ExportBrainProfile(RunOptions options, SimulationScenario sc
         state,
         options.ExportBrainName,
         options.ExportBrainNotes);
+}
+
+static BrainProfile ExportPairedSpeciesBrainProfile(
+    SpeciesProfile species,
+    SimulationScenario scenario,
+    WorldState state)
+{
+    var name = $"{species.Name} Brain";
+    var notes = string.IsNullOrWhiteSpace(species.Notes)
+        ? $"Paired controller exported with species profile {species.Name}."
+        : $"Paired controller exported with species profile {species.Name}. {species.Notes}";
+    return BrainProfileExporter.ExportCreatureBrain(
+        scenario,
+        state,
+        new EntityId(species.Source.CreatureId),
+        name,
+        notes);
+}
+
+static string ResolvePairedSpeciesBrainPath(RunOptions options, SpeciesProfile species)
+{
+    if (!string.IsNullOrWhiteSpace(options.ExportSpeciesPairedBrainPath))
+    {
+        return BrainProfileJson.WithFileExtension(options.ExportSpeciesPairedBrainPath);
+    }
+
+    var path = Path.Combine(
+        "brains",
+        "user",
+        $"{SlugifyProfileName($"{species.Name} Brain")}{BrainProfileJson.FileExtension}");
+    return GetUniquePath(path, BrainProfileJson.FileExtension);
+}
+
+static string NormalizeCatalogReference(string path)
+{
+    var fullPath = Path.GetFullPath(path);
+    var root = Path.GetFullPath(Directory.GetCurrentDirectory());
+    var relativePath = Path.GetRelativePath(root, fullPath);
+    return !relativePath.StartsWith("..", StringComparison.Ordinal)
+        && !Path.IsPathFullyQualified(relativePath)
+            ? relativePath.Replace('\\', '/')
+            : fullPath;
+}
+
+static string GetUniquePath(string preferredPath, string? fullExtension = null)
+{
+    if (!File.Exists(preferredPath))
+    {
+        return preferredPath;
+    }
+
+    var directory = Path.GetDirectoryName(preferredPath) ?? ".";
+    var rawFileName = Path.GetFileName(preferredPath);
+    var fileName = !string.IsNullOrWhiteSpace(fullExtension)
+        && rawFileName.EndsWith(fullExtension, StringComparison.OrdinalIgnoreCase)
+            ? rawFileName[..^fullExtension.Length]
+            : Path.GetFileNameWithoutExtension(preferredPath);
+    var extension = !string.IsNullOrWhiteSpace(fullExtension)
+        && rawFileName.EndsWith(fullExtension, StringComparison.OrdinalIgnoreCase)
+            ? fullExtension
+            : Path.GetExtension(preferredPath);
+    for (var index = 2; index < 1000; index++)
+    {
+        var candidate = Path.Combine(directory, $"{fileName}_{index}{extension}");
+        if (!File.Exists(candidate))
+        {
+            return candidate;
+        }
+    }
+
+    throw new IOException("Could not choose a unique paired brain profile path.");
+}
+
+static string SlugifyProfileName(string value)
+{
+    var chars = value.Select(character => char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : '_').ToArray();
+    var slug = new string(chars).Trim('_');
+    return string.IsNullOrWhiteSpace(slug) ? "profile" : slug;
 }
 
 static SimulationRunResult RunSimulation(
@@ -781,6 +881,13 @@ static void PrintSummary(RunResult result)
             $"{result.ExportedSpecies.Source.CreatureId} to {Path.GetFullPath(result.ExportedSpeciesPath)}");
     }
 
+    if (result.ExportedSpeciesPairedBrainPath is not null && result.ExportedSpeciesPairedBrain is not null)
+    {
+        Console.WriteLine(
+            $"Exported paired brain: {result.ExportedSpeciesPairedBrain.Name} from creature " +
+            $"{result.ExportedSpeciesPairedBrain.Source.CreatureId} to {Path.GetFullPath(result.ExportedSpeciesPairedBrainPath)}");
+    }
+
     if (outputPaths.CheckpointDirectory is not null)
     {
         Console.WriteLine($"Checkpoint directory: {Path.GetFullPath(outputPaths.CheckpointDirectory)}");
@@ -1035,6 +1142,10 @@ internal sealed record RunOptions
 
     public string? ExportSpeciesNotes { get; init; }
 
+    public bool ExportSpeciesPairedBrain { get; init; }
+
+    public string? ExportSpeciesPairedBrainPath { get; init; }
+
     public string? ExportBrainPath { get; init; }
 
     public int? ExportBrainCreatureId { get; init; }
@@ -1090,6 +1201,9 @@ internal sealed record RunOptions
 
     public bool IsBiomeMapExport => ExportBiomeMapPath is not null;
 
+    public bool ExportSpeciesPairedBrainEnabled => ExportSpeciesPairedBrain
+        || ExportSpeciesPairedBrainPath is not null;
+
     public string? ScenarioDirectory => ScenarioPath is null
         ? null
         : Path.GetDirectoryName(Path.GetFullPath(ScenarioPath));
@@ -1118,6 +1232,7 @@ internal sealed record RunOptions
             StdoutLogPath = ExpandProcessIdToken(StdoutLogPath),
             StderrLogPath = ExpandProcessIdToken(StderrLogPath),
             ExportSpeciesPath = ExpandProcessIdToken(ExportSpeciesPath),
+            ExportSpeciesPairedBrainPath = ExpandProcessIdToken(ExportSpeciesPairedBrainPath),
             ExportBrainPath = ExpandProcessIdToken(ExportBrainPath),
             BatchReportPath = ExpandProcessIdToken(BatchReportPath),
             BatchOutputDirectory = ExpandProcessIdToken(BatchOutputDirectory) ?? BatchOutputDirectory,
@@ -1444,6 +1559,12 @@ internal sealed record RunOptions
                 case "--export-species-notes":
                     options = options with { ExportSpeciesNotes = ReadValue(args, ref i, arg) };
                     break;
+                case "--export-species-paired-brain":
+                    options = options with { ExportSpeciesPairedBrain = true };
+                    break;
+                case "--export-species-paired-brain-path":
+                    options = options with { ExportSpeciesPairedBrainPath = ReadValue(args, ref i, arg) };
+                    break;
                 case "--export-brain":
                     options = options with { ExportBrainPath = ReadValue(args, ref i, arg) };
                     break;
@@ -1738,7 +1859,9 @@ internal readonly record struct RunResult(
     IReadOnlyList<CheckpointArtifact> Checkpoints,
     IReadOnlyList<SpeciesInjectionResult> SpeciesInjections,
     string? ExportedSpeciesPath,
-    SpeciesProfile? ExportedSpecies);
+    SpeciesProfile? ExportedSpecies,
+    string? ExportedSpeciesPairedBrainPath,
+    BrainProfile? ExportedSpeciesPairedBrain);
 
 internal readonly record struct OutputPaths(
     string? StatsPath,
