@@ -90,9 +90,9 @@ public partial class Main : Node2D
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
     private readonly Color _memoryColor = new(0.55f, 0.8f, 1.0f, 0.78f);
     private readonly Color _grabLinkColor = new(1.0f, 0.48f, 0.08f, 0.82f);
-    private readonly Color _creatureScentRangeColor = new(0.86f, 0.54f, 1.0f, 0.20f);
-    private readonly Color _meatScentRangeColor = new(0.96f, 0.34f, 0.24f, 0.23f);
-    private readonly Color _soundSenseRangeColor = new(0.38f, 0.86f, 1.0f, 0.24f);
+    private readonly Color _creatureScentRangeColor = new(0.92f, 0.48f, 1.0f, 0.95f);
+    private readonly Color _meatScentRangeColor = new(1.0f, 0.42f, 0.20f, 0.96f);
+    private readonly Color _soundSenseRangeColor = new(0.20f, 0.92f, 1.0f, 0.98f);
     private readonly Color _visionSectorPlantColor = new(0.32f, 0.92f, 0.45f, 0.92f);
     private readonly Color _visionSectorMeatColor = new(0.94f, 0.28f, 0.22f, 0.9f);
     private readonly Color _visionSectorEggColor = new(0.94f, 0.86f, 0.42f, 0.9f);
@@ -2679,12 +2679,12 @@ public partial class Main : Node2D
         Vector2 screenPosition,
         float radius)
     {
-        DrawSelectedSenseRangeRings(creature, genome, screenPosition);
         DrawVisionCone(creature, genome, screenPosition);
         DrawVisionSectorDebug(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
         DrawSelectedMemoryVector(creature, screenPosition);
         DrawSelectedSoundOverlay(creature, genome, screenPosition);
+        DrawSelectedSenseRangeRings(creature, genome, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
         DrawSelectedGrabLinks(creature, screenPosition);
@@ -2697,17 +2697,17 @@ public partial class Main : Node2D
             screenPosition,
             senseRadius * CreatureSensingSystem.CreatureSimilarityScentRangeMultiplier,
             _creatureScentRangeColor,
-            0.9f);
+            3.0f);
         DrawSelectedRangeRing(
             screenPosition,
             senseRadius * _scenario.MeatScentRangeMultiplier,
             _meatScentRangeColor,
-            1.0f);
+            3.6f);
         DrawSelectedRangeRing(
             screenPosition,
             senseRadius * _scenario.SoundRangeMultiplier,
             _soundSenseRangeColor,
-            1.15f);
+            4.2f);
     }
 
     private void DrawSelectedRangeRing(Vector2 screenPosition, float worldRadius, Color color, float width)
@@ -2718,7 +2718,26 @@ public partial class Main : Node2D
             return;
         }
 
+        var shadowColor = new Color(0f, 0f, 0f, 0.70f);
+        DrawArc(screenPosition, radiusPixels, 0f, MathF.Tau, 128, shadowColor, width: width + 2.4f);
         DrawArc(screenPosition, radiusPixels, 0f, MathF.Tau, 128, color, width: width);
+
+        if (radiusPixels < 16f)
+        {
+            return;
+        }
+
+        const int tickCount = 12;
+        var tickLength = Math.Clamp(radiusPixels * 0.018f, 5f, 14f);
+        for (var i = 0; i < tickCount; i++)
+        {
+            var angle = MathF.Tau * i / tickCount;
+            var direction = ToGodot(SimVector2.FromAngle(angle));
+            var inner = screenPosition + direction * (radiusPixels - tickLength * 0.5f);
+            var outer = screenPosition + direction * (radiusPixels + tickLength * 0.5f);
+            DrawLine(inner, outer, shadowColor, width: width + 2.0f);
+            DrawLine(inner, outer, color, width: width);
+        }
     }
 
     private void DrawSelectedMemoryVector(CreatureState creature, Vector2 screenPosition)

@@ -1,6 +1,7 @@
 param(
     [string]$GodotExe = "",
     [switch]$NoBuild,
+    [switch]$BuildOnly,
     [switch]$Console,
     [switch]$Wait,
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -38,9 +39,23 @@ if (-not $NoBuild) {
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
+
+    # Godot editor runs load the temp/bin/Debug managed assembly even when the
+    # C# project has been built in Release. Mirror the Release output there so
+    # the double-click launcher uses the current optimized code path.
+    $releaseBin = Join-Path $projectDir ".godot\mono\temp\bin\Release"
+    $editorLoadBin = Join-Path $projectDir ".godot\mono\temp\bin\Debug"
+    if (Test-Path -LiteralPath $releaseBin) {
+        New-Item -ItemType Directory -Force -Path $editorLoadBin | Out-Null
+        Copy-Item -Path (Join-Path $releaseBin "*") -Destination $editorLoadBin -Recurse -Force
+    }
 }
 
-$arguments = @("--release", "--path", $projectDir)
+if ($BuildOnly) {
+    return
+}
+
+$arguments = @("--path", $projectDir)
 if ($GodotArgs) {
     $arguments += $GodotArgs
 }
