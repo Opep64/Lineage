@@ -194,10 +194,12 @@ public sealed record SpeciesCatalogExportRequest(
     string? Notes,
     int? CreatureId,
     int? FounderId,
-    string? ClusterKey);
+    string? ClusterKey,
+    bool ExportPairedBrain);
 
 public sealed record SpeciesCatalogExportResult(
-    SpeciesCatalogEntry Species);
+    SpeciesCatalogEntry Species,
+    BrainCatalogEntry? Brain = null);
 
 public sealed record BrainCatalogExportRequest(
     string Name,

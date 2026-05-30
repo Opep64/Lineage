@@ -2567,9 +2567,10 @@ async function saveSpeciesFromRun(id) {
     return;
   }
 
+  const exportPairedBrain = confirm("Also save this representative's brain as a paired catalog brain and make it the species default?");
   let payload;
   try {
-    payload = buildSpeciesExportPayload(trimmedName, notes, selector);
+    payload = buildSpeciesExportPayload(trimmedName, notes, selector, exportPairedBrain);
   } catch (error) {
     refreshStatus.textContent = error.message;
     return;
@@ -2590,7 +2591,13 @@ async function saveSpeciesFromRun(id) {
 
   const result = await response.json();
   await loadSpeciesCatalog(result.species.path);
-  refreshStatus.textContent = `Saved species profile ${result.species.name}.`;
+  if (result.brain) {
+    await loadBrainCatalog(result.brain.path);
+  }
+
+  refreshStatus.textContent = result.brain
+    ? `Saved species profile ${result.species.name} with paired brain ${result.brain.name}.`
+    : `Saved species profile ${result.species.name}.`;
   document.querySelector(".species-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -2649,8 +2656,8 @@ async function saveBrainFromRun(id) {
   document.querySelector(".brain-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function buildSpeciesExportPayload(name, notes, selectorText) {
-  const payload = { name, notes: notes.trim() };
+function buildSpeciesExportPayload(name, notes, selectorText, exportPairedBrain = false) {
+  const payload = { name, notes: notes.trim(), exportPairedBrain };
   const selector = selectorText.trim();
   if (!selector) {
     return payload;

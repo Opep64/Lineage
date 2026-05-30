@@ -611,10 +611,30 @@ public sealed partial class LineageRunManager
 
         var speciesRoot = UserSpeciesCatalogRoot();
         Directory.CreateDirectory(speciesRoot);
+        BrainCatalogEntry? brainEntry = null;
+        if (request.ExportPairedBrain)
+        {
+            var brainName = $"{profile.Name} Brain";
+            var brainNotes = $"Paired controller exported with species profile {profile.Name}.";
+            var brainProfile = BrainProfileExporter.ExportCreatureBrain(
+                restored.Scenario,
+                restored.Simulation.State,
+                new EntityId(profile.Source.CreatureId),
+                brainName,
+                brainNotes);
+            var brainRoot = UserBrainCatalogRoot();
+            Directory.CreateDirectory(brainRoot);
+            var brainPath = GetUniquePath(Path.Combine(brainRoot, $"{Slugify(brainName)}{BrainProfileJson.FileExtension}"));
+            EnsurePathInside(brainPath, brainRoot);
+            BrainProfileJson.Save(brainPath, brainProfile);
+            brainEntry = ToBrainCatalogEntry(brainPath, brainProfile);
+            profile = profile with { DefaultBrainPath = NormalizeArtifactRelativePath(brainPath) };
+        }
+
         var path = GetUniquePath(Path.Combine(speciesRoot, $"{Slugify(name)}{SpeciesProfileJson.FileExtension}"));
         EnsurePathInside(path, speciesRoot);
         SpeciesProfileJson.Save(path, profile);
-        return new SpeciesCatalogExportResult(ToSpeciesCatalogEntry(path, profile));
+        return new SpeciesCatalogExportResult(ToSpeciesCatalogEntry(path, profile), brainEntry);
     }
 
     public BrainCatalogExportResult? ExportRunBrainProfile(string id, BrainCatalogExportRequest request)
