@@ -7,7 +7,7 @@ These notes capture the current discussion about creature actions, senses, input
 
 ## Current Dense Adapter Outputs
 
-The current neural adapter exposes 8 outputs:
+The current neural adapter exposes 10 outputs:
 
 | Output | Role |
 | --- | --- |
@@ -17,10 +17,12 @@ The current neural adapter exposes 8 outputs:
 | `Reproduce` | Gate for laying an egg when egg reserve, maturity, cooldown, and scenario rules allow it. |
 | `Attack` | Gate for biting/damaging a contacted creature. |
 | `Grab` | Continuous hold strength for grabbing or keeping hold of a contacted creature. |
+| `SoundAmplitude` | Intentional communication sound loudness, clamped `0..1`. |
+| `SoundTone` | Intentional communication tone, clamped `-1..1`. |
 | `MemoryForward` | Legacy memory-vector write in the creature's forward direction. |
 | `MemoryRight` | Legacy memory-vector write in the creature's right direction. |
 
-The real physical actions are move, turn, eat, reproduce, attack, and grab. Memory writes are internal controller actions. Creatures do not currently carry resources, latch through a separate action, guard, choose mates, emit signals, rest intentionally, or choose a specific target directly.
+The real physical actions are move, turn, eat, reproduce, attack, grab, and intentional sound emission. Memory writes are internal controller actions. Creatures do not currently carry resources, latch through a separate action, guard, choose mates, rest intentionally, or choose a specific target directly.
 
 ## Future Output Discussion
 
@@ -98,9 +100,12 @@ This gives grabbed-from-behind creatures a non-bite escape path. A small parasit
 
 ### Communication And Display Outputs To Discuss
 
-Potential future outputs:
+Implemented first-pass output:
 
 - Emit sound.
+
+Potential future outputs:
+
 - Emit scent or one of several scent channels.
 - Posture/display signal for aggressive, friendly, fearful, mating, territorial, or defensive intent.
 
@@ -116,8 +121,8 @@ Open questions:
 
 Current working decision:
 
-- Add `Grab` as the next physical output candidate.
-- Add sound as the first communication vector.
+- `Grab` is implemented as the first creature-interaction physical output.
+- Sound is implemented as the first communication vector.
 - Hold off on intentional emitted scent/pheromones.
 - Hold off on posture/display outputs.
 
@@ -129,7 +134,7 @@ Recommended first outputs:
 
 | Output | Range | Meaning |
 | --- | --- | --- |
-| `EmitSound` | `0..1` | Vocalization loudness. Below threshold means silent. |
+| `SoundAmplitude` | `0..1` | Vocalization loudness. Below threshold means silent. |
 | `SoundTone` | `-1..1` | Raw tone/modulation value. Only matters while emitting sound. |
 
 Recommended receiver inputs:
@@ -141,16 +146,17 @@ Recommended receiver inputs:
 | `SoundDirectionForward` | Blended sound direction ahead/behind. |
 | `SoundDirectionRight` | Blended sound direction right/left. |
 | `SoundTone` | Weighted average tone of nearby sound. |
+| `SoundToneClarity` | Confidence that the heard tone is coherent rather than mixed/canceling. |
 
-Initial mechanics:
+Implemented initial mechanics:
 
-- transient, probably based on last tick's emitted sound;
+- transient, based on each nearby creature's current/last brain action;
 - omnidirectional;
 - distance falloff;
 - public to all receivers, including predators and competitors;
 - no separate long-lived sound entities at first;
-- accumulate from nearby creature emitters using the existing creature spatial index;
-- energy cost scales with loudness, likely nonlinear, for example `soundCost * loudness^2 * bodySizeFactor`.
+- accumulated from nearby creature emitters using the existing creature spatial index;
+- no energy cost yet; add one later if sound becomes a free exploit.
 
 Avoid semantic outputs like `AlarmCall`, `FoodCall`, or `FriendlyCall`. If alarm calls, food calls, mating calls, deception, or group-cohesion calls appear, they should emerge from how tones are used.
 
@@ -264,11 +270,13 @@ Current architectures:
 - `HybridNeural`: direct input-output weights plus optional hidden nodes.
 - `HiddenLayerNeural`: one hidden layer; direct weights are stored for compatibility but forced to zero behaviorally.
 
-The current neural schema is 228 inputs and 8 outputs.
+The current neural schema is 233 inputs and 10 outputs.
 
 Schema v2 removed the old nearest-food and nearest-creature aggregate direction/proximity slots from the active brain contract. Older 239-input dense neural brains still load through migration: the removed nearest-target slots are dropped, and sector, density, contact, scent, terrain, quality, similarity, memory, and habitat weights are shifted into the current layout.
 
 Schema v3 adds the grab contact inputs: grab pressure, grab direction forward/right, can-grab-creature, and is-holding-creature. Output schema v2 inserts the `Grab` physical output before dense-memory writes. Older 7-output brains migrate by leaving `Grab` neutral and shifting memory-write weights to the new memory indices.
+
+Schema v4 adds sound receiver inputs: sound density, local direction forward/right, weighted tone, and tone clarity. Output schema v3 inserts `SoundAmplitude` and `SoundTone` before dense-memory writes. Older 8-output brains migrate by leaving sound outputs neutral and shifting memory-write weights to the current memory indices.
 
 Hidden nodes:
 
@@ -434,7 +442,7 @@ Desired conceptual split:
 
 This keeps future rtNEAT and plastic brains from being forced to use legacy memory outputs.
 
-Status: implemented at the frame/adapter boundary. The dense network now has 8 output slots: 6 feed the universal physical action frame and 2 remain dense-adapter memory writes.
+Status: implemented at the frame/adapter boundary. The dense network now has 10 output slots: 8 feed the universal physical action frame and 2 remain dense-adapter memory writes.
 
 ### 3. Keep The Flat Neural Schema As An Adapter
 

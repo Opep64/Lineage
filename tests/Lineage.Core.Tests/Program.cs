@@ -75,6 +75,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
     ("Creature sensing smells similar creatures beyond vision", CreatureSensingSmellsSimilarCreaturesBeyondVision),
     ("Creature sensing separates predator prey similarity", CreatureSensingSeparatesPredatorPreySimilarity),
+    ("Creature sensing hears intentional sound beyond vision", CreatureSensingHearsIntentionalSoundBeyondVision),
     ("Creature sensing smells meat beyond vision", CreatureSensingSmellsMeatBeyondVision),
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
@@ -137,6 +138,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates creature similarity inputs", NeuralBrainMigratesCreatureSimilarityInputs),
     ("Neural brain migrates habitat quality inputs", NeuralBrainMigratesHabitatQualityInputs),
     ("Neural brain migrates grab output and inputs", NeuralBrainMigratesGrabOutputAndInputs),
+    ("Neural brain migrates sound output and inputs", NeuralBrainMigratesSoundOutputAndInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -3095,6 +3097,54 @@ static void CreatureSensingSeparatesPredatorPreySimilarity()
     AssertTrue(senses.CreatureContactSimilarity < 0.82f, "Predator-prey trait split should stay below scent similarity floor");
 }
 
+static void CreatureSensingHearsIntentionalSoundBeyondVision()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 1309,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 1,
+                soundRangeMultiplier: 3f,
+                soundDensitySaturation: 0.2f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 40f,
+        VisionAngleRadians = MathF.PI / 3f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    var listener = simulation.State.Creatures[0];
+    listener.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = listener;
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(92f, 20f), energy: 25f);
+    var emitter = simulation.State.Creatures[1];
+    var emitterActions = emitter.Actions;
+    emitterActions.SoundAmplitude = 0.8f;
+    emitterActions.SoundTone = -0.6f;
+    emitter.Actions = emitterActions;
+    simulation.State.Creatures[1] = emitter;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.CreatureDetected, "Emitter outside vision radius should not be visually detected");
+    AssertTrue(senses.SoundDetected, "Intentional sound should be heard beyond vision");
+    AssertTrue(senses.SoundDensity > 0.4f, "Nearby emitted sound should have useful density");
+    AssertTrue(senses.SoundDirectionForward > 0.4f, "Sound should point forward toward the emitter");
+    AssertClose(0f, senses.SoundDirectionRight, 0.0001, "Sound right direction");
+    AssertClose(-0.6f, senses.SoundTone, 0.0001, "Sound tone should preserve the emitted tone");
+    AssertTrue(senses.SoundToneClarity > 0.4f, "Single emitted tone should have useful clarity");
+}
+
 static void CreatureSensingSmellsMeatBeyondVision()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -3719,7 +3769,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
 {
     AssertEqual(NeuralBrainSchema.InputCount, BrainIoRegistry.Inputs.Count, "Input registry count");
     AssertEqual(NeuralBrainSchema.OutputCount, BrainIoRegistry.Outputs.Count, "Output registry count");
-    AssertEqual(6, BrainIoRegistry.PhysicalActionOutputs.Count, "Physical action output count");
+    AssertEqual(8, BrainIoRegistry.PhysicalActionOutputs.Count, "Physical action output count");
     AssertEqual(2, BrainIoRegistry.ArchitectureInternalOutputs.Count, "Internal output count");
 
     for (var i = 0; i < BrainIoRegistry.Inputs.Count; i++)
@@ -3734,12 +3784,16 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
 
     var moveOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.MoveForwardOutput);
     var grabOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.GrabOutput);
+    var soundOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.SoundAmplitudeOutput);
     var memoryOutput = BrainIoRegistry.GetOutput(NeuralBrainSchema.MemoryForwardOutput);
     AssertEqual("action.move_forward", moveOutput.Key, "Move output key");
     AssertEqual(BrainOutputScope.PhysicalAction, moveOutput.Scope, "Move output scope");
     AssertEqual("action.grab", grabOutput.Key, "Grab output key");
     AssertEqual(BrainOutputScope.PhysicalAction, grabOutput.Scope, "Grab output scope");
     AssertEqual(2, grabOutput.IntroducedVersion, "Grab output introduced version");
+    AssertEqual("action.sound_amplitude", soundOutput.Key, "Sound output key");
+    AssertEqual(BrainOutputScope.PhysicalAction, soundOutput.Scope, "Sound output scope");
+    AssertEqual(3, soundOutput.IntroducedVersion, "Sound output introduced version");
     AssertEqual("dense_memory.write_forward", memoryOutput.Key, "Memory output key");
     AssertEqual(BrainOutputScope.ArchitectureInternal, memoryOutput.Scope, "Memory output scope");
 
@@ -3748,11 +3802,14 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
         NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex));
     var contactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FoodContactInput);
     var grabInput = BrainIoRegistry.GetInput(NeuralBrainSchema.GrabPressureInput);
+    var soundInput = BrainIoRegistry.GetInput(NeuralBrainSchema.SoundToneInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, grabInput.Freshness, "Grab input freshness");
     AssertEqual(3, grabInput.IntroducedVersion, "Grab input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, soundInput.Freshness, "Sound input freshness");
+    AssertEqual(4, soundInput.IntroducedVersion, "Sound input introduced version");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
 }
@@ -3814,6 +3871,11 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         CreatureSimilarityScentDensity = 0.43f,
         CreatureSimilarityScentDirectionForward = -0.53f,
         CreatureSimilarityScentDirectionRight = 0.63f,
+        SoundDensity = 0.29f,
+        SoundDirectionForward = 0.39f,
+        SoundDirectionRight = -0.49f,
+        SoundTone = 0.59f,
+        SoundToneClarity = 0.69f,
         CurrentTerrainDrag = 0.44f,
         ForwardTerrainDrag = 0.54f,
         LeftTerrainDrag = 0.64f,
@@ -3874,6 +3936,11 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.43f, inputs[NeuralBrainSchema.CreatureSimilarityScentDensityInput], 0.000001, "Creature similarity scent density input");
     AssertClose(-0.53f, inputs[NeuralBrainSchema.CreatureSimilarityScentForwardInput], 0.000001, "Creature similarity scent forward input");
     AssertClose(0.63f, inputs[NeuralBrainSchema.CreatureSimilarityScentRightInput], 0.000001, "Creature similarity scent right input");
+    AssertClose(0.29f, inputs[NeuralBrainSchema.SoundDensityInput], 0.000001, "Sound density input");
+    AssertClose(0.39f, inputs[NeuralBrainSchema.SoundDirectionForwardInput], 0.000001, "Sound forward input");
+    AssertClose(-0.49f, inputs[NeuralBrainSchema.SoundDirectionRightInput], 0.000001, "Sound right input");
+    AssertClose(0.59f, inputs[NeuralBrainSchema.SoundToneInput], 0.000001, "Sound tone input");
+    AssertClose(0.69f, inputs[NeuralBrainSchema.SoundToneClarityInput], 0.000001, "Sound clarity input");
     AssertClose(0.54f, inputs[NeuralBrainSchema.ForwardTerrainDragInput], 0.000001, "Terrain input");
     AssertClose(0.15f, inputs[NeuralBrainSchema.CurrentHabitatQualityInput], 0.000001, "Current habitat input");
     AssertClose(0.25f, inputs[NeuralBrainSchema.ForwardHabitatQualityInput], 0.000001, "Forward habitat input");
@@ -3934,6 +4001,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     outputs[NeuralBrainSchema.ReproduceOutput] = 0.5f;
     outputs[NeuralBrainSchema.AttackOutput] = -0.5f;
     outputs[NeuralBrainSchema.GrabOutput] = 2f;
+    outputs[NeuralBrainSchema.SoundAmplitudeOutput] = 2f;
+    outputs[NeuralBrainSchema.SoundToneOutput] = -2f;
     outputs[NeuralBrainSchema.MemoryForwardOutput] = 3f;
     outputs[NeuralBrainSchema.MemoryRightOutput] = -3f;
 
@@ -3946,6 +4015,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.5f, actionOutputs.Reproduce, 0.000001, "Reproduce output remains raw");
     AssertClose(-0.5f, actionOutputs.Attack, 0.000001, "Attack output remains raw");
     AssertClose(1f, actionOutputs.Grab, 0.000001, "Grab output is clamped");
+    AssertClose(1f, actionOutputs.SoundAmplitude, 0.000001, "Sound amplitude output is clamped");
+    AssertClose(-1f, actionOutputs.SoundTone, 0.000001, "Sound tone output is clamped");
     AssertClose(1f, memoryOutputs.DirectionForward, 0.000001, "Memory forward output is clamped");
     AssertClose(-1f, memoryOutputs.DirectionRight, 0.000001, "Memory right output is clamped");
 }
@@ -5873,12 +5944,12 @@ static void NeuralBrainMigratesGrabOutputAndInputs()
         1.25f,
         brain.GetWeight(NeuralBrainSchema.MemoryForwardOutput, NeuralBrainSchema.BiasInput),
         0.000001,
-        "Old memory-forward output shifts past grab");
+        "Old memory-forward output shifts past grab and sound");
     AssertClose(
         -1.5f,
         brain.GetWeight(NeuralBrainSchema.MemoryRightOutput, NeuralBrainSchema.BiasInput),
         0.000001,
-        "Old memory-right output shifts past grab");
+        "Old memory-right output shifts past grab and sound");
     AssertClose(
         0.8f,
         brain.GetWeight(NeuralBrainSchema.AttackOutput, NeuralBrainSchema.RightHabitatQualityInput),
@@ -5893,10 +5964,65 @@ static void NeuralBrainMigratesGrabOutputAndInputs()
         2.5f,
         brain.GetHiddenOutputWeight(NeuralBrainSchema.MemoryForwardOutput, 0),
         0.000001,
-        "Old hidden memory output shifts past grab");
+        "Old hidden memory output shifts past grab and sound");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.GrabOutput, NeuralBrainSchema.BiasInput), 0.000001, "New grab output starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.SoundAmplitudeOutput, NeuralBrainSchema.BiasInput), 0.000001, "New sound amplitude output starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.SoundToneOutput, NeuralBrainSchema.BiasInput), 0.000001, "New sound tone output starts neutral");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.GrabPressureInput), 0.000001, "New grab pressure input starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.IsHoldingCreatureInput), 0.000001, "New holding input starts neutral");
+}
+
+static void NeuralBrainMigratesSoundOutputAndInputs()
+{
+    const int legacyInputCount = NeuralBrainSchema.IsHoldingCreatureInput + 1;
+    const int legacyOutputCount = 8;
+    const int hiddenNodeCount = 3;
+    const int oldMemoryForwardOutput = 6;
+    const int oldMemoryRightOutput = 7;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.GrabOutput * legacyInputCount + NeuralBrainSchema.CanGrabCreatureInput] = 1.4f;
+    legacyWeights[oldMemoryForwardOutput * legacyInputCount + NeuralBrainSchema.BiasInput] = 1.7f;
+    legacyWeights[oldMemoryRightOutput * legacyInputCount + NeuralBrainSchema.BiasInput] = -1.8f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.IsHoldingCreatureInput] = 0.9f;
+    legacyWeights[legacyHiddenOutputOffset + oldMemoryForwardOutput * hiddenNodeCount] = 2.2f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Sound migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Sound migrated weight count");
+    AssertClose(
+        1.4f,
+        brain.GetWeight(NeuralBrainSchema.GrabOutput, NeuralBrainSchema.CanGrabCreatureInput),
+        0.000001,
+        "Existing grab output remains in place");
+    AssertClose(
+        1.7f,
+        brain.GetWeight(NeuralBrainSchema.MemoryForwardOutput, NeuralBrainSchema.BiasInput),
+        0.000001,
+        "Old memory-forward output shifts past sound");
+    AssertClose(
+        -1.8f,
+        brain.GetWeight(NeuralBrainSchema.MemoryRightOutput, NeuralBrainSchema.BiasInput),
+        0.000001,
+        "Old memory-right output shifts past sound");
+    AssertClose(
+        0.9f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.IsHoldingCreatureInput),
+        0.000001,
+        "Existing hidden grab input remains in place");
+    AssertClose(
+        2.2f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MemoryForwardOutput, 0),
+        0.000001,
+        "Old hidden memory output shifts past sound");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.SoundAmplitudeOutput, NeuralBrainSchema.BiasInput), 0.000001, "New sound amplitude output starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.SoundToneOutput, NeuralBrainSchema.BiasInput), 0.000001, "New sound tone output starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.SoundDensityInput), 0.000001, "New sound density input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.SoundToneClarityInput), 0.000001, "New sound clarity input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -6057,7 +6183,7 @@ static void BrainFactorySupportsHiddenLayerNeuralArchitecture()
     AssertEqual(BrainArchitectureKind.HiddenLayerNeural, descriptor.Kind, "Hidden descriptor kind");
     AssertEqual("Hidden-layer neural", descriptor.Name, "Hidden descriptor name");
     AssertEqual(NeuralBrainSchema.DefaultHiddenLayerNodeCount, descriptor.DefaultHiddenNodeCount, "Hidden default node count");
-    AssertEqual(NeuralBrainSchema.OutputCount, descriptor.MinHiddenNodeCount, "Hidden min node count");
+    AssertEqual(1, descriptor.MinHiddenNodeCount, "Hidden min node count");
     AssertTrue(descriptor.SupportsHiddenNodes, "Hidden architecture should support hidden nodes");
     AssertTrue(!descriptor.SupportsDirectInputOutputWeights, "Hidden architecture should not support direct weights");
 
@@ -8919,8 +9045,8 @@ static void BrainProfileJsonRoundTripsNeuralControllers()
     var roundTripped = BrainProfileJson.FromJson(brainJson);
 
     AssertTrue(brainJson.Contains("\"brainArchitectureKind\": \"hiddenLayerNeural\""), "Brain JSON should include architecture");
-    AssertTrue(brainJson.Contains("\"inputSchemaVersion\": 3"), "Brain JSON should include input schema version");
-    AssertTrue(brainJson.Contains("\"outputSchemaVersion\": 2"), "Brain JSON should include output schema version");
+    AssertTrue(brainJson.Contains("\"inputSchemaVersion\": 4"), "Brain JSON should include input schema version");
+    AssertTrue(brainJson.Contains("\"outputSchemaVersion\": 3"), "Brain JSON should include output schema version");
     AssertEqual("Probe brain", roundTripped.Name, "Brain profile name");
     AssertEqual("Round-trip brain test", roundTripped.Notes, "Brain profile notes");
     AssertEqual(BrainArchitectureKind.HiddenLayerNeural, roundTripped.BrainArchitectureKind, "Brain profile architecture");

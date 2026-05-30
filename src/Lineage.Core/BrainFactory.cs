@@ -30,7 +30,7 @@ public static class BrainFactory
         NeuralBrainSchema.InputCount,
         NeuralBrainSchema.OutputCount,
         NeuralBrainSchema.DefaultHiddenLayerNodeCount,
-        NeuralBrainSchema.OutputCount,
+        1,
         NeuralBrainSchema.MaxHiddenNodeCount,
         SupportsHiddenNodes: true,
         SupportsDirectInputOutputWeights: false);
@@ -142,6 +142,12 @@ public static class BrainFactory
             throw new ArgumentOutOfRangeException(
                 nameof(requestedHiddenNodeCount),
                 $"Hidden node count cannot exceed {descriptor.MaxHiddenNodeCount}.");
+        }
+
+        if (kind == BrainArchitectureKind.HiddenLayerNeural
+            && requestedHiddenNodeCount == NeuralBrainSchema.DefaultHiddenNodeCount)
+        {
+            return descriptor.DefaultHiddenNodeCount;
         }
 
         return requestedHiddenNodeCount < descriptor.MinHiddenNodeCount

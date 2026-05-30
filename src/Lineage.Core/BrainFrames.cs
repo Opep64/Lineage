@@ -13,6 +13,7 @@ namespace Lineage.Core;
 public readonly record struct BrainInputFrame(
     VisionInputFrame Vision,
     ScentInputFrame Scent,
+    CommunicationInputFrame Communication,
     BodyInputFrame Body,
     InternalInputFrame Internal)
 {
@@ -71,6 +72,14 @@ public readonly record struct BrainInputFrame(
                     senses.CreatureSimilarityScentDensity,
                     senses.CreatureSimilarityScentDirectionForward,
                     senses.CreatureSimilarityScentDirectionRight)),
+            new CommunicationInputFrame(
+                new DirectionalToneSignal(
+                    senses.SoundDetected,
+                    senses.SoundDensity,
+                    senses.SoundDirectionForward,
+                    senses.SoundDirectionRight,
+                    senses.SoundTone,
+                    senses.SoundToneClarity)),
             new BodyInputFrame(
                 senses.CurrentTerrainDrag,
                 senses.ForwardTerrainDrag,
@@ -139,6 +148,17 @@ public readonly record struct DirectionalGradientSignal(
     float DirectionRight);
 
 /// <summary>
+/// Directional intentional communication signal with a continuous tone channel.
+/// </summary>
+public readonly record struct DirectionalToneSignal(
+    bool Detected,
+    float Density,
+    float DirectionForward,
+    float DirectionRight,
+    float Tone,
+    float ToneClarity);
+
+/// <summary>
 /// Visual facts currently exposed to brains. Sector/ray vision should expand this bucket.
 /// </summary>
 public readonly record struct VisionInputFrame(
@@ -165,6 +185,12 @@ public readonly record struct ScentInputFrame(
     DirectionalGradientSignal Meat,
     DirectionalGradientSignal RottenMeat,
     DirectionalGradientSignal CreatureSimilarity);
+
+/// <summary>
+/// Intentional signals emitted by creature actions.
+/// </summary>
+public readonly record struct CommunicationInputFrame(
+    DirectionalToneSignal Sound);
 
 /// <summary>
 /// Touch/contact/proprioception: facts the body feels directly rather than sees or smells.
@@ -228,7 +254,9 @@ public readonly record struct BrainOutputFrame(
     float Eat,
     float Reproduce,
     float Attack,
-    float Grab);
+    float Grab,
+    float SoundAmplitude,
+    float SoundTone);
 
 /// <summary>
 /// Temporary bridge for the current fixed neural brain's controller-managed memory.

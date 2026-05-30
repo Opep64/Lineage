@@ -9,6 +9,7 @@ public enum BrainIoSignalGroup
     Internal,
     Vision,
     Scent,
+    Sound,
     Terrain,
     Habitat,
     Obstacle,
@@ -182,7 +183,12 @@ public static class BrainIoRegistry
             Input("contact.grab_forward", "Grab direction forward", NeuralBrainSchema.GrabDirectionForwardInput, BrainIoSignalGroup.Contact, -1f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Direction toward the grabbing creature projected forward.", introducedVersion: 3),
             Input("contact.grab_right", "Grab direction right", NeuralBrainSchema.GrabDirectionRightInput, BrainIoSignalGroup.Contact, -1f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Direction toward the grabbing creature projected right.", introducedVersion: 3),
             Input("contact.can_grab_creature", "Can grab creature", NeuralBrainSchema.CanGrabCreatureInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "A creature is close enough to grab.", introducedVersion: 3),
-            Input("contact.is_holding_creature", "Is holding creature", NeuralBrainSchema.IsHoldingCreatureInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "This creature is currently holding another creature.", introducedVersion: 3)
+            Input("contact.is_holding_creature", "Is holding creature", NeuralBrainSchema.IsHoldingCreatureInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "This creature is currently holding another creature.", introducedVersion: 3),
+            Input("sound.density", "Sound density", NeuralBrainSchema.SoundDensityInput, BrainIoSignalGroup.Sound, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Strength of nearby intentional communication sound.", introducedVersion: 4),
+            Input("sound.forward", "Sound direction forward", NeuralBrainSchema.SoundDirectionForwardInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Sound direction projected onto the creature's forward axis.", introducedVersion: 4),
+            Input("sound.right", "Sound direction right", NeuralBrainSchema.SoundDirectionRightInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Sound direction projected onto the creature's right axis.", introducedVersion: 4),
+            Input("sound.tone", "Sound tone", NeuralBrainSchema.SoundToneInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Weighted average tone of nearby intentional sound.", introducedVersion: 4),
+            Input("sound.tone_clarity", "Sound tone clarity", NeuralBrainSchema.SoundToneClarityInput, BrainIoSignalGroup.Sound, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Confidence that heard sound is a coherent tone rather than a mixed signal.", introducedVersion: 4)
         });
 
         return ValidateInputs(inputs);
@@ -221,6 +227,8 @@ public static class BrainIoRegistry
             Output("action.reproduce", "Reproduce intent", NeuralBrainSchema.ReproduceOutput, BrainIoSignalGroup.Action, -1f, 1f, 0f, BrainOutputScope.PhysicalAction, "Gate for laying an egg when reproduction rules allow it."),
             Output("action.attack", "Attack intent", NeuralBrainSchema.AttackOutput, BrainIoSignalGroup.Action, -1f, 1f, 0f, BrainOutputScope.PhysicalAction, "Gate for biting/damaging a contacted creature."),
             Output("action.grab", "Grab intent", NeuralBrainSchema.GrabOutput, BrainIoSignalGroup.Action, 0f, 1f, 0f, BrainOutputScope.PhysicalAction, "Continuous hold strength for grabbing a contacted creature.", introducedVersion: 2),
+            Output("action.sound_amplitude", "Sound amplitude", NeuralBrainSchema.SoundAmplitudeOutput, BrainIoSignalGroup.Sound, 0f, 1f, 0f, BrainOutputScope.PhysicalAction, "Intentional communication sound volume.", introducedVersion: 3),
+            Output("action.sound_tone", "Sound tone", NeuralBrainSchema.SoundToneOutput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainOutputScope.PhysicalAction, "Intentional communication tone in a continuous -1..1 range.", introducedVersion: 3),
             Output("dense_memory.write_forward", "Dense memory write forward", NeuralBrainSchema.MemoryForwardOutput, BrainIoSignalGroup.Memory, -1f, 1f, 0f, BrainOutputScope.ArchitectureInternal, "Legacy dense-adapter memory write along the creature's forward axis."),
             Output("dense_memory.write_right", "Dense memory write right", NeuralBrainSchema.MemoryRightOutput, BrainIoSignalGroup.Memory, -1f, 1f, 0f, BrainOutputScope.ArchitectureInternal, "Legacy dense-adapter memory write along the creature's right axis.")
         };

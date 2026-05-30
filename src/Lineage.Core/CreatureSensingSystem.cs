@@ -21,6 +21,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float CreatureSimilarityScentRangeMultiplier = 1.5f;
     private const float CreatureSimilarityScentDensitySaturation = 1f;
     public const int DefaultWorldSenseIntervalTicks = 10;
+    public const float DefaultSoundRangeMultiplier = 2.5f;
+    public const float DefaultSoundDensitySaturation = 1f;
     public const float DefaultCloseSenseRefreshProximity = 0.85f;
     public const int DefaultCloseSenseRefreshMinimumTicks = 1;
     public const bool DefaultEnableSectorVision = false;
@@ -39,6 +41,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly float _meatScentRangeMultiplier;
     private readonly float _meatScentCaloriesForFullStrength;
     private readonly float _meatScentDensitySaturation;
+    private readonly float _soundRangeMultiplier;
+    private readonly float _soundDensitySaturation;
     private readonly int _worldSenseIntervalTicks;
     private readonly float _closeSenseRefreshProximity;
     private readonly int _closeSenseRefreshMinimumTicks;
@@ -66,7 +70,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         int closeSenseRefreshMinimumTicks = DefaultCloseSenseRefreshMinimumTicks,
         bool enableSectorVision = DefaultEnableSectorVision,
         float plantPayoffTraceHalfLifeSeconds = DefaultPlantPayoffTraceHalfLifeSeconds,
-        int sensingThreadCount = DefaultSensingThreadCount)
+        int sensingThreadCount = DefaultSensingThreadCount,
+        float soundRangeMultiplier = DefaultSoundRangeMultiplier,
+        float soundDensitySaturation = DefaultSoundDensitySaturation)
     {
         if (meatScentRangeMultiplier < 1f || !float.IsFinite(meatScentRangeMultiplier))
         {
@@ -81,6 +87,16 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         if (meatScentDensitySaturation <= 0f || !float.IsFinite(meatScentDensitySaturation))
         {
             throw new ArgumentOutOfRangeException(nameof(meatScentDensitySaturation), "Meat scent density saturation must be finite and positive.");
+        }
+
+        if (soundRangeMultiplier < 1f || !float.IsFinite(soundRangeMultiplier))
+        {
+            throw new ArgumentOutOfRangeException(nameof(soundRangeMultiplier), "Sound range multiplier must be finite and at least 1.");
+        }
+
+        if (soundDensitySaturation <= 0f || !float.IsFinite(soundDensitySaturation))
+        {
+            throw new ArgumentOutOfRangeException(nameof(soundDensitySaturation), "Sound density saturation must be finite and positive.");
         }
 
         if (worldSenseIntervalTicks <= 0)
@@ -120,6 +136,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _meatScentRangeMultiplier = meatScentRangeMultiplier;
         _meatScentCaloriesForFullStrength = meatScentCaloriesForFullStrength;
         _meatScentDensitySaturation = meatScentDensitySaturation;
+        _soundRangeMultiplier = soundRangeMultiplier;
+        _soundDensitySaturation = soundDensitySaturation;
         _worldSenseIntervalTicks = worldSenseIntervalTicks;
         _closeSenseRefreshProximity = closeSenseRefreshProximity;
         _closeSenseRefreshMinimumTicks = closeSenseRefreshMinimumTicks;
@@ -195,6 +213,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
         var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
         var creatureSimilarityScentRadius = effectiveSenseRadius * CreatureSimilarityScentRangeMultiplier;
+        var soundRadius = effectiveSenseRadius * _soundRangeMultiplier;
         sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
 
         var worldSenseRefreshReason = GetWorldSenseRefreshReason(state, creature);
@@ -327,13 +346,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creatureVisibility.VisibleCount,
             0L);
         var creatureTraits = GetCreatureTraits(state, creatureIndex);
-        var creatureSimilaritySense = CalculateCreatureSimilaritySense(
+        var creatureAmbientSense = CalculateCreatureAmbientSense(
             state,
             creatureIndex,
             creature,
             creatureTraits,
             forward,
             creatureSimilarityScentRadius,
+            soundRadius,
             scratch.CreatureCandidates);
 
         var terrainSenseStartedAt = sensingProfile is not null
@@ -604,11 +624,19 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
         ApplyCreatureSimilarityScentSense(
             ref senses,
-            creatureSimilaritySense.ScentVector,
-            creatureSimilaritySense.TotalScentStrength,
+            creatureAmbientSense.ScentVector,
+            creatureAmbientSense.TotalScentStrength,
             forward,
             right);
-        senses.CreatureContactSimilarity = creatureSimilaritySense.ContactSimilarity;
+        ApplySoundSense(
+            ref senses,
+            creatureAmbientSense.SoundVector,
+            creatureAmbientSense.TotalSoundStrength,
+            creatureAmbientSense.SoundToneWeightedTotal,
+            creatureAmbientSense.SoundToneSquaredWeightedTotal,
+            forward,
+            right);
+        senses.CreatureContactSimilarity = creatureAmbientSense.ContactSimilarity;
 
         if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
         {
@@ -1161,23 +1189,71 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 
-    private CreatureSimilaritySense CalculateCreatureSimilaritySense(
+    private void ApplySoundSense(
+        ref CreatureSenseState senses,
+        SimVector2 soundVector,
+        float totalSoundStrength,
+        float soundToneWeightedTotal,
+        float soundToneSquaredWeightedTotal,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        if (totalSoundStrength <= MinimumScentStrength)
+        {
+            senses.SoundDetected = false;
+            senses.SoundDensity = 0f;
+            senses.SoundDirectionForward = 0f;
+            senses.SoundDirectionRight = 0f;
+            senses.SoundTone = 0f;
+            senses.SoundToneClarity = 0f;
+            return;
+        }
+
+        var density = Math.Clamp(totalSoundStrength / _soundDensitySaturation, 0f, 1f);
+        var tone = Math.Clamp(soundToneWeightedTotal / totalSoundStrength, -1f, 1f);
+        var toneMeanSquare = soundToneSquaredWeightedTotal / totalSoundStrength;
+        var toneVariance = Math.Max(0f, toneMeanSquare - tone * tone);
+        var toneClarity = Math.Clamp(1f - toneVariance, 0f, 1f) * density;
+
+        senses.SoundDetected = true;
+        senses.SoundDensity = density;
+        senses.SoundTone = tone;
+        senses.SoundToneClarity = toneClarity;
+        if (soundVector.LengthSquared <= 0.000001f)
+        {
+            senses.SoundDirectionForward = 0f;
+            senses.SoundDirectionRight = 0f;
+            return;
+        }
+
+        var direction = soundVector.Normalized();
+        var directionalConfidence = Math.Clamp(soundVector.Length / totalSoundStrength, 0f, 1f) * density;
+        senses.SoundDirectionForward = Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
+        senses.SoundDirectionRight = Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
+    }
+
+    private CreatureAmbientSense CalculateCreatureAmbientSense(
         WorldState state,
         int creatureIndex,
         CreatureState creature,
         CreatureSensingTraits creatureTraits,
         SimVector2 forward,
         float scentRadius,
+        float soundRadius,
         List<int> creatureCandidates)
     {
         _spatialIndex.AddCreatureCandidates(
             state,
             creature.Position,
-            scentRadius + 12f,
+            MathF.Max(scentRadius, soundRadius) + 12f,
             creatureCandidates);
 
         var totalScentStrength = 0f;
         var scentVector = SimVector2.Zero;
+        var totalSoundStrength = 0f;
+        var soundVector = SimVector2.Zero;
+        var soundToneWeightedTotal = 0f;
+        var soundToneSquaredWeightedTotal = 0f;
         var contactSimilarity = 0f;
         var hasContact = creature.IsTouchingCreature && creature.CreatureContactId != default;
 
@@ -1206,32 +1282,55 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var toOther = otherCreature.Position - creature.Position;
             var centerDistance = toOther.Length;
             var edgeDistance = Math.Max(0f, centerDistance - otherTraits.BodyRadius);
-            if (edgeDistance > scentRadius)
+            if (edgeDistance <= scentRadius)
+            {
+                var similarityWeight = CreatureSimilarity.ScentWeight(similarity);
+                if (similarityWeight > 0f)
+                {
+                    var distanceFactor = 1f - Math.Clamp(edgeDistance / scentRadius, 0f, 1f);
+                    var scentStrength = similarityWeight * distanceFactor * distanceFactor;
+                    if (scentStrength > MinimumScentStrength)
+                    {
+                        var scentDirection = centerDistance > 0.0001f
+                            ? toOther / centerDistance
+                            : forward;
+                        totalScentStrength += scentStrength;
+                        scentVector += scentDirection * scentStrength;
+                    }
+                }
+            }
+
+            var soundAmplitude = Math.Clamp(otherCreature.Actions.SoundAmplitude, 0f, 1f);
+            if (soundAmplitude <= MinimumScentStrength || edgeDistance > soundRadius)
             {
                 continue;
             }
 
-            var similarityWeight = CreatureSimilarity.ScentWeight(similarity);
-            if (similarityWeight <= 0f)
+            var soundDistanceFactor = 1f - Math.Clamp(edgeDistance / soundRadius, 0f, 1f);
+            var soundStrength = soundAmplitude * soundDistanceFactor * soundDistanceFactor;
+            if (soundStrength <= MinimumScentStrength)
             {
                 continue;
             }
 
-            var distanceFactor = 1f - Math.Clamp(edgeDistance / scentRadius, 0f, 1f);
-            var scentStrength = similarityWeight * distanceFactor * distanceFactor;
-            if (scentStrength <= MinimumScentStrength)
-            {
-                continue;
-            }
-
-            var scentDirection = centerDistance > 0.0001f
+            var soundDirection = centerDistance > 0.0001f
                 ? toOther / centerDistance
                 : forward;
-            totalScentStrength += scentStrength;
-            scentVector += scentDirection * scentStrength;
+            var soundTone = Math.Clamp(otherCreature.Actions.SoundTone, -1f, 1f);
+            totalSoundStrength += soundStrength;
+            soundVector += soundDirection * soundStrength;
+            soundToneWeightedTotal += soundTone * soundStrength;
+            soundToneSquaredWeightedTotal += soundTone * soundTone * soundStrength;
         }
 
-        return new CreatureSimilaritySense(totalScentStrength, scentVector, contactSimilarity);
+        return new CreatureAmbientSense(
+            totalScentStrength,
+            scentVector,
+            contactSimilarity,
+            totalSoundStrength,
+            soundVector,
+            soundToneWeightedTotal,
+            soundToneSquaredWeightedTotal);
     }
 
     private static void ApplyGenericFoodSense(
@@ -1555,10 +1654,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float MaxSpeed,
         CreatureGenome Genome);
 
-    private readonly record struct CreatureSimilaritySense(
+    private readonly record struct CreatureAmbientSense(
         float TotalScentStrength,
         SimVector2 ScentVector,
-        float ContactSimilarity);
+        float ContactSimilarity,
+        float TotalSoundStrength,
+        SimVector2 SoundVector,
+        float SoundToneWeightedTotal,
+        float SoundToneSquaredWeightedTotal);
 
     private readonly record struct CreatureVisualSense(
         float Proximity,

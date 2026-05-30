@@ -5,13 +5,13 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 3;
+    public const int InputSchemaVersion = 4;
 
-    public const int OutputSchemaVersion = 2;
+    public const int OutputSchemaVersion = 3;
 
     public const int DefaultHiddenNodeCount = 4;
 
-    public const int DefaultHiddenLayerNodeCount = 8;
+    public const int DefaultHiddenLayerNodeCount = 10;
 
     public const int MaxHiddenNodeCount = 64;
 
@@ -91,9 +91,19 @@ public static class NeuralBrainSchema
 
     public const int IsHoldingCreatureInput = CanGrabCreatureInput + 1;
 
-    public const int InputCount = IsHoldingCreatureInput + 1;
+    public const int SoundDensityInput = IsHoldingCreatureInput + 1;
 
-    public const int OutputCount = 8;
+    public const int SoundDirectionForwardInput = SoundDensityInput + 1;
+
+    public const int SoundDirectionRightInput = SoundDirectionForwardInput + 1;
+
+    public const int SoundToneInput = SoundDirectionRightInput + 1;
+
+    public const int SoundToneClarityInput = SoundToneInput + 1;
+
+    public const int InputCount = SoundToneClarityInput + 1;
+
+    public const int OutputCount = 10;
 
     public const int BiasInput = 0;
 
@@ -205,9 +215,13 @@ public static class NeuralBrainSchema
 
     public const int GrabOutput = 5;
 
-    public const int MemoryForwardOutput = 6;
+    public const int SoundAmplitudeOutput = 6;
 
-    public const int MemoryRightOutput = 7;
+    public const int SoundToneOutput = 7;
+
+    public const int MemoryForwardOutput = 8;
+
+    public const int MemoryRightOutput = 9;
 
     public static int VisionSectorPlantDensityInput(int sectorIndex)
     {

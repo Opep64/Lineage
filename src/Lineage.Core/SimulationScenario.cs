@@ -341,6 +341,10 @@ public sealed record SimulationScenario
 
     public float MeatScentDensitySaturation { get; init; } = 1f;
 
+    public float SoundRangeMultiplier { get; init; } = CreatureSensingSystem.DefaultSoundRangeMultiplier;
+
+    public float SoundDensitySaturation { get; init; } = CreatureSensingSystem.DefaultSoundDensitySaturation;
+
     public float BiteDamagePerSecond { get; init; } = 0.18f;
 
     public float BiteEnergyCostPerSecond { get; init; } = 0.15f;
@@ -507,6 +511,8 @@ public sealed record SimulationScenario
         EnsureRange(MeatScentRangeMultiplier, 1f, 10f, nameof(MeatScentRangeMultiplier));
         EnsurePositive(MeatScentCaloriesForFullStrength, nameof(MeatScentCaloriesForFullStrength));
         EnsurePositive(MeatScentDensitySaturation, nameof(MeatScentDensitySaturation));
+        EnsureRange(SoundRangeMultiplier, 1f, 10f, nameof(SoundRangeMultiplier));
+        EnsurePositive(SoundDensitySaturation, nameof(SoundDensitySaturation));
         EnsureNonNegative(BiteDamagePerSecond, nameof(BiteDamagePerSecond));
         EnsureNonNegative(BiteEnergyCostPerSecond, nameof(BiteEnergyCostPerSecond));
         EnsureNonNegative(BiteRangePadding, nameof(BiteRangePadding));

@@ -17,6 +17,10 @@ public struct CreatureActionState
 
     public float GrabOutput { get; set; }
 
+    public float SoundAmplitude { get; set; }
+
+    public float SoundTone { get; set; }
+
     public bool WantsEat { get; set; }
 
     public bool WantsReproduce { get; set; }

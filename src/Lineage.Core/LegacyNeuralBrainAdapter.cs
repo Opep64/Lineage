@@ -88,6 +88,11 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.GrabDirectionRightInput] = frame.Body.GrabDirectionRight;
         inputs[NeuralBrainSchema.CanGrabCreatureInput] = frame.Body.CanGrabCreature;
         inputs[NeuralBrainSchema.IsHoldingCreatureInput] = frame.Body.IsHoldingCreature;
+        inputs[NeuralBrainSchema.SoundDensityInput] = frame.Communication.Sound.Density;
+        inputs[NeuralBrainSchema.SoundDirectionForwardInput] = frame.Communication.Sound.DirectionForward;
+        inputs[NeuralBrainSchema.SoundDirectionRightInput] = frame.Communication.Sound.DirectionRight;
+        inputs[NeuralBrainSchema.SoundToneInput] = frame.Communication.Sound.Tone;
+        inputs[NeuralBrainSchema.SoundToneClarityInput] = frame.Communication.Sound.ToneClarity;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {
@@ -131,7 +136,9 @@ public static class LegacyNeuralBrainAdapter
             outputs[NeuralBrainSchema.EatOutput],
             outputs[NeuralBrainSchema.ReproduceOutput],
             outputs[NeuralBrainSchema.AttackOutput],
-            Math.Clamp(outputs[NeuralBrainSchema.GrabOutput], 0f, 1f));
+            Math.Clamp(outputs[NeuralBrainSchema.GrabOutput], 0f, 1f),
+            Math.Clamp(outputs[NeuralBrainSchema.SoundAmplitudeOutput], 0f, 1f),
+            Math.Clamp(outputs[NeuralBrainSchema.SoundToneOutput], -1f, 1f));
     }
 
     public static LegacyNeuralMemoryOutputFrame ReadMemoryOutputs(ReadOnlySpan<float> outputs)

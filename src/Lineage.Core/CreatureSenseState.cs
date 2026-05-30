@@ -97,6 +97,24 @@ public struct CreatureSenseState
 
     public float CreatureSimilarityScentDirectionRight { get; set; }
 
+    public bool SoundDetected { get; set; }
+
+    public float SoundDensity { get; set; }
+
+    public float SoundDirectionForward { get; set; }
+
+    public float SoundDirectionRight { get; set; }
+
+    /// <summary>
+    /// Weighted average of heard communication tones, in [-1, 1].
+    /// </summary>
+    public float SoundTone { get; set; }
+
+    /// <summary>
+    /// How coherent the heard tone mix is. Weak or conflicting tones trend toward 0.
+    /// </summary>
+    public float SoundToneClarity { get; set; }
+
     public bool CreatureDetected { get; set; }
 
     public float CreatureProximity { get; set; }

@@ -311,6 +311,8 @@ public sealed class NeuralControllerSystem(
             ReproduceOutput = actionOutputs.Reproduce,
             AttackOutput = actionOutputs.Attack,
             GrabOutput = actionOutputs.Grab,
+            SoundAmplitude = actionOutputs.SoundAmplitude,
+            SoundTone = actionOutputs.SoundTone,
             WantsEat = actionOutputs.Eat > eatThreshold,
             WantsReproduce = actionOutputs.Reproduce > reproduceThreshold,
             WantsAttack = actionOutputs.Attack > attackThreshold,
@@ -328,7 +330,9 @@ public sealed class NeuralControllerSystem(
             actions.EatOutput,
             actions.ReproduceOutput,
             actions.AttackOutput,
-            actions.GrabOutput);
+            Math.Clamp(actions.GrabOutput, 0f, 1f),
+            Math.Clamp(actions.SoundAmplitude, 0f, 1f),
+            Math.Clamp(actions.SoundTone, -1f, 1f));
     }
 
     private static void RecordNeuralDecision(ref CreatureState creature, long tick)

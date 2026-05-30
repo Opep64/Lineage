@@ -198,6 +198,8 @@ public static class SimulationScenarioMetadata
             "NeuralControllerThreadCount" => "Maximum worker threads used for neural controller evaluation. Defaults to 8; use 1 for the single-threaded deterministic path.",
             "CloseSenseRefreshMinimumTicks" => "Minimum age of stale world senses before proximity-only close cues can force an extra world refresh.",
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
+            "SoundRangeMultiplier" => "Intentional communication sound range as a multiplier of sense radius.",
+            "SoundDensitySaturation" => "Total nearby sound strength needed to saturate the sound-density input.",
             "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are not referenced by living creatures, eggs, or the current survivor ancestry chain.",
             "ExtinctPayloadPruneIntervalTicks" => "How often survivor-ancestry-aware genome and brain payload compaction runs.",
             "WorldMapPath" => "Reusable world map artifact used when biomeMapKind and/or obstacleMapKind are manual.",
@@ -297,6 +299,7 @@ public static class SimulationScenarioMetadata
         if (name.Contains("Brain", StringComparison.Ordinal)
             || name.Contains("Vision", StringComparison.Ordinal)
             || name.Contains("Sense", StringComparison.Ordinal)
+            || name.Contains("Sound", StringComparison.Ordinal)
             || name.Contains("Memory", StringComparison.Ordinal))
         {
             return "Brain & Vision";

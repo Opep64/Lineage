@@ -1614,7 +1614,8 @@ public partial class Main : Node2D
             $"Contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
             $"Grab output {creature.Actions.GrabOutput:0.00}   intent {(creature.Actions.WantsGrab ? "yes" : "no")}\n" +
             $"Holding {FormatCreatureReference(creature.HeldCreatureId)}   strength {creature.GrabStrength:0.00}\n" +
-            $"Grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n\n" +
+            $"Grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n" +
+            $"Sound amp {creature.Actions.SoundAmplitude:0.00}   tone {creature.Actions.SoundTone:0.00}\n\n" +
             $"Food\n" +
             $"Last meal {BuildLastMealSourceText(creature)}\n" +
             $"Since meal {creature.SecondsSinceLastMeal:0.0}s   distance {creature.DistanceSinceLastMeal:0.0}u\n" +
@@ -1689,6 +1690,9 @@ public partial class Main : Node2D
             $"Meat scent fwd {senses.MeatScentDirectionForward:0.00}   right {senses.MeatScentDirectionRight:0.00}\n" +
             $"Rot scent {(senses.RottenMeatScentDetected ? "yes" : "no")}   density {senses.RottenMeatScentDensity:0.00}\n" +
             $"Rot fwd {senses.RottenMeatScentDirectionForward:0.00}   right {senses.RottenMeatScentDirectionRight:0.00}\n\n" +
+            $"Communication\n" +
+            $"Sound {(senses.SoundDetected ? "yes" : "no")}   density {senses.SoundDensity:0.00}   clarity {senses.SoundToneClarity:0.00}\n" +
+            $"Sound tone {senses.SoundTone:0.00}   fwd {senses.SoundDirectionForward:0.00}   right {senses.SoundDirectionRight:0.00}\n\n" +
             $"Creatures\n" +
             $"Seen {(senses.CreatureDetected ? "yes" : "no")}   density {senses.VisibleCreatureDensity:0.00}\n" +
             $"Prox {senses.CreatureProximity:0.00}   fwd {senses.CreatureDirectionForward:0.00}   right {senses.CreatureDirectionRight:0.00}\n" +
@@ -1727,6 +1731,7 @@ public partial class Main : Node2D
             $"Repro output {creature.Actions.ReproduceOutput:0.00}   intent {creature.Actions.WantsReproduce}\n" +
             $"Attack output {creature.Actions.AttackOutput:0.00}   intent {creature.Actions.WantsAttack}\n" +
             $"Grab output {creature.Actions.GrabOutput:0.00}   intent {creature.Actions.WantsGrab}\n" +
+            $"Sound amp {creature.Actions.SoundAmplitude:0.00}   tone {creature.Actions.SoundTone:0.00}\n" +
             $"Memory write fwd {creature.Actions.MemoryForward:0.00}   right {creature.Actions.MemoryRight:0.00}\n\n" +
             $"Action Context\n" +
             $"Touching food {(creature.IsTouchingFood ? "yes" : "no")}   touching creature {(creature.IsTouchingCreature ? "yes" : "no")}\n" +
@@ -2344,6 +2349,7 @@ public partial class Main : Node2D
 
         if (_creatureRenderMode == CreatureRenderMode.Individual)
         {
+            DrawCreatureSoundSignals(visibleWorldRect);
             DrawCreatureGrabLinks(visibleWorldRect);
             DrawIndividualCreatures(visibleWorldRect);
         }
@@ -2466,6 +2472,38 @@ public partial class Main : Node2D
         }
     }
 
+    private void DrawCreatureSoundSignals(Rect2 visibleWorldRect)
+    {
+        foreach (var chunk in _creatureRenderCache.VisibleChunks(visibleWorldRect))
+        {
+            if (chunk.CreatureIndices is null)
+            {
+                continue;
+            }
+
+            foreach (var creatureIndex in chunk.CreatureIndices)
+            {
+                var creature = _simulation.State.Creatures[creatureIndex];
+                var amplitude = Math.Clamp(creature.Actions.SoundAmplitude, 0f, 1f);
+                if (amplitude <= 0.05f)
+                {
+                    continue;
+                }
+
+                var screenPosition = ToScreen(creature.Position);
+                var pulseRadius = 7f + amplitude * 25f;
+                if (!IsVisibleInWorldRect(screenPosition, pulseRadius + 8f))
+                {
+                    continue;
+                }
+
+                var color = ColorForSoundTone(creature.Actions.SoundTone, 0.16f + amplitude * 0.46f);
+                DrawArc(screenPosition, pulseRadius, 0f, MathF.Tau, 32, color, width: 1.0f + amplitude * 2.0f);
+                DrawCircle(screenPosition, 1.8f + amplitude * 2.8f, WithAlpha(color, 0.38f + amplitude * 0.42f));
+            }
+        }
+    }
+
     private void DrawCreatureGrabLinks(Rect2 visibleWorldRect)
     {
         var creatures = _simulation.State.Creatures;
@@ -2570,6 +2608,7 @@ public partial class Main : Node2D
         DrawVisionSectorDebug(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
         DrawSelectedMemoryVector(creature, screenPosition);
+        DrawSelectedSoundOverlay(creature, genome, screenPosition);
         DrawSelectedGrabLinks(creature, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
@@ -2588,6 +2627,53 @@ public partial class Main : Node2D
         var end = screenPosition + direction * (28f + 46f * strength);
         DrawLine(screenPosition, end, _memoryColor, width: 2f);
         DrawCircle(end, 3f + 2f * strength, _memoryColor);
+    }
+
+    private void DrawSelectedSoundOverlay(CreatureState creature, CreatureGenome genome, Vector2 screenPosition)
+    {
+        var amplitude = Math.Clamp(creature.Actions.SoundAmplitude, 0f, 1f);
+        if (amplitude > 0.05f)
+        {
+            var rangePixels = CreatureGrowth.EffectiveSenseRadius(creature, genome)
+                * _scenario.SoundRangeMultiplier
+                * _worldScale;
+            if (rangePixels > 3f && rangePixels < 12000f)
+            {
+                var rangeColor = ColorForSoundTone(creature.Actions.SoundTone, 0.10f + amplitude * 0.20f);
+                DrawArc(screenPosition, rangePixels, 0f, MathF.Tau, 96, rangeColor, width: 1.1f);
+            }
+
+            DrawArc(
+                screenPosition,
+                12f + amplitude * 34f,
+                0f,
+                MathF.Tau,
+                40,
+                ColorForSoundTone(creature.Actions.SoundTone, 0.44f + amplitude * 0.34f),
+                width: 1.6f + amplitude * 2.1f);
+        }
+
+        var senses = creature.Senses;
+        if (!senses.SoundDetected)
+        {
+            return;
+        }
+
+        var forward = SimVector2.FromAngle(creature.HeadingRadians);
+        var right = new SimVector2(-forward.Y, forward.X);
+        var heardVector = forward * senses.SoundDirectionForward + right * senses.SoundDirectionRight;
+        var heardStrength = heardVector.Length;
+        if (heardStrength <= 0.001f)
+        {
+            return;
+        }
+
+        var direction = ToGodot(heardVector / heardStrength);
+        var signal = Math.Clamp(MathF.Max(senses.SoundDensity, heardStrength), 0f, 1f);
+        var end = screenPosition + direction * (34f + 82f * signal);
+        var color = ColorForSoundTone(senses.SoundTone, 0.46f + signal * 0.38f);
+        DrawLine(screenPosition, end, color, width: 1.6f + signal * 2.2f);
+        DrawCircle(end, 4f + signal * 6f, WithAlpha(color, 0.42f + signal * 0.28f));
     }
 
     private void DrawSelectedEggOverlay()
@@ -2778,6 +2864,28 @@ public partial class Main : Node2D
     private static float VisionSignal(float density, float proximity)
     {
         return MathF.Max(Math.Clamp(density, 0f, 1f), Math.Clamp(proximity, 0f, 1f));
+    }
+
+    private static Color ColorForSoundTone(float tone, float alpha)
+    {
+        var neutral = new Color(0.88f, 0.96f, 0.82f, alpha);
+        var clampedTone = Math.Clamp(tone, -1f, 1f);
+        if (clampedTone < 0f)
+        {
+            return LerpColor(new Color(0.18f, 0.78f, 1.0f, alpha), neutral, clampedTone + 1f);
+        }
+
+        return LerpColor(neutral, new Color(1.0f, 0.55f, 0.12f, alpha), clampedTone);
+    }
+
+    private static Color LerpColor(Color from, Color to, float amount)
+    {
+        var t = Math.Clamp(amount, 0f, 1f);
+        return new Color(
+            from.R + (to.R - from.R) * t,
+            from.G + (to.G - from.G) * t,
+            from.B + (to.B - from.B) * t,
+            from.A + (to.A - from.A) * t);
     }
 
     private static Color WithAlpha(Color color, float alpha)

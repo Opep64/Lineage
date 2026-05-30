@@ -56,9 +56,11 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutPlantPayoffTrace = 224;
     private const int LegacyInputCountWithoutTypedPlantEnergyYield = 221;
     private const int LegacyInputCountWithoutGrab = NeuralBrainSchema.RightHabitatQualityInput + 1;
+    private const int LegacyInputCountWithoutSound = NeuralBrainSchema.IsHoldingCreatureInput + 1;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
     private const int LegacyOutputCountWithoutGrab = 7;
+    private const int LegacyOutputCountWithoutSound = 8;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
     {
@@ -155,7 +157,8 @@ public sealed class NeuralBrainGenome
         ValidateHiddenLayerNodeCount(hiddenNodeCount);
 
         var weights = new float[GetExpectedWeightCount(hiddenNodeCount)];
-        for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+        var relayOutputCount = Math.Min(NeuralBrainSchema.OutputCount, hiddenNodeCount);
+        for (var output = 0; output < relayOutputCount; output++)
         {
             var hidden = output;
             for (var input = 0; input < NeuralBrainSchema.InputCount; input++)
@@ -861,11 +864,11 @@ public sealed class NeuralBrainGenome
 
     private static void ValidateHiddenLayerNodeCount(int hiddenNodeCount)
     {
-        if (hiddenNodeCount < NeuralBrainSchema.OutputCount || hiddenNodeCount > NeuralBrainSchema.MaxHiddenNodeCount)
+        if (hiddenNodeCount < 1 || hiddenNodeCount > NeuralBrainSchema.MaxHiddenNodeCount)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(hiddenNodeCount),
-                $"Hidden-layer neural brains require between {NeuralBrainSchema.OutputCount} and {NeuralBrainSchema.MaxHiddenNodeCount} hidden nodes.");
+                $"Hidden-layer neural brains require between 1 and {NeuralBrainSchema.MaxHiddenNodeCount} hidden nodes.");
         }
     }
 
@@ -889,6 +892,21 @@ public sealed class NeuralBrainGenome
         if (TryInferCurrentWeightLayout(weights.Length, out var hiddenNodeCount))
         {
             return (weights, hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
+            LegacyInputCountWithoutSound,
+            LegacyOutputCountWithoutSound,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutSound,
+                LegacyOutputCountWithoutSound,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
         }
 
         if (TryInferLegacyWeightLayout(
@@ -1404,9 +1422,14 @@ public sealed class NeuralBrainGenome
 
     private static int MapLegacyOutput(int output, int legacyOutputCount)
     {
+        if (legacyOutputCount == LegacyOutputCountWithoutSound && output >= NeuralBrainSchema.SoundAmplitudeOutput)
+        {
+            return output + 2;
+        }
+
         if (legacyOutputCount == LegacyOutputCountWithoutGrab && output >= NeuralBrainSchema.GrabOutput)
         {
-            return output + 1;
+            return output + 3;
         }
 
         return output < NeuralBrainSchema.OutputCount ? output : -1;
@@ -1428,7 +1451,8 @@ public sealed class NeuralBrainGenome
             return NeuralBrainSchema.ReproductionReadinessInput;
         }
 
-        if (legacyInputCount == LegacyInputCountWithoutGrab)
+        if (legacyInputCount == LegacyInputCountWithoutSound
+            || legacyInputCount == LegacyInputCountWithoutGrab)
         {
             return input;
         }
