@@ -3433,7 +3433,8 @@ public static class ViewerReportWriter
         {
             var position = positions[node.Id];
             writer.WriteLine($"<circle cx=\"{Svg(position.X)}\" cy=\"{Svg(position.Y)}\" r=\"18\" fill=\"#fef3c7\" stroke=\"#b45309\" stroke-width=\"2\"><title>{Html(ShortRtNeatNodeLabel(node))}, bias {Html(node.Bias.ToString("0.###", CultureInfo.InvariantCulture))}, {Html(node.Activation)}</title></circle>");
-            writer.WriteLine($"<text x=\"{Svg(position.X)}\" y=\"{Svg(position.Y + 4f)}\" text-anchor=\"middle\" class=\"rtneat-node-label\">h{Html(node.Id)}</text>");
+            writer.WriteLine($"<text x=\"{Svg(position.X)}\" y=\"{Svg(position.Y - 2f)}\" text-anchor=\"middle\" class=\"rtneat-node-label\">h{Html(node.Id)}</text>");
+            writer.WriteLine($"<text x=\"{Svg(position.X)}\" y=\"{Svg(position.Y + 10f)}\" text-anchor=\"middle\" class=\"rtneat-node-kind\">{Html(ShortRtNeatActivationLabel(node.Activation))} b{Html(FormatRtNeatBias(node.Bias))}</text>");
         }
 
         writer.WriteLine("</svg>");
@@ -3485,6 +3486,23 @@ public static class ViewerReportWriter
             .Replace("obstacle.", "obs.", StringComparison.Ordinal)
             .Replace("action.", string.Empty, StringComparison.Ordinal);
         return key.Length <= 24 ? key : $"{key[..21]}...";
+    }
+
+    private static string ShortRtNeatActivationLabel(RtNeatActivationKind activation)
+    {
+        return activation switch
+        {
+            RtNeatActivationKind.Tanh => "tanh",
+            RtNeatActivationKind.Sigmoid => "sig",
+            RtNeatActivationKind.Relu => "relu",
+            RtNeatActivationKind.Linear => "lin",
+            _ => activation.ToString()
+        };
+    }
+
+    private static string FormatRtNeatBias(float bias)
+    {
+        return bias.ToString("+0.##;-0.##;0", CultureInfo.InvariantCulture);
     }
 
     private static string Svg(float value)
