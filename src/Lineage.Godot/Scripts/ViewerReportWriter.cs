@@ -18,6 +18,7 @@ public static class ViewerReportWriter
     private const int ReportTrendRowCount = 8;
     private const int ReportTimelineSampleLimit = 1200;
     private const int SurvivorLineageTreeNodeRenderLimit = 260;
+    private const int RtNeatGraphRenderLimit = 3;
 
     private readonly record struct SpatialHeatmapLayer(
         string Title,
@@ -25,6 +26,12 @@ public static class ViewerReportWriter
         IReadOnlyList<float> Values,
         string Color,
         string Description);
+
+    private readonly record struct RtNeatBrainGraphCandidate(
+        int BrainId,
+        int LivingCreatures,
+        int Eggs,
+        RtNeatBrainGenome Brain);
 
     public static void Write(
         string path,
@@ -516,6 +523,7 @@ public static class ViewerReportWriter
         WriteLineageBehaviorAssaySection(writer, lineageBehaviorSummaries);
         WriteBrainInputDiagnosticsSection(writer, brainInputDiagnostics);
         WriteLineageBrainInputDiagnosticsSection(writer, lineageBrainInputDiagnostics);
+        WriteRtNeatBrainGraphSection(writer, state);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Final Living Traits</h2>");
@@ -843,6 +851,63 @@ public static class ViewerReportWriter
               width: 100%;
               height: auto;
               overflow: visible;
+            }
+            .rtneat-panel {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+              gap: 14px;
+              align-items: start;
+              margin-top: 14px;
+            }
+            .rtneat-graph-frame {
+              overflow: auto;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #fbfcf8;
+            }
+            .rtneat-graph {
+              display: block;
+              min-width: 920px;
+              width: 100%;
+              height: auto;
+              font-family: "Segoe UI", system-ui, sans-serif;
+            }
+            .rtneat-graph text {
+              font-size: 10px;
+              fill: var(--text);
+              pointer-events: none;
+            }
+            .rtneat-node-label { font-weight: 650; }
+            .rtneat-node-kind {
+              fill: var(--muted);
+              font-size: 8px;
+              text-transform: uppercase;
+            }
+            .rtneat-detail {
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              padding: 12px;
+              background: #fbfcf8;
+            }
+            .rtneat-detail h3 {
+              margin: 0 0 10px;
+              font-size: 1rem;
+            }
+            .rtneat-detail dl {
+              display: grid;
+              grid-template-columns: auto 1fr;
+              gap: 6px 12px;
+              margin: 0;
+            }
+            .rtneat-detail dt {
+              color: var(--muted);
+              font-size: 0.78rem;
+              text-transform: uppercase;
+            }
+            .rtneat-detail dd {
+              margin: 0;
+              font-weight: 650;
+              overflow-wrap: anywhere;
             }
             .lineage-tree-frame {
               position: relative;
@@ -3177,6 +3242,253 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
     }
 
+    private static void WriteRtNeatBrainGraphSection(StreamWriter writer, WorldState state)
+    {
+        var candidates = SelectRtNeatBrainGraphs(state, RtNeatGraphRenderLimit);
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>rtNEAT Brain Graphs</h2>");
+        writer.WriteLine("<p class=\"biome-map-note\">Representative living graph brains. Connected inputs are shown on the left, hidden nodes in the middle, and physical action outputs on the right. Green links are positive weights, red links are negative weights, and gray links are disabled.</p>");
+        foreach (var candidate in candidates)
+        {
+            writer.WriteLine("<div class=\"rtneat-panel\">");
+            writer.WriteLine("<div class=\"rtneat-graph-frame\">");
+            WriteRtNeatBrainGraphSvg(writer, candidate.Brain);
+            writer.WriteLine("</div>");
+            writer.WriteLine("<aside class=\"rtneat-detail\">");
+            writer.WriteLine($"<h3>Brain #{Html(candidate.BrainId)}</h3>");
+            writer.WriteLine("<dl>");
+            WriteDefinition(writer, "Living", candidate.LivingCreatures.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Eggs", candidate.Eggs.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Nodes", candidate.Brain.Nodes.Length.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Hidden", candidate.Brain.HiddenNodeCount.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Connections", candidate.Brain.ConnectionCount.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Enabled", candidate.Brain.EnabledConnectionCount.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Weights", candidate.Brain.WeightCount.ToString(CultureInfo.InvariantCulture));
+            WriteDefinition(writer, "Schema", $"input v{candidate.Brain.InputSchemaVersion}, output v{candidate.Brain.OutputSchemaVersion}");
+            writer.WriteLine("</dl>");
+            writer.WriteLine("</aside>");
+            writer.WriteLine("</div>");
+        }
+
+        writer.WriteLine("</section>");
+    }
+
+    private static IReadOnlyList<RtNeatBrainGraphCandidate> SelectRtNeatBrainGraphs(WorldState state, int limit)
+    {
+        var livingByBrain = new Dictionary<int, int>();
+        foreach (var creature in state.Creatures)
+        {
+            if (creature.BrainId >= 0)
+            {
+                livingByBrain[creature.BrainId] = livingByBrain.GetValueOrDefault(creature.BrainId) + 1;
+            }
+        }
+
+        var eggsByBrain = new Dictionary<int, int>();
+        foreach (var egg in state.Eggs)
+        {
+            if (egg.BrainId >= 0)
+            {
+                eggsByBrain[egg.BrainId] = eggsByBrain.GetValueOrDefault(egg.BrainId) + 1;
+            }
+        }
+
+        return livingByBrain.Keys
+            .Concat(eggsByBrain.Keys)
+            .Distinct()
+            .Select(brainId =>
+            {
+                if (!state.TryGetBrain(brainId, out var brain) || brain?.RtNeat is null)
+                {
+                    return default;
+                }
+
+                return new RtNeatBrainGraphCandidate(
+                    brainId,
+                    livingByBrain.GetValueOrDefault(brainId),
+                    eggsByBrain.GetValueOrDefault(brainId),
+                    brain.RtNeat);
+            })
+            .Where(candidate => candidate.Brain is not null)
+            .OrderByDescending(candidate => candidate.LivingCreatures)
+            .ThenByDescending(candidate => candidate.Eggs)
+            .ThenBy(candidate => candidate.BrainId)
+            .Take(limit)
+            .ToArray();
+    }
+
+    private static void WriteRtNeatBrainGraphSvg(TextWriter writer, RtNeatBrainGenome brain)
+    {
+        const float width = 980f;
+        const float leftX = 145f;
+        const float outputX = 835f;
+        const float topPadding = 54f;
+        const float bottomPadding = 38f;
+
+        var nodeById = brain.Nodes.ToDictionary(node => node.Id);
+        var visibleNodeIds = new HashSet<int>();
+        foreach (var connection in brain.Connections)
+        {
+            visibleNodeIds.Add(connection.SourceNodeId);
+            visibleNodeIds.Add(connection.TargetNodeId);
+        }
+
+        foreach (var node in brain.Nodes)
+        {
+            if (node.Kind != RtNeatNodeKind.Input)
+            {
+                visibleNodeIds.Add(node.Id);
+            }
+        }
+
+        var visibleNodes = brain.Nodes
+            .Where(node => visibleNodeIds.Contains(node.Id))
+            .ToArray();
+        var inputs = visibleNodes
+            .Where(node => node.Kind == RtNeatNodeKind.Input)
+            .OrderBy(node => node.Key, StringComparer.Ordinal)
+            .ToArray();
+        var hidden = visibleNodes
+            .Where(node => node.Kind == RtNeatNodeKind.Hidden)
+            .OrderBy(node => node.Depth)
+            .ThenBy(node => node.Id)
+            .ToArray();
+        var outputs = visibleNodes
+            .Where(node => node.Kind == RtNeatNodeKind.Output)
+            .OrderBy(node => node.Key, StringComparer.Ordinal)
+            .ToArray();
+        var rowCount = Math.Max(1, Math.Max(inputs.Length, Math.Max(hidden.Length, outputs.Length)));
+        var height = MathF.Max(360f, topPadding + bottomPadding + rowCount * 44f);
+        var positions = new Dictionary<int, (float X, float Y)>();
+
+        for (var i = 0; i < inputs.Length; i++)
+        {
+            positions[inputs[i].Id] = (leftX, DistributeY(i, inputs.Length, height, topPadding, bottomPadding));
+        }
+
+        for (var i = 0; i < hidden.Length; i++)
+        {
+            var depth = Math.Clamp(hidden[i].Depth, 0.05f, 0.95f);
+            positions[hidden[i].Id] = (250f + depth * 470f, DistributeY(i, hidden.Length, height, topPadding, bottomPadding));
+        }
+
+        for (var i = 0; i < outputs.Length; i++)
+        {
+            positions[outputs[i].Id] = (outputX, DistributeY(i, outputs.Length, height, topPadding, bottomPadding));
+        }
+
+        writer.WriteLine($"<svg class=\"rtneat-graph\" viewBox=\"0 0 {Svg(width)} {Svg(height)}\" role=\"img\" aria-label=\"rtNEAT graph brain\">");
+        writer.WriteLine($"<rect x=\"0\" y=\"0\" width=\"{Svg(width)}\" height=\"{Svg(height)}\" fill=\"#fbfcf8\"/>");
+        writer.WriteLine("<text x=\"50\" y=\"26\" class=\"rtneat-node-kind\">inputs</text>");
+        writer.WriteLine("<text x=\"470\" y=\"26\" text-anchor=\"middle\" class=\"rtneat-node-kind\">hidden</text>");
+        writer.WriteLine("<text x=\"760\" y=\"26\" class=\"rtneat-node-kind\">actions</text>");
+
+        foreach (var connection in brain.Connections.OrderBy(connection => connection.Enabled ? 1 : 0).ThenBy(connection => Math.Abs(connection.Weight)))
+        {
+            if (!positions.TryGetValue(connection.SourceNodeId, out var source)
+                || !positions.TryGetValue(connection.TargetNodeId, out var target)
+                || !nodeById.TryGetValue(connection.SourceNodeId, out var sourceNode)
+                || !nodeById.TryGetValue(connection.TargetNodeId, out var targetNode))
+            {
+                continue;
+            }
+
+            var weightMagnitude = Math.Abs(connection.Weight);
+            var color = !connection.Enabled
+                ? "#9ca3af"
+                : connection.Weight >= 0f ? "#15803d" : "#dc2626";
+            var opacity = !connection.Enabled
+                ? 0.18f
+                : Math.Clamp(0.25f + weightMagnitude / 5f, 0.25f, 0.82f);
+            var strokeWidth = !connection.Enabled
+                ? 1f
+                : Math.Clamp(1f + weightMagnitude * 0.85f, 1f, 5f);
+            var curveA = source.X + MathF.Max(70f, (target.X - source.X) * 0.42f);
+            var curveB = target.X - MathF.Max(70f, (target.X - source.X) * 0.42f);
+
+            writer.WriteLine(
+                $"<path d=\"M {Svg(source.X)} {Svg(source.Y)} C {Svg(curveA)} {Svg(source.Y)}, {Svg(curveB)} {Svg(target.Y)}, {Svg(target.X)} {Svg(target.Y)}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"{Svg(strokeWidth)}\" opacity=\"{Svg(opacity)}\">" +
+                $"<title>{Html(ShortRtNeatNodeLabel(sourceNode))} -> {Html(ShortRtNeatNodeLabel(targetNode))}: {Html(connection.Weight.ToString("0.###", CultureInfo.InvariantCulture))}{(connection.Enabled ? string.Empty : " disabled")}</title></path>");
+        }
+
+        foreach (var node in inputs)
+        {
+            WriteRtNeatRectNode(writer, node, positions[node.Id], 190f, "#e0f2fe", "#0369a1");
+        }
+
+        foreach (var node in outputs)
+        {
+            WriteRtNeatRectNode(writer, node, positions[node.Id], 190f, "#ecfdf5", "#15803d");
+        }
+
+        foreach (var node in hidden)
+        {
+            var position = positions[node.Id];
+            writer.WriteLine($"<circle cx=\"{Svg(position.X)}\" cy=\"{Svg(position.Y)}\" r=\"18\" fill=\"#fef3c7\" stroke=\"#b45309\" stroke-width=\"2\"><title>{Html(ShortRtNeatNodeLabel(node))}, bias {Html(node.Bias.ToString("0.###", CultureInfo.InvariantCulture))}, {Html(node.Activation)}</title></circle>");
+            writer.WriteLine($"<text x=\"{Svg(position.X)}\" y=\"{Svg(position.Y + 4f)}\" text-anchor=\"middle\" class=\"rtneat-node-label\">h{Html(node.Id)}</text>");
+        }
+
+        writer.WriteLine("</svg>");
+    }
+
+    private static void WriteRtNeatRectNode(
+        TextWriter writer,
+        RtNeatNodeGene node,
+        (float X, float Y) position,
+        float width,
+        string fill,
+        string stroke)
+    {
+        var x = position.X - width / 2f;
+        var y = position.Y - 17f;
+        writer.WriteLine($"<rect x=\"{Svg(x)}\" y=\"{Svg(y)}\" width=\"{Svg(width)}\" height=\"34\" rx=\"6\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"1.5\"><title>{Html(node.Key)}, bias {Html(node.Bias.ToString("0.###", CultureInfo.InvariantCulture))}</title></rect>");
+        writer.WriteLine($"<text x=\"{Svg(position.X)}\" y=\"{Svg(position.Y - 1f)}\" text-anchor=\"middle\" class=\"rtneat-node-label\">{Html(ShortRtNeatNodeLabel(node))}</text>");
+        writer.WriteLine($"<text x=\"{Svg(position.X)}\" y=\"{Svg(position.Y + 11f)}\" text-anchor=\"middle\" class=\"rtneat-node-kind\">{Html(node.Kind)}</text>");
+    }
+
+    private static void WriteDefinition(TextWriter writer, string term, string value)
+    {
+        writer.WriteLine($"<dt>{Html(term)}</dt><dd>{Html(value)}</dd>");
+    }
+
+    private static float DistributeY(int index, int count, float height, float topPadding, float bottomPadding)
+    {
+        if (count <= 1)
+        {
+            return (topPadding + height - bottomPadding) * 0.5f;
+        }
+
+        return topPadding + index * ((height - topPadding - bottomPadding) / (count - 1));
+    }
+
+    private static string ShortRtNeatNodeLabel(RtNeatNodeGene node)
+    {
+        if (node.Kind == RtNeatNodeKind.Hidden)
+        {
+            return $"h{node.Id}";
+        }
+
+        var key = node.Key
+            .Replace("vision.", "vis.", StringComparison.Ordinal)
+            .Replace("internal.", "int.", StringComparison.Ordinal)
+            .Replace("contact.", "touch.", StringComparison.Ordinal)
+            .Replace("terrain.", "ter.", StringComparison.Ordinal)
+            .Replace("habitat.", "hab.", StringComparison.Ordinal)
+            .Replace("obstacle.", "obs.", StringComparison.Ordinal)
+            .Replace("action.", string.Empty, StringComparison.Ordinal);
+        return key.Length <= 24 ? key : $"{key[..21]}...";
+    }
+
+    private static string Svg(float value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
     private static void WriteBrainInputDiagnosticsSection(StreamWriter writer, BrainInputDiagnosticSummary summary)
     {
         writer.WriteLine("<section>");
@@ -3373,6 +3685,7 @@ public static class ViewerReportWriter
         {
             BrainArchitectureKind.HybridNeural => "Hybrid neural",
             BrainArchitectureKind.HiddenLayerNeural => "Hidden-layer neural",
+            BrainArchitectureKind.RtNeatGraph => "rtNEAT graph",
             _ => kind.ToString()
         };
     }

@@ -283,7 +283,7 @@ public static class BehaviorAssay
     }
 
     private static void Accumulate(
-        NeuralBrainGenome brain,
+        BrainGenome brain,
         CreatureGenome genome,
         CreatureSenseState senses,
         Span<float> inputs,
@@ -292,13 +292,11 @@ public static class BehaviorAssay
     {
         var inputFrame = BrainInputFrame.FromSenses(senses, genome);
         var legacyMemoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(senses);
-        LegacyNeuralBrainAdapter.FillInputs(
+        var actionOutputs = brain.Evaluate(
             inputFrame,
             legacyMemoryInputs,
-            inputs);
-        outputs.Clear();
-        brain.Evaluate(inputs, outputs);
-        var actionOutputs = LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs);
+            inputs,
+            outputs).Actions;
 
         accumulator.Add(new BehaviorAssayResult(
             string.Empty,
