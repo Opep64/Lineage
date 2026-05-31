@@ -503,15 +503,39 @@ public sealed record RtNeatBrainGenome
         AddConnection(
             connections,
             ref nextInnovationId,
+            InputNodeId("internal.hunger"),
+            OutputNodeId("action.attack"),
+            1.6f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("internal.dietary_meat_bias"),
+            OutputNodeId("action.attack"),
+            1.2f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("internal.hunger"),
+            OutputNodeId("action.grab"),
+            0.7f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("internal.dietary_meat_bias"),
+            OutputNodeId("action.grab"),
+            0.5f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
             InputNodeId("contact.creature_similarity"),
             OutputNodeId("action.attack"),
-            -4.5f);
+            -2.4f);
         AddConnection(
             connections,
             ref nextInnovationId,
             InputNodeId("contact.creature_similarity"),
             OutputNodeId("action.grab"),
-            -2.0f);
+            -1.1f);
 
         return new RtNeatBrainGenome
         {

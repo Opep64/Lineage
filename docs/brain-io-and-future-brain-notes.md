@@ -459,6 +459,10 @@ Output:
 - `out/rtneat_sparse_starter_compare_20260531/scavenger_20k.html`
 - `out/rtneat_sparse_starter_compare_20260531/predation_20k.csv`
 - `out/rtneat_sparse_starter_compare_20260531/predation_20k.html`
+- `out/rtneat_sparse_starter_compare_20260531/predation_tuned_20k.csv`
+- `out/rtneat_sparse_starter_compare_20260531/predation_tuned_20k.html`
+- `out/rtneat_sparse_starter_compare_20260531/predation_tuned2_20k.csv`
+- `out/rtneat_sparse_starter_compare_20260531/predation_tuned2_20k.html`
 - `out/rtneat_sparse_starter_compare_20260531/balanced_30k.csv`
 - `out/rtneat_sparse_starter_compare_20260531/balanced_30k.html`
 
@@ -474,11 +478,15 @@ Output:
 | Predation Pressure | Hybrid scenario base | 53.7 | 313.0 | 2.7 | 0.00 | 0 | 0.00 | 0 | Reference row. |
 | Predation Pressure | rtNEAT forager | 33.7 | 268.3 | 3.0 | 0.54 | 2 | 7.18 | 10 | Sparse plant-only baseline. |
 | Predation Pressure | rtNEAT predator | 30.7 | 264.0 | 3.3 | 0.44 | 2 | 13.78 | 17 | Not ready; extra predator gates cost survival here. |
+| Predation Pressure | rtNEAT predator tuned | 31.0 | 273.7 | 3.0 | 0.69 | 3 | 18.32 | 23 | Hunger/meat-bias gates improved intent, but not survival. |
+| Predation Pressure | rtNEAT predator tuned2 | 21.0 | 242.0 | 3.7 | 0.61 | 3 | 25.30 | 30 | Rejected; center prey/can-grab gates overcommitted and hurt survival. |
 
 Behavior read:
 
 - The scavenger starter ate meat in `Scavenger Pressure`: average meat-calorie share was 18.8% versus 0% for rtNEAT forager, with low rotten-meat damage.
 - The predator starter did not translate its contact attack/grab graph into useful predation in `Predation Pressure`: average attack intent stayed at 0%, while grab intent appeared only around 1%. The likely cause is the strong same/similar-contact suppression in a mostly single-population predation world.
+- A safer predator tuning softened similar-contact suppression and added hunger/meat-bias attack/grab gates. It raised attack intent to about 2.1% and grab intent to about 4.6%, but final population stayed below sparse forager and meat share remained 0%.
+- A more aggressive tuning that added center-sector prey and can-grab gates was worse, averaging 21.0 final creatures. That path should not be used as the starter default.
 - `Predator Prey Pressure` is not a clean simple override probe because the scenario uses species profiles with saved hybrid brain payloads. Testing a sparse predator there needs either rtNEAT starter species profiles or roster brain overrides, not just `initialBrainKind=sparseGraphPredator`.
 - The balanced-only 30K artifact completed despite the console command timing out before reporting: hybrid base averaged 50.3 final creatures, rtNEAT forager 38.7, rtNEAT scavenger 39.7, and rtNEAT predator 30.3. This supports keeping scavenger as the promising diet variant and treating the predator starter as not ready.
 
@@ -487,7 +495,7 @@ Open design questions after the first pass:
 - Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?
 - Should graph complexity have an immediate energy cost, or should we first measure bloat without adding another pressure?
 - Should rtNEAT eventually get recurrent/self connections for memory, or should memory wait for a separate recurrent/plastic architecture pass?
-- Should the sparse predator starter soften similar-contact suppression, add hunger/meat-bias attack gates, or move to a predator-prey roster test before tuning single-species predation?
+- Should the sparse predator starter move to a predator-prey roster/profile test before more single-species predation tuning?
 
 ### HyperNEAT
 

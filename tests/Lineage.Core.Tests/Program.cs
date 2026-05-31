@@ -6534,11 +6534,29 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
         default,
         denseInputs,
         denseOutputs).Actions;
+    var hungryMeatBiasedSimilarCreatureContact = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                Hunger = 0.9f,
+                CreatureDetected = true,
+                CreatureProximity = 1f,
+                CreatureDirectionForward = 1f,
+                CreatureContact = 1f,
+                CreatureContactSimilarity = 1f,
+                VisibleCreatureDensity = 1f
+            },
+            CreatureGenome.Baseline with { DietaryAdaptation = 0.75f }),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
     AssertTrue(predatorStarter.RtNeat!.ConnectionCount > starter.RtNeat.ConnectionCount, "rtNEAT predator starter should add creature-contact sparse connections");
     AssertTrue(creatureToRight.Turn > 0.25f, "rtNEAT predator starter should turn toward creatures on the right");
     AssertTrue(creatureContact.Attack > 0.25f, "rtNEAT predator starter should attack contacted creatures");
     AssertTrue(creatureContact.Grab > 0.25f, "rtNEAT predator starter should grab contacted creatures");
     AssertTrue(similarCreatureContact.Attack < creatureContact.Attack, "rtNEAT predator starter should suppress attacks against similar contacts");
+    AssertTrue(hungryMeatBiasedSimilarCreatureContact.Attack > 0.25f, "rtNEAT predator starter should let hunger and meat bias overcome similar-contact attack suppression");
+    AssertTrue(hungryMeatBiasedSimilarCreatureContact.Grab > 0.35f, "rtNEAT predator starter should let hunger and meat bias overcome similar-contact grab suppression");
 
     var mutated = BrainFactory.Mutate(
         BrainArchitectureKind.RtNeatGraph,
