@@ -22,6 +22,10 @@ public partial class Main : Node2D
     private const string BrainProfileDirectoryName = "brains";
     private const string ReadableTokensThemePath = "res://Assets/SpriteThemes/readable_tokens.png";
     private const string ReadableTokensColorMaskPath = "res://Assets/SpriteThemes/readable_tokens_color_mask.png";
+    private const string PillbugTokensThemePath = "res://Assets/SpriteThemes/pillbug_tokens.png";
+    private const string PillbugTokensColorMaskPath = "res://Assets/SpriteThemes/pillbug_tokens_color_mask.png";
+    private const string CubeTokensThemePath = "res://Assets/SpriteThemes/cube_tokens.png";
+    private const string CubeTokensColorMaskPath = "res://Assets/SpriteThemes/cube_tokens_color_mask.png";
     private const float LauncherPanelWidth = 520f;
     private const float RightPanelWidth = 640f;
     private const float ViewMargin = 24f;
@@ -67,7 +71,11 @@ public partial class Main : Node2D
     private const float CreatureSpriteMotionSquash = 0.08f;
     private const float CreatureSpriteGaitStretch = 0.035f;
     private const float CreatureSpriteGaitSquash = 0.025f;
-    private const float CreatureSpriteColorMaskAlpha = 0.48f;
+    private const float CreatureSpriteColorMaskAlpha = 0.90f;
+    private const float ColorLegendWidth = 250f;
+    private const float ColorLegendPadding = 10f;
+    private const float ColorLegendRowHeight = 34f;
+    private const float ColorLegendSampleSize = 30f;
     private const float MinResourceSpriteSizePixels = 14f;
     private const float MaxPlantSpriteSizePixels = 50f;
     private const float MaxMeatSpriteSizePixels = 54f;
@@ -275,6 +283,8 @@ public partial class Main : Node2D
     {
         _spriteThemes.Clear();
         AddSpriteTheme("Readable Tokens", ReadableTokensThemePath, ReadableTokensColorMaskPath, drawProceduralCreatureEyes: false);
+        AddSpriteTheme("Pillbug Tokens", PillbugTokensThemePath, PillbugTokensColorMaskPath, drawProceduralCreatureEyes: false);
+        AddSpriteTheme("Cube Tokens", CubeTokensThemePath, CubeTokensColorMaskPath, drawProceduralCreatureEyes: false);
 
         if (_spriteThemes.Count == 0)
         {
@@ -626,6 +636,7 @@ public partial class Main : Node2D
             DrawCreatures();
             DrawSelectedEggOverlay();
             DrawScaleBar();
+            DrawColorLegend();
         }
         else
         {
@@ -2219,6 +2230,95 @@ public partial class Main : Node2D
         return true;
     }
 
+    private void DrawColorLegend()
+    {
+        var entries = GetColorLegendEntries();
+        if (entries.Length == 0 || _worldRect.Size.X < 260f || _worldRect.Size.Y < 180f)
+        {
+            return;
+        }
+
+        var titleHeight = 24f;
+        var height = ColorLegendPadding * 2f + titleHeight + entries.Length * ColorLegendRowHeight;
+        var position = new Vector2(
+            _worldRect.End.X - ColorLegendWidth - 12f,
+            _worldRect.Position.Y + 12f);
+        var panel = new Rect2(position, new Vector2(ColorLegendWidth, height));
+
+        DrawRect(panel, new Color(0.02f, 0.025f, 0.024f, 0.80f), filled: true);
+        DrawRect(panel, new Color(0.86f, 0.90f, 0.82f, 0.32f), filled: false, width: 1f);
+
+        DrawLegendText(
+            position + new Vector2(ColorLegendPadding, ColorLegendPadding + 15f),
+            $"{FormatColorMode(_colorMode)} colors",
+            new Color(0.96f, 0.98f, 0.92f));
+
+        for (var i = 0; i < entries.Length; i++)
+        {
+            var rowTop = position.Y + ColorLegendPadding + titleHeight + i * ColorLegendRowHeight;
+            var sampleCenter = new Vector2(position.X + ColorLegendPadding + 18f, rowTop + ColorLegendRowHeight * 0.5f);
+            DrawColorLegendSample(sampleCenter, entries[i].Color);
+            DrawLegendText(
+                new Vector2(position.X + ColorLegendPadding + 44f, rowTop + 22f),
+                entries[i].Label,
+                new Color(0.90f, 0.93f, 0.88f));
+        }
+    }
+
+    private ColorLegendEntry[] GetColorLegendEntries()
+    {
+        return _colorMode switch
+        {
+            CreatureColorMode.Generation => new[]
+            {
+                new ColorLegendEntry("Gen 0", ColorForGeneration(0)),
+                new ColorLegendEntry("Gen 5", ColorForGeneration(5)),
+                new ColorLegendEntry("Gen 10", ColorForGeneration(10))
+            },
+            CreatureColorMode.Energy => new[]
+            {
+                new ColorLegendEntry("red = low energy", ColorForEnergy(0f, 1f)),
+                new ColorLegendEntry("repro threshold", ColorForEnergy(1f, 1f)),
+                new ColorLegendEntry("green = high reserve", ColorForEnergy(1.5f, 1f))
+            },
+            CreatureColorMode.Age => new[]
+            {
+                new ColorLegendEntry("cyan = young", ColorForAge(0f)),
+                new ColorLegendEntry("yellow = middle", ColorForAge(450f)),
+                new ColorLegendEntry("magenta = old", ColorForAge(900f))
+            },
+            _ => Array.Empty<ColorLegendEntry>()
+        };
+    }
+
+    private void DrawColorLegendSample(Vector2 center, Color color)
+    {
+        if (_visualRenderMode == VisualRenderMode.SpriteTheme && TryGetSpriteTheme(out var theme))
+        {
+            var size = new Vector2(ColorLegendSampleSize, ColorLegendSampleSize);
+            if (TryDrawSpriteRegion(theme, SpriteAtlasSlot.CreatureGeneralist, center, size, 0f, Colors.White))
+            {
+                TryDrawSpriteColorMask(theme, SpriteAtlasSlot.CreatureGeneralist, center, size, 0f, color);
+                return;
+            }
+        }
+
+        var radius = ColorLegendSampleSize * 0.34f;
+        DrawCircle(center, radius, color);
+        DrawLine(center, center + new Vector2(radius + 7f, 0f), Colors.Black, width: 1.2f);
+    }
+
+    private void DrawLegendText(Vector2 baseline, string text, Color color)
+    {
+        var font = ThemeDB.FallbackFont;
+        if (font is null)
+        {
+            return;
+        }
+
+        DrawString(font, baseline, text, HorizontalAlignment.Left, -1f, 14, color);
+    }
+
     private void DrawSpriteBackplate(Vector2 center, float radius, Color color, float alpha)
     {
         if (radius <= 0f)
@@ -2388,10 +2488,7 @@ public partial class Main : Node2D
         {
             DrawSpriteBackplate(screenPosition, backplateRadius, _selectedColor, 0.54f);
         }
-        else
-        {
-            DrawSpriteShadow(screenPosition, backplateRadius, 0.24f);
-        }
+
         var drawn = TryDrawSpriteRegion(
             theme,
             slot,
@@ -3732,16 +3829,26 @@ public partial class Main : Node2D
 
     private static Color ColorForEnergy(float energy, float reproductionThreshold)
     {
-        var ratio = reproductionThreshold > 0f
-            ? Mathf.Clamp(energy / reproductionThreshold, 0f, 1.5f) / 1.5f
+        var reserveRatio = reproductionThreshold > 0f
+            ? Mathf.Clamp(energy / reproductionThreshold, 0f, 1.5f)
             : 0f;
-        return new Color(0.9f, 0.24f, 0.22f).Lerp(new Color(0.25f, 0.9f, 0.42f), ratio);
+        var low = new Color(1.0f, 0.08f, 0.06f);
+        var ready = new Color(1.0f, 0.86f, 0.04f);
+        var high = new Color(0.08f, 1.0f, 0.24f);
+        return reserveRatio <= 1f
+            ? low.Lerp(ready, reserveRatio)
+            : ready.Lerp(high, (reserveRatio - 1f) / 0.5f);
     }
 
     private static Color ColorForAge(float ageSeconds)
     {
         var ratio = Mathf.Clamp(ageSeconds / 900f, 0f, 1f);
-        return new Color(0.53f, 0.88f, 0.94f).Lerp(new Color(0.94f, 0.56f, 0.86f), ratio);
+        var young = new Color(0.08f, 0.92f, 1.0f);
+        var middle = new Color(1.0f, 0.88f, 0.06f);
+        var old = new Color(1.0f, 0.10f, 0.78f);
+        return ratio <= 0.5f
+            ? young.Lerp(middle, ratio / 0.5f)
+            : middle.Lerp(old, (ratio - 0.5f) / 0.5f);
     }
 
     private void DrawBiomeOverlay()
@@ -6071,6 +6178,8 @@ public partial class Main : Node2D
         float MaxPressure,
         float AverageStrength,
         float MaxStrength);
+
+    private readonly record struct ColorLegendEntry(string Label, Color Color);
 
     private enum CreatureColorMode
     {
