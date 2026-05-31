@@ -7,6 +7,11 @@ public sealed partial class LineageRunManager
     private const int MaxBrainLabSnapshotOptions = 200;
     private const int MaxBrainLabCreatures = 1000;
     private const int MaxBrainLabPopulationCreatures = 5000;
+    private const int MaxBrainLabWorldProbeResources = 500;
+    private const int MaxBrainLabWorldProbeEggs = 250;
+    private const int MaxBrainLabWorldProbeCreatures = 500;
+    private const float BrainLabWorldProbePadding = 24f;
+    private const float BrainLabSoundEmissionThreshold = 0.05f;
 
     private readonly object _brainLabSnapshotLock = new();
     private readonly BrainProbeService _brainProbeService = new();
@@ -170,6 +175,85 @@ public sealed partial class LineageRunManager
             rows);
     }
 
+    public BrainLabWorldProbeScene GetBrainLabWorldProbe(BrainLabWorldProbeRequest request)
+    {
+        if (request.CreatureId <= 0)
+        {
+            throw new ArgumentException("Creature ID is required.");
+        }
+
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var state = restored.Simulation.State;
+        if (!TryFindBrainLabCreature(state, new EntityId(request.CreatureId), out var focus))
+        {
+            throw new ArgumentException($"Creature {request.CreatureId} was not found.");
+        }
+
+        var focusGenome = state.GetGenome(focus.GenomeId);
+        var focusRadius = CreatureGrowth.EffectiveBodyRadius(focus, focusGenome);
+        var senseRadius = CreatureGrowth.EffectiveSenseRadius(focus, focusGenome);
+        var soundRadius = senseRadius * restored.Scenario.SoundRangeMultiplier;
+        var probeRadius = MathF.Max(senseRadius, soundRadius) + MathF.Max(focusRadius, BrainLabWorldProbePadding);
+        var center = focus.Position;
+
+        var resourceCandidates = state.Resources
+            .Where(resource => resource.Calories > 0f)
+            .Select(resource => CreateBrainLabProbeResource(resource, center))
+            .Where(resource => resource.Distance <= probeRadius + resource.Radius)
+            .OrderBy(resource => resource.Distance)
+            .ToArray();
+        var eggCandidates = state.Eggs
+            .Where(egg => egg.Health > 0f)
+            .Select(egg => CreateBrainLabProbeEgg(egg, center))
+            .Where(egg => egg.Distance <= probeRadius + egg.Radius)
+            .OrderBy(egg => egg.Distance)
+            .ToArray();
+        var creatureCandidates = state.Creatures
+            .Where(creature => creature.Id != focus.Id && creature.Health > 0f && creature.Energy > 0f)
+            .Select(creature => CreateBrainLabProbeCreature(state, creature, center, isFocus: false))
+            .Where(creature => creature.Distance <= probeRadius + creature.Radius)
+            .OrderBy(creature => creature.Distance)
+            .ToArray();
+
+        var returnedResources = resourceCandidates
+            .Take(MaxBrainLabWorldProbeResources)
+            .ToArray();
+        var returnedEggs = eggCandidates
+            .Take(MaxBrainLabWorldProbeEggs)
+            .ToArray();
+        var returnedCreatures = creatureCandidates
+            .Take(MaxBrainLabWorldProbeCreatures)
+            .ToArray();
+
+        var counts = new BrainLabWorldProbeCounts(
+            resourceCandidates.Count(resource => string.Equals(resource.Kind, nameof(ResourceKind.Plant), StringComparison.Ordinal)),
+            resourceCandidates.Count(resource => string.Equals(resource.Kind, nameof(ResourceKind.Meat), StringComparison.Ordinal)),
+            eggCandidates.Length,
+            creatureCandidates.Length,
+            creatureCandidates.Count(creature => creature.SoundAmplitude > BrainLabSoundEmissionThreshold),
+            returnedResources.Length,
+            returnedEggs.Length,
+            returnedCreatures.Length);
+
+        return new BrainLabWorldProbeScene(
+            NormalizeArtifactRelativePath(resolvedPath),
+            focus.Id.Value,
+            probeRadius,
+            senseRadius,
+            soundRadius,
+            state.Bounds.Width,
+            state.Bounds.Height,
+            resourceCandidates.Length > returnedResources.Length
+                || eggCandidates.Length > returnedEggs.Length
+                || creatureCandidates.Length > returnedCreatures.Length,
+            counts,
+            CreateBrainLabProbeCreature(state, focus, center, isFocus: true),
+            returnedResources,
+            returnedEggs,
+            returnedCreatures);
+    }
+
     private RestoredSimulation LoadBrainLabSimulation(string resolvedPath)
     {
         var modifiedUtc = File.GetLastWriteTimeUtc(resolvedPath);
@@ -221,6 +305,80 @@ public sealed partial class LineageRunManager
             || fileName.StartsWith("checkpoint_", StringComparison.Ordinal)
             || fileName.Contains("_snapshot", StringComparison.Ordinal)
             || fileName.Contains(".snapshot.", StringComparison.Ordinal);
+    }
+
+    private static bool TryFindBrainLabCreature(WorldState state, EntityId creatureId, out CreatureState creature)
+    {
+        foreach (var candidate in state.Creatures)
+        {
+            if (candidate.Id == creatureId)
+            {
+                creature = candidate;
+                return true;
+            }
+        }
+
+        creature = default;
+        return false;
+    }
+
+    private static BrainLabWorldProbeResource CreateBrainLabProbeResource(
+        ResourcePatchState resource,
+        SimVector2 center)
+    {
+        var relative = resource.Position - center;
+        return new BrainLabWorldProbeResource(
+            resource.Id.Value,
+            resource.Kind.ToString(),
+            resource.Kind == ResourceKind.Plant ? resource.PlantKind.ToString() : string.Empty,
+            relative.X,
+            relative.Y,
+            relative.Length,
+            resource.Radius,
+            resource.Calories,
+            resource.MaxCalories,
+            MeatQuality.Freshness(resource));
+    }
+
+    private static BrainLabWorldProbeEgg CreateBrainLabProbeEgg(EggState egg, SimVector2 center)
+    {
+        var relative = egg.Position - center;
+        return new BrainLabWorldProbeEgg(
+            egg.Id.Value,
+            egg.Generation,
+            relative.X,
+            relative.Y,
+            relative.Length,
+            EggPredation.ContactRadius(egg),
+            egg.Energy,
+            egg.Health);
+    }
+
+    private static BrainLabWorldProbeCreature CreateBrainLabProbeCreature(
+        WorldState state,
+        CreatureState creature,
+        SimVector2 center,
+        bool isFocus)
+    {
+        var genome = state.GetGenome(creature.GenomeId);
+        var relative = creature.Position - center;
+        return new BrainLabWorldProbeCreature(
+            creature.Id.Value,
+            creature.Generation,
+            state.GetBrainArchitectureKind(creature.BrainId).ToString(),
+            relative.X,
+            relative.Y,
+            relative.Length,
+            CreatureGrowth.EffectiveBodyRadius(creature, genome),
+            creature.HeadingRadians,
+            creature.Senses.EnergyRatio,
+            creature.Senses.HealthRatio,
+            creature.Senses.Hunger,
+            Math.Clamp(creature.Actions.SoundAmplitude, 0f, 1f),
+            Math.Clamp(creature.Actions.SoundTone, -1f, 1f),
+            creature.Senses.SoundDetected,
+            creature.Senses.SoundDensity,
+            isFocus);
     }
 
     private sealed record BrainLabPresetDefinition(

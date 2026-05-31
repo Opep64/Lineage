@@ -71,6 +71,18 @@ api.MapPost("/brain-lab/preset-matrix", (BrainLabPresetMatrixRequest request, Li
     }
 });
 
+api.MapPost("/brain-lab/world-probe", (BrainLabWorldProbeRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.GetBrainLabWorldProbe(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/species-catalog/delete", (SpeciesCatalogDeleteRequest request, LineageRunManager manager) =>
 {
     try

@@ -3,6 +3,9 @@ const runsBody = document.querySelector("#runsBody");
 const launchForm = document.querySelector("#launchForm");
 const formMessage = document.querySelector("#formMessage");
 const refreshStatus = document.querySelector("#refreshStatus");
+const launcherTabs = document.querySelector("#launcherTabs");
+const launcherTabButtons = [...document.querySelectorAll("[data-launcher-tab]")];
+const launcherTabPanels = [...document.querySelectorAll("[data-launcher-panel]")];
 const refreshButton = document.querySelector("#refreshButton");
 const runSearch = document.querySelector("#runSearch");
 const statusFilter = document.querySelector("#statusFilter");
@@ -84,6 +87,9 @@ const brainLabInputs = document.querySelector("#brainLabInputs");
 const brainLabOutputs = document.querySelector("#brainLabOutputs");
 const brainLabPopulation = document.querySelector("#brainLabPopulation");
 const brainLabPresetMatrix = document.querySelector("#brainLabPresetMatrix");
+const brainLabWorldProbe = document.querySelector("#brainLabWorldProbe");
+const brainLabWorldProbeCanvas = document.querySelector("#brainLabWorldProbeCanvas");
+const brainLabWorldProbeSummary = document.querySelector("#brainLabWorldProbeSummary");
 const brainLabStatus = document.querySelector("#brainLabStatus");
 const speciesCatalogSelect = document.querySelector("#speciesCatalogSelect");
 const speciesCatalogDetails = document.querySelector("#speciesCatalogDetails");
@@ -108,8 +114,10 @@ let brainLabSnapshot = null;
 let brainLabEvaluation = null;
 let brainLabPopulationEvaluation = null;
 let brainLabPresetMatrixResult = null;
+let brainLabWorldProbeScene = null;
 let brainLabOverrides = {};
 let brainLabEvaluateTimer = null;
+let brainLabWorldProbeOverrideKeys = new Set();
 let appliedRecipes = [];
 let recipeBaseScenario = null;
 let recipeDiffCheckpoint = null;
@@ -133,6 +141,7 @@ let sortKey = "createdAtUtc";
 let sortDirection = "desc";
 let scenarioEditor = null;
 let scenarioEditorBaseline = null;
+let activeLauncherTab = "launch";
 let activeScenarioGroup = null;
 let biomePreviewTimer = null;
 let biomePreviewRequestId = 0;
@@ -141,6 +150,30 @@ let biomePreviewCollapsed = false;
 let biomePaintEnabled = false;
 let biomePaintDirty = false;
 let biomePaintPointerDown = false;
+
+function setLauncherTab(tab) {
+  if (!launcherTabPanels.some((panel) => panel.dataset.launcherPanel === tab)) {
+    return;
+  }
+
+  activeLauncherTab = tab;
+  for (const button of launcherTabButtons) {
+    const isActive = button.dataset.launcherTab === tab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+    button.tabIndex = isActive ? 0 : -1;
+  }
+
+  for (const panel of launcherTabPanels) {
+    const isActive = panel.dataset.launcherPanel === tab;
+    panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
+  }
+
+  if (tab === "brain") {
+    renderBrainLabWorldProbe();
+  }
+}
 
 async function loadScenarios(selectedPath = scenarioSelect.value) {
   const response = await fetch("/api/scenarios");
@@ -395,7 +428,10 @@ async function loadBrainLabSnapshot() {
   brainLabEvaluation = null;
   brainLabPopulationEvaluation = null;
   brainLabPresetMatrixResult = null;
+  brainLabWorldProbeScene = null;
   brainLabOverrides = {};
+  brainLabWorldProbeOverrideKeys = new Set();
+  resetBrainLabWorldProbeToggles();
   if (brainLabSnapshotPath) {
     brainLabSnapshotPath.value = brainLabSnapshot.path;
   }
@@ -406,6 +442,7 @@ async function loadBrainLabSnapshot() {
   renderBrainLabSnapshot();
   brainLabStatus.textContent = `Loaded ${brainLabSnapshot.path}`;
   if (brainLabSnapshot.creatures?.length > 0) {
+    await loadBrainLabWorldProbe();
     await evaluateBrainLab();
   }
 }
@@ -417,6 +454,7 @@ function renderBrainLabSnapshot() {
   renderBrainLabOutputs();
   renderBrainLabPopulation();
   renderBrainLabPresetMatrix();
+  renderBrainLabWorldProbe();
   updateBrainLabButtons();
 }
 
@@ -485,6 +523,7 @@ async function evaluateBrainLab() {
   renderBrainLabInputs();
   renderBrainLabOutputs();
   renderBrainLabPopulation();
+  renderBrainLabWorldProbe();
   updateBrainLabButtons();
   brainLabStatus.textContent = [
     `${formatNumber(brainLabEvaluation.changedOutputCount)} changed outputs`,
@@ -525,6 +564,305 @@ function renderBrainLabMeta() {
     `tick ${formatNumber(brainLabSnapshot.tick)}`,
     `${formatNumber(brainLabSnapshot.creatureCount)} creatures${brainLabSnapshot.creatureListTruncated ? ` (${formatNumber(brainLabSnapshot.returnedCreatureCount)} shown)` : ""}`
   ].join(" | ") + creatureText;
+}
+
+async function loadBrainLabWorldProbe() {
+  const path = brainLabSelectedPath();
+  const creatureId = Number(brainLabCreatureSelect?.value || 0);
+  if (!path || !creatureId) {
+    brainLabWorldProbeScene = null;
+    renderBrainLabWorldProbe();
+    return;
+  }
+
+  const response = await fetch("/api/brain-lab/world-probe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      creatureId
+    })
+  });
+
+  if (!response.ok) {
+    brainLabWorldProbeScene = null;
+    renderBrainLabWorldProbe();
+    brainLabStatus.textContent = await responseErrorMessage(response, "World probe failed.");
+    return;
+  }
+
+  brainLabWorldProbeScene = await response.json();
+  renderBrainLabWorldProbe();
+}
+
+function renderBrainLabWorldProbe() {
+  if (!brainLabWorldProbeCanvas || !brainLabWorldProbeSummary) {
+    return;
+  }
+
+  const canvas = brainLabWorldProbeCanvas;
+  resizeBrainLabWorldProbeCanvas(canvas);
+  const context = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#f5f8fb";
+  context.fillRect(0, 0, width, height);
+
+  if (!brainLabWorldProbeScene) {
+    brainLabWorldProbeSummary.textContent = "No world probe yet.";
+    return;
+  }
+
+  const toggles = brainLabWorldProbeToggles();
+  const scene = brainLabWorldProbeScene;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.max(1, Number(scene.probeRadius || 1));
+  const scale = Math.min((width - 34) / (radius * 2), (height - 34) / (radius * 2));
+  const toScreen = (item) => ({
+    x: centerX + Number(item.x || 0) * scale,
+    y: centerY - Number(item.y || 0) * scale
+  });
+
+  drawBrainLabProbeCircle(context, centerX, centerY, Number(scene.soundRadius || 0) * scale, "#e7a13d", [8, 8]);
+  drawBrainLabProbeCircle(context, centerX, centerY, Number(scene.senseRadius || 0) * scale, "#5078bd", [4, 7]);
+  drawBrainLabProbeCircle(context, centerX, centerY, radius * scale, "#9aa5b1", []);
+
+  if (toggles.sound && toggles.creatures) {
+    for (const creature of scene.creatures || []) {
+      if (Number(creature.soundAmplitude || 0) > 0.05) {
+        drawBrainLabProbeSound(context, toScreen(creature), creature);
+      }
+    }
+  }
+
+  if (toggles.plants) {
+    for (const resource of (scene.resources || []).filter((item) => item.kind === "Plant")) {
+      drawBrainLabProbeDot(context, toScreen(resource), Math.max(3, Number(resource.radius || 0) * scale), "#3d9462", "#1f6d43");
+    }
+  }
+
+  if (toggles.meatEggs) {
+    for (const resource of (scene.resources || []).filter((item) => item.kind === "Meat")) {
+      drawBrainLabProbeDot(context, toScreen(resource), Math.max(3, Number(resource.radius || 0) * scale), "#b95c52", "#873b34");
+    }
+
+    for (const egg of scene.eggs || []) {
+      drawBrainLabProbeDot(context, toScreen(egg), Math.max(3, Number(egg.radius || 0) * scale), "#d7ad34", "#9b7b1e");
+    }
+  }
+
+  if (toggles.creatures) {
+    for (const creature of scene.creatures || []) {
+      drawBrainLabProbeCreature(context, toScreen(creature), creature, scale);
+    }
+  }
+
+  drawBrainLabProbeCreature(context, toScreen(scene.focus), scene.focus, scale);
+  const counts = scene.counts || {};
+  brainLabWorldProbeSummary.innerHTML = [
+    `<span>probe ${formatBrainLabNumber(scene.probeRadius)}u</span>`,
+    `<span>sense ${formatBrainLabNumber(scene.senseRadius)}u</span>`,
+    `<span>sound ${formatBrainLabNumber(scene.soundRadius)}u</span>`,
+    `<span>plants ${formatNumber(counts.plantCount || 0)}</span>`,
+    `<span>meat ${formatNumber(counts.meatCount || 0)}</span>`,
+    `<span>eggs ${formatNumber(counts.eggCount || 0)}</span>`,
+    `<span>creatures ${formatNumber(counts.creatureCount || 0)}</span>`,
+    `<span>sound sources ${formatNumber(counts.soundSourceCount || 0)}</span>`,
+    scene.truncated ? `<span>view capped</span>` : ""
+  ].filter(Boolean).join("");
+}
+
+function resizeBrainLabWorldProbeCanvas(canvas) {
+  const width = Math.max(320, Math.round(canvas.clientWidth || canvas.width));
+  const height = Math.max(220, Math.round(canvas.clientHeight || canvas.height));
+  if (canvas.width !== width) {
+    canvas.width = width;
+  }
+  if (canvas.height !== height) {
+    canvas.height = height;
+  }
+}
+
+function drawBrainLabProbeCircle(context, x, y, radius, color, dash) {
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return;
+  }
+
+  context.save();
+  context.setLineDash(dash);
+  context.strokeStyle = color;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.arc(x, y, radius, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+function drawBrainLabProbeDot(context, point, radius, fill, stroke) {
+  context.save();
+  context.fillStyle = fill;
+  context.strokeStyle = stroke;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.arc(point.x, point.y, Math.min(12, radius), 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.restore();
+}
+
+function drawBrainLabProbeSound(context, point, creature) {
+  const amplitude = Math.max(0, Number(creature.soundAmplitude || 0));
+  const radius = 8 + amplitude * 22;
+  context.save();
+  context.strokeStyle = "rgba(218, 132, 39, 0.45)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+function drawBrainLabProbeCreature(context, point, creature, scale) {
+  const bodyRadius = Math.max(4, Math.min(14, Number(creature.radius || 0) * scale));
+  const heading = Number(creature.headingRadians || 0);
+  const lineLength = bodyRadius + 7;
+  context.save();
+  context.fillStyle = creature.isFocus ? "#1d2733" : "#5c7fbd";
+  context.strokeStyle = creature.isFocus ? "#ffffff" : "#2e4d82";
+  context.lineWidth = creature.isFocus ? 2.5 : 1.25;
+  context.beginPath();
+  context.arc(point.x, point.y, bodyRadius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.strokeStyle = creature.isFocus ? "#1d2733" : "#2e4d82";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(point.x, point.y);
+  context.lineTo(point.x + Math.cos(heading) * lineLength, point.y - Math.sin(heading) * lineLength);
+  context.stroke();
+  context.restore();
+}
+
+function brainLabWorldProbeToggles() {
+  const state = {
+    plants: true,
+    meatEggs: true,
+    creatures: true,
+    sound: true
+  };
+  if (!brainLabWorldProbe) {
+    return state;
+  }
+
+  for (const control of brainLabWorldProbe.querySelectorAll("[data-brain-lab-world-toggle]")) {
+    state[control.dataset.brainLabWorldToggle] = control.checked;
+  }
+  return state;
+}
+
+function resetBrainLabWorldProbeToggles() {
+  if (!brainLabWorldProbe) {
+    return;
+  }
+
+  for (const control of brainLabWorldProbe.querySelectorAll("[data-brain-lab-world-toggle]")) {
+    control.checked = true;
+  }
+}
+
+function applyBrainLabWorldProbeToggles() {
+  if (brainLabEvaluation?.supportsRawInputOverrides === false) {
+    renderBrainLabWorldProbe();
+    return;
+  }
+
+  const inputs = brainLabEvaluation?.inputs || [];
+  if (inputs.length === 0) {
+    renderBrainLabWorldProbe();
+    return;
+  }
+
+  for (const key of brainLabWorldProbeOverrideKeys) {
+    delete brainLabOverrides[key];
+  }
+  brainLabWorldProbeOverrideKeys = new Set();
+
+  const toggles = brainLabWorldProbeToggles();
+  if (!toggles.plants && !toggles.meatEggs) {
+    setBrainLabWorldProbeFoodNeutral(inputs);
+  } else if (!toggles.plants) {
+    setBrainLabWorldProbeOnlyMeatEggs(inputs);
+  } else if (!toggles.meatEggs) {
+    setBrainLabWorldProbeOnlyPlants(inputs);
+  }
+
+  if (!toggles.creatures) {
+    for (const input of inputs.filter(isBrainLabCreatureInput)) {
+      setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
+    }
+  }
+
+  if (!toggles.sound) {
+    for (const input of inputs.filter((candidate) => candidate.group === "Sound")) {
+      setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
+    }
+  }
+
+  clearBrainLabPopulation();
+  renderBrainLabWorldProbe();
+  evaluateBrainLab();
+}
+
+function setBrainLabWorldProbeFoodNeutral(inputs) {
+  for (const input of inputs.filter(isBrainLabFoodInput)) {
+    setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
+  }
+}
+
+function setBrainLabWorldProbeOnlyPlants(inputs) {
+  const plantDensity = findBrainLabInput("vision.plant_density", inputs)?.baselineValue ?? 0;
+  const plantContact = findBrainLabInput("contact.plant_food", inputs)?.baselineValue ?? 0;
+  for (const input of inputs.filter(isBrainLabMeatOrEggInput)) {
+    setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
+  }
+  setBrainLabWorldProbeOverride("vision.food_density", plantDensity, inputs);
+  setBrainLabWorldProbeOverride("contact.food", plantContact, inputs);
+}
+
+function setBrainLabWorldProbeOnlyMeatEggs(inputs) {
+  const meatDensity = findBrainLabInput("vision.meat_density", inputs)?.baselineValue ?? 0;
+  const meatContact = Math.max(
+    findBrainLabInput("contact.meat_food", inputs)?.baselineValue ?? 0,
+    findBrainLabInput("contact.egg_food", inputs)?.baselineValue ?? 0);
+  for (const input of inputs.filter(isBrainLabPlantInput)) {
+    setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
+  }
+  setBrainLabWorldProbeOverride("vision.food_density", meatDensity, inputs);
+  setBrainLabWorldProbeOverride("contact.food", meatContact, inputs);
+}
+
+function setBrainLabWorldProbeOverride(key, value, inputs) {
+  const input = findBrainLabInput(key, inputs);
+  if (!input) {
+    return;
+  }
+
+  brainLabWorldProbeOverrideKeys.add(key);
+  const clamped = Math.min(Math.max(Number(value), Number(input.minimumValue)), Number(input.maximumValue));
+  if (Math.abs(clamped - Number(input.baselineValue)) <= 0.0005) {
+    delete brainLabOverrides[key];
+  } else {
+    brainLabOverrides[key] = clamped;
+  }
+}
+
+function isBrainLabCreatureInput(input) {
+  return input.key.includes("creature")
+    || input.key.startsWith("contact.grab")
+    || input.key === "contact.can_grab_creature"
+    || input.key === "contact.is_holding_creature";
 }
 
 function renderBrainLabInputs() {
@@ -858,6 +1196,9 @@ function muteBrainLabSound() {
 
 function resetBrainLabOverrides() {
   brainLabOverrides = {};
+  brainLabWorldProbeOverrideKeys = new Set();
+  resetBrainLabWorldProbeToggles();
+  renderBrainLabWorldProbe();
   clearBrainLabPopulation();
   evaluateBrainLab();
 }
@@ -873,6 +1214,8 @@ function applyBrainLabPreset() {
   }
 
   brainLabOverrides = {};
+  brainLabWorldProbeOverrideKeys = new Set();
+  resetBrainLabWorldProbeToggles();
   const preset = brainLabPresetSelect?.value || "muteSound";
   if (preset === "muteSound") {
     setBrainLabGroupNeutral("Sound", inputs);
@@ -1014,6 +1357,11 @@ function updateBrainLabButtons() {
   }
   if (runBrainLabPresetMatrixButton) {
     runBrainLabPresetMatrixButton.disabled = !hasSnapshot;
+  }
+  if (brainLabWorldProbe) {
+    for (const control of brainLabWorldProbe.querySelectorAll("[data-brain-lab-world-toggle]")) {
+      control.disabled = !hasSnapshot || !hasCreature || !hasEvaluation || !supportsOverrides || !brainLabWorldProbeScene;
+    }
   }
 }
 
@@ -3657,6 +4005,7 @@ async function saveSpeciesFromRun(id) {
   refreshStatus.textContent = result.brain
     ? `Saved species profile ${result.species.name} with paired brain ${result.brain.name}.`
     : `Saved species profile ${result.species.name}.`;
+  setLauncherTab("launch");
   document.querySelector(".species-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -3712,6 +4061,7 @@ async function saveBrainFromRun(id) {
   const result = await response.json();
   await loadBrainCatalog(result.brain.path);
   refreshStatus.textContent = `Saved brain profile ${result.brain.name}.`;
+  setLauncherTab("brain");
   document.querySelector(".brain-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -4130,6 +4480,15 @@ function updateSortIndicators() {
   }
 }
 
+launcherTabs?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-launcher-tab]");
+  if (!button) {
+    return;
+  }
+
+  setLauncherTab(button.dataset.launcherTab);
+});
+
 launchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   formMessage.textContent = "Starting run...";
@@ -4460,8 +4819,11 @@ brainLabSnapshotSelect.addEventListener("change", () => {
 });
 brainLabCreatureSelect.addEventListener("change", () => {
   brainLabOverrides = {};
+  brainLabWorldProbeOverrideKeys = new Set();
+  resetBrainLabWorldProbeToggles();
+  brainLabWorldProbeScene = null;
   clearBrainLabPopulation();
-  evaluateBrainLab();
+  loadBrainLabWorldProbe().then(evaluateBrainLab);
 });
 brainLabGroupFilter.addEventListener("change", renderBrainLabInputs);
 brainLabInputs.addEventListener("input", (event) => {
@@ -4474,6 +4836,12 @@ brainLabInputs.addEventListener("click", (event) => {
   const button = event.target.closest("[data-brain-lab-reset-input]");
   if (button) {
     resetBrainLabInput(button.dataset.brainLabResetInput);
+  }
+});
+brainLabWorldProbe.addEventListener("change", (event) => {
+  const control = event.target.closest("[data-brain-lab-world-toggle]");
+  if (control) {
+    applyBrainLabWorldProbeToggles();
   }
 });
 
@@ -4612,6 +4980,7 @@ async function cloneRunSettings(id) {
   scenarioOptionsPanel.hidden = false;
   formMessage.textContent = `Loaded settings from ${settings.sourceRunName}.`;
   refreshStatus.textContent = "Clone settings loaded";
+  setLauncherTab("launch");
   document.querySelector(".launch-panel").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -4938,6 +5307,8 @@ async function boot() {
   await loadRuns();
   refreshTimer = setInterval(loadRuns, 2000);
 }
+
+setLauncherTab(activeLauncherTab);
 
 boot().catch((error) => {
   refreshStatus.textContent = "Error";

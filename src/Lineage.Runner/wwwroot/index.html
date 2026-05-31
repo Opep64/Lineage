@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260530-roster-editor1">
+  <link rel="stylesheet" href="/styles.css?v=20260531-launch-tabs1">
 </head>
 <body>
   <header class="app-header">
@@ -16,6 +16,13 @@
   </header>
 
   <main>
+    <nav id="launcherTabs" class="launcher-tabs" role="tablist" aria-label="Launcher areas">
+      <button id="launcherTabLaunchButton" class="launcher-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="launcherTabLaunch" data-launcher-tab="launch">Launch</button>
+      <button id="launcherTabBrainButton" class="launcher-tab" type="button" role="tab" aria-selected="false" aria-controls="launcherTabBrain" data-launcher-tab="brain">Brain</button>
+      <button id="launcherTabRunsButton" class="launcher-tab" type="button" role="tab" aria-selected="false" aria-controls="launcherTabRuns" data-launcher-tab="runs">Runs</button>
+    </nav>
+
+    <div id="launcherTabLaunch" class="launcher-tab-panel is-active" role="tabpanel" aria-labelledby="launcherTabLaunchButton" data-launcher-panel="launch">
     <section class="launch-panel">
       <h2>Launch Run</h2>
       <form id="launchForm" class="launch-form">
@@ -165,105 +172,6 @@
       <p id="formMessage" class="form-message" role="status"></p>
     </section>
 
-    <section class="brain-panel">
-      <div class="section-title">
-        <h2>Brain Catalog</h2>
-        <div class="section-actions">
-          <button id="refreshBrainCatalogButton" class="secondary" type="button">Refresh Catalog</button>
-          <button id="deleteBrainCatalogButton" class="danger" type="button" disabled>Delete Brain</button>
-        </div>
-      </div>
-      <div class="brain-tools">
-        <label>
-          Brain profile
-          <select id="brainCatalogSelect">
-            <option value="">No brain profiles loaded</option>
-          </select>
-        </label>
-      </div>
-      <div id="brainCatalogDetails" class="catalog-details">Choose a brain profile to inspect it.</div>
-    </section>
-
-    <section class="brain-lab-panel">
-      <div class="section-title">
-        <h2>Brain Lab</h2>
-        <div class="section-actions">
-          <button id="refreshBrainLabSnapshotsButton" class="secondary" type="button">Refresh Snapshots</button>
-          <button id="loadBrainLabSnapshotButton" class="secondary" type="button">Load Snapshot</button>
-          <button id="evaluateBrainLabButton" type="button" disabled>Evaluate</button>
-        </div>
-      </div>
-      <div class="brain-lab-tools">
-        <label>
-          Snapshot
-          <select id="brainLabSnapshotSelect">
-            <option value="">No snapshots loaded</option>
-          </select>
-        </label>
-        <label>
-          Path
-          <input id="brainLabSnapshotPath" type="text" placeholder="out/run/final_snapshot.json">
-        </label>
-        <label>
-          Creature
-          <select id="brainLabCreatureSelect" disabled>
-            <option value="">Load a snapshot</option>
-          </select>
-        </label>
-        <label>
-          Input group
-          <select id="brainLabGroupFilter">
-            <option value="Sound">Sound</option>
-            <option value="Internal">Internal</option>
-            <option value="Contact">Contact</option>
-            <option value="Vision">Vision</option>
-            <option value="Scent">Scent</option>
-            <option value="Terrain">Terrain</option>
-            <option value="Habitat">Habitat</option>
-            <option value="Obstacle">Obstacle</option>
-            <option value="Memory">Memory</option>
-            <option value="all">All</option>
-          </select>
-        </label>
-        <div class="brain-lab-actions">
-          <button id="muteBrainLabSoundButton" class="secondary" type="button" disabled>Mute Sound</button>
-          <button id="resetBrainLabOverridesButton" class="secondary" type="button" disabled>Reset Inputs</button>
-        </div>
-      </div>
-      <div class="brain-lab-preset-bar">
-        <label>
-          Preset
-          <select id="brainLabPresetSelect">
-            <option value="muteSound">Mute Sound</option>
-            <option value="noFood">No Food</option>
-            <option value="onlyPlants">Only Plants</option>
-            <option value="onlyMeatEggs">Only Meat/Eggs</option>
-            <option value="noContact">No Contact</option>
-            <option value="hungry">Hungry</option>
-            <option value="full">Full</option>
-            <option value="readyToReproduce">Ready To Reproduce</option>
-          </select>
-        </label>
-        <button id="applyBrainLabPresetButton" class="secondary" type="button" disabled>Apply Preset</button>
-        <button id="compareBrainLabPopulationButton" type="button" disabled>Compare Population</button>
-        <button id="runBrainLabPresetMatrixButton" class="secondary" type="button" disabled>Preset Matrix</button>
-      </div>
-      <div id="brainLabMeta" class="brain-lab-meta">No snapshot loaded.</div>
-      <div class="brain-lab-workbench">
-        <div class="brain-lab-input-panel">
-          <h3>Inputs</h3>
-          <div id="brainLabInputs" class="brain-lab-inputs"></div>
-        </div>
-        <div class="brain-lab-output-panel">
-          <h3>Outputs</h3>
-          <div id="brainLabOutputs" class="brain-lab-outputs">No evaluation yet.</div>
-        </div>
-      </div>
-      <div id="brainLabPopulation" class="brain-lab-population">No population comparison yet.</div>
-      <div id="brainLabPresetMatrix" class="brain-lab-preset-matrix">No preset matrix yet.</div>
-      <p id="brainLabStatus" class="form-message" role="status"></p>
-    </section>
-
     <section class="species-panel">
       <div class="section-title">
         <h2>Species Catalog</h2>
@@ -318,8 +226,138 @@
       </div>
       <div id="speciesCatalogDetails" class="catalog-details">Choose a species profile to inspect it.</div>
     </section>
+    </div>
 
-    <section>
+    <div id="launcherTabBrain" class="launcher-tab-panel" role="tabpanel" aria-labelledby="launcherTabBrainButton" data-launcher-panel="brain">
+    <section class="brain-panel">
+      <div class="section-title">
+        <h2>Brain Catalog</h2>
+        <div class="section-actions">
+          <button id="refreshBrainCatalogButton" class="secondary" type="button">Refresh Catalog</button>
+          <button id="deleteBrainCatalogButton" class="danger" type="button" disabled>Delete Brain</button>
+        </div>
+      </div>
+      <div class="brain-tools">
+        <label>
+          Brain profile
+          <select id="brainCatalogSelect">
+            <option value="">No brain profiles loaded</option>
+          </select>
+        </label>
+      </div>
+      <div id="brainCatalogDetails" class="catalog-details">Choose a brain profile to inspect it.</div>
+    </section>
+
+    <section class="brain-lab-panel">
+      <div class="section-title">
+        <h2>Brain Lab</h2>
+        <div class="section-actions">
+          <button id="refreshBrainLabSnapshotsButton" class="secondary" type="button">Refresh Snapshots</button>
+        </div>
+      </div>
+      <div class="brain-lab-snapshot-tools">
+        <label>
+          Snapshot
+          <select id="brainLabSnapshotSelect">
+            <option value="">No snapshots loaded</option>
+          </select>
+        </label>
+        <label>
+          Path
+          <input id="brainLabSnapshotPath" type="text" placeholder="out/run/final_snapshot.json">
+        </label>
+        <button id="loadBrainLabSnapshotButton" class="secondary" type="button">Load Snapshot</button>
+      </div>
+      <div id="brainLabMeta" class="brain-lab-meta">No snapshot loaded.</div>
+
+      <div class="brain-lab-scope-section">
+        <div class="brain-lab-scope-heading">
+          <h3>Selected Creature</h3>
+          <button id="evaluateBrainLabButton" type="button" disabled>Evaluate</button>
+        </div>
+        <div class="brain-lab-creature-tools">
+          <label>
+            Creature
+            <select id="brainLabCreatureSelect" disabled>
+              <option value="">Load a snapshot</option>
+            </select>
+          </label>
+          <label>
+            Input preset
+            <select id="brainLabPresetSelect">
+              <option value="muteSound">Mute Sound</option>
+              <option value="noFood">No Food</option>
+              <option value="onlyPlants">Only Plants</option>
+              <option value="onlyMeatEggs">Only Meat/Eggs</option>
+              <option value="noContact">No Contact</option>
+              <option value="hungry">Hungry</option>
+              <option value="full">Full</option>
+              <option value="readyToReproduce">Ready To Reproduce</option>
+            </select>
+          </label>
+          <button id="applyBrainLabPresetButton" class="secondary" type="button" disabled>Apply Preset</button>
+          <button id="muteBrainLabSoundButton" class="secondary" type="button" disabled>Mute Sound</button>
+          <button id="resetBrainLabOverridesButton" class="secondary" type="button" disabled>Reset Inputs</button>
+        </div>
+        <div id="brainLabWorldProbe" class="brain-lab-world-probe">
+          <div class="brain-lab-world-probe-toolbar">
+            <h3>World Probe</h3>
+            <label><input type="checkbox" data-brain-lab-world-toggle="plants" checked> Plants</label>
+            <label><input type="checkbox" data-brain-lab-world-toggle="meatEggs" checked> Meat/Eggs</label>
+            <label><input type="checkbox" data-brain-lab-world-toggle="creatures" checked> Creatures</label>
+            <label><input type="checkbox" data-brain-lab-world-toggle="sound" checked> Sound</label>
+          </div>
+          <canvas id="brainLabWorldProbeCanvas" width="920" height="360"></canvas>
+          <div id="brainLabWorldProbeSummary" class="brain-lab-world-probe-summary">No world probe yet.</div>
+        </div>
+        <div class="brain-lab-workbench">
+          <div class="brain-lab-input-panel">
+            <div class="brain-lab-panel-heading">
+              <h3>Inputs</h3>
+              <label>
+                Group
+                <select id="brainLabGroupFilter">
+                  <option value="Sound">Sound</option>
+                  <option value="Internal">Internal</option>
+                  <option value="Contact">Contact</option>
+                  <option value="Vision">Vision</option>
+                  <option value="Scent">Scent</option>
+                  <option value="Terrain">Terrain</option>
+                  <option value="Habitat">Habitat</option>
+                  <option value="Obstacle">Obstacle</option>
+                  <option value="Memory">Memory</option>
+                  <option value="all">All</option>
+                </select>
+              </label>
+            </div>
+            <div id="brainLabInputs" class="brain-lab-inputs"></div>
+          </div>
+          <div class="brain-lab-output-panel">
+            <div class="brain-lab-panel-heading">
+              <h3>Outputs</h3>
+            </div>
+            <div id="brainLabOutputs" class="brain-lab-outputs">No evaluation yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brain-lab-scope-section">
+        <div class="brain-lab-scope-heading">
+          <h3>Population</h3>
+          <div class="brain-lab-actions">
+            <button id="compareBrainLabPopulationButton" type="button" disabled>Compare Population</button>
+            <button id="runBrainLabPresetMatrixButton" class="secondary" type="button" disabled>Preset Matrix</button>
+          </div>
+        </div>
+        <div id="brainLabPopulation" class="brain-lab-population">No population comparison yet.</div>
+        <div id="brainLabPresetMatrix" class="brain-lab-preset-matrix">No preset matrix yet.</div>
+      </div>
+      <p id="brainLabStatus" class="form-message" role="status"></p>
+    </section>
+    </div>
+
+    <div id="launcherTabRuns" class="launcher-tab-panel" role="tabpanel" aria-labelledby="launcherTabRunsButton" data-launcher-panel="runs">
+    <section class="runs-panel">
       <div class="section-title">
         <h2>Runs</h2>
         <div class="section-actions">
@@ -379,8 +417,9 @@
         </table>
       </div>
     </section>
+    </div>
   </main>
 
-  <script src="/app.js?v=20260530-roster-editor1"></script>
+  <script src="/app.js?v=20260531-launch-tabs1"></script>
 </body>
 </html>

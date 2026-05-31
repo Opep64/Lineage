@@ -301,6 +301,75 @@ public sealed record BrainLabPresetMatrixOutput(
     int GateFlipCount,
     double GateFlipShare);
 
+public sealed record BrainLabWorldProbeRequest(
+    string SnapshotPath,
+    int CreatureId);
+
+public sealed record BrainLabWorldProbeScene(
+    string SnapshotPath,
+    int CreatureId,
+    double ProbeRadius,
+    double SenseRadius,
+    double SoundRadius,
+    double WorldWidth,
+    double WorldHeight,
+    bool Truncated,
+    BrainLabWorldProbeCounts Counts,
+    BrainLabWorldProbeCreature Focus,
+    IReadOnlyList<BrainLabWorldProbeResource> Resources,
+    IReadOnlyList<BrainLabWorldProbeEgg> Eggs,
+    IReadOnlyList<BrainLabWorldProbeCreature> Creatures);
+
+public sealed record BrainLabWorldProbeCounts(
+    int PlantCount,
+    int MeatCount,
+    int EggCount,
+    int CreatureCount,
+    int SoundSourceCount,
+    int ReturnedResourceCount,
+    int ReturnedEggCount,
+    int ReturnedCreatureCount);
+
+public sealed record BrainLabWorldProbeResource(
+    int Id,
+    string Kind,
+    string PlantKind,
+    double X,
+    double Y,
+    double Distance,
+    double Radius,
+    double Calories,
+    double MaxCalories,
+    double Freshness);
+
+public sealed record BrainLabWorldProbeEgg(
+    int Id,
+    int Generation,
+    double X,
+    double Y,
+    double Distance,
+    double Radius,
+    double Energy,
+    double Health);
+
+public sealed record BrainLabWorldProbeCreature(
+    int Id,
+    int Generation,
+    string BrainArchitectureKind,
+    double X,
+    double Y,
+    double Distance,
+    double Radius,
+    double HeadingRadians,
+    double EnergyRatio,
+    double HealthRatio,
+    double Hunger,
+    double SoundAmplitude,
+    double SoundTone,
+    bool HeardSound,
+    double SoundDensity,
+    bool IsFocus);
+
 public sealed record RunCreateRequest(
     string ScenarioPath,
     int Ticks,
