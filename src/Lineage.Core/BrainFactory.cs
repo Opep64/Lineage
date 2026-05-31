@@ -4,11 +4,6 @@ namespace Lineage.Core;
 /// Central construction point for brain architectures.
 /// </summary>
 ///
-/// <remarks>
-/// This is a transitional seam: world state still stores the current neural genome
-/// type, but callers no longer need to know how starter, random, or mutated brains
-/// are produced for the active architecture.
-/// </remarks>
 public static class BrainFactory
 {
     private static readonly BrainArchitectureDescriptor HybridNeuralDescriptor = new(
@@ -35,28 +30,46 @@ public static class BrainFactory
         SupportsHiddenNodes: true,
         SupportsDirectInputOutputWeights: false);
 
+    private static readonly BrainArchitectureDescriptor RtNeatGraphDescriptor = new(
+        BrainArchitectureKind.RtNeatGraph,
+        "rtNEAT graph",
+        "Sparse topology-evolving graph controller with semantic input and action nodes.",
+        RtNeatBrainIoRegistry.Inputs.Count,
+        RtNeatBrainIoRegistry.Outputs.Count,
+        0,
+        0,
+        0,
+        SupportsHiddenNodes: true,
+        SupportsDirectInputOutputWeights: false);
+
     public static BrainArchitectureDescriptor Describe(BrainArchitectureKind kind)
     {
         return kind switch
         {
             BrainArchitectureKind.HybridNeural => HybridNeuralDescriptor,
             BrainArchitectureKind.HiddenLayerNeural => HiddenLayerNeuralDescriptor,
+            BrainArchitectureKind.RtNeatGraph => RtNeatGraphDescriptor,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
 
-    public static NeuralBrainGenome CreateZero(BrainArchitectureKind kind, int hiddenNodeCount = 0)
+    public static BrainGenome CreateZero(BrainArchitectureKind kind, int hiddenNodeCount = 0)
     {
         var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
         return kind switch
         {
-            BrainArchitectureKind.HybridNeural => NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount),
-            BrainArchitectureKind.HiddenLayerNeural => NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount),
+            BrainArchitectureKind.HybridNeural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount)),
+            BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount)),
+            BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateZero()),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
 
-    public static NeuralBrainGenome CreateRandom(
+    public static BrainGenome CreateRandom(
         BrainArchitectureKind kind,
         DeterministicRandom random,
         float scale = 1f,
@@ -66,20 +79,37 @@ public static class BrainFactory
         var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
         return kind switch
         {
-            BrainArchitectureKind.HybridNeural => NeuralBrainGenome.CreateRandom(random, scale, resolvedHiddenNodeCount),
-            BrainArchitectureKind.HiddenLayerNeural => NeuralBrainGenome.CreateHiddenLayerRandom(
-                random,
-                scale,
-                resolvedHiddenNodeCount),
+            BrainArchitectureKind.HybridNeural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateRandom(random, scale, resolvedHiddenNodeCount)),
+            BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHiddenLayerRandom(
+                    random,
+                    scale,
+                    resolvedHiddenNodeCount)),
+            BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateRandom(random, scale)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
 
-    public static NeuralBrainGenome CreateStarter(
+    public static BrainGenome CreateStarter(
         BrainArchitectureKind kind,
         InitialBrainKind initialBrainKind,
         int hiddenNodeCount = 0)
     {
+        if (kind == BrainArchitectureKind.RtNeatGraph)
+        {
+            if (initialBrainKind == InitialBrainKind.RandomPerFounder)
+            {
+                throw new ArgumentException(
+                    "Random-per-founder brains are created individually.",
+                    nameof(initialBrainKind));
+            }
+
+            return BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateStarterForager());
+        }
+
         var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
         var starter = initialBrainKind switch
         {
@@ -90,6 +120,7 @@ public static class BrainFactory
             InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.SparseGraphForager => NeuralBrainGenome.CreateSectorForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.RandomPerFounder => throw new ArgumentException(
                 "Random-per-founder brains are created individually.",
                 nameof(initialBrainKind)),
@@ -101,30 +132,42 @@ public static class BrainFactory
 
         return kind switch
         {
-            BrainArchitectureKind.HybridNeural => starter,
-            BrainArchitectureKind.HiddenLayerNeural => NeuralBrainGenome.CreateHiddenLayerFromDirect(
-                starter,
-                resolvedHiddenNodeCount),
+            BrainArchitectureKind.HybridNeural => BrainGenome.FromNeural(kind, starter),
+            BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHiddenLayerFromDirect(
+                    starter,
+                    resolvedHiddenNodeCount)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
 
-    public static NeuralBrainGenome Mutate(
+    public static BrainGenome Mutate(
         BrainArchitectureKind kind,
-        NeuralBrainGenome brain,
+        BrainGenome brain,
         DeterministicRandom random,
         float mutationStrength,
-        float mutationRate)
+        float mutationRate,
+        RtNeatMutationPolicy? rtNeatMutationPolicy = null)
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(random);
         return kind switch
         {
-            BrainArchitectureKind.HybridNeural => brain.Mutated(random, mutationStrength, mutationRate),
-            BrainArchitectureKind.HiddenLayerNeural => brain.MutatedHiddenLayer(
-                random,
-                mutationStrength,
-                mutationRate),
+            BrainArchitectureKind.HybridNeural => BrainGenome.FromNeural(
+                kind,
+                brain.Neural?.Mutated(random, mutationStrength, mutationRate)
+                    ?? throw new InvalidOperationException("Hybrid neural mutation requires a dense brain payload.")),
+            BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
+                kind,
+                brain.Neural?.MutatedHiddenLayer(
+                    random,
+                    mutationStrength,
+                    mutationRate)
+                    ?? throw new InvalidOperationException("Hidden-layer neural mutation requires a dense brain payload.")),
+            BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(
+                brain.RtNeat?.Mutated(random, mutationStrength, mutationRate, rtNeatMutationPolicy)
+                    ?? throw new InvalidOperationException("rtNEAT mutation requires a graph brain payload.")),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
@@ -135,6 +178,11 @@ public static class BrainFactory
         if (requestedHiddenNodeCount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(requestedHiddenNodeCount), "Hidden node count cannot be negative.");
+        }
+
+        if (kind == BrainArchitectureKind.RtNeatGraph)
+        {
+            return 0;
         }
 
         if (requestedHiddenNodeCount > descriptor.MaxHiddenNodeCount)

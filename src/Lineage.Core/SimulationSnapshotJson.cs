@@ -86,10 +86,10 @@ public static class SimulationSnapshotJson
             state.Genomes.Add(NormalizeGenome(genome).Validated());
         }
 
-        var brainArchitectureKinds = NormalizeBrainArchitectureKinds(snapshot);
-        for (var i = 0; i < snapshot.BrainWeights.Length; i++)
+        var brainPayloads = NormalizeBrainPayloads(snapshot);
+        for (var i = 0; i < brainPayloads.Length; i++)
         {
-            state.AddBrain(new NeuralBrainGenome(snapshot.BrainWeights[i]), brainArchitectureKinds[i]);
+            state.AddBrain(brainPayloads[i].CreateBrain());
         }
 
         state.Creatures.AddRange(snapshot.Creatures.Select(NormalizeCreature));
@@ -162,11 +162,10 @@ public static class SimulationSnapshotJson
             _ = NormalizeGenome(genome).Validated();
         }
 
-        var brainArchitectureKinds = NormalizeBrainArchitectureKinds(snapshot);
-        for (var i = 0; i < snapshot.BrainWeights.Length; i++)
+        var brainPayloads = NormalizeBrainPayloads(snapshot);
+        for (var i = 0; i < brainPayloads.Length; i++)
         {
-            _ = BrainFactory.Describe(brainArchitectureKinds[i]);
-            _ = new NeuralBrainGenome(snapshot.BrainWeights[i]);
+            _ = brainPayloads[i].CreateBrain();
         }
 
         _ = snapshot.Biomes.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
@@ -190,6 +189,32 @@ public static class SimulationSnapshotJson
         }
 
         return snapshot.BrainArchitectureKinds;
+    }
+
+    private static BrainSnapshot[] NormalizeBrainPayloads(SimulationSnapshot snapshot)
+    {
+        if (snapshot.BrainPayloads.Length > 0)
+        {
+            foreach (var payload in snapshot.BrainPayloads)
+            {
+                _ = payload.CreateBrain();
+            }
+
+            return snapshot.BrainPayloads;
+        }
+
+        var brainArchitectureKinds = NormalizeBrainArchitectureKinds(snapshot);
+        var payloads = new BrainSnapshot[snapshot.BrainWeights.Length];
+        for (var i = 0; i < payloads.Length; i++)
+        {
+            payloads[i] = new BrainSnapshot
+            {
+                ArchitectureKind = brainArchitectureKinds[i],
+                Weights = snapshot.BrainWeights[i]
+            };
+        }
+
+        return payloads;
     }
 
     private static CreatureGenome NormalizeGenome(CreatureGenome genome)

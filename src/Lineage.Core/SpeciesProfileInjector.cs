@@ -29,8 +29,7 @@ public static class SpeciesProfileInjector
                     BrainFactory.CreateRandom(
                         options.BrainArchitectureKind,
                         randomBrain ?? throw new InvalidOperationException("Random brain source was not created."),
-                        hiddenNodeCount: options.BrainHiddenNodeCount),
-                    options.BrainArchitectureKind)
+                        hiddenNodeCount: options.BrainHiddenNodeCount))
                 : sharedBrainId;
             if (reportedBrainId < 0)
             {
@@ -75,10 +74,8 @@ public static class SpeciesProfileInjector
         if (options.BrainOverrideKind is null)
         {
             return options.BrainOverrideProfile is null
-                ? state.AddBrain(profile.CreateBrain(), profile.BrainArchitectureKind)
-                : state.AddBrain(
-                    options.BrainOverrideProfile.CreateBrain(),
-                    options.BrainOverrideProfile.BrainArchitectureKind);
+                ? state.AddBrain(profile.CreateBrain())
+                : state.AddBrain(options.BrainOverrideProfile.CreateBrain());
         }
 
         if (options.BrainOverrideKind == InitialBrainKind.RandomPerFounder)
@@ -90,8 +87,7 @@ public static class SpeciesProfileInjector
             BrainFactory.CreateStarter(
                 options.BrainArchitectureKind,
                 options.BrainOverrideKind.Value,
-                options.BrainHiddenNodeCount),
-            options.BrainArchitectureKind);
+                options.BrainHiddenNodeCount));
     }
 
     private static SimVector2 RandomCreaturePosition(

@@ -147,6 +147,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
     ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
     ("Brain factory supports hidden-layer neural architecture", BrainFactorySupportsHiddenLayerNeuralArchitecture),
+    ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -204,6 +205,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Brain profile JSON round trips neural controllers", BrainProfileJsonRoundTripsNeuralControllers),
+    ("Brain profile JSON round trips rtNEAT graph controllers", BrainProfileJsonRoundTripsRtNeatGraphControllers),
     ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
@@ -6354,6 +6356,112 @@ static void BrainFactorySupportsHiddenLayerNeuralArchitecture()
         "Hidden-layer mutation should change at least one hidden weight");
 }
 
+static void BrainFactorySupportsRtNeatGraphArchitecture()
+{
+    var descriptor = BrainFactory.Describe(BrainArchitectureKind.RtNeatGraph);
+
+    AssertEqual(BrainArchitectureKind.RtNeatGraph, descriptor.Kind, "rtNEAT descriptor kind");
+    AssertEqual("rtNEAT graph", descriptor.Name, "rtNEAT descriptor name");
+    AssertTrue(descriptor.InputCount >= BrainIoRegistry.Inputs.Count, "rtNEAT should expose semantic inputs");
+    AssertEqual(BrainIoRegistry.PhysicalActionOutputs.Count, descriptor.OutputCount, "rtNEAT output count");
+
+    var starter = BrainFactory.CreateStarter(
+        BrainArchitectureKind.RtNeatGraph,
+        InitialBrainKind.SparseGraphForager);
+    AssertEqual(BrainArchitectureKind.RtNeatGraph, starter.ArchitectureKind, "rtNEAT starter architecture");
+    AssertTrue(starter.RtNeat is not null, "rtNEAT starter should include graph payload");
+    AssertEqual(0, starter.HiddenNodeCount, "rtNEAT starter should begin without hidden nodes");
+    AssertTrue(starter.WeightCount > 0, "rtNEAT starter should include sparse connections and output biases");
+
+    Span<float> denseInputs = stackalloc float[NeuralBrainSchema.InputCount];
+    Span<float> denseOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
+    var noFood = starter.Evaluate(
+        BrainInputFrame.FromSenses(new CreatureSenseState(), CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var plantToRight = starter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                PlantDetected = true,
+                PlantProximity = 0.35f,
+                PlantDirectionForward = 0.6f,
+                PlantDirectionRight = 0.7f,
+                VisiblePlantDensity = 0.5f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var plantContact = starter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                PlantDetected = true,
+                PlantProximity = 1f,
+                PlantDirectionForward = 1f,
+                FoodContact = 1f,
+                PlantFoodContact = 1f,
+                VisiblePlantDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var eggContact = starter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                FoodDetected = true,
+                FoodProximity = 1f,
+                FoodDirectionForward = 1f,
+                FoodContact = 1f,
+                EggFoodContact = 1f,
+                VisibleFoodDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+
+    AssertTrue(noFood.MoveForward > 0.5f, "rtNEAT starter should search forward by default");
+    AssertTrue(noFood.Eat < 0f, "rtNEAT starter should not eat without plant contact");
+    AssertTrue(plantToRight.Turn > 0.5f, "rtNEAT starter should turn toward plants on the right");
+    AssertTrue(plantContact.MoveForward < noFood.MoveForward, "rtNEAT starter should slow near contacted plants");
+    AssertTrue(plantContact.Eat > 0.25f, "rtNEAT starter should eat contacted plants");
+    AssertTrue(eggContact.Eat < 0f, "rtNEAT starter should not begin as an egg predator");
+
+    var mutated = BrainFactory.Mutate(
+        BrainArchitectureKind.RtNeatGraph,
+        starter,
+        new DeterministicRandom(442),
+        mutationStrength: 0.5f,
+        mutationRate: MutationProfile.Default.BrainMutationRate);
+    AssertTrue(
+        mutated.RtNeat is not null
+        && (mutated.RtNeat.ConnectionCount != starter.RtNeat!.ConnectionCount
+            || mutated.Weights.Zip(starter.Weights).Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f)),
+        "rtNEAT mutation should alter graph structure or weights");
+
+    var scenario = new SimulationScenario
+    {
+        Seed = 111,
+        PipelineKind = SimulationPipelineKind.Neural,
+        BrainArchitectureKind = BrainArchitectureKind.RtNeatGraph,
+        InitialBrainKind = InitialBrainKind.SparseGraphForager,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var snapshotJson = SimulationSnapshotJson.ToJson(SimulationSnapshot.Capture(scenario, simulation));
+    var restored = SimulationSnapshotJson.RestoreSimulation(SimulationSnapshotJson.FromJson(snapshotJson));
+    var restoredCreature = restored.Simulation.State.Creatures.Single();
+    var restoredBrain = restored.Simulation.State.GetBrain(restoredCreature.BrainId);
+    AssertEqual(BrainArchitectureKind.RtNeatGraph, restoredBrain.ArchitectureKind, "Restored rtNEAT brain architecture");
+    AssertTrue(restoredBrain.RtNeat is not null, "Restored rtNEAT brain should retain graph payload");
+}
+
 static void WorldStateTracksBrainArchitectureMetadata()
 {
     var simulation = new Simulation(new SimulationConfig(), seed: 304, systems: []);
@@ -9175,7 +9283,9 @@ static Simulation CreateIntentToggleSimulation(bool requireIntent)
     };
     var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
     var creature = simulation.State.Creatures[0];
-    simulation.State.Brains[creature.BrainId] = NeuralBrainGenome.CreateZero();
+    simulation.State.Brains[creature.BrainId] = BrainGenome.FromNeural(
+        BrainArchitectureKind.HybridNeural,
+        NeuralBrainGenome.CreateZero());
     creature.AgeSeconds = 10f;
     creature.Energy = 100f;
     creature.ReproductiveEnergy = 20f;
@@ -9225,6 +9335,29 @@ static void BrainProfileJsonRoundTripsNeuralControllers()
     var sourceBrain = simulation.State.GetBrain(creature.BrainId);
     var loadedBrain = roundTripped.CreateBrain();
     AssertBrainsClose(sourceBrain, loadedBrain, "Brain profile weights");
+}
+
+static void BrainProfileJsonRoundTripsRtNeatGraphControllers()
+{
+    var profile = new BrainProfile
+    {
+        Name = "Sparse graph probe",
+        Notes = "rtNEAT profile round-trip test",
+        BrainArchitectureKind = BrainArchitectureKind.RtNeatGraph,
+        RtNeatBrain = RtNeatBrainGenome.CreateStarterForager()
+    }.Validated();
+
+    var brainJson = BrainProfileJson.ToJson(profile);
+    var roundTripped = BrainProfileJson.FromJson(brainJson);
+    var loadedBrain = roundTripped.CreateBrain();
+
+    AssertTrue(brainJson.Contains("\"brainArchitectureKind\": \"rtNeatGraph\""), "rtNEAT JSON should include architecture");
+    AssertTrue(brainJson.Contains("\"rtNeatBrain\""), "rtNEAT JSON should include graph payload");
+    AssertEqual("Sparse graph probe", roundTripped.Name, "rtNEAT brain profile name");
+    AssertEqual(BrainArchitectureKind.RtNeatGraph, roundTripped.BrainArchitectureKind, "rtNEAT brain profile architecture");
+    AssertTrue(roundTripped.RtNeatBrain is not null, "Round-tripped rtNEAT profile should retain graph payload");
+    AssertEqual(profile.RtNeatBrain!.ConnectionCount, loadedBrain.RtNeat!.ConnectionCount, "rtNEAT connection count");
+    AssertEqual(profile.WeightCount, loadedBrain.WeightCount, "rtNEAT profile weight count");
 }
 
 static void BrainProfileCompatibilityReportsSchemaStatus()

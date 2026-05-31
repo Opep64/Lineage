@@ -568,7 +568,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 relativePath,
                 catalogProfile.BrainArchitectureKind.ToString(),
                 catalogProfile.HiddenNodeCount,
-                catalogProfile.Weights.Length,
+                catalogProfile.WeightCount,
                 compatibility.IsCompatible,
                 compatibility.Status);
             return true;

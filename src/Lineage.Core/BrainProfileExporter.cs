@@ -75,6 +75,7 @@ public static class BrainProfileExporter
             BrainArchitectureKind = brainArchitectureKind,
             HiddenNodeCount = brain.HiddenNodeCount,
             Weights = brain.Weights.ToArray(),
+            RtNeatBrain = brain.RtNeat,
             Source = new BrainProfileSource
             {
                 ScenarioName = scenario.Name,

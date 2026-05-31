@@ -334,6 +334,98 @@ Needs from I/O design:
 - architecture-specific payload storage;
 - clean runtime evaluator separate from dense neural genome assumptions.
 
+Short first implementation design:
+
+| Area | First-pass design |
+| --- | --- |
+| Brain kind | Add a new `RtNeat` / `RtNeatGraph` architecture kind rather than extending the dense neural kinds. |
+| Inputs/outputs | Use the current semantic brain input/output contract and an rtNEAT adapter. Do not expose dense memory outputs as universal actions. |
+| Genome payload | Store node genes, connection genes, input/output schema versions, architecture settings, and innovation identifiers. |
+| Node genes | Fixed input and output nodes from stable I/O keys; hidden nodes are added by mutation. Each node stores an id, type, activation function, and optional depth/order hint. |
+| Connection genes | Source node id, target node id, weight, enabled flag, innovation id. Keep the first version feed-forward and acyclic. |
+| Evaluation | Fill input node activations from the semantic input frame, evaluate hidden/output nodes in topological order, clamp/transform outputs into `BrainOutputFrame`. |
+| Mutation | Weight perturbation/reset from world mutation policy; add-connection mutation between valid acyclic nodes; add-node mutation by splitting an enabled connection and disabling the original. |
+| Crossover | Defer at first because reproduction is currently one-parent mutation. Leave innovation ids in place so future two-parent crossover can align genes. |
+| Runtime state | First version is stateless per tick. Recurrent links, internal memory nodes, or plasticity traces should wait until the base sparse feed-forward graph is viable. |
+| Speciation | Do not add NEAT species reproduction mechanics yet. The existing species clustering/reporting can observe graph/genome distance later, but reproduction remains current lineage mutation. |
+| Cost/complexity | Add optional brain complexity telemetry immediately. Consider a later metabolic or reproduction cost for hidden nodes/connections if graph bloat appears. |
+| Catalog/export | Brain profiles should serialize rtNEAT payloads as first-class catalog brains, with compatibility warnings for input/output schema changes. |
+| Reports/UI | Show architecture, node/connection counts, enabled connection count, average absolute weight, and mutation/normalization status. |
+
+Starter sparse graph:
+
+Use the Bibites `Basic bibite` pattern as inspiration: all fixed input/output nodes exist in the schema, but the starter brain begins with no hidden nodes and only a few enabled direct input-to-output connections. Node biases/base activations are part of the inherited brain and are behavior-critical.
+
+First viable starter goal:
+
+- see plant food and turn toward it;
+- move by default so it can search when it sees nothing;
+- slow down as visible/touched plant food gets close;
+- eat contacted plants, but do not begin as an egg predator;
+- reproduce from a baseline reproduce bias, because a disconnected/off reproduction output would produce a creature that can survive but cannot found a lineage;
+- keep attack, grab, sound, and dense-memory-style outputs disconnected and biased neutral/off for the first starter.
+
+Candidate starter graph:
+
+| Source | Target | Starting behavior |
+| --- | --- | --- |
+| `vision.plant.direction_right` | `action.turn` | Turn strongly toward visible plants. |
+| `vision.plant.direction_forward` | `action.move_forward` | Move more confidently when plants are ahead. |
+| `vision.plant.proximity` | `action.move_forward` | Negative weight that brakes against the positive movement bias as plants get close. |
+| `contact.plant_food` | `action.move_forward` | Stronger negative contact brake to stay on touched plants. |
+| `contact.plant_food` | `action.eat` | Positive eat gate for plant contact. |
+| `contact.egg_food` | `action.eat` | Negative eat gate so the starter does not begin as an egg predator. |
+
+Candidate output biases:
+
+| Output | Bias intent |
+| --- | --- |
+| `action.move_forward` | Positive search movement. |
+| `action.turn` | Neutral. |
+| `action.eat` | Negative until plant contact overrides it. |
+| `action.reproduce` | Mild positive, relying on maturity, energy, egg reserve, cooldown, and health gates. |
+| `action.attack` | Off/negative. |
+| `action.grab` | Off/neutral. |
+| `action.sound_amplitude` | Off/zero. |
+| `action.sound_tone` | Neutral. |
+
+Evolution should then mutate this sparse graph by perturbing weights/biases, adding random valid connections, and inserting random hidden nodes by splitting an existing enabled connection. The starter is deliberately not meant to be optimal; it only needs to survive long enough for graph mutations to explore.
+
+Bibites mutation reference from the user-provided generation-1000 example:
+
+| Setting | Bibites value | Lineage interpretation |
+| --- | ---: | --- |
+| Background mutation chance | 1.50 | Treat as a target average number of mutation events per birth for graph brains. |
+| Background mutation variance | 5.0% | Keep per-birth event count close to the average rather than wildly bursty at first. |
+| Mutation value relativity | 75% | Prefer relative/proportional value perturbations for existing weights/biases. |
+| Synapse mutation probability | 60.0% | Most brain mutation events should touch connection genes. |
+| Neuron mutation probability | 40.0% | A substantial minority should touch hidden-node structure/type/bias. |
+| Synapse strength mutation probability | 75.0% | Within synapse events, most should perturb existing weights. |
+| Synapse flip probability | 2.5% | Rare sign flips. |
+| Synapse toggle probability | 2.5% | Rare enable/disable toggles. |
+| Synapse add probability | 10.0% | Regular but not dominant connection growth. |
+| Synapse removal probability | 10.0% | Counter-pressure against connection bloat. |
+
+This is a stronger structural exploration rate than "almost never add nodes." Starting from a sparse viable graph, a 1,000-generation survivor reaching roughly dozens of active nodes/connections is a good target shape: enough graph growth to discover behavior, but not runaway fully connected density.
+
+First-pass implementation status:
+
+- Added `RtNeatGraph` as a third brain architecture.
+- Added graph payload storage with fixed semantic input/output nodes, hidden nodes, connection genes, enabled flags, innovation ids, output biases, schema versions, and feed-forward evaluation.
+- Added a `BrainGenome` wrapper so `WorldState`, snapshots, profiles, exporters, and controllers can carry dense or graph brains.
+- Added rtNEAT graph mutation with the Bibites-inspired default mutation policy. The existing world/scenario `MutationStrength` and `BrainMutationRate` scale mutation pressure.
+- Added JSON snapshot/profile round-tripping for graph payloads.
+- Added a sparse forager starter with no hidden nodes and six enabled direct connections.
+- First smoke result: a 50K tick balanced-foraging-derived run with 40 rtNEAT founders reached generation 2 and ended with 12 living creatures. Egg predation was high because the first graph used generic food contact.
+- Tuned starter result: switching the seed graph to plant-specific steering/eating plus an egg-contact eat suppressor produced a 50K tick smoke run with 65 living creatures, 236 hatched eggs, 0 egg predation deaths, and max generation 6. This is a better first viable rtNEAT baseline, though still intentionally simple.
+
+Open design questions after the first pass:
+
+- Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?
+- Should graph complexity have an immediate energy cost, or should we first measure bloat without adding another pressure?
+- Should rtNEAT eventually get recurrent/self connections for memory, or should memory wait for a separate recurrent/plastic architecture pass?
+- Should the sparse starter remain plant-only, or should we add separate scavenger/predator sparse starters rather than making one seed graph cover every diet?
+
 ### HyperNEAT
 
 Not the first target.

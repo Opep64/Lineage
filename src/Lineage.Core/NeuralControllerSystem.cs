@@ -152,16 +152,8 @@ public sealed class NeuralControllerSystem(
         var brain = state.GetBrain(creature.BrainId);
         var inputFrame = BrainInputFrame.FromSenses(creature.Senses, genome);
         var legacyMemoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(creature.Senses);
-        LegacyNeuralBrainAdapter.FillInputs(
-            inputFrame,
-            legacyMemoryInputs,
-            inputs);
-        outputs.Clear();
-        brain.Evaluate(inputs, outputs);
-
-        var actionOutputs = LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs);
-        var memoryOutputs = LegacyNeuralBrainAdapter.ReadMemoryOutputs(outputs);
-        ApplyControllerOutputs(ref creature, genome, actionOutputs, memoryOutputs, deltaSeconds);
+        var brainOutputs = brain.Evaluate(inputFrame, legacyMemoryInputs, inputs, outputs);
+        ApplyControllerOutputs(ref creature, genome, brainOutputs.Actions, brainOutputs.Memory, deltaSeconds);
         RecordNeuralDecision(ref creature, state.Tick);
         return new NeuralControllerCreatureUpdate(
             creature,

@@ -136,6 +136,7 @@ public static class SpeciesProfileExporter
             BrainArchitectureKind = brainArchitectureKind,
             BrainHiddenNodeCount = brain.HiddenNodeCount,
             BrainWeights = brain.Weights.ToArray(),
+            RtNeatBrain = brain.RtNeat,
             Source = new SpeciesProfileSource
             {
                 ScenarioName = scenario.Name,

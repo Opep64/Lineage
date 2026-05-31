@@ -141,7 +141,7 @@ public static class BrainInputDiagnostics
         }
     }
 
-    private static float MeanAbsoluteDirectInputWeights(NeuralBrainGenome brain, int input)
+    private static float MeanAbsoluteDirectInputWeights(BrainGenome brain, int input)
     {
         var sum = 0f;
         for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
@@ -152,7 +152,7 @@ public static class BrainInputDiagnostics
         return sum / NeuralBrainSchema.OutputCount;
     }
 
-    private static float MeanAbsoluteDirectInputWeights(NeuralBrainGenome brain, IReadOnlyList<int> inputs)
+    private static float MeanAbsoluteDirectInputWeights(BrainGenome brain, IReadOnlyList<int> inputs)
     {
         var sum = 0f;
         for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
@@ -166,7 +166,7 @@ public static class BrainInputDiagnostics
         return sum / (NeuralBrainSchema.OutputCount * inputs.Count);
     }
 
-    private static float MeanAbsoluteHiddenInputWeights(NeuralBrainGenome brain, int input)
+    private static float MeanAbsoluteHiddenInputWeights(BrainGenome brain, int input)
     {
         if (brain.HiddenNodeCount == 0)
         {
@@ -182,7 +182,7 @@ public static class BrainInputDiagnostics
         return sum / brain.HiddenNodeCount;
     }
 
-    private static float MeanAbsoluteHiddenInputWeights(NeuralBrainGenome brain, IReadOnlyList<int> inputs)
+    private static float MeanAbsoluteHiddenInputWeights(BrainGenome brain, IReadOnlyList<int> inputs)
     {
         if (brain.HiddenNodeCount == 0)
         {
@@ -201,7 +201,7 @@ public static class BrainInputDiagnostics
         return sum / (brain.HiddenNodeCount * inputs.Count);
     }
 
-    private static float MeanDirectOutputInputWeights(NeuralBrainGenome brain, int output, IReadOnlyList<int> inputs)
+    private static float MeanDirectOutputInputWeights(BrainGenome brain, int output, IReadOnlyList<int> inputs)
     {
         var sum = 0f;
         for (var i = 0; i < inputs.Count; i++)
@@ -261,7 +261,7 @@ public static class BrainInputDiagnostics
         private float _attackCreatureApproachSectorWeight;
         private float _attackCreatureFacingSectorWeight;
 
-        public void Add(NeuralBrainGenome brain)
+        public void Add(BrainGenome brain)
         {
             Count++;
             _directFreshnessMagnitude += MeanAbsoluteDirectInputWeights(brain, NeuralBrainSchema.VisibleMeatFreshnessInput);

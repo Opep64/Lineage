@@ -13,5 +13,10 @@ public enum BrainArchitectureKind
     /// <summary>
     /// Fixed neural controller that routes all inputs through a hidden layer before outputs.
     /// </summary>
-    HiddenLayerNeural = 1
+    HiddenLayerNeural = 1,
+
+    /// <summary>
+    /// Sparse, topology-evolving graph controller inspired by rtNEAT/Bibites-style brains.
+    /// </summary>
+    RtNeatGraph = 2
 }

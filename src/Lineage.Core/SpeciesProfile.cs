@@ -30,10 +30,18 @@ public sealed record SpeciesProfile
 
     public float[] BrainWeights { get; init; } = [];
 
-    public NeuralBrainGenome CreateBrain()
+    public RtNeatBrainGenome? RtNeatBrain { get; init; }
+
+    public int BrainWeightCount => BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph
+        ? RtNeatBrain?.WeightCount ?? 0
+        : BrainWeights.Length;
+
+    public BrainGenome CreateBrain()
     {
         _ = BrainFactory.Describe(BrainArchitectureKind);
-        return new NeuralBrainGenome(BrainWeights);
+        return BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph
+            ? BrainGenome.FromRtNeat(RtNeatBrain ?? throw new InvalidOperationException("rtNEAT species profile must include graph brain payload."))
+            : BrainGenome.FromNeural(BrainArchitectureKind, new NeuralBrainGenome(BrainWeights));
     }
 
     public SpeciesProfile Validated()
@@ -48,6 +56,29 @@ public sealed record SpeciesProfile
             : Name.Trim();
         var genome = Genome.Validated();
         _ = BrainFactory.Describe(BrainArchitectureKind);
+        if (BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph)
+        {
+            if (RtNeatBrain is null)
+            {
+                throw new InvalidOperationException("rtNEAT species profile must include graph brain payload.");
+            }
+
+            var graphBrain = RtNeatBrain.Validated();
+            return this with
+            {
+                Name = name,
+                Notes = Notes.Trim(),
+                DefaultBrainPath = string.IsNullOrWhiteSpace(DefaultBrainPath)
+                    ? null
+                    : DefaultBrainPath.Trim(),
+                Genome = genome,
+                BrainArchitectureKind = BrainArchitectureKind,
+                BrainHiddenNodeCount = graphBrain.HiddenNodeCount,
+                BrainWeights = graphBrain.FlattenWeights(),
+                RtNeatBrain = graphBrain
+            };
+        }
+
         if (BrainWeights.Length == 0)
         {
             throw new InvalidOperationException("Species profile must include neural brain weights.");

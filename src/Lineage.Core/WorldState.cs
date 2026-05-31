@@ -50,7 +50,7 @@ public sealed class WorldState
 
     public List<CreatureGenome> Genomes { get; } = [];
 
-    public List<NeuralBrainGenome> Brains { get; } = [];
+    public List<BrainGenome> Brains { get; } = [];
 
     public List<BrainArchitectureKind> BrainArchitectureKinds { get; } = [];
 
@@ -101,12 +101,19 @@ public sealed class WorldState
     {
         ArgumentNullException.ThrowIfNull(brain);
         _ = BrainFactory.Describe(architectureKind);
-        Brains.Add(brain);
-        BrainArchitectureKinds.Add(architectureKind);
+        return AddBrain(BrainGenome.FromNeural(architectureKind, brain));
+    }
+
+    public int AddBrain(BrainGenome brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        var validated = brain.Validated();
+        Brains.Add(validated);
+        BrainArchitectureKinds.Add(validated.ArchitectureKind);
         return Brains.Count - 1;
     }
 
-    public NeuralBrainGenome GetBrain(int brainId)
+    public BrainGenome GetBrain(int brainId)
     {
         if ((uint)brainId >= (uint)Brains.Count)
         {
@@ -116,7 +123,7 @@ public sealed class WorldState
         return Brains[brainId];
     }
 
-    public bool TryGetBrain(int brainId, out NeuralBrainGenome? brain)
+    public bool TryGetBrain(int brainId, out BrainGenome? brain)
     {
         if ((uint)brainId < (uint)Brains.Count)
         {
@@ -137,7 +144,7 @@ public sealed class WorldState
 
         return (uint)brainId < (uint)BrainArchitectureKinds.Count
             ? BrainArchitectureKinds[brainId]
-            : BrainArchitectureKind.HybridNeural;
+            : Brains[brainId].ArchitectureKind;
     }
 
     public ExtinctPayloadPruneResult PruneExtinctPayloads()
@@ -695,7 +702,7 @@ public sealed class WorldState
             Brains.Add(oldBrains[oldId]);
             BrainArchitectureKinds.Add((uint)oldId < (uint)oldKinds.Length
                 ? oldKinds[oldId]
-                : BrainArchitectureKind.HybridNeural);
+                : oldBrains[oldId].ArchitectureKind);
         }
     }
 

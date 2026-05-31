@@ -42,7 +42,14 @@ public sealed record BrainProfileCompatibility(
                 $"Brain profile output schema {profile.OutputSchemaVersion} is newer than supported schema {NeuralBrainSchema.OutputSchemaVersion}.");
         }
 
-        if (profile.Weights.Length == 0)
+        if (profile.BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph)
+        {
+            if (profile.RtNeatBrain is null)
+            {
+                return Incompatible("rtNEAT brain profile must include graph payload.");
+            }
+        }
+        else if (profile.Weights.Length == 0)
         {
             return Incompatible("Brain profile must include neural brain weights.");
         }
@@ -54,7 +61,7 @@ public sealed record BrainProfileCompatibility(
                 || profile.OutputSchemaVersion < NeuralBrainSchema.OutputSchemaVersion
                 || profile.InputCount != NeuralBrainSchema.InputCount
                 || profile.OutputCount != NeuralBrainSchema.OutputCount
-                || profile.Weights.Length != validated.Weights.Length)
+                || profile.WeightCount != validated.WeightCount)
             {
                 warnings.Add(
                     $"Profile will be normalized from input v{profile.InputSchemaVersion}/{profile.InputCount} and output v{profile.OutputSchemaVersion}/{profile.OutputCount} to input v{NeuralBrainSchema.InputSchemaVersion}/{NeuralBrainSchema.InputCount} and output v{NeuralBrainSchema.OutputSchemaVersion}/{NeuralBrainSchema.OutputCount}.");

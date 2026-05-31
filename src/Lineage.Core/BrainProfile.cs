@@ -29,10 +29,18 @@ public sealed record BrainProfile
 
     public float[] Weights { get; init; } = [];
 
-    public NeuralBrainGenome CreateBrain()
+    public RtNeatBrainGenome? RtNeatBrain { get; init; }
+
+    public int WeightCount => BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph
+        ? RtNeatBrain?.WeightCount ?? 0
+        : Weights.Length;
+
+    public BrainGenome CreateBrain()
     {
         _ = BrainFactory.Describe(BrainArchitectureKind);
-        return new NeuralBrainGenome(Weights);
+        return BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph
+            ? BrainGenome.FromRtNeat(RtNeatBrain ?? throw new InvalidOperationException("rtNEAT brain profile must include graph payload."))
+            : BrainGenome.FromNeural(BrainArchitectureKind, new NeuralBrainGenome(Weights));
     }
 
     public BrainProfile Validated()
@@ -56,6 +64,28 @@ public sealed record BrainProfile
         {
             throw new InvalidOperationException(
                 $"Brain profile output schema {OutputSchemaVersion} is newer than supported schema {NeuralBrainSchema.OutputSchemaVersion}.");
+        }
+
+        if (BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph)
+        {
+            if (RtNeatBrain is null)
+            {
+                throw new InvalidOperationException("rtNEAT brain profile must include graph payload.");
+            }
+
+            var graphBrain = RtNeatBrain.Validated();
+            return this with
+            {
+                Name = name,
+                Notes = Notes.Trim(),
+                InputSchemaVersion = NeuralBrainSchema.InputSchemaVersion,
+                OutputSchemaVersion = NeuralBrainSchema.OutputSchemaVersion,
+                InputCount = NeuralBrainSchema.InputCount,
+                OutputCount = NeuralBrainSchema.OutputCount,
+                HiddenNodeCount = graphBrain.HiddenNodeCount,
+                Weights = graphBrain.FlattenWeights(),
+                RtNeatBrain = graphBrain
+            };
         }
 
         if (Weights.Length == 0)

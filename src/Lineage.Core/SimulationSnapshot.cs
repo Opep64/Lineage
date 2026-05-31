@@ -36,6 +36,8 @@ public sealed record SimulationSnapshot
 
     public BrainArchitectureKind[] BrainArchitectureKinds { get; init; } = [];
 
+    public BrainSnapshot[] BrainPayloads { get; init; } = [];
+
     public CreatureLineageRecord[] LineageRecords { get; init; } = [];
 
     public SimulationStatsSnapshot[] StatsSnapshots { get; init; } = [];
@@ -127,6 +129,7 @@ public sealed record SimulationSnapshot
             BrainArchitectureKinds = state.Brains
                 .Select((_, brainId) => state.GetBrainArchitectureKind(brainId))
                 .ToArray(),
+            BrainPayloads = state.Brains.Select(BrainSnapshot.Capture).ToArray(),
             LineageRecords = state.LineageRecords.ToArray(),
             StatsSnapshots = SelectStatsSnapshots(state.Stats.Snapshots, maxStatsSnapshots),
             SpatialHeatmaps = state.Stats.SpatialHeatmaps.ToSnapshot(),

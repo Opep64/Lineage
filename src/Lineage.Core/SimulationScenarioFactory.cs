@@ -537,7 +537,7 @@ public static class SimulationScenarioFactory
         return state.AddBrain(BrainFactory.CreateStarter(
             scenario.BrainArchitectureKind,
             scenario.InitialBrainKind,
-            scenario.BrainHiddenNodeCount), scenario.BrainArchitectureKind);
+            scenario.BrainHiddenNodeCount));
     }
 
     private static int CreateFounderBrainId(
@@ -565,7 +565,7 @@ public static class SimulationScenarioFactory
         return state.AddBrain(BrainFactory.CreateRandom(
             scenario.BrainArchitectureKind,
             initialBrainRandom,
-            hiddenNodeCount: scenario.BrainHiddenNodeCount), scenario.BrainArchitectureKind);
+            hiddenNodeCount: scenario.BrainHiddenNodeCount));
     }
 
     private static SimVector2 RandomCreaturePosition(

@@ -1025,7 +1025,7 @@ public static class SpeciesClusterAnalyzer
         ];
     }
 
-    private static float[] CreateBrainFeatures(NeuralBrainGenome brain)
+    private static float[] CreateBrainFeatures(BrainGenome brain)
     {
         var features = new float[1 + BrainFeatureBucketCount * 2];
         features[0] = brain.HiddenNodeCount / (float)NeuralBrainSchema.MaxHiddenNodeCount;

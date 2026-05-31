@@ -6,6 +6,7 @@ namespace Lineage.Core;
 public sealed class ReproductionSystem(
     bool requireReproductionIntent = false,
     WorldMutationPolicy? mutationPolicy = null,
+    RtNeatMutationPolicy? rtNeatMutationPolicy = null,
     float reproductivePrimeAgeSeconds = 240f,
     float reproductiveSenescenceAgeSeconds = 900f,
     float senescentFertilityMultiplier = 0.18f,
@@ -13,6 +14,7 @@ public sealed class ReproductionSystem(
 {
     private readonly WorldMutationPolicy _mutationPolicy = mutationPolicy
         ?? new WorldMutationPolicy(MutationProfile.Default);
+    private readonly RtNeatMutationPolicy _rtNeatMutationPolicy = (rtNeatMutationPolicy ?? RtNeatMutationPolicy.Default).Validated();
     private readonly float _reproductivePrimeAgeSeconds =
         ValidateNonNegative(reproductivePrimeAgeSeconds, nameof(reproductivePrimeAgeSeconds));
     private readonly float _reproductiveSenescenceAgeSeconds =
@@ -98,8 +100,8 @@ public sealed class ReproductionSystem(
                         state.GetBrain(parent.BrainId),
                         state.Random,
                         mutationProfile.MutationStrength,
-                        mutationProfile.BrainMutationRate),
-                    parentBrainKind);
+                        mutationProfile.BrainMutationRate,
+                        _rtNeatMutationPolicy));
             }
             var angle = state.Random.NextSingle(0f, MathF.Tau);
             var parentRadius = CreatureGrowth.EffectiveBodyRadius(parent, parentGenome);
