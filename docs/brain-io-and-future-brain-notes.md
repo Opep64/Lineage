@@ -434,6 +434,21 @@ Decision from this sample:
 - Do not jump to brain mutation rate `0.16`; the 50K matrix already showed it bought complexity by burning too much viability.
 - Added the `rtNEAT Graph Growth` scenario recipe so the stronger setting is available deliberately.
 
+60K telemetry-backed sanity pass after adding stats columns:
+
+Output:
+
+- `out/rtneat_topology_compare_20260531/probe_60k.csv`
+- `out/rtneat_topology_compare_20260531/probe_60k.html`
+
+| Variant | Avg final | Final range | Avg births | Avg max gen | Avg hidden | Max hidden | Avg connections | Max connections | Avg enabled | Max enabled | Read |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Hybrid scenario base | 39.3 | 22-59 | 368.7 | 4.7 | 0.00 | 0 | 0.00 | 0 | 0.00 | 0 | Reference row only. |
+| rtNEAT base `0.06 / 0.08` | 33.7 | 23-47 | 276.0 | 6.0 | 0.66 | 3 | 7.68 | 12 | 6.96 | 10 | Healthier rtNEAT setting. |
+| rtNEAT graph-growth `0.08 / 0.12` | 26.0 | 19-31 | 254.7 | 6.0 | 1.47 | 6 | 9.42 | 18 | 7.63 | 13 | Richer graphs, weaker survival. |
+
+This reproduces the earlier pattern with first-class telemetry: stronger mutation grows hidden nodes and connection counts, but the base setting remains the safer default.
+
 Open design questions after the first pass:
 
 - Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?
