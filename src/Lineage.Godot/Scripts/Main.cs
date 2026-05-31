@@ -24,8 +24,9 @@ public partial class Main : Node2D
     private const float LauncherPanelWidth = 520f;
     private const float RightPanelWidth = 640f;
     private const float ViewMargin = 24f;
-    private const float SelectionPanelWidth = 430f;
+    private const float SelectionPanelWidth = 560f;
     private const float SelectionPanelHeight = 460f;
+    private const float SummaryActionActiveThreshold = 0.33f;
     private const float CompactStatsHeight = 184f;
     private const float InstructionsPanelHeight = 88f;
     private const float MiniGraphGap = 12f;
@@ -47,8 +48,24 @@ public partial class Main : Node2D
     private const float PlantSpriteScalePixels = 6.4f;
     private const float MeatSpriteScalePixels = 6.6f;
     private const float EggSpriteScalePixels = 5.4f;
+    private const float PlantSpriteIdleWindRotationRadians = 0.070f;
+    private const float PlantSpriteIdleWindStretch = 0.046f;
+    private const float PlantSpriteIdleWindSquash = 0.028f;
+    private const float PlantSpriteEatingWindRotationRadians = 0.045f;
+    private const float PlantSpriteEatingWindStretch = 0.030f;
+    private const float PlantSpriteEatingWindSquash = 0.018f;
+    private const float PlantSpriteEatingStretch = 0.14f;
+    private const float PlantSpriteEatingSquash = 0.07f;
+    private const float PlantSpriteEatingShakeRadians = 0.11f;
+    private const float FoodSpriteEatingStretch = 0.12f;
+    private const float FoodSpriteEatingSquash = 0.07f;
+    private const float FoodSpriteEatingShakeRadians = 0.13f;
     private const float MinCreatureSpriteSizePixels = 22f;
     private const float MaxCreatureSpriteSizePixels = 100f;
+    private const float CreatureSpriteMotionStretch = 0.16f;
+    private const float CreatureSpriteMotionSquash = 0.08f;
+    private const float CreatureSpriteGaitStretch = 0.035f;
+    private const float CreatureSpriteGaitSquash = 0.025f;
     private const float MinResourceSpriteSizePixels = 14f;
     private const float MaxPlantSpriteSizePixels = 50f;
     private const float MaxMeatSpriteSizePixels = 54f;
@@ -117,7 +134,7 @@ public partial class Main : Node2D
     private PanelContainer _selectionPanel = null!;
     private Label _selectionTitle = null!;
     private ScrollContainer _inspectorScroll = null!;
-    private Label _inspector = null!;
+    private RichTextLabel _inspector = null!;
     private Label _graphLegend = null!;
     private Label _graphDetails = null!;
     private readonly Label[] _miniGraphLabels = new Label[MiniGraphCount];
@@ -132,7 +149,7 @@ public partial class Main : Node2D
     private double _stepAccumulator;
     private EntityId _selectedCreatureId;
     private EntityId _selectedEggId;
-    private SelectedInspectorView _selectedInspectorView = SelectedInspectorView.State;
+    private SelectedInspectorView _selectedInspectorView = SelectedInspectorView.Summary;
     private readonly Dictionary<SelectedInspectorView, Button> _selectionViewButtons = [];
     private ulong _currentSeed = SimulationScenario.DefaultSeed;
     private string? _currentScenarioPath;
@@ -168,6 +185,9 @@ public partial class Main : Node2D
     private ulong _creatureCacheLastRefreshMilliseconds;
     private CreatureRenderMode _creatureRenderMode = CreatureRenderMode.Individual;
     private readonly Dictionary<EntityId, CreatureState> _drawCreatureById = [];
+    private readonly HashSet<EntityId> _drawEatingPlantResourceIds = [];
+    private readonly HashSet<EntityId> _drawEatingMeatResourceIds = [];
+    private readonly HashSet<EntityId> _drawEatingEggIds = [];
     private ImageTexture? _biomeOverlayTexture;
     private BiomeMap? _biomeOverlaySource;
     private int _biomeOverlayPixelsPerCell = 1;
@@ -176,6 +196,7 @@ public partial class Main : Node2D
     private int _drawnResourceAggregateCount;
     private int _drawnCreatureCount;
     private int _drawnCreatureAggregateCount;
+    private float _drawVisualTimeSeconds;
     private double _telemetryWindowSeconds;
     private int _telemetryFrameCount;
     private int _telemetryStepCount;
@@ -327,6 +348,7 @@ public partial class Main : Node2D
         var buttonRow = new HBoxContainer();
         buttonRow.AddThemeConstantOverride("separation", 6);
         root.AddChild(buttonRow);
+        buttonRow.AddChild(CreateInspectorViewButton("Summary", SelectedInspectorView.Summary));
         buttonRow.AddChild(CreateInspectorViewButton("State", SelectedInspectorView.State));
         buttonRow.AddChild(CreateInspectorViewButton("Body", SelectedInspectorView.Body));
         buttonRow.AddChild(CreateInspectorViewButton("Senses", SelectedInspectorView.Senses));
@@ -337,9 +359,15 @@ public partial class Main : Node2D
             SizeFlagsVertical = Control.SizeFlags.ExpandFill,
             MouseFilter = Control.MouseFilterEnum.Stop
         };
-        _inspector = CreateLabel(Vector2.Zero, new Color(0.9f, 0.92f, 0.88f));
-        _inspector.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _inspector.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _inspector = new RichTextLabel
+        {
+            BbcodeEnabled = true,
+            FitContent = true,
+            ScrollActive = false,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        _inspector.AddThemeColorOverride("default_color", new Color(0.9f, 0.92f, 0.88f));
         _inspectorScroll.AddChild(_inspector);
         root.AddChild(_inspectorScroll);
 
@@ -561,6 +589,8 @@ public partial class Main : Node2D
             }
 
             DrawObstacleOverlay();
+            _drawVisualTimeSeconds = Time.GetTicksMsec() * 0.001f;
+            UpdateFoodEatingAnimationSignals();
             DrawResources();
             DrawEggs();
             DrawCreatures();
@@ -1484,6 +1514,11 @@ public partial class Main : Node2D
 
     private string BuildCreatureInspectorText(CreatureState creature)
     {
+        if (_selectedInspectorView == SelectedInspectorView.Summary)
+        {
+            return BuildCreatureSummaryInspectorText(creature);
+        }
+
         if (_selectedInspectorView == SelectedInspectorView.State)
         {
             return BuildCreatureStateInspectorText(creature);
@@ -1628,6 +1663,98 @@ public partial class Main : Node2D
             $"Eat intent {creature.Actions.WantsEat}\n" +
             $"Attack intent {creature.Actions.WantsAttack}\n" +
             $"Reproduce {creature.Actions.WantsReproduce}";
+    }
+
+    private string BuildCreatureSummaryInspectorText(CreatureState creature)
+    {
+        var genome = _simulation.State.GetGenome(creature.GenomeId);
+        var senses = creature.Senses;
+        var maturityProgress = CreatureGrowth.MaturityProgress(creature, genome);
+        var growthFactor = CreatureGrowth.GrowthFactor(creature, genome);
+        var maturityText = CreatureGrowth.IsMature(creature, genome)
+            ? "adult"
+            : $"juvenile {maturityProgress:P0}";
+        var effectiveMaxSpeed = CreatureGrowth.EffectiveMaxSpeed(creature, genome);
+        var speedRatio = effectiveMaxSpeed > 0f
+            ? creature.Velocity.Length / effectiveMaxSpeed
+            : 0f;
+        var energyRatio = genome.ReproductionEnergyThreshold > 0f
+            ? creature.Energy / genome.ReproductionEnergyThreshold
+            : 1f;
+        var healthRatio = senses.HealthRatio > 0f
+            ? senses.HealthRatio
+            : creature.Health;
+        var memoryOutput = MathF.Max(
+            MathF.Abs(creature.Actions.MemoryForward),
+            MathF.Abs(creature.Actions.MemoryRight));
+
+        return
+            $"{ColorText("[b]Vitals[/b]", "#f3f0d0")}\n" +
+            $"{SummaryMetric("Energy", $"{creature.Energy:0.0}", energyRatio, "vs repro")}\n" +
+            $"{SummaryMetric("Health", $"{creature.Health:0.00}", healthRatio, "of max")}\n" +
+            $"{ColorText("Age", "#b8c7bd")} {creature.AgeSeconds:0.0}s    " +
+            $"{ColorText("Growth", "#b8c7bd")} {maturityText} ({growthFactor:P0})\n" +
+            $"{ColorText("Egg reserve", "#b8c7bd")} {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0} ({senses.EggReserveRatio:P0})    " +
+            $"{ColorText("Speed", "#b8c7bd")} {creature.Velocity.Length:0.0} ({speedRatio:P0})\n\n" +
+            $"{ColorText("[b]World Outputs[/b]", "#f3f0d0")}\n" +
+            $"{SummaryAction("Move", creature.Actions.MoveForward, MathF.Abs(creature.Actions.MoveForward) >= SummaryActionActiveThreshold, "#72cfff")}  " +
+            $"{SummaryAction("Turn", creature.Actions.Turn, MathF.Abs(creature.Actions.Turn) >= SummaryActionActiveThreshold, "#72cfff")}\n" +
+            $"{SummaryAction("Eat", creature.Actions.EatOutput, creature.Actions.WantsEat || creature.Actions.EatOutput >= SummaryActionActiveThreshold, "#7ee37a")}  " +
+            $"{SummaryAction("Repro", creature.Actions.ReproduceOutput, creature.Actions.WantsReproduce || creature.Actions.ReproduceOutput >= SummaryActionActiveThreshold, "#d7e86c")}\n" +
+            $"{SummaryAction("Attack", creature.Actions.AttackOutput, creature.Actions.WantsAttack || creature.Actions.AttackOutput >= SummaryActionActiveThreshold, "#ff6b4a")}  " +
+            $"{SummaryAction("Grab", creature.Actions.GrabOutput, creature.Actions.WantsGrab || creature.Actions.GrabOutput >= SummaryActionActiveThreshold, "#ff9b45")}\n" +
+            $"{SummaryAction("Sound", creature.Actions.SoundAmplitude, creature.Actions.SoundAmplitude >= SummaryActionActiveThreshold, "#b88cff")}  " +
+            $"{SummaryAction("Memory", memoryOutput, memoryOutput >= SummaryActionActiveThreshold, "#8fd7ff")}\n\n" +
+            $"{ColorText("[b]Contacts & Recent Effects[/b]", "#f3f0d0")}\n" +
+            $"{SummaryBoolean("Food", creature.IsTouchingFood, "#7ee37a")}  " +
+            $"{SummaryBoolean("Creature", creature.IsTouchingCreature, "#ff9b45")}  " +
+            $"{SummaryBoolean("Holding", creature.HeldCreatureId != default, "#ff9b45")}  " +
+            $"{SummaryBoolean("Grabbed", creature.GrabbedByCreatureId != default, "#ff6b4a")}\n" +
+            $"{ColorText("Swallowed", "#b8c7bd")} {creature.LastCaloriesEaten:0.00} raw    " +
+            $"{ColorText("Digested", "#b8c7bd")} {creature.LastCaloriesDigested:0.00} energy\n" +
+            $"{ColorText("Attack dealt", "#b8c7bd")} {creature.LastAttackDamageDealt:0.000}    " +
+            $"{ColorText("Damage taken", "#b8c7bd")} {creature.LastAttackDamageTaken:0.000}\n" +
+            $"{ColorText("Sound tone", "#b8c7bd")} {creature.Actions.SoundTone:0.00}    " +
+            $"{ColorText("Grab pressure", "#b8c7bd")} {creature.GrabPressure:0.00}\n";
+    }
+
+    private static string SummaryMetric(string label, string value, float ratio, string suffix)
+    {
+        var clampedRatio = Math.Clamp(ratio, 0f, 9.99f);
+        var color = RatioStatusColor(clampedRatio);
+        return $"{ColorText(label, "#b8c7bd")} {ColorText($"{value} ({clampedRatio:P0} {suffix})", color)}";
+    }
+
+    private static string SummaryAction(string label, float value, bool active, string activeColor)
+    {
+        var color = active ? activeColor : "#68716b";
+        var state = active ? "ON" : "off";
+        return ColorText($"{label} {value:0.00} {state}", color);
+    }
+
+    private static string SummaryBoolean(string label, bool active, string activeColor)
+    {
+        return ColorText($"{label} {(active ? "yes" : "no")}", active ? activeColor : "#68716b");
+    }
+
+    private static string RatioStatusColor(float ratio)
+    {
+        if (ratio <= 0.20f)
+        {
+            return "#ff6b4a";
+        }
+
+        if (ratio <= 0.50f)
+        {
+            return "#ffd45e";
+        }
+
+        return "#a7f28b";
+    }
+
+    private static string ColorText(string text, string color)
+    {
+        return $"[color={color}]{text}[/color]";
     }
 
     private string BuildCreatureStateInspectorText(CreatureState creature)
@@ -2050,12 +2177,87 @@ public partial class Main : Node2D
         var sizePixels = resource.Kind == ResourceKind.Meat
             ? SpriteSizeFromScreenRadius(radius, MeatSpriteScalePixels, MinResourceSpriteSizePixels, MaxMeatSpriteSizePixels)
             : SpriteSizeFromScreenRadius(radius, PlantSpriteScalePixels, MinResourceSpriteSizePixels, MaxPlantSpriteSizePixels);
+        var animation = resource.Kind == ResourceKind.Plant
+            ? PlantSpriteAnimation(resource, fullness, sizePixels)
+            : FoodSpriteEatingAnimation(resource.Id, _drawEatingMeatResourceIds, sizePixels);
+        var animatedCenter = screenPosition + animation.Offset;
+        var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = ResourceSpriteTint(resource, color, fullness);
         var rotation = resource.Kind == ResourceKind.Meat
             ? StableAngle(resource.Id.Value)
             : 0f;
-        DrawSpriteBackplate(screenPosition, sizePixels * 0.30f, color, resource.Kind == ResourceKind.Meat ? 0.32f : 0.22f);
-        return TryDrawSpriteRegion(theme, slot, screenPosition, new Vector2(sizePixels, sizePixels), rotation, modulate);
+        DrawSpriteBackplate(
+            animatedCenter,
+            sizePixels * 0.30f * MathF.Max(animation.Scale.X, animation.Scale.Y),
+            color,
+            resource.Kind == ResourceKind.Meat ? 0.32f : animation.IsEating ? 0.34f : 0.22f);
+        return TryDrawSpriteRegion(theme, slot, animatedCenter, animatedSize, rotation + animation.Rotation, modulate);
+    }
+
+    private (Vector2 Offset, Vector2 Scale, float Rotation, bool IsEating) PlantSpriteAnimation(
+        ResourcePatchState resource,
+        float fullness,
+        float sizePixels)
+    {
+        var phase = StableAngle(resource.Id.Value);
+        var growth = Math.Clamp(fullness, 0.15f, 1f);
+        var isEating = _drawEatingPlantResourceIds.Contains(resource.Id);
+        var wind = (MathF.Sin(_drawVisualTimeSeconds * 1.15f + phase)
+            + MathF.Sin(_drawVisualTimeSeconds * 2.05f + phase * 1.7f) * 0.45f)
+            * 0.55f
+            * (0.35f + growth * 0.65f);
+        var sway = MathF.Abs(wind);
+        var rotation = wind * (isEating ? PlantSpriteEatingWindRotationRadians : PlantSpriteIdleWindRotationRadians);
+        var scaleX = 1f + sway * (isEating ? PlantSpriteEatingWindStretch : PlantSpriteIdleWindStretch);
+        var scaleY = 1f - sway * (isEating ? PlantSpriteEatingWindSquash : PlantSpriteIdleWindSquash);
+        var offsetFactor = isEating ? 0.025f : 0.038f;
+        var maxOffset = isEating ? 1.8f : 2.7f;
+        var offset = new Vector2(
+            wind * Math.Clamp(sizePixels * offsetFactor, 0.4f, maxOffset),
+            0f);
+
+        if (isEating)
+        {
+            var pulse = 0.5f + 0.5f * MathF.Sin(_drawVisualTimeSeconds * 18f + phase);
+            rotation += MathF.Sin(_drawVisualTimeSeconds * 28f + phase) * PlantSpriteEatingShakeRadians;
+            scaleX += PlantSpriteEatingStretch * (0.55f + pulse * 0.45f);
+            scaleY -= PlantSpriteEatingSquash * (0.55f + pulse * 0.45f);
+            offset += new Vector2(
+                MathF.Sin(_drawVisualTimeSeconds * 32f + phase) * 1.5f,
+                MathF.Cos(_drawVisualTimeSeconds * 24f + phase) * 0.65f);
+        }
+
+        return (
+            offset,
+            new Vector2(Math.Clamp(scaleX, 0.78f, 1.28f), Math.Clamp(scaleY, 0.76f, 1.18f)),
+            rotation,
+            isEating);
+    }
+
+    private (Vector2 Offset, Vector2 Scale, float Rotation, bool IsEating) FoodSpriteEatingAnimation(
+        EntityId foodId,
+        HashSet<EntityId> eatingIds,
+        float sizePixels)
+    {
+        if (!eatingIds.Contains(foodId))
+        {
+            return (Vector2.Zero, Vector2.One, 0f, false);
+        }
+
+        var phase = StableAngle(foodId.Value);
+        var pulse = 0.5f + 0.5f * MathF.Sin(_drawVisualTimeSeconds * 18f + phase);
+        var shake = MathF.Sin(_drawVisualTimeSeconds * 30f + phase);
+        var offset = new Vector2(
+            shake * Math.Clamp(sizePixels * 0.030f, 0.45f, 1.8f),
+            MathF.Cos(_drawVisualTimeSeconds * 22f + phase) * Math.Clamp(sizePixels * 0.014f, 0.25f, 0.85f));
+
+        return (
+            offset,
+            new Vector2(
+                Math.Clamp(1f + FoodSpriteEatingStretch * (0.55f + pulse * 0.45f), 0.86f, 1.20f),
+                Math.Clamp(1f - FoodSpriteEatingSquash * (0.55f + pulse * 0.45f), 0.84f, 1.12f)),
+            shake * FoodSpriteEatingShakeRadians,
+            true);
     }
 
     private bool TryDrawSpriteEgg(EggState egg, Vector2 screenPosition, float radius, Color color)
@@ -2069,9 +2271,22 @@ public partial class Main : Node2D
             ? SpriteAtlasSlot.EggA
             : SpriteAtlasSlot.EggB;
         var sizePixels = SpriteSizeFromScreenRadius(radius, EggSpriteScalePixels, MinEggSpriteSizePixels, MaxEggSpriteSizePixels);
+        var animation = FoodSpriteEatingAnimation(egg.Id, _drawEatingEggIds, sizePixels);
+        var animatedCenter = screenPosition + animation.Offset;
+        var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = Colors.White.Lerp(color, 0.10f);
-        DrawSpriteBackplate(screenPosition, sizePixels * 0.34f, color, 0.26f);
-        return TryDrawSpriteRegion(theme, slot, screenPosition, new Vector2(sizePixels, sizePixels), StableAngle(egg.Id.Value), modulate);
+        DrawSpriteBackplate(
+            animatedCenter,
+            sizePixels * 0.34f * MathF.Max(animation.Scale.X, animation.Scale.Y),
+            color,
+            animation.IsEating ? 0.38f : 0.26f);
+        return TryDrawSpriteRegion(
+            theme,
+            slot,
+            animatedCenter,
+            animatedSize,
+            StableAngle(egg.Id.Value) + animation.Rotation,
+            modulate);
     }
 
     private bool TryDrawSpriteCreature(CreatureState creature, CreatureGenome genome, Vector2 screenPosition, float radius, Color color)
@@ -2083,35 +2298,87 @@ public partial class Main : Node2D
 
         var slot = SpriteSlotForCreature(genome);
         var sizePixels = SpriteSizeFromScreenRadius(radius, CreatureSpriteScalePixels, MinCreatureSpriteSizePixels, MaxCreatureSpriteSizePixels);
+        var animationScale = CreatureSpriteAnimationScale(creature, genome);
+        var animatedSize = new Vector2(sizePixels * animationScale.X, sizePixels * animationScale.Y);
         var selected = creature.Id == _selectedCreatureId;
         var colorModeEnabled = _colorMode != CreatureColorMode.Off || selected;
         var modulate = colorModeEnabled
             ? Colors.White.Lerp(color, selected ? 0.10f : 0.16f)
             : Colors.White;
+        var backplateRadius = sizePixels * 0.34f * MathF.Max(animationScale.X, animationScale.Y);
         if (colorModeEnabled)
         {
-            DrawSpriteBackplate(screenPosition, sizePixels * 0.34f, color, selected ? 0.62f : 0.38f);
+            DrawSpriteBackplate(screenPosition, backplateRadius, color, selected ? 0.62f : 0.38f);
         }
         else
         {
-            DrawSpriteShadow(screenPosition, sizePixels * 0.34f, 0.24f);
+            DrawSpriteShadow(screenPosition, backplateRadius, 0.24f);
         }
         var drawn = TryDrawSpriteRegion(
             theme,
             slot,
             screenPosition,
-            new Vector2(sizePixels, sizePixels),
+            animatedSize,
             creature.HeadingRadians,
             modulate);
         if (drawn && theme.DrawProceduralCreatureEyes)
         {
-            DrawCreatureSpriteEyes(creature, screenPosition, sizePixels);
+            DrawCreatureSpriteEyes(creature, screenPosition, sizePixels, animationScale);
         }
 
         return drawn;
     }
 
-    private void DrawCreatureSpriteEyes(CreatureState creature, Vector2 screenPosition, float sizePixels)
+    private Vector2 CreatureSpriteAnimationScale(CreatureState creature, CreatureGenome genome)
+    {
+        var effectiveMaxSpeed = MathF.Max(0.001f, CreatureGrowth.EffectiveMaxSpeed(creature, genome));
+        var speedRatio = Math.Clamp(creature.Velocity.Length / effectiveMaxSpeed, 0f, 1.35f);
+        var phase = StableAngle(creature.Id.Value);
+        var gait = MathF.Sin(_drawVisualTimeSeconds * (5.5f + speedRatio * 5.5f) + phase) * speedRatio;
+
+        var forwardScale = 1f
+            + speedRatio * CreatureSpriteMotionStretch
+            + gait * CreatureSpriteGaitStretch;
+        var sideScale = 1f
+            - speedRatio * CreatureSpriteMotionSquash
+            - gait * CreatureSpriteGaitSquash;
+
+        var turnAmount = Math.Clamp(MathF.Abs(creature.Actions.Turn), 0f, 1f);
+        forwardScale -= turnAmount * 0.035f;
+        sideScale += turnAmount * 0.055f;
+
+        if (creature.Actions.WantsEat || creature.LastCaloriesEaten > 0f)
+        {
+            var pulse = 0.5f + 0.5f * MathF.Sin(_drawVisualTimeSeconds * 12f + phase);
+            forwardScale -= 0.025f + pulse * 0.025f;
+            sideScale += 0.045f + pulse * 0.030f;
+        }
+
+        if (creature.LastAttackDamageDealt > 0f)
+        {
+            forwardScale += 0.18f;
+            sideScale -= 0.08f;
+        }
+
+        if (creature.LastAttackDamageTaken > 0f)
+        {
+            forwardScale -= 0.10f;
+            sideScale += 0.10f;
+        }
+
+        var grabPressure = Math.Clamp(creature.GrabPressure, 0f, 1f);
+        if (grabPressure > 0f)
+        {
+            forwardScale -= grabPressure * 0.055f;
+            sideScale += grabPressure * 0.045f;
+        }
+
+        return new Vector2(
+            Math.Clamp(forwardScale, 0.72f, 1.40f),
+            Math.Clamp(sideScale, 0.72f, 1.32f));
+    }
+
+    private void DrawCreatureSpriteEyes(CreatureState creature, Vector2 screenPosition, float sizePixels, Vector2 animationScale)
     {
         if (sizePixels < 18f)
         {
@@ -2122,8 +2389,8 @@ public partial class Main : Node2D
         var side = new Vector2(-forward.Y, forward.X);
         var eyeRadius = Math.Clamp(sizePixels * 0.075f, 1.4f, 4.4f);
         var pupilRadius = Math.Clamp(eyeRadius * 0.42f, 0.7f, 1.8f);
-        var eyeBase = screenPosition + forward * sizePixels * 0.22f;
-        var spacing = Math.Clamp(sizePixels * 0.105f, 2.0f, 7.5f);
+        var eyeBase = screenPosition + forward * sizePixels * animationScale.X * 0.22f;
+        var spacing = Math.Clamp(sizePixels * animationScale.Y * 0.105f, 2.0f, 7.5f);
         var lookOffset = forward * eyeRadius * 0.32f;
         var left = eyeBase + side * spacing;
         var right = eyeBase - side * spacing;
@@ -2540,6 +2807,41 @@ public partial class Main : Node2D
                 var radius = Math.Clamp(3f + MathF.Sqrt(summary.CreatureCount) * 0.55f, 3f, maxRadius);
                 DrawCircle(center, radius, color);
                 _drawnCreatureAggregateCount++;
+            }
+        }
+    }
+
+    private void UpdateFoodEatingAnimationSignals()
+    {
+        _drawEatingPlantResourceIds.Clear();
+        _drawEatingMeatResourceIds.Clear();
+        _drawEatingEggIds.Clear();
+
+        foreach (var creature in _simulation.State.Creatures)
+        {
+            if (creature.FoodContactResourceId == default || creature.LastCaloriesEaten <= 0f)
+            {
+                continue;
+            }
+
+            if (creature.FoodContactKind == FoodContactKind.Resource)
+            {
+                if (creature.FoodContactResourceKind == ResourceKind.Plant && creature.LastPlantCaloriesEaten > 0f)
+                {
+                    _drawEatingPlantResourceIds.Add(creature.FoodContactResourceId);
+                }
+                else if (creature.FoodContactResourceKind == ResourceKind.Meat
+                    && (creature.LastCarcassCaloriesEaten > 0f
+                        || creature.LastFreshMeatCaloriesEaten > 0f
+                        || creature.LastStaleMeatCaloriesEaten > 0f
+                        || creature.LastCaloriesEaten > 0f))
+                {
+                    _drawEatingMeatResourceIds.Add(creature.FoodContactResourceId);
+                }
+            }
+            else if (creature.FoodContactKind == FoodContactKind.Egg && creature.LastEggCaloriesEaten > 0f)
+            {
+                _drawEatingEggIds.Add(creature.FoodContactResourceId);
             }
         }
     }
@@ -5665,6 +5967,7 @@ public partial class Main : Node2D
 
     private enum SelectedInspectorView
     {
+        Summary,
         State,
         Body,
         Senses,
