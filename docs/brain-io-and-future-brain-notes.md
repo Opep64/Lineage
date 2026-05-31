@@ -415,7 +415,7 @@ First-pass implementation status:
 - Added a `BrainGenome` wrapper so `WorldState`, snapshots, profiles, exporters, and controllers can carry dense or graph brains.
 - Added rtNEAT graph mutation with the Bibites-inspired default mutation policy. The existing world/scenario `MutationStrength` and `BrainMutationRate` scale mutation pressure.
 - Added JSON snapshot/profile round-tripping for graph payloads.
-- Added a sparse forager starter with no hidden nodes and six enabled direct connections.
+- Added sparse forager, scavenger, and predator starters with no hidden nodes and diet-specific enabled direct connections. The scavenger and predator variants keep a plant-forager fallback instead of starting as single-diet specialists.
 - Added active rtNEAT topology telemetry to stats/probe/report outputs: graph-brain count/share, average/max hidden nodes, average/max connections, and average/max enabled connections.
 - First smoke result: a 50K tick balanced-foraging-derived run with 40 rtNEAT founders reached generation 2 and ended with 12 living creatures. Egg predation was high because the first graph used generic food contact.
 - Tuned starter result: switching the seed graph to plant-specific steering/eating plus an egg-contact eat suppressor produced a 50K tick smoke run with 65 living creatures, 236 hatched eggs, 0 egg predation deaths, and max generation 6. This is a better first viable rtNEAT baseline, though still intentionally simple.
@@ -454,7 +454,7 @@ Open design questions after the first pass:
 - Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?
 - Should graph complexity have an immediate energy cost, or should we first measure bloat without adding another pressure?
 - Should rtNEAT eventually get recurrent/self connections for memory, or should memory wait for a separate recurrent/plastic architecture pass?
-- Should the sparse starter remain plant-only, or should we add separate scavenger/predator sparse starters rather than making one seed graph cover every diet?
+- Do the sparse scavenger and predator starters survive better than the plant-only starter in carrion/predation scenarios, or do their extra direct gates need softer weights?
 
 ### HyperNEAT
 

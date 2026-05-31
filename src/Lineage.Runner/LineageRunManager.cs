@@ -2961,6 +2961,9 @@ public sealed partial class LineageRunManager
             "scavengerForager" => "Scavenger forager",
             "freshnessAwareScavenger" => "Freshness-aware scavenger",
             "foragerPredator" => "Forager predator",
+            "sparseGraphForager" => "Sparse graph forager",
+            "sparseGraphScavenger" => "Sparse graph scavenger",
+            "sparseGraphPredator" => "Sparse graph predator",
             "randomPerFounder" => "Per-founder random weights",
             null or "" => "unknown",
             _ => value

@@ -97,6 +97,7 @@ Implemented:
 - Long Run Performance applies the current long-run performance bundle.
 - Double Mutation applies a controlled higher-mutation world pressure.
 - rtNEAT Graph Growth applies the current experimental sparse-graph architecture, sector vision, and stronger graph-growth mutation pressure.
+- rtNEAT Sparse Scavenger and rtNEAT Sparse Predator apply the new diet-specific sparse starter graphs while keeping base rtNEAT mutation pressure.
 - Recipes are available from the launcher and Godot scenario tools.
 
 Remaining:

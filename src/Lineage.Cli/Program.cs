@@ -9242,6 +9242,9 @@ internal static class RunReportWriter
             InitialBrainKind.ScavengerForager => "Scavenger forager",
             InitialBrainKind.FreshnessAwareScavenger => "Freshness-aware scavenger",
             InitialBrainKind.ForagerPredator => "Forager predator",
+            InitialBrainKind.SparseGraphForager => "Sparse graph forager",
+            InitialBrainKind.SparseGraphScavenger => "Sparse graph scavenger",
+            InitialBrainKind.SparseGraphPredator => "Sparse graph predator",
             InitialBrainKind.RandomPerFounder => "Per-founder random weights",
             _ => kind.ToString()
         };

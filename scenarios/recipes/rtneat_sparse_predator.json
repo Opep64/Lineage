@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "lineage.runner.scenario-recipe.v1",
+  "name": "rtNEAT Sparse Predator",
+  "description": "Switches the scenario to the sparse rtNEAT graph architecture with a plant-forager plus creature-contact attack/grab starter and base mutation pressure.",
+  "tags": [
+    "brain",
+    "rtneat",
+    "starter",
+    "experiment"
+  ],
+  "changes": {
+    "brainArchitectureKind": "rtNeatGraph",
+    "initialBrainKind": "sparseGraphPredator",
+    "brainHiddenNodeCount": 0,
+    "enableSectorVision": true
+  },
+  "createdAtUtc": "2026-05-31T22:30:00Z",
+  "updatedAtUtc": "2026-05-31T22:30:00Z"
+}

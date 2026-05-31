@@ -6433,6 +6433,113 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
     AssertTrue(plantContact.Eat > 0.25f, "rtNEAT starter should eat contacted plants");
     AssertTrue(eggContact.Eat < 0f, "rtNEAT starter should not begin as an egg predator");
 
+    var scavengerStarter = BrainFactory.CreateStarter(
+        BrainArchitectureKind.RtNeatGraph,
+        InitialBrainKind.SparseGraphScavenger);
+    var meatToRight = scavengerStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 0.4f,
+                MeatDirectionForward = 0.5f,
+                MeatDirectionRight = 0.8f,
+                VisibleMeatDensity = 0.7f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var meatContact = scavengerStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 1f,
+                MeatDirectionForward = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var rottenMeatContact = scavengerStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                RottenMeatScentDetected = true,
+                RottenMeatScentDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    AssertTrue(scavengerStarter.RtNeat!.ConnectionCount > starter.RtNeat!.ConnectionCount, "rtNEAT scavenger starter should add meat-specific sparse connections");
+    AssertTrue(meatToRight.Turn > 0.5f, "rtNEAT scavenger starter should turn toward meat on the right");
+    AssertTrue(meatContact.Eat > 0.25f, "rtNEAT scavenger starter should eat contacted meat");
+    AssertTrue(rottenMeatContact.Eat < meatContact.Eat, "rtNEAT scavenger starter should reduce eating near rotten scent");
+
+    var predatorStarter = BrainFactory.CreateStarter(
+        BrainArchitectureKind.RtNeatGraph,
+        InitialBrainKind.SparseGraphPredator);
+    var creatureToRight = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.5f,
+                CreatureDirectionForward = 0.45f,
+                CreatureDirectionRight = 0.8f,
+                VisibleCreatureDensity = 0.7f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var creatureContact = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                CreatureDetected = true,
+                CreatureProximity = 1f,
+                CreatureDirectionForward = 1f,
+                CreatureContact = 1f,
+                VisibleCreatureDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var similarCreatureContact = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                CreatureDetected = true,
+                CreatureProximity = 1f,
+                CreatureDirectionForward = 1f,
+                CreatureContact = 1f,
+                CreatureContactSimilarity = 1f,
+                VisibleCreatureDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    AssertTrue(predatorStarter.RtNeat!.ConnectionCount > starter.RtNeat.ConnectionCount, "rtNEAT predator starter should add creature-contact sparse connections");
+    AssertTrue(creatureToRight.Turn > 0.25f, "rtNEAT predator starter should turn toward creatures on the right");
+    AssertTrue(creatureContact.Attack > 0.25f, "rtNEAT predator starter should attack contacted creatures");
+    AssertTrue(creatureContact.Grab > 0.25f, "rtNEAT predator starter should grab contacted creatures");
+    AssertTrue(similarCreatureContact.Attack < creatureContact.Attack, "rtNEAT predator starter should suppress attacks against similar contacts");
+
     var mutated = BrainFactory.Mutate(
         BrainArchitectureKind.RtNeatGraph,
         starter,

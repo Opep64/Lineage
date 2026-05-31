@@ -381,6 +381,149 @@ public sealed record RtNeatBrainGenome
         var connections = new List<RtNeatConnectionGene>();
         var nextInnovationId = 1;
 
+        AddForagerConnections(connections, ref nextInnovationId);
+
+        return new RtNeatBrainGenome
+        {
+            Nodes = nodes.ToArray(),
+            Connections = connections.ToArray(),
+            NextNodeId = FirstHiddenNodeId,
+            NextInnovationId = nextInnovationId
+        }.Validated();
+    }
+
+    public static RtNeatBrainGenome CreateStarterScavenger()
+    {
+        var nodes = CreateFixedNodes(useStarterOutputBiases: true).ToList();
+        var connections = new List<RtNeatConnectionGene>();
+        var nextInnovationId = 1;
+
+        AddForagerConnections(connections, ref nextInnovationId);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat.direction_right"),
+            OutputNodeId("action.turn"),
+            3.0f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat.direction_forward"),
+            OutputNodeId("action.move_forward"),
+            0.65f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat.proximity"),
+            OutputNodeId("action.move_forward"),
+            -0.35f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.meat_food"),
+            OutputNodeId("action.move_forward"),
+            -1.5f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.meat_food"),
+            OutputNodeId("action.eat"),
+            4.9f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat_freshness"),
+            OutputNodeId("action.eat"),
+            1.1f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("scent.rotten_meat_density"),
+            OutputNodeId("action.eat"),
+            -1.8f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.plant_food"),
+            OutputNodeId("action.eat"),
+            1.7f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.egg_food"),
+            OutputNodeId("action.eat"),
+            -3.0f);
+
+        return new RtNeatBrainGenome
+        {
+            Nodes = nodes.ToArray(),
+            Connections = connections.ToArray(),
+            NextNodeId = FirstHiddenNodeId,
+            NextInnovationId = nextInnovationId
+        }.Validated();
+    }
+
+    public static RtNeatBrainGenome CreateStarterPredator()
+    {
+        var nodes = CreateFixedNodes(useStarterOutputBiases: true).ToList();
+        var connections = new List<RtNeatConnectionGene>();
+        var nextInnovationId = 1;
+
+        AddForagerConnections(connections, ref nextInnovationId);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.creature.direction_right"),
+            OutputNodeId("action.turn"),
+            1.8f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.creature.direction_forward"),
+            OutputNodeId("action.move_forward"),
+            0.35f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.creature"),
+            OutputNodeId("action.move_forward"),
+            -1.0f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.creature"),
+            OutputNodeId("action.attack"),
+            5.0f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.creature"),
+            OutputNodeId("action.grab"),
+            2.7f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.creature_similarity"),
+            OutputNodeId("action.attack"),
+            -4.5f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.creature_similarity"),
+            OutputNodeId("action.grab"),
+            -2.0f);
+
+        return new RtNeatBrainGenome
+        {
+            Nodes = nodes.ToArray(),
+            Connections = connections.ToArray(),
+            NextNodeId = FirstHiddenNodeId,
+            NextInnovationId = nextInnovationId
+        }.Validated();
+    }
+
+    private static void AddForagerConnections(List<RtNeatConnectionGene> connections, ref int nextInnovationId)
+    {
         AddConnection(
             connections,
             ref nextInnovationId,
@@ -417,14 +560,6 @@ public sealed record RtNeatBrainGenome
             InputNodeId("contact.egg_food"),
             OutputNodeId("action.eat"),
             -3.0f);
-
-        return new RtNeatBrainGenome
-        {
-            Nodes = nodes.ToArray(),
-            Connections = connections.ToArray(),
-            NextNodeId = FirstHiddenNodeId,
-            NextInnovationId = nextInnovationId
-        }.Validated();
     }
 
     public static RtNeatBrainGenome CreateRandom(DeterministicRandom random, float scale = 1f)

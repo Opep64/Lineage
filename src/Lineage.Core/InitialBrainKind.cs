@@ -13,5 +13,7 @@ public enum InitialBrainKind
     FreshnessAwareScavenger,
     ForagerPredator,
     SparseGraphForager,
+    SparseGraphScavenger,
+    SparseGraphPredator,
     RandomPerFounder
 }

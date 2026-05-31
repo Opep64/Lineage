@@ -107,7 +107,23 @@ public static class BrainFactory
                     nameof(initialBrainKind));
             }
 
-            return BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateStarterForager());
+            return BrainGenome.FromRtNeat(initialBrainKind switch
+            {
+                InitialBrainKind.SparseGraphForager => RtNeatBrainGenome.CreateStarterForager(),
+                InitialBrainKind.SparseGraphScavenger => RtNeatBrainGenome.CreateStarterScavenger(),
+                InitialBrainKind.SparseGraphPredator => RtNeatBrainGenome.CreateStarterPredator(),
+                InitialBrainKind.SeedForager
+                    or InitialBrainKind.ExplorerForager
+                    or InitialBrainKind.SectorForager
+                    or InitialBrainKind.OpportunisticForager => RtNeatBrainGenome.CreateStarterForager(),
+                InitialBrainKind.ScavengerForager
+                    or InitialBrainKind.FreshnessAwareScavenger => RtNeatBrainGenome.CreateStarterScavenger(),
+                InitialBrainKind.ForagerPredator => RtNeatBrainGenome.CreateStarterPredator(),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(initialBrainKind),
+                    initialBrainKind,
+                    "Unsupported initial brain kind.")
+            });
         }
 
         var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
@@ -121,6 +137,8 @@ public static class BrainFactory
             InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.SparseGraphForager => NeuralBrainGenome.CreateSectorForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.SparseGraphScavenger => NeuralBrainGenome.CreateScavengerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.SparseGraphPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
             InitialBrainKind.RandomPerFounder => throw new ArgumentException(
                 "Random-per-founder brains are created individually.",
                 nameof(initialBrainKind)),
