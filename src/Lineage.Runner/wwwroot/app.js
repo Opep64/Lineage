@@ -75,9 +75,15 @@ const loadBrainLabSnapshotButton = document.querySelector("#loadBrainLabSnapshot
 const evaluateBrainLabButton = document.querySelector("#evaluateBrainLabButton");
 const muteBrainLabSoundButton = document.querySelector("#muteBrainLabSoundButton");
 const resetBrainLabOverridesButton = document.querySelector("#resetBrainLabOverridesButton");
+const brainLabPresetSelect = document.querySelector("#brainLabPresetSelect");
+const applyBrainLabPresetButton = document.querySelector("#applyBrainLabPresetButton");
+const compareBrainLabPopulationButton = document.querySelector("#compareBrainLabPopulationButton");
+const runBrainLabPresetMatrixButton = document.querySelector("#runBrainLabPresetMatrixButton");
 const brainLabMeta = document.querySelector("#brainLabMeta");
 const brainLabInputs = document.querySelector("#brainLabInputs");
 const brainLabOutputs = document.querySelector("#brainLabOutputs");
+const brainLabPopulation = document.querySelector("#brainLabPopulation");
+const brainLabPresetMatrix = document.querySelector("#brainLabPresetMatrix");
 const brainLabStatus = document.querySelector("#brainLabStatus");
 const speciesCatalogSelect = document.querySelector("#speciesCatalogSelect");
 const speciesCatalogDetails = document.querySelector("#speciesCatalogDetails");
@@ -100,6 +106,8 @@ let speciesCatalog = [];
 let brainLabSnapshots = [];
 let brainLabSnapshot = null;
 let brainLabEvaluation = null;
+let brainLabPopulationEvaluation = null;
+let brainLabPresetMatrixResult = null;
 let brainLabOverrides = {};
 let brainLabEvaluateTimer = null;
 let appliedRecipes = [];
@@ -385,6 +393,8 @@ async function loadBrainLabSnapshot() {
 
   brainLabSnapshot = await response.json();
   brainLabEvaluation = null;
+  brainLabPopulationEvaluation = null;
+  brainLabPresetMatrixResult = null;
   brainLabOverrides = {};
   if (brainLabSnapshotPath) {
     brainLabSnapshotPath.value = brainLabSnapshot.path;
@@ -405,6 +415,8 @@ function renderBrainLabSnapshot() {
   renderBrainLabCreatureOptions();
   renderBrainLabInputs();
   renderBrainLabOutputs();
+  renderBrainLabPopulation();
+  renderBrainLabPresetMatrix();
   updateBrainLabButtons();
 }
 
@@ -472,6 +484,7 @@ async function evaluateBrainLab() {
   renderBrainLabMeta();
   renderBrainLabInputs();
   renderBrainLabOutputs();
+  renderBrainLabPopulation();
   updateBrainLabButtons();
   brainLabStatus.textContent = [
     `${formatNumber(brainLabEvaluation.changedOutputCount)} changed outputs`,
@@ -611,6 +624,173 @@ function renderBrainLabOutputRow(output) {
   `;
 }
 
+async function compareBrainLabPopulation() {
+  const path = brainLabSelectedPath();
+  if (!path || !brainLabEvaluation) {
+    updateBrainLabButtons();
+    return;
+  }
+
+  brainLabStatus.textContent = "Comparing population";
+  const response = await fetch("/api/brain-lab/population-evaluate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      inputOverrides: brainLabOverrides,
+      maxCreatures: 5000
+    })
+  });
+
+  if (!response.ok) {
+    brainLabStatus.textContent = await responseErrorMessage(response, "Population comparison failed.");
+    return;
+  }
+
+  brainLabPopulationEvaluation = await response.json();
+  renderBrainLabPopulation();
+  updateBrainLabButtons();
+  brainLabStatus.textContent = [
+    `${formatNumber(brainLabPopulationEvaluation.evaluatedCreatureCount)} creatures compared`,
+    `${formatPercent(brainLabPopulationEvaluation.changedCreatureShare)} changed`,
+    `${formatPercent(brainLabPopulationEvaluation.gateFlipCreatureShare)} gate flips`
+  ].join(" | ");
+}
+
+function renderBrainLabPopulation() {
+  if (!brainLabPopulation) {
+    return;
+  }
+
+  if (!brainLabPopulationEvaluation) {
+    brainLabPopulation.textContent = "No population comparison yet.";
+    return;
+  }
+
+  const outputs = [...(brainLabPopulationEvaluation.outputs || [])]
+    .sort((left, right) => Number(right.meanAbsoluteDelta || 0) - Number(left.meanAbsoluteDelta || 0));
+  brainLabPopulation.innerHTML = `
+    <div class="brain-lab-population-summary">
+      <strong>${formatNumber(brainLabPopulationEvaluation.evaluatedCreatureCount)} compared</strong>
+      <span>${formatNumber(brainLabPopulationEvaluation.changedCreatureCount)} changed (${formatPercent(brainLabPopulationEvaluation.changedCreatureShare)})</span>
+      <span>${formatNumber(brainLabPopulationEvaluation.gateFlipCreatureCount)} gate-flipped (${formatPercent(brainLabPopulationEvaluation.gateFlipCreatureShare)})</span>
+      ${brainLabPopulationEvaluation.skippedCreatureCount ? `<span>${formatNumber(brainLabPopulationEvaluation.skippedCreatureCount)} skipped</span>` : ""}
+      ${brainLabPopulationEvaluation.supportsRawInputOverrides === false ? `<span>some brains did not support raw overrides</span>` : ""}
+    </div>
+    <table class="brain-lab-population-table">
+      <thead>
+        <tr>
+          <th>Output</th>
+          <th>Mean</th>
+          <th>Mean Delta</th>
+          <th>Mean Abs</th>
+          <th>Changed</th>
+          <th>Gate Flips</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${outputs.map(renderBrainLabPopulationRow).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderBrainLabPopulationRow(output) {
+  const deltaClass = output.meanDelta > 0 ? "is-positive" : output.meanDelta < 0 ? "is-negative" : "";
+  return `
+    <tr class="${Number(output.changedCreatureCount || 0) > 0 ? "is-changed" : ""}">
+      <td><strong>${escapeHtml(output.name)}</strong><code>${escapeHtml(output.key)}</code></td>
+      <td>${formatBrainLabNumber(output.baselineMean)} -> ${formatBrainLabNumber(output.modifiedMean)}</td>
+      <td class="${deltaClass}">${formatBrainLabDelta(output.meanDelta)}</td>
+      <td>${formatBrainLabNumber(output.meanAbsoluteDelta)}</td>
+      <td>${formatNumber(output.changedCreatureCount)} (${formatPercent(output.changedCreatureShare)})</td>
+      <td>${formatNumber(output.gateFlipCount)} (${formatPercent(output.gateFlipShare)})</td>
+    </tr>
+  `;
+}
+
+async function runBrainLabPresetMatrix() {
+  const path = brainLabSelectedPath();
+  if (!path || !brainLabSnapshot) {
+    updateBrainLabButtons();
+    return;
+  }
+
+  brainLabStatus.textContent = "Running preset matrix";
+  const response = await fetch("/api/brain-lab/preset-matrix", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      maxCreatures: 5000
+    })
+  });
+
+  if (!response.ok) {
+    brainLabStatus.textContent = await responseErrorMessage(response, "Preset matrix failed.");
+    return;
+  }
+
+  brainLabPresetMatrixResult = await response.json();
+  renderBrainLabPresetMatrix();
+  updateBrainLabButtons();
+  const strongest = [...(brainLabPresetMatrixResult.rows || [])]
+    .sort((left, right) => Number(right.changedCreatureShare || 0) - Number(left.changedCreatureShare || 0))[0];
+  brainLabStatus.textContent = strongest
+    ? `Preset matrix complete | strongest ${strongest.name} (${formatPercent(strongest.changedCreatureShare)} changed)`
+    : "Preset matrix complete";
+}
+
+function renderBrainLabPresetMatrix() {
+  if (!brainLabPresetMatrix) {
+    return;
+  }
+
+  if (!brainLabPresetMatrixResult) {
+    brainLabPresetMatrix.textContent = "No preset matrix yet.";
+    return;
+  }
+
+  const rows = [...(brainLabPresetMatrixResult.rows || [])]
+    .sort((left, right) => Number(right.changedCreatureShare || 0) - Number(left.changedCreatureShare || 0));
+  brainLabPresetMatrix.innerHTML = `
+    <div class="brain-lab-preset-matrix-summary">
+      <strong>${formatNumber(brainLabPresetMatrixResult.totalCreatureCount)} creatures</strong>
+      <span>cap ${formatNumber(brainLabPresetMatrixResult.maxCreatures)}</span>
+      <span>${escapeHtml(brainLabPresetMatrixResult.snapshotPath)}</span>
+    </div>
+    <table class="brain-lab-preset-matrix-table">
+      <thead>
+        <tr>
+          <th>Preset</th>
+          <th>Changed</th>
+          <th>Gate Flips</th>
+          <th>Max Delta</th>
+          <th>Top Outputs</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(renderBrainLabPresetMatrixRow).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderBrainLabPresetMatrixRow(row) {
+  const topOutputs = (row.topOutputs || [])
+    .map((output) => `${escapeHtml(output.name)} ${formatBrainLabNumber(output.meanAbsoluteDelta)}`)
+    .join("<br>");
+  return `
+    <tr>
+      <td><strong>${escapeHtml(row.name)}</strong><code>${escapeHtml(row.key)}</code></td>
+      <td>${formatNumber(row.changedCreatureCount)} (${formatPercent(row.changedCreatureShare)})</td>
+      <td>${formatNumber(row.gateFlipCreatureCount)} (${formatPercent(row.gateFlipCreatureShare)})</td>
+      <td>${formatBrainLabNumber(row.maxAbsoluteOutputDelta)}</td>
+      <td>${topOutputs}</td>
+    </tr>
+  `;
+}
+
 function updateBrainLabInputOverride(control) {
   if (brainLabEvaluation?.supportsRawInputOverrides === false) {
     return;
@@ -634,6 +814,7 @@ function updateBrainLabInputOverride(control) {
     brainLabOverrides[key] = clamped;
   }
 
+  clearBrainLabPopulation();
   syncBrainLabInputControls(key, clamped);
   scheduleBrainLabEvaluate();
 }
@@ -645,6 +826,7 @@ function resetBrainLabInput(key) {
   }
 
   delete brainLabOverrides[key];
+  clearBrainLabPopulation();
   syncBrainLabInputControls(key, Number(input.baselineValue));
   scheduleBrainLabEvaluate();
 }
@@ -670,12 +852,144 @@ function muteBrainLabSound() {
   for (const input of inputs.filter((candidate) => candidate.group === "Sound")) {
     brainLabOverrides[input.key] = Number(input.neutralValue);
   }
+  clearBrainLabPopulation();
   evaluateBrainLab();
 }
 
 function resetBrainLabOverrides() {
   brainLabOverrides = {};
+  clearBrainLabPopulation();
   evaluateBrainLab();
+}
+
+function applyBrainLabPreset() {
+  if (brainLabEvaluation?.supportsRawInputOverrides === false) {
+    return;
+  }
+
+  const inputs = brainLabEvaluation?.inputs || [];
+  if (inputs.length === 0) {
+    return;
+  }
+
+  brainLabOverrides = {};
+  const preset = brainLabPresetSelect?.value || "muteSound";
+  if (preset === "muteSound") {
+    setBrainLabGroupNeutral("Sound", inputs);
+  } else if (preset === "noFood") {
+    setBrainLabFoodNeutral(inputs);
+  } else if (preset === "onlyPlants") {
+    setBrainLabOnlyPlants(inputs);
+  } else if (preset === "onlyMeatEggs") {
+    setBrainLabOnlyMeatEggs(inputs);
+  } else if (preset === "noContact") {
+    setBrainLabGroupNeutral("Contact", inputs);
+  } else if (preset === "hungry") {
+    setBrainLabOverride("internal.hunger", 1, inputs);
+    setBrainLabOverride("internal.energy_ratio", 0.2, inputs);
+    setBrainLabOverride("internal.energy_surplus", 0, inputs);
+    setBrainLabOverride("internal.fat_ratio", 0, inputs);
+    setBrainLabOverride("internal.mass_burden", 0, inputs);
+  } else if (preset === "full") {
+    setBrainLabOverride("internal.hunger", 0, inputs);
+    setBrainLabOverride("internal.energy_ratio", 1, inputs);
+    setBrainLabOverride("internal.energy_surplus", 1, inputs);
+    setBrainLabOverride("internal.fat_ratio", 1, inputs);
+    setBrainLabOverride("internal.mass_burden", 1, inputs);
+  } else if (preset === "readyToReproduce") {
+    setBrainLabOverride("internal.reproduction_readiness", 1, inputs);
+    setBrainLabOverride("internal.egg_reserve_ratio", 1, inputs);
+    setBrainLabOverride("internal.energy_surplus", 1, inputs);
+    setBrainLabOverride("internal.health_ratio", 1, inputs);
+  }
+
+  clearBrainLabPopulation();
+  evaluateBrainLab();
+}
+
+function setBrainLabGroupNeutral(group, inputs) {
+  for (const input of inputs.filter((candidate) => candidate.group === group)) {
+    setBrainLabOverride(input.key, input.neutralValue, inputs);
+  }
+}
+
+function setBrainLabFoodNeutral(inputs) {
+  for (const input of inputs.filter(isBrainLabFoodInput)) {
+    setBrainLabOverride(input.key, input.neutralValue, inputs);
+  }
+}
+
+function setBrainLabOnlyPlants(inputs) {
+  const plantDensity = findBrainLabInput("vision.plant_density", inputs)?.baselineValue ?? 0;
+  const plantContact = findBrainLabInput("contact.plant_food", inputs)?.baselineValue ?? 0;
+  for (const input of inputs.filter(isBrainLabMeatOrEggInput)) {
+    setBrainLabOverride(input.key, input.neutralValue, inputs);
+  }
+  setBrainLabOverride("vision.food_density", plantDensity, inputs);
+  setBrainLabOverride("contact.food", plantContact, inputs);
+}
+
+function setBrainLabOnlyMeatEggs(inputs) {
+  const meatDensity = findBrainLabInput("vision.meat_density", inputs)?.baselineValue ?? 0;
+  const meatContact = Math.max(
+    findBrainLabInput("contact.meat_food", inputs)?.baselineValue ?? 0,
+    findBrainLabInput("contact.egg_food", inputs)?.baselineValue ?? 0);
+  for (const input of inputs.filter(isBrainLabPlantInput)) {
+    setBrainLabOverride(input.key, input.neutralValue, inputs);
+  }
+  setBrainLabOverride("vision.food_density", meatDensity, inputs);
+  setBrainLabOverride("contact.food", meatContact, inputs);
+}
+
+function setBrainLabOverride(key, value, inputs) {
+  const input = findBrainLabInput(key, inputs);
+  if (!input) {
+    return;
+  }
+
+  const clamped = Math.min(Math.max(Number(value), Number(input.minimumValue)), Number(input.maximumValue));
+  if (Math.abs(clamped - Number(input.baselineValue)) <= 0.0005) {
+    delete brainLabOverrides[key];
+  } else {
+    brainLabOverrides[key] = clamped;
+  }
+}
+
+function findBrainLabInput(key, inputs = brainLabEvaluation?.inputs || []) {
+  return inputs.find((input) => input.key === key) ?? null;
+}
+
+function isBrainLabFoodInput(input) {
+  return input.key === "vision.food_density"
+    || isBrainLabPlantInput(input)
+    || isBrainLabMeatOrEggInput(input)
+    || input.key.startsWith("contact.food")
+    || input.key.startsWith("contact.plant_")
+    || input.key.startsWith("contact.meat_")
+    || input.key.startsWith("contact.egg_")
+    || input.key.startsWith("scent.meat")
+    || input.key.startsWith("scent.rotten_meat");
+}
+
+function isBrainLabPlantInput(input) {
+  return input.key.startsWith("vision.plant")
+    || input.key.includes(".plant_")
+    || input.key.startsWith("contact.plant");
+}
+
+function isBrainLabMeatOrEggInput(input) {
+  return input.key.startsWith("vision.meat")
+    || input.key.includes(".meat_")
+    || input.key.includes(".egg_")
+    || input.key.startsWith("contact.meat")
+    || input.key.startsWith("contact.egg")
+    || input.key.startsWith("scent.meat")
+    || input.key.startsWith("scent.rotten_meat");
+}
+
+function clearBrainLabPopulation() {
+  brainLabPopulationEvaluation = null;
+  renderBrainLabPopulation();
 }
 
 function updateBrainLabButtons() {
@@ -691,6 +1005,15 @@ function updateBrainLabButtons() {
   }
   if (resetBrainLabOverridesButton) {
     resetBrainLabOverridesButton.disabled = !hasEvaluation || !supportsOverrides || Object.keys(brainLabOverrides).length === 0;
+  }
+  if (applyBrainLabPresetButton) {
+    applyBrainLabPresetButton.disabled = !hasEvaluation || !supportsOverrides;
+  }
+  if (compareBrainLabPopulationButton) {
+    compareBrainLabPopulationButton.disabled = !hasSnapshot || !hasEvaluation;
+  }
+  if (runBrainLabPresetMatrixButton) {
+    runBrainLabPresetMatrixButton.disabled = !hasSnapshot;
   }
 }
 
@@ -4126,6 +4449,9 @@ loadBrainLabSnapshotButton.addEventListener("click", loadBrainLabSnapshot);
 evaluateBrainLabButton.addEventListener("click", evaluateBrainLab);
 muteBrainLabSoundButton.addEventListener("click", muteBrainLabSound);
 resetBrainLabOverridesButton.addEventListener("click", resetBrainLabOverrides);
+applyBrainLabPresetButton.addEventListener("click", applyBrainLabPreset);
+compareBrainLabPopulationButton.addEventListener("click", compareBrainLabPopulation);
+runBrainLabPresetMatrixButton.addEventListener("click", runBrainLabPresetMatrix);
 brainLabSnapshotSelect.addEventListener("change", () => {
   brainLabSnapshotPath.value = brainLabSnapshotSelect.value;
   if (brainLabSnapshotSelect.value) {
@@ -4134,6 +4460,7 @@ brainLabSnapshotSelect.addEventListener("change", () => {
 });
 brainLabCreatureSelect.addEventListener("change", () => {
   brainLabOverrides = {};
+  clearBrainLabPopulation();
   evaluateBrainLab();
 });
 brainLabGroupFilter.addEventListener("change", renderBrainLabInputs);

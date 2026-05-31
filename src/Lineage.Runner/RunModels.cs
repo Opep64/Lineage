@@ -263,6 +263,44 @@ public sealed record BrainLabEvaluateRequest(
     int CreatureId,
     Dictionary<string, float>? InputOverrides);
 
+public sealed record BrainLabPopulationEvaluateRequest(
+    string SnapshotPath,
+    Dictionary<string, float>? InputOverrides,
+    int? MaxCreatures);
+
+public sealed record BrainLabPresetMatrixRequest(
+    string SnapshotPath,
+    int? MaxCreatures);
+
+public sealed record BrainLabPresetMatrixResult(
+    string SnapshotPath,
+    int TotalCreatureCount,
+    int MaxCreatures,
+    IReadOnlyList<BrainLabPresetMatrixRow> Rows);
+
+public sealed record BrainLabPresetMatrixRow(
+    string Key,
+    string Name,
+    int OverrideCount,
+    int EvaluatedCreatureCount,
+    int SkippedCreatureCount,
+    int UnsupportedOverrideCreatureCount,
+    int ChangedCreatureCount,
+    double ChangedCreatureShare,
+    int GateFlipCreatureCount,
+    double GateFlipCreatureShare,
+    double MaxAbsoluteOutputDelta,
+    IReadOnlyList<BrainLabPresetMatrixOutput> TopOutputs);
+
+public sealed record BrainLabPresetMatrixOutput(
+    string Key,
+    string Name,
+    double MeanAbsoluteDelta,
+    int ChangedCreatureCount,
+    double ChangedCreatureShare,
+    int GateFlipCount,
+    double GateFlipShare);
+
 public sealed record RunCreateRequest(
     string ScenarioPath,
     int Ticks,

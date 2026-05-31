@@ -6,12 +6,25 @@ public sealed partial class LineageRunManager
 {
     private const int MaxBrainLabSnapshotOptions = 200;
     private const int MaxBrainLabCreatures = 1000;
+    private const int MaxBrainLabPopulationCreatures = 5000;
 
     private readonly object _brainLabSnapshotLock = new();
     private readonly BrainProbeService _brainProbeService = new();
     private string _brainLabCachedSnapshotPath = string.Empty;
     private DateTime _brainLabCachedSnapshotModifiedUtc;
     private RestoredSimulation? _brainLabCachedSimulation;
+
+    private static readonly IReadOnlyList<BrainLabPresetDefinition> BrainLabPresetDefinitions =
+    [
+        new("muteSound", "Mute Sound", BrainProbePresetKind.MuteSound),
+        new("noFood", "No Food", BrainProbePresetKind.NoFood),
+        new("onlyPlants", "Only Plants", BrainProbePresetKind.OnlyPlants),
+        new("onlyMeatEggs", "Only Meat/Eggs", BrainProbePresetKind.OnlyMeatEggs),
+        new("noContact", "No Contact", BrainProbePresetKind.NoContact),
+        new("hungry", "Hungry", BrainProbePresetKind.Hungry),
+        new("full", "Full", BrainProbePresetKind.Full),
+        new("readyToReproduce", "Ready To Reproduce", BrainProbePresetKind.ReadyToReproduce)
+    ];
 
     public IReadOnlyList<BrainLabSnapshotOption> ListBrainLabSnapshots()
     {
@@ -91,6 +104,72 @@ public sealed partial class LineageRunManager
             request.InputOverrides);
     }
 
+    public BrainProbePopulationEvaluation EvaluateBrainLabPopulation(BrainLabPopulationEvaluateRequest request)
+    {
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var maxCreatures = Math.Clamp(
+            request.MaxCreatures ?? MaxBrainLabPopulationCreatures,
+            1,
+            MaxBrainLabPopulationCreatures);
+        return _brainProbeService.EvaluatePopulation(
+            restored.Simulation.State,
+            request.InputOverrides,
+            maxCreatures);
+    }
+
+    public BrainLabPresetMatrixResult EvaluateBrainLabPresetMatrix(BrainLabPresetMatrixRequest request)
+    {
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var maxCreatures = Math.Clamp(
+            request.MaxCreatures ?? MaxBrainLabPopulationCreatures,
+            1,
+            MaxBrainLabPopulationCreatures);
+        var rows = BrainLabPresetDefinitions
+            .Select(definition =>
+            {
+                var evaluation = _brainProbeService.EvaluatePopulationPreset(
+                    restored.Simulation.State,
+                    definition.PresetKind,
+                    maxCreatures);
+                var topOutputs = evaluation.Outputs
+                    .OrderByDescending(output => output.MeanAbsoluteDelta)
+                    .ThenByDescending(output => output.ChangedCreatureCount)
+                    .Take(3)
+                    .Select(output => new BrainLabPresetMatrixOutput(
+                        output.Key,
+                        output.Name,
+                        output.MeanAbsoluteDelta,
+                        output.ChangedCreatureCount,
+                        output.ChangedCreatureShare,
+                        output.GateFlipCount,
+                        output.GateFlipShare))
+                    .ToArray();
+
+                return new BrainLabPresetMatrixRow(
+                    definition.Key,
+                    definition.Name,
+                    evaluation.OverrideCount,
+                    evaluation.EvaluatedCreatureCount,
+                    evaluation.SkippedCreatureCount,
+                    evaluation.UnsupportedOverrideCreatureCount,
+                    evaluation.ChangedCreatureCount,
+                    evaluation.ChangedCreatureShare,
+                    evaluation.GateFlipCreatureCount,
+                    evaluation.GateFlipCreatureShare,
+                    evaluation.MaxAbsoluteOutputDelta,
+                    topOutputs);
+            })
+            .ToArray();
+
+        return new BrainLabPresetMatrixResult(
+            NormalizeArtifactRelativePath(resolvedPath),
+            restored.Simulation.State.Creatures.Count,
+            maxCreatures,
+            rows);
+    }
+
     private RestoredSimulation LoadBrainLabSimulation(string resolvedPath)
     {
         var modifiedUtc = File.GetLastWriteTimeUtc(resolvedPath);
@@ -143,4 +222,9 @@ public sealed partial class LineageRunManager
             || fileName.Contains("_snapshot", StringComparison.Ordinal)
             || fileName.Contains(".snapshot.", StringComparison.Ordinal);
     }
+
+    private sealed record BrainLabPresetDefinition(
+        string Key,
+        string Name,
+        BrainProbePresetKind PresetKind);
 }

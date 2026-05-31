@@ -47,6 +47,30 @@ api.MapPost("/brain-lab/evaluate", (BrainLabEvaluateRequest request, LineageRunM
     }
 });
 
+api.MapPost("/brain-lab/population-evaluate", (BrainLabPopulationEvaluateRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.EvaluateBrainLabPopulation(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/brain-lab/preset-matrix", (BrainLabPresetMatrixRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.EvaluateBrainLabPresetMatrix(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/species-catalog/delete", (SpeciesCatalogDeleteRequest request, LineageRunManager manager) =>
 {
     try

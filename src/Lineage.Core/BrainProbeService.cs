@@ -14,6 +14,11 @@ public sealed class BrainProbeService
     private static readonly IReadOnlyDictionary<string, BrainInputDefinition> InputByKey =
         BrainIoRegistry.Inputs.ToDictionary(input => input.Key, StringComparer.Ordinal);
 
+    private delegate bool BrainProbeInputOverrideProvider(
+        BrainInputDefinition input,
+        float[] baselineInputs,
+        out float overrideValue);
+
     public BrainProbeEvaluation Evaluate(
         WorldState state,
         EntityId creatureId,
@@ -29,21 +34,164 @@ public sealed class BrainProbeService
         var genome = state.GetGenome(creature.GenomeId);
         var brain = state.GetBrain(creature.BrainId);
         var overrides = NormalizeOverrides(inputOverrides);
+        var provider = CreateFixedOverrideProvider(overrides);
 
+        return EvaluateCreature(creature, genome, brain, overrides.Count, provider);
+    }
+
+    public BrainProbePopulationEvaluation EvaluatePopulation(
+        WorldState state,
+        IReadOnlyDictionary<string, float>? inputOverrides = null,
+        int maxCreatures = int.MaxValue)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (maxCreatures <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxCreatures), "Maximum creature count must be positive.");
+        }
+
+        var overrides = NormalizeOverrides(inputOverrides);
+        return EvaluatePopulationCore(
+            state,
+            overrides.Count,
+            CreateFixedOverrideProvider(overrides),
+            maxCreatures);
+    }
+
+    public BrainProbePopulationEvaluation EvaluatePopulationPreset(
+        WorldState state,
+        BrainProbePresetKind presetKind,
+        int maxCreatures = int.MaxValue)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (maxCreatures <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxCreatures), "Maximum creature count must be positive.");
+        }
+
+        var provider = CreatePresetOverrideProvider(presetKind);
+        return EvaluatePopulationCore(
+            state,
+            CountPresetOverrides(provider),
+            provider,
+            maxCreatures);
+    }
+
+    private BrainProbePopulationEvaluation EvaluatePopulationCore(
+        WorldState state,
+        int declaredOverrideCount,
+        BrainProbeInputOverrideProvider overrideProvider,
+        int maxCreatures)
+    {
+        var outputAccumulators = BrainIoRegistry.Outputs
+            .Select(static output => new BrainProbePopulationOutputAccumulator(output))
+            .ToArray();
+        var totalCreatureCount = state.Creatures.Count;
+        var creatureLimit = Math.Min(totalCreatureCount, maxCreatures);
+        var changedCreatureCount = 0;
+        var gateFlipCreatureCount = 0;
+        var evaluatedCreatureCount = 0;
+        var skippedCreatureCount = totalCreatureCount - creatureLimit;
+        var maxAbsoluteOutputDelta = 0f;
+        var unsupportedOverrideCount = 0;
+        var architectureKinds = new HashSet<BrainArchitectureKind>();
+
+        for (var i = 0; i < creatureLimit; i++)
+        {
+            var creature = state.Creatures[i];
+            var genome = state.GetGenome(creature.GenomeId);
+            var brain = state.GetBrain(creature.BrainId);
+            architectureKinds.Add(brain.ArchitectureKind);
+
+            if (declaredOverrideCount > 0 && brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph)
+            {
+                unsupportedOverrideCount++;
+                skippedCreatureCount++;
+                continue;
+            }
+
+            var evaluation = EvaluateCreature(
+                creature,
+                genome,
+                brain,
+                declaredOverrideCount,
+                overrideProvider);
+            var creatureChanged = false;
+            var creatureGateFlipped = false;
+            for (var outputIndex = 0; outputIndex < evaluation.Outputs.Count; outputIndex++)
+            {
+                var output = evaluation.Outputs[outputIndex];
+                outputAccumulators[outputIndex].Add(output);
+                creatureChanged |= output.Changed;
+                creatureGateFlipped |= output.BaselineActive.HasValue
+                    && output.ModifiedActive.HasValue
+                    && output.BaselineActive.Value != output.ModifiedActive.Value;
+                maxAbsoluteOutputDelta = Math.Max(maxAbsoluteOutputDelta, Math.Abs(output.Delta));
+            }
+
+            if (creatureChanged)
+            {
+                changedCreatureCount++;
+            }
+
+            if (creatureGateFlipped)
+            {
+                gateFlipCreatureCount++;
+            }
+
+            evaluatedCreatureCount++;
+        }
+
+        var architectureKind = architectureKinds.Count switch
+        {
+            0 => "None",
+            1 => architectureKinds.Single().ToString(),
+            _ => "Mixed"
+        };
+
+        return new BrainProbePopulationEvaluation(
+            architectureKind,
+            declaredOverrideCount == 0 || unsupportedOverrideCount == 0,
+            declaredOverrideCount,
+            totalCreatureCount,
+            evaluatedCreatureCount,
+            skippedCreatureCount,
+            unsupportedOverrideCount,
+            changedCreatureCount,
+            evaluatedCreatureCount > 0 ? changedCreatureCount / (float)evaluatedCreatureCount : 0f,
+            gateFlipCreatureCount,
+            evaluatedCreatureCount > 0 ? gateFlipCreatureCount / (float)evaluatedCreatureCount : 0f,
+            maxAbsoluteOutputDelta,
+            outputAccumulators.Select(static accumulator => accumulator.ToValue()).ToArray());
+    }
+
+    private static BrainProbeEvaluation EvaluateCreature(
+        CreatureState creature,
+        CreatureGenome genome,
+        BrainGenome brain,
+        int declaredOverrideCount,
+        BrainProbeInputOverrideProvider overrideProvider)
+    {
         var inputFrame = BrainInputFrame.FromSenses(creature.Senses, genome);
         var memoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(creature.Senses);
         var baselineInputs = new float[NeuralBrainSchema.InputCount];
         LegacyNeuralBrainAdapter.FillInputs(inputFrame, memoryInputs, baselineInputs);
 
         var modifiedInputs = baselineInputs.ToArray();
-        foreach (var (key, value) in overrides)
+        var modifiedInputCount = 0;
+        foreach (var input in BrainIoRegistry.Inputs)
         {
-            var definition = InputByKey[key];
-            modifiedInputs[definition.FlatIndex] = Math.Clamp(value, definition.MinimumValue, definition.MaximumValue);
+            if (!overrideProvider(input, baselineInputs, out var value))
+            {
+                continue;
+            }
+
+            modifiedInputs[input.FlatIndex] = Math.Clamp(value, input.MinimumValue, input.MaximumValue);
+            modifiedInputCount++;
         }
 
-        var baseline = EvaluateBrain(brain, inputFrame, memoryInputs, baselineInputs, overrides.Count > 0);
-        var modified = overrides.Count == 0
+        var baseline = EvaluateBrain(brain, inputFrame, memoryInputs, baselineInputs, declaredOverrideCount > 0);
+        var modified = modifiedInputCount == 0
             ? baseline
             : EvaluateDenseBrain(brain, modifiedInputs);
 
@@ -58,7 +206,7 @@ public sealed class BrainProbeService
                 input.NeutralValue,
                 baselineInputs[input.FlatIndex],
                 modifiedInputs[input.FlatIndex],
-                overrides.ContainsKey(input.Key),
+                overrideProvider(input, baselineInputs, out _),
                 input.Meaning))
             .ToArray();
 
@@ -91,7 +239,7 @@ public sealed class BrainProbeService
                 creature.Actions.SoundAmplitude),
             brain.ArchitectureKind.ToString(),
             brain.ArchitectureKind != BrainArchitectureKind.RtNeatGraph,
-            overrides.Count,
+            modifiedInputCount,
             changedOutputCount,
             gateFlipCount,
             maxAbsoluteOutputDelta,
@@ -164,6 +312,185 @@ public sealed class BrainProbeService
         }
 
         return overrides;
+    }
+
+    private static BrainProbeInputOverrideProvider CreateFixedOverrideProvider(
+        IReadOnlyDictionary<string, float> overrides)
+    {
+        return (BrainInputDefinition input, float[] _, out float overrideValue) =>
+        {
+            if (overrides.TryGetValue(input.Key, out overrideValue))
+            {
+                return true;
+            }
+
+            overrideValue = 0f;
+            return false;
+        };
+    }
+
+    private static BrainProbeInputOverrideProvider CreatePresetOverrideProvider(BrainProbePresetKind presetKind)
+    {
+        return presetKind switch
+        {
+            BrainProbePresetKind.MuteSound => NeutralizeGroup(BrainIoSignalGroup.Sound),
+            BrainProbePresetKind.NoFood => Neutralize(IsFoodInput),
+            BrainProbePresetKind.OnlyPlants => OnlyPlants,
+            BrainProbePresetKind.OnlyMeatEggs => OnlyMeatEggs,
+            BrainProbePresetKind.NoContact => NeutralizeGroup(BrainIoSignalGroup.Contact),
+            BrainProbePresetKind.Hungry => FixedPreset(new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                ["internal.hunger"] = 1f,
+                ["internal.energy_ratio"] = 0.2f,
+                ["internal.energy_surplus"] = 0f,
+                ["internal.fat_ratio"] = 0f,
+                ["internal.mass_burden"] = 0f
+            }),
+            BrainProbePresetKind.Full => FixedPreset(new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                ["internal.hunger"] = 0f,
+                ["internal.energy_ratio"] = 1f,
+                ["internal.energy_surplus"] = 1f,
+                ["internal.fat_ratio"] = 1f,
+                ["internal.mass_burden"] = 1f
+            }),
+            BrainProbePresetKind.ReadyToReproduce => FixedPreset(new Dictionary<string, float>(StringComparer.Ordinal)
+            {
+                ["internal.reproduction_readiness"] = 1f,
+                ["internal.egg_reserve_ratio"] = 1f,
+                ["internal.energy_surplus"] = 1f,
+                ["internal.health_ratio"] = 1f
+            }),
+            _ => throw new ArgumentOutOfRangeException(nameof(presetKind), presetKind, "Unknown Brain Lab preset.")
+        };
+    }
+
+    private static BrainProbeInputOverrideProvider NeutralizeGroup(BrainIoSignalGroup group)
+    {
+        return Neutralize(input => input.Group == group);
+    }
+
+    private static BrainProbeInputOverrideProvider Neutralize(Func<BrainInputDefinition, bool> predicate)
+    {
+        return (BrainInputDefinition input, float[] _, out float overrideValue) =>
+        {
+            if (predicate(input))
+            {
+                overrideValue = input.NeutralValue;
+                return true;
+            }
+
+            overrideValue = 0f;
+            return false;
+        };
+    }
+
+    private static BrainProbeInputOverrideProvider FixedPreset(IReadOnlyDictionary<string, float> values)
+    {
+        return (BrainInputDefinition input, float[] _, out float overrideValue) =>
+        {
+            if (values.TryGetValue(input.Key, out overrideValue))
+            {
+                return true;
+            }
+
+            overrideValue = 0f;
+            return false;
+        };
+    }
+
+    private static bool OnlyPlants(BrainInputDefinition input, float[] baselineInputs, out float overrideValue)
+    {
+        if (IsMeatOrEggInput(input))
+        {
+            overrideValue = input.NeutralValue;
+            return true;
+        }
+
+        if (string.Equals(input.Key, "vision.food_density", StringComparison.Ordinal))
+        {
+            overrideValue = BaselineValue("vision.plant_density", baselineInputs);
+            return true;
+        }
+
+        if (string.Equals(input.Key, "contact.food", StringComparison.Ordinal))
+        {
+            overrideValue = BaselineValue("contact.plant_food", baselineInputs);
+            return true;
+        }
+
+        overrideValue = 0f;
+        return false;
+    }
+
+    private static bool OnlyMeatEggs(BrainInputDefinition input, float[] baselineInputs, out float overrideValue)
+    {
+        if (IsPlantInput(input))
+        {
+            overrideValue = input.NeutralValue;
+            return true;
+        }
+
+        if (string.Equals(input.Key, "vision.food_density", StringComparison.Ordinal))
+        {
+            overrideValue = BaselineValue("vision.meat_density", baselineInputs);
+            return true;
+        }
+
+        if (string.Equals(input.Key, "contact.food", StringComparison.Ordinal))
+        {
+            overrideValue = Math.Max(
+                BaselineValue("contact.meat_food", baselineInputs),
+                BaselineValue("contact.egg_food", baselineInputs));
+            return true;
+        }
+
+        overrideValue = 0f;
+        return false;
+    }
+
+    private static int CountPresetOverrides(BrainProbeInputOverrideProvider provider)
+    {
+        var baselineInputs = new float[NeuralBrainSchema.InputCount];
+        return BrainIoRegistry.Inputs.Count(input => provider(input, baselineInputs, out _));
+    }
+
+    private static float BaselineValue(string key, float[] baselineInputs)
+    {
+        return InputByKey.TryGetValue(key, out var definition)
+            ? baselineInputs[definition.FlatIndex]
+            : 0f;
+    }
+
+    private static bool IsFoodInput(BrainInputDefinition input)
+    {
+        return string.Equals(input.Key, "vision.food_density", StringComparison.Ordinal)
+            || IsPlantInput(input)
+            || IsMeatOrEggInput(input)
+            || input.Key.StartsWith("contact.food", StringComparison.Ordinal)
+            || input.Key.StartsWith("contact.plant_", StringComparison.Ordinal)
+            || input.Key.StartsWith("contact.meat_", StringComparison.Ordinal)
+            || input.Key.StartsWith("contact.egg_", StringComparison.Ordinal)
+            || input.Key.StartsWith("scent.meat", StringComparison.Ordinal)
+            || input.Key.StartsWith("scent.rotten_meat", StringComparison.Ordinal);
+    }
+
+    private static bool IsPlantInput(BrainInputDefinition input)
+    {
+        return input.Key.StartsWith("vision.plant", StringComparison.Ordinal)
+            || input.Key.Contains(".plant_", StringComparison.Ordinal)
+            || input.Key.StartsWith("contact.plant", StringComparison.Ordinal);
+    }
+
+    private static bool IsMeatOrEggInput(BrainInputDefinition input)
+    {
+        return input.Key.StartsWith("vision.meat", StringComparison.Ordinal)
+            || input.Key.Contains(".meat_", StringComparison.Ordinal)
+            || input.Key.Contains(".egg_", StringComparison.Ordinal)
+            || input.Key.StartsWith("contact.meat", StringComparison.Ordinal)
+            || input.Key.StartsWith("contact.egg", StringComparison.Ordinal)
+            || input.Key.StartsWith("scent.meat", StringComparison.Ordinal)
+            || input.Key.StartsWith("scent.rotten_meat", StringComparison.Ordinal);
     }
 
     private static BrainProbeOutputValue CreateOutputValue(
@@ -251,6 +578,21 @@ public sealed record BrainProbeEvaluation(
     IReadOnlyList<BrainProbeInputValue> Inputs,
     IReadOnlyList<BrainProbeOutputValue> Outputs);
 
+public sealed record BrainProbePopulationEvaluation(
+    string BrainArchitectureKind,
+    bool SupportsRawInputOverrides,
+    int OverrideCount,
+    int TotalCreatureCount,
+    int EvaluatedCreatureCount,
+    int SkippedCreatureCount,
+    int UnsupportedOverrideCreatureCount,
+    int ChangedCreatureCount,
+    float ChangedCreatureShare,
+    int GateFlipCreatureCount,
+    float GateFlipCreatureShare,
+    float MaxAbsoluteOutputDelta,
+    IReadOnlyList<BrainProbePopulationOutputValue> Outputs);
+
 public sealed record BrainProbeCreature(
     int Id,
     int Generation,
@@ -294,3 +636,101 @@ public sealed record BrainProbeOutputValue(
     bool? BaselineActive,
     bool? ModifiedActive,
     string Meaning);
+
+public sealed record BrainProbePopulationOutputValue(
+    string Key,
+    string Name,
+    int FlatIndex,
+    string Group,
+    float BaselineMean,
+    float ModifiedMean,
+    float MeanDelta,
+    float MeanAbsoluteDelta,
+    float MaxAbsoluteDelta,
+    int ChangedCreatureCount,
+    float ChangedCreatureShare,
+    int GateFlipCount,
+    float GateFlipShare,
+    int PositiveDeltaCount,
+    int NegativeDeltaCount,
+    string Meaning);
+
+public enum BrainProbePresetKind
+{
+    MuteSound,
+    NoFood,
+    OnlyPlants,
+    OnlyMeatEggs,
+    NoContact,
+    Hungry,
+    Full,
+    ReadyToReproduce
+}
+
+internal sealed class BrainProbePopulationOutputAccumulator(BrainOutputDefinition definition)
+{
+    private float _baselineTotal;
+    private float _modifiedTotal;
+    private float _deltaTotal;
+    private float _absoluteDeltaTotal;
+    private float _maxAbsoluteDelta;
+    private int _sampleCount;
+    private int _changedCreatureCount;
+    private int _gateFlipCount;
+    private int _positiveDeltaCount;
+    private int _negativeDeltaCount;
+
+    public void Add(BrainProbeOutputValue output)
+    {
+        var delta = output.Delta;
+        var absoluteDelta = Math.Abs(delta);
+        _sampleCount++;
+        _baselineTotal += output.BaselineValue;
+        _modifiedTotal += output.ModifiedValue;
+        _deltaTotal += delta;
+        _absoluteDeltaTotal += absoluteDelta;
+        _maxAbsoluteDelta = Math.Max(_maxAbsoluteDelta, absoluteDelta);
+        if (output.Changed)
+        {
+            _changedCreatureCount++;
+        }
+
+        if (output.BaselineActive.HasValue
+            && output.ModifiedActive.HasValue
+            && output.BaselineActive.Value != output.ModifiedActive.Value)
+        {
+            _gateFlipCount++;
+        }
+
+        if (delta > 0f)
+        {
+            _positiveDeltaCount++;
+        }
+        else if (delta < 0f)
+        {
+            _negativeDeltaCount++;
+        }
+    }
+
+    public BrainProbePopulationOutputValue ToValue()
+    {
+        var divisor = Math.Max(1, _sampleCount);
+        return new BrainProbePopulationOutputValue(
+            definition.Key,
+            definition.Name,
+            definition.FlatIndex,
+            definition.Group.ToString(),
+            _baselineTotal / divisor,
+            _modifiedTotal / divisor,
+            _deltaTotal / divisor,
+            _absoluteDeltaTotal / divisor,
+            _maxAbsoluteDelta,
+            _changedCreatureCount,
+            _changedCreatureCount / (float)divisor,
+            _gateFlipCount,
+            _gateFlipCount / (float)divisor,
+            _positiveDeltaCount,
+            _negativeDeltaCount,
+            definition.Meaning);
+    }
+}
