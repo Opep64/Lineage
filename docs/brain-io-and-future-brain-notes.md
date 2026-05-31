@@ -419,6 +419,20 @@ First-pass implementation status:
 - First smoke result: a 50K tick balanced-foraging-derived run with 40 rtNEAT founders reached generation 2 and ended with 12 living creatures. Egg predation was high because the first graph used generic food contact.
 - Tuned starter result: switching the seed graph to plant-specific steering/eating plus an egg-contact eat suppressor produced a 50K tick smoke run with 65 living creatures, 236 hatched eggs, 0 egg predation deaths, and max generation 6. This is a better first viable rtNEAT baseline, though still intentionally simple.
 
+150K mutation-pressure readout:
+
+| Variant | Avg final | Final range | Avg births | Avg max gen | Avg hidden | Max hidden | Hidden-brain share | Avg connections | Max connections | Read |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Base `0.06 / 0.08` | 103.7 | 97-109 | 887.7 | 11.0 | 1.03 | 4 | 68.2% | 8.59 | 16 | Healthier default. |
+| Strength `0.08`, rate `0.12` | 65.7 | 38-104 | 711.0 | 13.3 | 3.78 | 11 | 93.7% | 14.55 | 27 | Richer graphs, lower survival. |
+
+Decision from this sample:
+
+- Keep the base mutation settings as the default rtNEAT posture for now.
+- Treat strength `0.08` plus brain mutation rate `0.12` as an experiment setting for graph-growth probes, not as the default.
+- Do not jump to brain mutation rate `0.16`; the 50K matrix already showed it bought complexity by burning too much viability.
+- Added the `rtNEAT Graph Growth` scenario recipe so the stronger setting is available deliberately.
+
 Open design questions after the first pass:
 
 - Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?

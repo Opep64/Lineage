@@ -96,6 +96,7 @@ Implemented:
 - Recipes live under `scenarios/recipes/`.
 - Long Run Performance applies the current long-run performance bundle.
 - Double Mutation applies a controlled higher-mutation world pressure.
+- rtNEAT Graph Growth applies the current experimental sparse-graph architecture, sector vision, and stronger graph-growth mutation pressure.
 - Recipes are available from the launcher and Godot scenario tools.
 
 Remaining:
