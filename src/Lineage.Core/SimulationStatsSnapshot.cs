@@ -271,4 +271,12 @@ public readonly record struct SimulationStatsSnapshot(
     float RightRegionAverageGeneration,
     float LeftRegionSeasonFertilityMultiplier,
     float MiddleRegionSeasonFertilityMultiplier,
-    float RightRegionSeasonFertilityMultiplier);
+    float RightRegionSeasonFertilityMultiplier,
+    int RtNeatBrainCount,
+    float RtNeatBrainShare,
+    float AverageRtNeatHiddenNodeCount,
+    int MaxRtNeatHiddenNodeCount,
+    float AverageRtNeatConnectionCount,
+    int MaxRtNeatConnectionCount,
+    float AverageRtNeatEnabledConnectionCount,
+    int MaxRtNeatEnabledConnectionCount);

@@ -416,6 +416,7 @@ First-pass implementation status:
 - Added rtNEAT graph mutation with the Bibites-inspired default mutation policy. The existing world/scenario `MutationStrength` and `BrainMutationRate` scale mutation pressure.
 - Added JSON snapshot/profile round-tripping for graph payloads.
 - Added a sparse forager starter with no hidden nodes and six enabled direct connections.
+- Added active rtNEAT topology telemetry to stats/probe/report outputs: graph-brain count/share, average/max hidden nodes, average/max connections, and average/max enabled connections.
 - First smoke result: a 50K tick balanced-foraging-derived run with 40 rtNEAT founders reached generation 2 and ended with 12 living creatures. Egg predation was high because the first graph used generic food contact.
 - Tuned starter result: switching the seed graph to plant-specific steering/eating plus an egg-contact eat suppressor produced a 50K tick smoke run with 65 living creatures, 236 hatched eggs, 0 egg predation deaths, and max generation 6. This is a better first viable rtNEAT baseline, though still intentionally simple.
 

@@ -168,6 +168,7 @@ var tests = new (string Name, Action Body)[]
     ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
     ("Stats recording ignores extinct brain payloads", StatsRecordingIgnoresExtinctBrainPayloads),
+    ("Stats recording reports rtNEAT topology telemetry", StatsRecordingReportsRtNeatTopologyTelemetry),
     ("Stats recording reports biome pressure telemetry", StatsRecordingReportsBiomePressureTelemetry),
     ("Stats recording reports biome death causes", StatsRecordingReportsBiomeDeathCauses),
     ("Stats recording reports lifespan summary", StatsRecordingReportsLifespanSummary),
@@ -7606,6 +7607,14 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(13.1f / (4f * NeuralBrainSchema.InputCount), snapshot.AverageBrainHiddenInputWeightMagnitude, 0.000001, "Snapshot hidden input weight magnitude");
     AssertClose(0f, snapshot.AverageBrainHiddenOutputWeightMagnitude, 0.000001, "Snapshot hidden output weight magnitude");
     AssertClose(0f, snapshot.ActiveBrainHiddenOutputShare, 0.000001, "Snapshot active hidden output share");
+    AssertEqual(0, snapshot.RtNeatBrainCount, "Snapshot rtNEAT brain count");
+    AssertClose(0f, snapshot.RtNeatBrainShare, 0.000001, "Snapshot rtNEAT brain share");
+    AssertClose(0f, snapshot.AverageRtNeatHiddenNodeCount, 0.000001, "Snapshot average rtNEAT hidden nodes");
+    AssertEqual(0, snapshot.MaxRtNeatHiddenNodeCount, "Snapshot max rtNEAT hidden nodes");
+    AssertClose(0f, snapshot.AverageRtNeatConnectionCount, 0.000001, "Snapshot average rtNEAT connections");
+    AssertEqual(0, snapshot.MaxRtNeatConnectionCount, "Snapshot max rtNEAT connections");
+    AssertClose(0f, snapshot.AverageRtNeatEnabledConnectionCount, 0.000001, "Snapshot average rtNEAT enabled connections");
+    AssertEqual(0, snapshot.MaxRtNeatEnabledConnectionCount, "Snapshot max rtNEAT enabled connections");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
     AssertClose(12f, snapshot.TotalCreatureEnergy, 0.000001, "Snapshot creature energy");
     AssertClose(8f, snapshot.TotalFatCalories, 0.000001, "Snapshot fat energy");
@@ -7812,6 +7821,89 @@ static void StatsRecordingIgnoresExtinctBrainPayloads()
     AssertEqual(2, snapshot.BrainCount, "Snapshot retained brain payload count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot active average hidden nodes");
     AssertEqual(4, snapshot.MaxBrainHiddenNodeCount, "Snapshot active max hidden nodes");
+    AssertEqual(0, snapshot.RtNeatBrainCount, "Snapshot active rtNEAT brain count");
+}
+
+static void StatsRecordingReportsRtNeatTopologyTelemetry()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 115,
+        systems: [new StatsRecordingSystem()]);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var firstBrainId = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(hiddenNodeCount: 1, disabledHiddenOutputCount: 1));
+    var secondBrainId = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(hiddenNodeCount: 2));
+    _ = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(hiddenNodeCount: 4));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 8f, brainId: firstBrainId);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 20f), energy: 8f, brainId: secondBrainId);
+
+    simulation.Step();
+
+    var snapshot = simulation.State.Stats.Snapshots.Single();
+    AssertEqual(2, snapshot.CreatureCount, "Snapshot rtNEAT creature count");
+    AssertEqual(3, snapshot.BrainCount, "Snapshot retained rtNEAT brain payload count");
+    AssertEqual(2, snapshot.RtNeatBrainCount, "Snapshot active rtNEAT brain count");
+    AssertClose(1f, snapshot.RtNeatBrainShare, 0.000001, "Snapshot active rtNEAT brain share");
+    AssertClose(1.5f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot active graph average hidden nodes");
+    AssertEqual(2, snapshot.MaxBrainHiddenNodeCount, "Snapshot active graph max hidden nodes");
+    AssertClose(1.5f, snapshot.AverageRtNeatHiddenNodeCount, 0.000001, "Snapshot average rtNEAT hidden nodes");
+    AssertEqual(2, snapshot.MaxRtNeatHiddenNodeCount, "Snapshot max rtNEAT hidden nodes");
+    AssertClose(9f, snapshot.AverageRtNeatConnectionCount, 0.000001, "Snapshot average rtNEAT connections");
+    AssertEqual(10, snapshot.MaxRtNeatConnectionCount, "Snapshot max rtNEAT connections");
+    AssertClose(8.5f, snapshot.AverageRtNeatEnabledConnectionCount, 0.000001, "Snapshot average rtNEAT enabled connections");
+    AssertEqual(10, snapshot.MaxRtNeatEnabledConnectionCount, "Snapshot max rtNEAT enabled connections");
+}
+
+static BrainGenome CreateRtNeatTopologyTestBrain(int hiddenNodeCount, int disabledHiddenOutputCount = 0)
+{
+    var starter = RtNeatBrainGenome.CreateStarterForager();
+    var nodes = starter.Nodes.ToList();
+    var connections = starter.Connections.ToList();
+    var inputIds = starter.Nodes
+        .Where(node => node.Kind == RtNeatNodeKind.Input)
+        .Select(node => node.Id)
+        .ToArray();
+    var outputId = starter.Nodes.First(node => node.Kind == RtNeatNodeKind.Output).Id;
+    var nextNodeId = starter.NextNodeId;
+    var nextInnovationId = starter.NextInnovationId;
+
+    for (var i = 0; i < hiddenNodeCount; i++)
+    {
+        var hiddenNodeId = nextNodeId++;
+        nodes.Add(new RtNeatNodeGene
+        {
+            Id = hiddenNodeId,
+            Kind = RtNeatNodeKind.Hidden,
+            Key = $"hidden.test.{i}",
+            Activation = RtNeatActivationKind.Tanh,
+            Bias = 0.1f * i,
+            Depth = 0.5f
+        });
+        connections.Add(new RtNeatConnectionGene
+        {
+            InnovationId = nextInnovationId++,
+            SourceNodeId = inputIds[i % inputIds.Length],
+            TargetNodeId = hiddenNodeId,
+            Weight = 1f
+        });
+        connections.Add(new RtNeatConnectionGene
+        {
+            InnovationId = nextInnovationId++,
+            SourceNodeId = hiddenNodeId,
+            TargetNodeId = outputId,
+            Weight = 0.75f,
+            Enabled = i >= disabledHiddenOutputCount
+        });
+    }
+
+    return BrainGenome.FromRtNeat(starter with
+    {
+        Nodes = nodes.ToArray(),
+        Connections = connections.ToArray(),
+        NextNodeId = nextNodeId,
+        NextInnovationId = nextInnovationId
+    });
 }
 
 static void StatsRecordingReportsBiomePressureTelemetry()

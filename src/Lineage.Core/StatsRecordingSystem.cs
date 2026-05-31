@@ -856,6 +856,13 @@ public sealed class StatsRecordingSystem(
         var activeHiddenOutputWeightCount = 0;
         var activeBrainIds = new HashSet<int>();
         var evaluatedBrainCount = 0;
+        var rtNeatBrainCount = 0;
+        var totalRtNeatHiddenNodeCount = 0;
+        var maxRtNeatHiddenNodeCount = 0;
+        var totalRtNeatConnectionCount = 0;
+        var maxRtNeatConnectionCount = 0;
+        var totalRtNeatEnabledConnectionCount = 0;
+        var maxRtNeatEnabledConnectionCount = 0;
         foreach (var creature in state.Creatures)
         {
             if (creature.BrainId >= 0)
@@ -888,10 +895,32 @@ public sealed class StatsRecordingSystem(
             hiddenInputWeightCount += brain.HiddenInputWeightCount;
             hiddenOutputWeightCount += brain.HiddenOutputWeightCount;
             activeHiddenOutputWeightCount += brain.CountActiveHiddenOutputWeights(ActiveHiddenOutputWeightThreshold);
+            if (brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph && brain.RtNeat is { } rtNeat)
+            {
+                rtNeatBrainCount++;
+                totalRtNeatHiddenNodeCount += rtNeat.HiddenNodeCount;
+                maxRtNeatHiddenNodeCount = Math.Max(maxRtNeatHiddenNodeCount, rtNeat.HiddenNodeCount);
+                totalRtNeatConnectionCount += rtNeat.ConnectionCount;
+                maxRtNeatConnectionCount = Math.Max(maxRtNeatConnectionCount, rtNeat.ConnectionCount);
+                totalRtNeatEnabledConnectionCount += rtNeat.EnabledConnectionCount;
+                maxRtNeatEnabledConnectionCount = Math.Max(maxRtNeatEnabledConnectionCount, rtNeat.EnabledConnectionCount);
+            }
         }
 
         var averageBrainHiddenNodeCount = evaluatedBrainCount > 0
             ? totalBrainHiddenNodeCount / (float)evaluatedBrainCount
+            : 0f;
+        var rtNeatBrainShare = evaluatedBrainCount > 0
+            ? rtNeatBrainCount / (float)evaluatedBrainCount
+            : 0f;
+        var averageRtNeatHiddenNodeCount = rtNeatBrainCount > 0
+            ? totalRtNeatHiddenNodeCount / (float)rtNeatBrainCount
+            : 0f;
+        var averageRtNeatConnectionCount = rtNeatBrainCount > 0
+            ? totalRtNeatConnectionCount / (float)rtNeatBrainCount
+            : 0f;
+        var averageRtNeatEnabledConnectionCount = rtNeatBrainCount > 0
+            ? totalRtNeatEnabledConnectionCount / (float)rtNeatBrainCount
             : 0f;
         var averageHiddenInputWeightMagnitude = hiddenInputWeightCount > 0
             ? totalHiddenInputWeightMagnitude / hiddenInputWeightCount
@@ -1181,7 +1210,15 @@ public sealed class StatsRecordingSystem(
             AverageRegionGeneration(rightRegionGenerationTotal, rightRegionCreatureCount),
             leftRegionSeason.FertilityMultiplier,
             middleRegionSeason.FertilityMultiplier,
-            rightRegionSeason.FertilityMultiplier));
+            rightRegionSeason.FertilityMultiplier,
+            rtNeatBrainCount,
+            rtNeatBrainShare,
+            averageRtNeatHiddenNodeCount,
+            maxRtNeatHiddenNodeCount,
+            averageRtNeatConnectionCount,
+            maxRtNeatConnectionCount,
+            averageRtNeatEnabledConnectionCount,
+            maxRtNeatEnabledConnectionCount));
     }
 
     private SeasonalFertilityState CalculateRegionSeason(WorldState state, float xFraction)
