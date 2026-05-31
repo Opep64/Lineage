@@ -2683,8 +2683,8 @@ public partial class Main : Node2D
         DrawVisionSectorDebug(creature, genome, screenPosition);
         DrawArc(screenPosition, radius + 5f, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
         DrawSelectedMemoryVector(creature, screenPosition);
-        DrawSelectedSoundOverlay(creature, genome, screenPosition);
         DrawSelectedSenseRangeRings(creature, genome, screenPosition);
+        DrawSelectedSoundOverlay(creature, genome, screenPosition);
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
         DrawSelectedGrabLinks(creature, screenPosition);
@@ -2765,18 +2765,23 @@ public partial class Main : Node2D
                 * _worldScale;
             if (rangePixels > 3f && rangePixels < 12000f)
             {
-                var rangeColor = ColorForSoundTone(creature.Actions.SoundTone, 0.10f + amplitude * 0.20f);
-                DrawArc(screenPosition, rangePixels, 0f, MathF.Tau, 96, rangeColor, width: 1.1f);
+                var emissionRangePixels = rangePixels + Math.Clamp(4f + amplitude * 10f, 5f, 14f);
+                var rangeColor = ColorForSoundTone(creature.Actions.SoundTone, 0.58f + amplitude * 0.28f);
+                DrawArc(screenPosition, emissionRangePixels, 0f, MathF.Tau, 128, new Color(0f, 0f, 0f, 0.72f), width: 5.2f);
+                DrawArc(screenPosition, emissionRangePixels, 0f, MathF.Tau, 128, rangeColor, width: 1.8f + amplitude * 2.4f);
+                DrawSoundEmissionTicks(screenPosition, emissionRangePixels, rangeColor, 2.0f + amplitude * 2.2f);
             }
 
+            var pulseRadius = 14f + amplitude * 38f;
+            DrawArc(screenPosition, pulseRadius, 0f, MathF.Tau, 48, new Color(0f, 0f, 0f, 0.68f), width: 4.6f);
             DrawArc(
                 screenPosition,
-                12f + amplitude * 34f,
+                pulseRadius,
                 0f,
                 MathF.Tau,
-                40,
-                ColorForSoundTone(creature.Actions.SoundTone, 0.44f + amplitude * 0.34f),
-                width: 1.6f + amplitude * 2.1f);
+                48,
+                ColorForSoundTone(creature.Actions.SoundTone, 0.72f + amplitude * 0.22f),
+                width: 2.2f + amplitude * 2.8f);
         }
 
         var senses = creature.Senses;
@@ -2800,6 +2805,27 @@ public partial class Main : Node2D
         var color = ColorForSoundTone(senses.SoundTone, 0.46f + signal * 0.38f);
         DrawLine(screenPosition, end, color, width: 1.6f + signal * 2.2f);
         DrawCircle(end, 4f + signal * 6f, WithAlpha(color, 0.42f + signal * 0.28f));
+    }
+
+    private void DrawSoundEmissionTicks(Vector2 screenPosition, float radiusPixels, Color color, float width)
+    {
+        if (radiusPixels < 18f)
+        {
+            return;
+        }
+
+        const int tickCount = 16;
+        var tickLength = Math.Clamp(radiusPixels * 0.012f, 4f, 12f);
+        var shadowColor = new Color(0f, 0f, 0f, 0.72f);
+        for (var i = 0; i < tickCount; i++)
+        {
+            var angle = MathF.Tau * i / tickCount;
+            var direction = ToGodot(SimVector2.FromAngle(angle));
+            var inner = screenPosition + direction * (radiusPixels - tickLength);
+            var outer = screenPosition + direction * (radiusPixels + tickLength);
+            DrawLine(inner, outer, shadowColor, width: width + 2.4f);
+            DrawLine(inner, outer, color, width: width);
+        }
     }
 
     private void DrawSelectedEggOverlay()
