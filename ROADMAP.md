@@ -1,6 +1,6 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-05-30
+Last reviewed: 2026-05-31
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
@@ -115,6 +115,8 @@ Status: first pass implemented, not final ecology
 - Make freshness-aware and carrion-aware behavior more discoverable without prewiring every founder.
 - Improve predation-specific diagnostics and long-run stability.
 - Tune predator/prey starter behavior through scenario rosters and catalog profiles rather than globally increasing bite damage.
+- Revisit combat lethality tuning: baseline bite damage currently requires long sustained contact for a kill, so future work should evaluate bite damage, bite-strength scaling, attack-output intensity, target body/health scaling, and how easily predators can maintain contact.
+- Revisit creature health regeneration: decide whether health should recover over time, whether recovery requires energy surplus/rest/safe conditions, and how regeneration would interact with predation so chip damage does not become either irrelevant or overpowered.
 - Add imperfect similarity/species cues or social-tolerance gates before expecting stable predator-only populations.
 - Investigate hard action gates, especially attack intent, because partial progress toward rare actions may not be rewarded.
 - Add generic intent/progress/frustration feedback so brains can learn when intended effort is not producing results.
