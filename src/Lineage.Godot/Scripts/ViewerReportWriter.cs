@@ -303,6 +303,18 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Damage-dealing this tick", FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Attack damage", $"{snapshot.TotalAttackDamagePerSecond:0.###} health/s");
         WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
+        WriteMetric(writer, "Grab intent", FormatPercent(Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Can grab", FormatPercent(Share(snapshot.CanGrabCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Holding", $"{FormatPercent(Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount))} ({snapshot.HoldingCreatureCount})");
+        WriteMetric(writer, "Grabbed", $"{FormatPercent(Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount))} ({snapshot.GrabbedCreatureCount})");
+        WriteMetric(writer, "Avg grab output", snapshot.AverageGrabOutput.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg grab pressure", snapshot.AverageGrabPressure.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg grab strength", snapshot.AverageGrabStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Sound emitting", FormatPercent(Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Sound heard", FormatPercent(Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Avg sound amp", snapshot.AverageSoundAmplitude.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg sound density", snapshot.AverageSoundDensity.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg sound clarity", snapshot.AverageSoundToneClarity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Injury deaths", state.Stats.InjuryDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rotten meat deaths", state.Stats.RottenMeatDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Fresh kill share", FormatPercent(snapshot.FreshKillCaloriesEatenShare));
@@ -2477,6 +2489,7 @@ public static class ViewerReportWriter
             new ChartSeries("Damage-dealing %", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Avg raw attack", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageAttackOutput).ToArray()),
             new ChartSeries("Avg touch attack", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageTouchingAttackOutput).ToArray()),
+            new ChartSeries("Avg grab output", "#ff8a30", snapshots.Select(snapshot => snapshot.AverageGrabOutput).ToArray()),
             new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()));
         WriteLineChart(
             writer,
@@ -2555,6 +2568,16 @@ public static class ViewerReportWriter
             new ChartSeries("Fresh kill share", "#8f4cb8", snapshots.Select(snapshot => snapshot.FreshKillCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Fresh meat share", "#d69d2f", snapshots.Select(snapshot => snapshot.FreshMeatCaloriesEatenShare * 100f).ToArray()),
             new ChartSeries("Meat energy share", "#b84a4a", snapshots.Select(snapshot => snapshot.MeatDigestedEnergyShare * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Grab And Sound",
+            "%",
+            snapshots,
+            new ChartSeries("Grab intent", "#ff8a30", snapshots.Select(snapshot => Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Holding", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Grabbed", "#9d3434", snapshots.Select(snapshot => Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Sound emit", "#29b6f6", snapshots.Select(snapshot => Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Sound heard", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Meat Freshness",

@@ -16,6 +16,7 @@ public sealed class StatsRecordingSystem(
 {
     private const float ActiveHiddenOutputWeightThreshold = 0.05f;
     private const float RawAttackPositiveThreshold = 0f;
+    private const float SoundEmissionThreshold = 0.05f;
     private const int PlantPatchinessGridAxisCells = 10;
     private const int PlantPatchinessGridCellCount = PlantPatchinessGridAxisCells * PlantPatchinessGridAxisCells;
 
@@ -153,6 +154,12 @@ public sealed class StatsRecordingSystem(
         var rawAttackPositiveCreatureCount = 0;
         var rawAttackNearGateCreatureCount = 0;
         var rawAttackNearGateWhileTouchingCreatureCount = 0;
+        var grabIntentCreatureCount = 0;
+        var canGrabCreatureCount = 0;
+        var holdingCreatureCount = 0;
+        var grabbedCreatureCount = 0;
+        var soundEmittingCreatureCount = 0;
+        var soundHeardCreatureCount = 0;
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
         var activeMemoryCreatureCount = 0;
@@ -169,6 +176,12 @@ public sealed class StatsRecordingSystem(
         var totalAttackOutput = 0f;
         var totalTouchingAttackOutput = 0f;
         var totalCreatureContactSimilarity = 0f;
+        var totalGrabOutput = 0f;
+        var totalGrabPressure = 0f;
+        var totalGrabStrength = 0f;
+        var totalSoundAmplitude = 0f;
+        var totalSoundDensity = 0f;
+        var totalSoundToneClarity = 0f;
         var barrenCreatureCount = 0;
         var sparseCreatureCount = 0;
         var grasslandCreatureCount = 0;
@@ -440,6 +453,19 @@ public sealed class StatsRecordingSystem(
                 creatureSimilarityScentDetectedCreatureCount++;
             }
 
+            totalSoundAmplitude += creature.Actions.SoundAmplitude;
+            totalSoundDensity += creature.Senses.SoundDensity;
+            totalSoundToneClarity += creature.Senses.SoundToneClarity;
+            if (creature.Actions.SoundAmplitude > SoundEmissionThreshold)
+            {
+                soundEmittingCreatureCount++;
+            }
+
+            if (creature.Senses.SoundDetected)
+            {
+                soundHeardCreatureCount++;
+            }
+
             if (creature.IsTouchingFood)
             {
                 foodContactCreatureCount++;
@@ -451,6 +477,7 @@ public sealed class StatsRecordingSystem(
             }
 
             totalAttackOutput += creature.Actions.AttackOutput;
+            totalGrabOutput += creature.Actions.GrabOutput;
             if (creature.Actions.AttackOutput > RawAttackPositiveThreshold)
             {
                 rawAttackPositiveCreatureCount++;
@@ -463,6 +490,28 @@ public sealed class StatsRecordingSystem(
             if (creature.Actions.WantsAttack)
             {
                 attackIntentCreatureCount++;
+            }
+
+            if (creature.Actions.WantsGrab)
+            {
+                grabIntentCreatureCount++;
+            }
+
+            if (creature.Senses.CanGrabCreature > 0f)
+            {
+                canGrabCreatureCount++;
+            }
+
+            if (creature.HeldCreatureId != default)
+            {
+                holdingCreatureCount++;
+                totalGrabStrength += creature.GrabStrength;
+            }
+
+            if (creature.GrabbedByCreatureId != default)
+            {
+                grabbedCreatureCount++;
+                totalGrabPressure += creature.GrabPressure;
             }
 
             if (creature.IsTouchingCreature)
@@ -981,6 +1030,18 @@ public sealed class StatsRecordingSystem(
             totalAttackOutput / divisor,
             creatureContactCreatureCount > 0 ? totalTouchingAttackOutput / creatureContactCreatureCount : 0f,
             attackDamagePerSecond,
+            grabIntentCreatureCount,
+            canGrabCreatureCount,
+            holdingCreatureCount,
+            grabbedCreatureCount,
+            totalGrabOutput / divisor,
+            grabbedCreatureCount > 0 ? totalGrabPressure / grabbedCreatureCount : 0f,
+            holdingCreatureCount > 0 ? totalGrabStrength / holdingCreatureCount : 0f,
+            soundEmittingCreatureCount,
+            soundHeardCreatureCount,
+            totalSoundAmplitude / divisor,
+            totalSoundDensity / divisor,
+            totalSoundToneClarity / divisor,
             totalSecondsSinceLastMeal / divisor,
             distanceTraveledPerSecond,
             totalDistanceSinceLastMeal / divisor,

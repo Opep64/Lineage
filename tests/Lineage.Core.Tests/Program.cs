@@ -7221,6 +7221,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSeedForager(4));
     var parentId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 5f, brainId: brainId);
     simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 20f), energy: 7f, generation: 2, brainId: brainId);
+    var childId = simulation.State.Creatures[1].Id;
     var seeingCreature = simulation.State.Creatures[0];
     seeingCreature.Senses = new CreatureSenseState
     {
@@ -7235,9 +7236,13 @@ static void StatsRecordingCapturesAggregateSnapshot()
         RottenMeatScentDensity = 0.1f,
         CreatureSimilarityScentDetected = true,
         CreatureSimilarityScentDensity = 0.8f,
+        SoundDetected = true,
+        SoundDensity = 0.3f,
+        SoundToneClarity = 0.6f,
         CreatureDetected = true,
         VisibleCreatureDensity = 0.05f,
         CreatureContactSimilarity = 0.9f,
+        CanGrabCreature = 1f,
         EggReserveRatio = 0.5f,
         EnergySurplusRatio = 0.25f,
         RecentFoodSuccess = 0.75f,
@@ -7254,10 +7259,15 @@ static void StatsRecordingCapturesAggregateSnapshot()
     {
         WantsReproduce = true,
         WantsAttack = true,
-        AttackOutput = 0.8f
+        WantsGrab = true,
+        AttackOutput = 0.8f,
+        GrabOutput = 0.7f,
+        SoundAmplitude = 0.6f
     };
     seeingCreature.IsTouchingFood = true;
     seeingCreature.IsTouchingCreature = true;
+    seeingCreature.HeldCreatureId = childId;
+    seeingCreature.GrabStrength = 0.5f;
     seeingCreature.LastMovementBlocked = true;
     seeingCreature.LastCaloriesEaten = 4.25f;
     seeingCreature.LastPlantCaloriesEaten = 2.5f;
@@ -7292,6 +7302,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
         RottenMeatScentDensity = 0.5f,
         CreatureSimilarityScentDetected = true,
         CreatureSimilarityScentDensity = 0.4f,
+        SoundDetected = false,
+        SoundDensity = 0f,
+        SoundToneClarity = 0f,
         VisibleCreatureDensity = 0.15f,
         CreatureContactSimilarity = 0.2f,
         EggReserveRatio = 0.25f,
@@ -7310,6 +7323,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     searchingCreature.DistanceSinceLastMeal = 12f;
     searchingCreature.Actions = new CreatureActionState { AttackOutput = 0.1f };
     searchingCreature.IsTouchingCreature = true;
+    searchingCreature.GrabbedByCreatureId = parentId;
+    searchingCreature.GrabPressure = 0.5f;
     simulation.State.Creatures[1] = searchingCreature;
     simulation.State.SpawnResourcePatch(new ResourcePatchState
     {
@@ -7449,6 +7464,18 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.45f, snapshot.AverageAttackOutput, 0.000001, "Average attack output");
     AssertClose(0.45f, snapshot.AverageTouchingAttackOutput, 0.000001, "Average touching attack output");
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
+    AssertEqual(1, snapshot.GrabIntentCreatureCount, "Grab intent count");
+    AssertEqual(1, snapshot.CanGrabCreatureCount, "Can grab creature count");
+    AssertEqual(1, snapshot.HoldingCreatureCount, "Holding creature count");
+    AssertEqual(1, snapshot.GrabbedCreatureCount, "Grabbed creature count");
+    AssertClose(0.35f, snapshot.AverageGrabOutput, 0.000001, "Average grab output");
+    AssertClose(0.5f, snapshot.AverageGrabPressure, 0.000001, "Average grab pressure");
+    AssertClose(0.5f, snapshot.AverageGrabStrength, 0.000001, "Average grab strength");
+    AssertEqual(1, snapshot.SoundEmittingCreatureCount, "Sound emitting count");
+    AssertEqual(1, snapshot.SoundHeardCreatureCount, "Sound heard count");
+    AssertClose(0.3f, snapshot.AverageSoundAmplitude, 0.000001, "Average sound amplitude");
+    AssertClose(0.15f, snapshot.AverageSoundDensity, 0.000001, "Average sound density");
+    AssertClose(0.3f, snapshot.AverageSoundToneClarity, 0.000001, "Average sound clarity");
     AssertClose(CreatureGenome.Baseline.DietaryAdaptation, snapshot.AverageDietaryAdaptation, 0.000001, "Average dietary adaptation");
     AssertClose(CreatureGenome.Baseline.CarrionAdaptation, snapshot.AverageCarrionAdaptation, 0.000001, "Average carrion adaptation");
     AssertClose(CreatureGenome.Baseline.TenderPlantAdaptation, snapshot.AverageTenderPlantAdaptation, 0.000001, "Average tender plant adaptation");

@@ -2101,6 +2101,18 @@ internal readonly record struct ProbeRunResult(
     float RawAttackNearGateTouchingShare,
     float AverageAttackOutput,
     float AverageTouchingAttackOutput,
+    float GrabIntentShare,
+    float CanGrabShare,
+    float HoldingShare,
+    float GrabbedShare,
+    float AverageGrabOutput,
+    float AverageGrabPressure,
+    float AverageGrabStrength,
+    float SoundEmittingShare,
+    float SoundHeardShare,
+    float AverageSoundAmplitude,
+    float AverageSoundDensity,
+    float AverageSoundToneClarity,
     float VisibleFoodDensity,
     float CaloriesEatenPerSecond,
     float MeatCaloriesEatenShare,
@@ -2161,6 +2173,17 @@ internal readonly record struct ProbeRunResult(
     float TailRawAttackNearGateTouchingShare,
     float TailAverageAttackOutput,
     float TailAverageTouchingAttackOutput,
+    float TailGrabIntentShare,
+    float TailHoldingShare,
+    float TailGrabbedShare,
+    float TailAverageGrabOutput,
+    float TailAverageGrabPressure,
+    float TailAverageGrabStrength,
+    float TailSoundEmittingShare,
+    float TailSoundHeardShare,
+    float TailAverageSoundAmplitude,
+    float TailAverageSoundDensity,
+    float TailAverageSoundToneClarity,
     float TailDeathsPerSecond,
     float TailStarvationDeathsPerSecond,
     float TailInjuryDeathsPerSecond,
@@ -2280,6 +2303,18 @@ internal readonly record struct ProbeRunResult(
             Share(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount),
             snapshot.AverageAttackOutput,
             snapshot.AverageTouchingAttackOutput,
+            Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.CanGrabCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount),
+            snapshot.AverageGrabOutput,
+            snapshot.AverageGrabPressure,
+            snapshot.AverageGrabStrength,
+            Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount),
+            Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount),
+            snapshot.AverageSoundAmplitude,
+            snapshot.AverageSoundDensity,
+            snapshot.AverageSoundToneClarity,
             snapshot.AverageVisibleFoodDensity,
             snapshot.TotalCaloriesEatenPerSecond,
             snapshot.MeatCaloriesEatenShare,
@@ -2340,6 +2375,17 @@ internal readonly record struct ProbeRunResult(
             tail.RawAttackNearGateTouchingShare,
             tail.AverageAttackOutput,
             tail.AverageTouchingAttackOutput,
+            tail.GrabIntentShare,
+            tail.HoldingShare,
+            tail.GrabbedShare,
+            tail.AverageGrabOutput,
+            tail.AverageGrabPressure,
+            tail.AverageGrabStrength,
+            tail.SoundEmittingShare,
+            tail.SoundHeardShare,
+            tail.AverageSoundAmplitude,
+            tail.AverageSoundDensity,
+            tail.AverageSoundToneClarity,
             tail.DeathsPerSecond,
             tail.StarvationDeathsPerSecond,
             tail.InjuryDeathsPerSecond,
@@ -2389,6 +2435,17 @@ internal readonly record struct ProbeTailSummary(
     float RawAttackNearGateTouchingShare,
     float AverageAttackOutput,
     float AverageTouchingAttackOutput,
+    float GrabIntentShare,
+    float HoldingShare,
+    float GrabbedShare,
+    float AverageGrabOutput,
+    float AverageGrabPressure,
+    float AverageGrabStrength,
+    float SoundEmittingShare,
+    float SoundHeardShare,
+    float AverageSoundAmplitude,
+    float AverageSoundDensity,
+    float AverageSoundToneClarity,
     float DeathsPerSecond,
     float StarvationDeathsPerSecond,
     float InjuryDeathsPerSecond,
@@ -2439,6 +2496,17 @@ internal readonly record struct ProbeTailSummary(
         var rawAttackNearGateTouchingShare = 0f;
         var averageAttackOutput = 0f;
         var averageTouchingAttackOutput = 0f;
+        var grabIntentShare = 0f;
+        var holdingShare = 0f;
+        var grabbedShare = 0f;
+        var averageGrabOutput = 0f;
+        var averageGrabPressure = 0f;
+        var averageGrabStrength = 0f;
+        var soundEmittingShare = 0f;
+        var soundHeardShare = 0f;
+        var averageSoundAmplitude = 0f;
+        var averageSoundDensity = 0f;
+        var averageSoundToneClarity = 0f;
         var caloriesEatenPerDistance = 0f;
         var averageSecondsSinceLastMeal = 0f;
         var plantPatchOccupiedCellShare = 0f;
@@ -2476,6 +2544,17 @@ internal readonly record struct ProbeTailSummary(
             rawAttackNearGateTouchingShare += Share(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount);
             averageAttackOutput += snapshot.AverageAttackOutput;
             averageTouchingAttackOutput += snapshot.AverageTouchingAttackOutput;
+            grabIntentShare += Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount);
+            holdingShare += Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount);
+            grabbedShare += Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount);
+            averageGrabOutput += snapshot.AverageGrabOutput;
+            averageGrabPressure += snapshot.AverageGrabPressure;
+            averageGrabStrength += snapshot.AverageGrabStrength;
+            soundEmittingShare += Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount);
+            soundHeardShare += Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount);
+            averageSoundAmplitude += snapshot.AverageSoundAmplitude;
+            averageSoundDensity += snapshot.AverageSoundDensity;
+            averageSoundToneClarity += snapshot.AverageSoundToneClarity;
             caloriesEatenPerDistance += snapshot.CaloriesEatenPerDistance;
             averageSecondsSinceLastMeal += snapshot.AverageSecondsSinceLastMeal;
             plantPatchOccupiedCellShare += snapshot.PlantPatchOccupiedCellShare;
@@ -2518,6 +2597,17 @@ internal readonly record struct ProbeTailSummary(
             rawAttackNearGateTouchingShare / divisor,
             averageAttackOutput / divisor,
             averageTouchingAttackOutput / divisor,
+            grabIntentShare / divisor,
+            holdingShare / divisor,
+            grabbedShare / divisor,
+            averageGrabOutput / divisor,
+            averageGrabPressure / divisor,
+            averageGrabStrength / divisor,
+            soundEmittingShare / divisor,
+            soundHeardShare / divisor,
+            averageSoundAmplitude / divisor,
+            averageSoundDensity / divisor,
+            averageSoundToneClarity / divisor,
             Rate(last.CreatureDeathCount - first.CreatureDeathCount, deathRateDivisor),
             Rate(last.StarvationDeathCount - first.StarvationDeathCount, deathRateDivisor),
             Rate(last.InjuryDeathCount - first.InjuryDeathCount, deathRateDivisor),
@@ -2547,7 +2637,7 @@ internal static class ProbeCsvWriter
     public static void Write(string path, IReadOnlyList<ProbeRunResult> results)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scenario,scenario_path,variant,variant_overrides,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,current_east_progress_share,run_east_progress_share,middle_region_creatures,right_region_creatures,behavior_movement_style,behavior_search_tendency,behavior_ecotype,behavior_terrain_response,behavior_rotten_meat_response,behavior_fresh_meat_preference_score,behavior_rotten_scent_avoidance_score,food_detected_share,plant_detected_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,stale_meat_avoided_share,avg_visible_meat_freshness,meat_scent_detected_share,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,avg_carrion_adaptation,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,rotten_meat_damage_per_second,rotten_meat_damaged_share,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_fresh_meat_detected_share,tail_stale_meat_detected_share,tail_stale_meat_avoided_share,tail_avg_visible_meat_freshness,tail_rotten_meat_scent_detected_share,tail_avg_rotten_meat_scent_density,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_rotten_meat_damage_per_second,tail_rotten_meat_damaged_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal,tail_plant_patch_occupied_cell_share,tail_plant_patch_top_decile_calories_share,tail_plant_patchiness,tail_avg_local_fertility_multiplier,tail_min_local_fertility_multiplier,tail_depleted_local_fertility_cell_share,creature_contact_share,attack_intent_share,attack_intent_touching_share,attack_no_intent_contact_share,raw_attack_positive_share,raw_attack_near_gate_share,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,tail_creature_contact_share,tail_attack_intent_share,tail_attack_intent_touching_share,tail_attack_no_intent_contact_share,tail_raw_attack_near_gate_touching_share,tail_avg_attack_output,tail_avg_touching_attack_output");
+        writer.WriteLine("scenario,scenario_path,variant,variant_overrides,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,current_east_progress_share,run_east_progress_share,middle_region_creatures,right_region_creatures,behavior_movement_style,behavior_search_tendency,behavior_ecotype,behavior_terrain_response,behavior_rotten_meat_response,behavior_fresh_meat_preference_score,behavior_rotten_scent_avoidance_score,food_detected_share,plant_detected_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,stale_meat_avoided_share,avg_visible_meat_freshness,meat_scent_detected_share,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,avg_carrion_adaptation,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,rotten_meat_damage_per_second,rotten_meat_damaged_share,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_fresh_meat_detected_share,tail_stale_meat_detected_share,tail_stale_meat_avoided_share,tail_avg_visible_meat_freshness,tail_rotten_meat_scent_detected_share,tail_avg_rotten_meat_scent_density,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_rotten_meat_damage_per_second,tail_rotten_meat_damaged_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal,tail_plant_patch_occupied_cell_share,tail_plant_patch_top_decile_calories_share,tail_plant_patchiness,tail_avg_local_fertility_multiplier,tail_min_local_fertility_multiplier,tail_depleted_local_fertility_cell_share,creature_contact_share,attack_intent_share,attack_intent_touching_share,attack_no_intent_contact_share,raw_attack_positive_share,raw_attack_near_gate_share,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,tail_creature_contact_share,tail_attack_intent_share,tail_attack_intent_touching_share,tail_attack_no_intent_contact_share,tail_raw_attack_near_gate_touching_share,tail_avg_attack_output,tail_avg_touching_attack_output,grab_intent_share,can_grab_share,holding_share,grabbed_share,avg_grab_output,avg_grab_pressure,avg_grab_strength,sound_emitting_share,sound_heard_share,avg_sound_amplitude,avg_sound_density,avg_sound_tone_clarity,tail_grab_intent_share,tail_holding_share,tail_grabbed_share,tail_avg_grab_output,tail_avg_grab_pressure,tail_avg_grab_strength,tail_sound_emitting_share,tail_sound_heard_share,tail_avg_sound_amplitude,tail_avg_sound_density,tail_avg_sound_tone_clarity");
 
         foreach (var result in results)
         {
@@ -2708,7 +2798,30 @@ internal static class ProbeCsvWriter
                 Format(result.TailAttackNoIntentContactShare),
                 Format(result.TailRawAttackNearGateTouchingShare),
                 Format(result.TailAverageAttackOutput),
-                Format(result.TailAverageTouchingAttackOutput)));
+                Format(result.TailAverageTouchingAttackOutput),
+                Format(result.GrabIntentShare),
+                Format(result.CanGrabShare),
+                Format(result.HoldingShare),
+                Format(result.GrabbedShare),
+                Format(result.AverageGrabOutput),
+                Format(result.AverageGrabPressure),
+                Format(result.AverageGrabStrength),
+                Format(result.SoundEmittingShare),
+                Format(result.SoundHeardShare),
+                Format(result.AverageSoundAmplitude),
+                Format(result.AverageSoundDensity),
+                Format(result.AverageSoundToneClarity),
+                Format(result.TailGrabIntentShare),
+                Format(result.TailHoldingShare),
+                Format(result.TailGrabbedShare),
+                Format(result.TailAverageGrabOutput),
+                Format(result.TailAverageGrabPressure),
+                Format(result.TailAverageGrabStrength),
+                Format(result.TailSoundEmittingShare),
+                Format(result.TailSoundHeardShare),
+                Format(result.TailAverageSoundAmplitude),
+                Format(result.TailAverageSoundDensity),
+                Format(result.TailAverageSoundToneClarity)));
         }
     }
 
@@ -2765,7 +2878,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</div></section>");
 
         writer.WriteLine("<section><h2>Scenario Summary</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Overrides</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>East max</th><th>Right now</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Tail patch</th><th>Tail avg fert</th><th>Tail min fert</th><th>Tail dep fert</th><th>Ticks/s</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Overrides</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>East max</th><th>Right now</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail grab</th><th>Tail held</th><th>Tail sound</th><th>Tail heard</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Tail patch</th><th>Tail avg fert</th><th>Tail min fert</th><th>Tail dep fert</th><th>Ticks/s</th></tr></thead><tbody>");
         foreach (var group in groups)
         {
             writer.WriteLine(
@@ -2807,6 +2920,10 @@ internal static class ProbeReportWriter
                 $"<td>{Html(FormatPercent(group.Average(result => result.TailAttackIntentTouchingShare)))}</td>" +
                 $"<td>{Html(FormatPercent(group.Average(result => result.TailRawAttackNearGateTouchingShare)))}</td>" +
                 $"<td>{Html(group.Average(result => result.TailAverageAttackOutput).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailGrabIntentShare)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailHoldingShare)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailSoundEmittingShare)))}</td>" +
+                $"<td>{Html(FormatPercent(group.Average(result => result.TailSoundHeardShare)))}</td>" +
                 $"<td>{Html(group.Average(result => result.TailDeathsPerSecond).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.CaloriesEatenPerDistance).ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.PlantDepletions).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
@@ -2821,7 +2938,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</tbody></table></div></section>");
 
         writer.WriteLine("<section><h2>Run Rows</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>East now</th><th>East max</th><th>Middle</th><th>Right</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Patch</th><th>Avg fert</th><th>Min fert</th><th>Dep fert</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>East now</th><th>East max</th><th>Middle</th><th>Right</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail grab</th><th>Tail held</th><th>Tail sound</th><th>Tail heard</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Patch</th><th>Avg fert</th><th>Min fert</th><th>Dep fert</th></tr></thead><tbody>");
         foreach (var result in results
             .OrderBy(result => result.ScenarioName)
             .ThenBy(result => result.VariantName)
@@ -2872,6 +2989,10 @@ internal static class ProbeReportWriter
                 $"<td>{Html(FormatPercent(result.TailAttackIntentTouchingShare))}</td>" +
                 $"<td>{Html(FormatPercent(result.TailRawAttackNearGateTouchingShare))}</td>" +
                 $"<td>{Html(result.TailAverageAttackOutput.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailGrabIntentShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailHoldingShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailSoundEmittingShare))}</td>" +
+                $"<td>{Html(FormatPercent(result.TailSoundHeardShare))}</td>" +
                 $"<td>{Html(result.TailDeathsPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.CaloriesEatenPerDistance.ToString("0.####", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.PlantDepletions)}</td>" +
@@ -2970,7 +3091,7 @@ internal static class StatsCsvWriter
     public static void Write(string path, IReadOnlyList<SimulationStatsSnapshot> snapshots)
     {
         using var writer = CreateWriter(path);
-        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,dormant_plant_resources,total_dormant_plant_seconds_remaining,avg_dormant_plant_seconds_remaining,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,tender_plant_type_resources,rich_plant_type_resources,tough_plant_type_resources,tender_plant_type_calories,rich_plant_type_calories,tough_plant_type_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,forest_creatures,forest_creature_share,wetland_creatures,wetland_creature_share,tundra_creatures,tundra_creature_share,highland_creatures,highland_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,obstacle_blocked_creatures,obstacle_blocked_share,obstacle_sensed_creatures,obstacle_sensed_share,avg_forward_obstacle,avg_left_obstacle,avg_right_obstacle,barren_plant_calories,sparse_plant_calories,grassland_plant_calories,rich_plant_calories,forest_plant_calories,wetland_plant_calories,tundra_plant_calories,highland_plant_calories,barren_meat_calories,sparse_meat_calories,grassland_meat_calories,rich_meat_calories,forest_meat_calories,wetland_meat_calories,tundra_meat_calories,highland_meat_calories,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,forest_calories_eaten_per_second,wetland_calories_eaten_per_second,tundra_calories_eaten_per_second,highland_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,forest_deaths,wetland_deaths,tundra_deaths,highland_deaths,avg_creature_x,max_creature_x,avg_max_creature_x_reached,max_creature_x_reached,run_max_creature_x_reached,current_east_progress_share,run_east_progress_share,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,fresh_meat_detected_creatures,fresh_meat_detected_share,stale_meat_detected_creatures,stale_meat_detected_share,stale_meat_avoided_creatures,stale_meat_avoided_share,avg_visible_meat_freshness,avg_meat_scent_density,rotten_meat_scent_detected_creatures,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,avg_visible_creature_density,creature_similarity_scent_detected_creatures,creature_similarity_scent_detected_share,avg_creature_similarity_scent_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,tender_plant_calories_eaten_per_second,rich_plant_calories_eaten_per_second,tough_plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,tender_plant_digested_energy_per_second,rich_plant_digested_energy_per_second,tough_plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,rotten_meat_deaths,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,avg_plant_dormancy_scheduled_seconds,avg_plant_dormancy_completed_seconds,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,rotten_meat_damaged_creatures,rotten_meat_damaged_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_recent_food_success,avg_recent_food_energy_yield,avg_tender_plant_payoff_trace,avg_rich_plant_payoff_trace,avg_tough_plant_payoff_trace,active_memory_creatures,active_memory_share,avg_memory_strength,memory_food_contact_share,non_memory_food_contact_share,memory_eating_share,non_memory_eating_share,memory_calories_eaten_per_distance,non_memory_calories_eaten_per_distance,memory_avg_seconds_since_last_meal,non_memory_avg_seconds_since_last_meal,memory_avg_distance_since_last_meal,non_memory_avg_distance_since_last_meal,memory_avg_recent_food_success,non_memory_avg_recent_food_success,memory_avg_generation,non_memory_avg_generation,memory_avg_max_x_progress_share,non_memory_avg_max_x_progress_share,memory_right_region_share,non_memory_right_region_share,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility,creature_contact_creatures,creature_contact_share,similar_creature_contact_creatures,similar_creature_contact_share,avg_creature_contact_similarity,attack_intent_creatures,attack_intent_share,attack_intent_touching_creatures,attack_intent_touching_share,attack_intent_touching_similar_creatures,attack_intent_touching_similar_share,attack_no_intent_contact_creatures,attack_no_intent_contact_share,raw_attack_positive_creatures,raw_attack_positive_share,raw_attack_near_gate_creatures,raw_attack_near_gate_share,raw_attack_near_gate_touching_creatures,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output");
+        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,dormant_plant_resources,total_dormant_plant_seconds_remaining,avg_dormant_plant_seconds_remaining,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,max_generation,total_creature_energy,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,tender_plant_type_resources,rich_plant_type_resources,tough_plant_type_resources,tender_plant_type_calories,rich_plant_type_calories,tough_plant_type_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,forest_creatures,forest_creature_share,wetland_creatures,wetland_creature_share,tundra_creatures,tundra_creature_share,highland_creatures,highland_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,obstacle_blocked_creatures,obstacle_blocked_share,obstacle_sensed_creatures,obstacle_sensed_share,avg_forward_obstacle,avg_left_obstacle,avg_right_obstacle,barren_plant_calories,sparse_plant_calories,grassland_plant_calories,rich_plant_calories,forest_plant_calories,wetland_plant_calories,tundra_plant_calories,highland_plant_calories,barren_meat_calories,sparse_meat_calories,grassland_meat_calories,rich_meat_calories,forest_meat_calories,wetland_meat_calories,tundra_meat_calories,highland_meat_calories,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,forest_calories_eaten_per_second,wetland_calories_eaten_per_second,tundra_calories_eaten_per_second,highland_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,forest_deaths,wetland_deaths,tundra_deaths,highland_deaths,avg_creature_x,max_creature_x,avg_max_creature_x_reached,max_creature_x_reached,run_max_creature_x_reached,current_east_progress_share,run_east_progress_share,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,fresh_meat_detected_creatures,fresh_meat_detected_share,stale_meat_detected_creatures,stale_meat_detected_share,stale_meat_avoided_creatures,stale_meat_avoided_share,avg_visible_meat_freshness,avg_meat_scent_density,rotten_meat_scent_detected_creatures,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,avg_visible_creature_density,creature_similarity_scent_detected_creatures,creature_similarity_scent_detected_share,avg_creature_similarity_scent_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,tender_plant_calories_eaten_per_second,rich_plant_calories_eaten_per_second,tough_plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,tender_plant_digested_energy_per_second,rich_plant_digested_energy_per_second,tough_plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,rotten_meat_deaths,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,avg_plant_dormancy_scheduled_seconds,avg_plant_dormancy_completed_seconds,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,rotten_meat_damaged_creatures,rotten_meat_damaged_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_recent_food_success,avg_recent_food_energy_yield,avg_tender_plant_payoff_trace,avg_rich_plant_payoff_trace,avg_tough_plant_payoff_trace,active_memory_creatures,active_memory_share,avg_memory_strength,memory_food_contact_share,non_memory_food_contact_share,memory_eating_share,non_memory_eating_share,memory_calories_eaten_per_distance,non_memory_calories_eaten_per_distance,memory_avg_seconds_since_last_meal,non_memory_avg_seconds_since_last_meal,memory_avg_distance_since_last_meal,non_memory_avg_distance_since_last_meal,memory_avg_recent_food_success,non_memory_avg_recent_food_success,memory_avg_generation,non_memory_avg_generation,memory_avg_max_x_progress_share,non_memory_avg_max_x_progress_share,memory_right_region_share,non_memory_right_region_share,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility,creature_contact_creatures,creature_contact_share,similar_creature_contact_creatures,similar_creature_contact_share,avg_creature_contact_similarity,attack_intent_creatures,attack_intent_share,attack_intent_touching_creatures,attack_intent_touching_share,attack_intent_touching_similar_creatures,attack_intent_touching_similar_share,attack_no_intent_contact_creatures,attack_no_intent_contact_share,raw_attack_positive_creatures,raw_attack_positive_share,raw_attack_near_gate_creatures,raw_attack_near_gate_share,raw_attack_near_gate_touching_creatures,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,grab_intent_creatures,grab_intent_share,can_grab_creatures,can_grab_share,holding_creatures,holding_share,grabbed_creatures,grabbed_share,avg_grab_output,avg_grab_pressure,avg_grab_strength,sound_emitting_creatures,sound_emitting_share,sound_heard_creatures,sound_heard_share,avg_sound_amplitude,avg_sound_density,avg_sound_tone_clarity");
 
         foreach (var snapshot in snapshots)
         {
@@ -3259,7 +3380,25 @@ internal static class StatsCsvWriter
                 snapshot.RawAttackNearGateWhileTouchingCreatureCount.ToString(CultureInfo.InvariantCulture),
                 FormatShare(snapshot.RawAttackNearGateWhileTouchingCreatureCount, snapshot.CreatureCount),
                 snapshot.AverageAttackOutput.ToString("0.######", CultureInfo.InvariantCulture),
-                snapshot.AverageTouchingAttackOutput.ToString("0.######", CultureInfo.InvariantCulture)));
+                snapshot.AverageTouchingAttackOutput.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.GrabIntentCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount),
+                snapshot.CanGrabCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.CanGrabCreatureCount, snapshot.CreatureCount),
+                snapshot.HoldingCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.HoldingCreatureCount, snapshot.CreatureCount),
+                snapshot.GrabbedCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.GrabbedCreatureCount, snapshot.CreatureCount),
+                snapshot.AverageGrabOutput.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageGrabPressure.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageGrabStrength.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.SoundEmittingCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount),
+                snapshot.SoundHeardCreatureCount.ToString(CultureInfo.InvariantCulture),
+                FormatShare(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount),
+                snapshot.AverageSoundAmplitude.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageSoundDensity.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageSoundToneClarity.ToString("0.######", CultureInfo.InvariantCulture)));
         }
     }
 
@@ -5237,6 +5376,18 @@ internal static class RunReportWriter
         WriteMetric(writer, "Damage-dealing this tick", FormatPercent(Share(finalSnapshot.AttackingCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Attack damage", $"{finalSnapshot.TotalAttackDamagePerSecond:0.###} health/s");
         WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
+        WriteMetric(writer, "Grab intent", FormatPercent(Share(finalSnapshot.GrabIntentCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Can grab", FormatPercent(Share(finalSnapshot.CanGrabCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Holding", $"{FormatPercent(Share(finalSnapshot.HoldingCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.HoldingCreatureCount})");
+        WriteMetric(writer, "Grabbed", $"{FormatPercent(Share(finalSnapshot.GrabbedCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.GrabbedCreatureCount})");
+        WriteMetric(writer, "Avg grab output", finalSnapshot.AverageGrabOutput.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg grab pressure", finalSnapshot.AverageGrabPressure.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg grab strength", finalSnapshot.AverageGrabStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Sound emitting", FormatPercent(Share(finalSnapshot.SoundEmittingCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Sound heard", FormatPercent(Share(finalSnapshot.SoundHeardCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Avg sound amp", finalSnapshot.AverageSoundAmplitude.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg sound density", finalSnapshot.AverageSoundDensity.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg sound clarity", finalSnapshot.AverageSoundToneClarity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Injury deaths", state.Stats.InjuryDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rotten meat deaths", state.Stats.RottenMeatDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Fresh kill share", FormatPercent(finalSnapshot.FreshKillCaloriesEatenShare));
@@ -7564,6 +7715,16 @@ internal static class RunReportWriter
             new ChartSeries("Meat energy share", "#b84a4a", snapshots.Select(snapshot => snapshot.MeatDigestedEnergyShare * 100f).ToArray()));
         WriteLineChart(
             writer,
+            "Grab And Sound",
+            "%",
+            snapshots,
+            new ChartSeries("Grab intent", "#ff8a30", snapshots.Select(snapshot => Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Holding", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Grabbed", "#9d3434", snapshots.Select(snapshot => Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Sound emit", "#29b6f6", snapshots.Select(snapshot => Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Sound heard", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
             "Meat Freshness",
             "%",
             snapshots,
@@ -7604,6 +7765,7 @@ internal static class RunReportWriter
             new ChartSeries("Damage-dealing %", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Avg raw attack", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageAttackOutput).ToArray()),
             new ChartSeries("Avg touch attack", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageTouchingAttackOutput).ToArray()),
+            new ChartSeries("Avg grab output", "#ff8a30", snapshots.Select(snapshot => snapshot.AverageGrabOutput).ToArray()),
             new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
