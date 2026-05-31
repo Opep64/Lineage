@@ -449,12 +449,42 @@ Output:
 
 This reproduces the earlier pattern with first-class telemetry: stronger mutation grows hidden nodes and connection counts, but the base setting remains the safer default.
 
+20K sparse starter comparison, base rtNEAT mutation pressure:
+
+Output:
+
+- `out/rtneat_sparse_starter_compare_20260531/balanced_20k.csv`
+- `out/rtneat_sparse_starter_compare_20260531/balanced_20k.html`
+- `out/rtneat_sparse_starter_compare_20260531/scavenger_20k.csv`
+- `out/rtneat_sparse_starter_compare_20260531/scavenger_20k.html`
+- `out/rtneat_sparse_starter_compare_20260531/predation_20k.csv`
+- `out/rtneat_sparse_starter_compare_20260531/predation_20k.html`
+
+| Scenario | Variant | Avg final | Avg births | Avg max gen | Avg hidden | Max hidden | Avg connections | Max connections | Read |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Balanced Foraging | Hybrid scenario base | 80.0 | 199.0 | 2.0 | 0.00 | 0 | 0.00 | 0 | Reference row. |
+| Balanced Foraging | rtNEAT forager | 61.7 | 180.0 | 2.0 | 0.34 | 2 | 6.74 | 11 | Sparse baseline. |
+| Balanced Foraging | rtNEAT scavenger | 65.7 | 183.3 | 2.0 | 0.39 | 2 | 15.84 | 20 | Extra diet gates did not hurt short-run survival. |
+| Balanced Foraging | rtNEAT predator | 64.0 | 176.0 | 2.0 | 0.39 | 3 | 13.86 | 19 | Also not obviously harmful in this short run. |
+| Scavenger Pressure | Hybrid scenario base | 79.0 | 254.3 | 2.0 | 0.00 | 0 | 0.00 | 0 | Reference row. |
+| Scavenger Pressure | rtNEAT forager | 43.0 | 173.0 | 2.0 | 0.38 | 2 | 6.73 | 10 | Sparse plant-only baseline. |
+| Scavenger Pressure | rtNEAT scavenger | 47.3 | 180.0 | 2.3 | 0.37 | 2 | 15.83 | 19 | Small target-world lift; worth a 60K follow-up. |
+| Predation Pressure | Hybrid scenario base | 53.7 | 313.0 | 2.7 | 0.00 | 0 | 0.00 | 0 | Reference row. |
+| Predation Pressure | rtNEAT forager | 33.7 | 268.3 | 3.0 | 0.54 | 2 | 7.18 | 10 | Sparse plant-only baseline. |
+| Predation Pressure | rtNEAT predator | 30.7 | 264.0 | 3.3 | 0.44 | 2 | 13.78 | 17 | Not ready; extra predator gates cost survival here. |
+
+Behavior read:
+
+- The scavenger starter ate meat in `Scavenger Pressure`: average meat-calorie share was 18.8% versus 0% for rtNEAT forager, with low rotten-meat damage.
+- The predator starter did not translate its contact attack/grab graph into useful predation in `Predation Pressure`: average attack intent stayed at 0%, while grab intent appeared only around 1%. The likely cause is the strong same/similar-contact suppression in a mostly single-population predation world.
+- `Predator Prey Pressure` is not a clean simple override probe because the scenario uses species profiles with saved hybrid brain payloads. Testing a sparse predator there needs either rtNEAT starter species profiles or roster brain overrides, not just `initialBrainKind=sparseGraphPredator`.
+
 Open design questions after the first pass:
 
 - Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?
 - Should graph complexity have an immediate energy cost, or should we first measure bloat without adding another pressure?
 - Should rtNEAT eventually get recurrent/self connections for memory, or should memory wait for a separate recurrent/plastic architecture pass?
-- Do the sparse scavenger and predator starters survive better than the plant-only starter in carrion/predation scenarios, or do their extra direct gates need softer weights?
+- Should the sparse predator starter soften similar-contact suppression, add hunger/meat-bias attack gates, or move to a predator-prey roster test before tuning single-species predation?
 
 ### HyperNEAT
 
