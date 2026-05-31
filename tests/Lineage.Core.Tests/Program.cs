@@ -58,6 +58,8 @@ var tests = new (string Name, Action Body)[]
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
     ("Metabolism charges plant specialization upkeep", MetabolismChargesPlantSpecializationUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
+    ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
+    ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
     ("Reproduction fertility declines with age", ReproductionFertilityDeclinesWithAge),
     ("Reproduction fertility declines with crowding", ReproductionFertilityDeclinesWithCrowding),
@@ -139,6 +141,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates habitat quality inputs", NeuralBrainMigratesHabitatQualityInputs),
     ("Neural brain migrates grab output and inputs", NeuralBrainMigratesGrabOutputAndInputs),
     ("Neural brain migrates sound output and inputs", NeuralBrainMigratesSoundOutputAndInputs),
+    ("Neural brain migrates fat inputs", NeuralBrainMigratesFatInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2292,6 +2295,75 @@ static void MetabolismBasalCostFollowsBiomeMultiplier()
     AssertClose(7f, simulation.State.Creatures[0].Energy, 0.000001, "Biome basal energy");
 }
 
+static void FatStoragePreservesEggReservePriority()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 1004,
+        systems:
+        [
+            new ReproductionSystem(),
+            new FatStorageSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 100f,
+        OffspringEnergyInvestment = 30f,
+        EggProductionEnergyPerSecond = 10f,
+        MaturityAgeSeconds = 0f,
+        ReproductionCooldownSeconds = 0f,
+        FatStorageCapacityCalories = 50f,
+        FatStorageEfficiency = 1f,
+        MutationStrength = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 140f);
+
+    simulation.Step();
+
+    var creature = simulation.State.Creatures[0];
+    AssertEqual(0, simulation.State.Eggs.Count, "Fat storage should not lay an egg early");
+    AssertClose(10f, creature.ReproductiveEnergy, 0.000001, "Egg reserve keeps first claim on surplus energy");
+    AssertClose(5f, creature.FatCalories, 0.000001, "Fat stores only energy remaining above the deposit target");
+    AssertClose(125f, creature.Energy, 0.000001, "Parent energy lands on fat deposit target after egg reserve transfer");
+    AssertClose(5f, creature.LastFatStoredCalories, 0.000001, "Fat storage telemetry records stored reserve");
+}
+
+static void FatStorageReleasesBeforeStarvationDeath()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 1005,
+        systems:
+        [
+            new FatStorageSystem(),
+            new DeathSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f,
+        FatStorageCapacityCalories = 50f,
+        FatStorageEfficiency = 1f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 1f);
+    var creature = simulation.State.Creatures[0];
+    creature.Energy = -5f;
+    creature.FatCalories = 40f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertEqual(1, simulation.State.Creatures.Count, "Fat reserve should rescue a starving creature before death removal");
+    creature = simulation.State.Creatures[0];
+    AssertClose(17.5f, creature.Energy, 0.000001, "Released fat restores usable energy");
+    AssertClose(17.5f, creature.FatCalories, 0.000001, "Released fat is removed from reserve");
+    AssertClose(22.5f, creature.LastFatReleasedCalories, 0.000001, "Fat release telemetry records usable energy");
+}
+
 static void ReproductionBuildsEggReserveBeforeLaying()
 {
     var simulation = new Simulation(
@@ -3803,6 +3875,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var contactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FoodContactInput);
     var grabInput = BrainIoRegistry.GetInput(NeuralBrainSchema.GrabPressureInput);
     var soundInput = BrainIoRegistry.GetInput(NeuralBrainSchema.SoundToneInput);
+    var fatInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FatRatioInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -3810,6 +3883,8 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(3, grabInput.IntroducedVersion, "Grab input introduced version");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, soundInput.Freshness, "Sound input freshness");
     AssertEqual(4, soundInput.IntroducedVersion, "Sound input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, fatInput.Freshness, "Fat input freshness");
+    AssertEqual(5, fatInput.IntroducedVersion, "Fat input introduced version");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
 }
@@ -3876,6 +3951,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         SoundDirectionRight = -0.49f,
         SoundTone = 0.59f,
         SoundToneClarity = 0.69f,
+        FatRatio = 0.79f,
+        MassBurdenRatio = 0.89f,
         CurrentTerrainDrag = 0.44f,
         ForwardTerrainDrag = 0.54f,
         LeftTerrainDrag = 0.64f,
@@ -3941,6 +4018,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(-0.49f, inputs[NeuralBrainSchema.SoundDirectionRightInput], 0.000001, "Sound right input");
     AssertClose(0.59f, inputs[NeuralBrainSchema.SoundToneInput], 0.000001, "Sound tone input");
     AssertClose(0.69f, inputs[NeuralBrainSchema.SoundToneClarityInput], 0.000001, "Sound clarity input");
+    AssertClose(0.79f, inputs[NeuralBrainSchema.FatRatioInput], 0.000001, "Fat ratio input");
+    AssertClose(0.89f, inputs[NeuralBrainSchema.MassBurdenInput], 0.000001, "Mass burden input");
     AssertClose(0.54f, inputs[NeuralBrainSchema.ForwardTerrainDragInput], 0.000001, "Terrain input");
     AssertClose(0.15f, inputs[NeuralBrainSchema.CurrentHabitatQualityInput], 0.000001, "Current habitat input");
     AssertClose(0.25f, inputs[NeuralBrainSchema.ForwardHabitatQualityInput], 0.000001, "Forward habitat input");
@@ -6025,6 +6104,45 @@ static void NeuralBrainMigratesSoundOutputAndInputs()
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.SoundToneClarityInput), 0.000001, "New sound clarity input starts neutral");
 }
 
+static void NeuralBrainMigratesFatInputs()
+{
+    const int legacyInputCount = NeuralBrainSchema.SoundToneClarityInput + 1;
+    const int legacyOutputCount = NeuralBrainSchema.OutputCount;
+    const int hiddenNodeCount = 2;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.SoundToneClarityInput] = 0.7f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.SoundToneClarityInput] = 0.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 0.9f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Fat migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Fat migrated weight count");
+    AssertClose(
+        0.7f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.SoundToneClarityInput),
+        0.000001,
+        "Existing sound clarity input remains in place");
+    AssertClose(
+        0.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.SoundToneClarityInput),
+        0.000001,
+        "Existing hidden sound clarity input remains in place");
+    AssertClose(
+        0.9f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.FatRatioInput), 0.000001, "New fat ratio input starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MassBurdenInput), 0.000001, "New mass burden input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.FatRatioInput), 0.000001, "New hidden fat input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.MassBurdenInput), 0.000001, "New hidden mass input starts neutral");
+}
+
 static void NeuralBrainSupportsHiddenNodes()
 {
     const int hiddenNodeCount = 4;
@@ -7245,6 +7363,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
         CanGrabCreature = 1f,
         EggReserveRatio = 0.5f,
         EnergySurplusRatio = 0.25f,
+        FatRatio = 0.5f,
+        MassBurdenRatio = 0.1f,
         RecentFoodSuccess = 0.75f,
         RecentFoodEnergyYield = 0.6f,
         TenderPlantPayoffTrace = 0.9f,
@@ -7279,6 +7399,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.LastPlantDigestedEnergy = 2f;
     seeingCreature.LastMeatDigestedEnergy = 1.5f;
     seeingCreature.LastRottenMeatDamage = 0.03f;
+    seeingCreature.FatCalories = 6f;
+    seeingCreature.LastFatStoredCalories = 1f;
     seeingCreature.GutPlantCalories = 20f;
     seeingCreature.GutMeatCalories = 5f;
     seeingCreature.LastAttackDamageDealt = 0.2f;
@@ -7309,6 +7431,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
         CreatureContactSimilarity = 0.2f,
         EggReserveRatio = 0.25f,
         EnergySurplusRatio = 0.05f,
+        FatRatio = 0.25f,
+        MassBurdenRatio = 0.05f,
         RecentFoodSuccess = 0.25f,
         RecentFoodEnergyYield = 0.2f,
         TenderPlantPayoffTrace = 0.1f,
@@ -7322,6 +7446,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     searchingCreature.LastDistanceTraveled = 5f;
     searchingCreature.DistanceSinceLastMeal = 12f;
     searchingCreature.Actions = new CreatureActionState { AttackOutput = 0.1f };
+    searchingCreature.FatCalories = 2f;
+    searchingCreature.LastFatReleasedCalories = 0.4f;
     searchingCreature.IsTouchingCreature = true;
     searchingCreature.GrabbedByCreatureId = parentId;
     searchingCreature.GrabPressure = 0.5f;
@@ -7374,6 +7500,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0f, snapshot.ActiveBrainHiddenOutputShare, 0.000001, "Snapshot active hidden output share");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
     AssertClose(12f, snapshot.TotalCreatureEnergy, 0.000001, "Snapshot creature energy");
+    AssertClose(8f, snapshot.TotalFatCalories, 0.000001, "Snapshot fat energy");
     AssertClose(6f, snapshot.TotalEggEnergy, 0.000001, "Snapshot egg energy");
     AssertClose(0.5f, snapshot.TotalEggHealth, 0.000001, "Snapshot egg health");
     AssertClose(8f, snapshot.TotalResourceCalories, 0.000001, "Snapshot resource calories");
@@ -7501,6 +7628,11 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(1f, snapshot.AverageBirthInvestmentRatio, 0.000001, "Average birth investment");
     AssertClose(0.375f, snapshot.AverageEggReserveRatio, 0.000001, "Average egg reserve ratio");
     AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
+    AssertClose(0.375f, snapshot.AverageFatRatio, 0.000001, "Average fat ratio");
+    AssertClose(0.075f, snapshot.AverageMassBurdenRatio, 0.000001, "Average fat mass burden");
+    AssertClose(0.993142843f, snapshot.AverageFatSpeedMultiplier, 0.000001, "Average fat speed multiplier");
+    AssertClose(1f, snapshot.TotalFatStoredCaloriesPerSecond, 0.000001, "Fat stored calories per second");
+    AssertClose(0.4f, snapshot.TotalFatReleasedCaloriesPerSecond, 0.000001, "Fat released calories per second");
     AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");
     AssertClose(0.4f, snapshot.AverageRecentFoodEnergyYield, 0.000001, "Average recent food energy yield");
     AssertClose(0.5f, snapshot.AverageTenderPlantPayoffTrace, 0.000001, "Average tender plant payoff trace");
@@ -9075,7 +9207,7 @@ static void BrainProfileJsonRoundTripsNeuralControllers()
     var roundTripped = BrainProfileJson.FromJson(brainJson);
 
     AssertTrue(brainJson.Contains("\"brainArchitectureKind\": \"hiddenLayerNeural\""), "Brain JSON should include architecture");
-    AssertTrue(brainJson.Contains("\"inputSchemaVersion\": 4"), "Brain JSON should include input schema version");
+    AssertTrue(brainJson.Contains($"\"inputSchemaVersion\": {NeuralBrainSchema.InputSchemaVersion}"), "Brain JSON should include input schema version");
     AssertTrue(brainJson.Contains("\"outputSchemaVersion\": 3"), "Brain JSON should include output schema version");
     AssertEqual("Probe brain", roundTripped.Name, "Brain profile name");
     AssertEqual("Round-trip brain test", roundTripped.Notes, "Brain profile notes");

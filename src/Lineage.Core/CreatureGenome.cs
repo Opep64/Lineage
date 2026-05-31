@@ -33,6 +33,8 @@ public readonly record struct CreatureGenome
         ToughPlantAdaptation = 0f,
         GutCapacityCalories = 55f,
         DigestionCaloriesPerSecond = 5f,
+        FatStorageCapacityCalories = 42f,
+        FatStorageEfficiency = 0.85f,
         BiteStrength = 0.55f,
         DamageResistance = 1f,
         MutationStrength = 0.05f,
@@ -40,7 +42,7 @@ public readonly record struct CreatureGenome
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 23;
+    private const int MutatingTraitCount = 25;
 
     public float BodyRadius { get; init; }
 
@@ -83,6 +85,10 @@ public readonly record struct CreatureGenome
     public float GutCapacityCalories { get; init; }
 
     public float DigestionCaloriesPerSecond { get; init; }
+
+    public float FatStorageCapacityCalories { get; init; }
+
+    public float FatStorageEfficiency { get; init; }
 
     public float BiteStrength { get; init; }
 
@@ -139,6 +145,8 @@ public readonly record struct CreatureGenome
             DigestionCaloriesPerSecond = MutateTraitIfSelected(random, mutations[19], DigestionCaloriesPerSecond, strength, 1f, 60f),
             BiteStrength = MutateTraitIfSelected(random, mutations[20], BiteStrength, strength, 0.05f, 4f),
             DamageResistance = MutateTraitIfSelected(random, mutations[21], DamageResistance, strength, 0.25f, 4f),
+            FatStorageCapacityCalories = MutateTraitIfSelected(random, mutations[23], FatStorageCapacityCalories, strength, 0f, 250f),
+            FatStorageEfficiency = MutateTraitIfSelected(random, mutations[24], FatStorageEfficiency, strength, 0.35f, 0.98f),
             MutationStrength = mutationProfile.MutationStrength,
             TraitMutationRate = mutationProfile.TraitMutationRate,
             BrainMutationRate = mutationProfile.BrainMutationRate
@@ -161,39 +169,52 @@ public readonly record struct CreatureGenome
 
     public CreatureGenome Validated()
     {
-        EnsurePositive(BodyRadius, nameof(BodyRadius));
-        EnsurePositive(MaxSpeed, nameof(MaxSpeed));
-        EnsurePositive(MaxTurnRadiansPerSecond, nameof(MaxTurnRadiansPerSecond));
-        EnsurePositive(SenseRadius, nameof(SenseRadius));
-        EnsureRange(VisionAngleRadians, MathF.PI / 12f, MathF.Tau, nameof(VisionAngleRadians));
-        EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
-        EnsureNonNegative(MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));
-        EnsurePositive(EatCaloriesPerSecond, nameof(EatCaloriesPerSecond));
-        EnsurePositive(OffspringEnergyInvestment, nameof(OffspringEnergyInvestment));
-        EnsurePositive(EggProductionEnergyPerSecond, nameof(EggProductionEnergyPerSecond));
-        EnsureNonNegative(EggIncubationSeconds, nameof(EggIncubationSeconds));
-        EnsurePositive(ReproductionEnergyThreshold, nameof(ReproductionEnergyThreshold));
-        EnsureNonNegative(MaturityAgeSeconds, nameof(MaturityAgeSeconds));
-        EnsureNonNegative(ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
-        EnsureProbability(DietaryAdaptation, nameof(DietaryAdaptation));
-        EnsureProbability(CarrionAdaptation, nameof(CarrionAdaptation));
-        EnsureProbability(TenderPlantAdaptation, nameof(TenderPlantAdaptation));
-        EnsureProbability(RichPlantAdaptation, nameof(RichPlantAdaptation));
-        EnsureProbability(ToughPlantAdaptation, nameof(ToughPlantAdaptation));
-        EnsurePositive(GutCapacityCalories, nameof(GutCapacityCalories));
-        EnsurePositive(DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
-        EnsurePositive(BiteStrength, nameof(BiteStrength));
-        EnsurePositive(DamageResistance, nameof(DamageResistance));
-        EnsureNonNegative(MutationStrength, nameof(MutationStrength));
-        EnsureProbability(TraitMutationRate, nameof(TraitMutationRate));
-        EnsureProbability(BrainMutationRate, nameof(BrainMutationRate));
+        var normalized = this;
+        if (normalized.FatStorageCapacityCalories <= 0f || !float.IsFinite(normalized.FatStorageCapacityCalories))
+        {
+            normalized = normalized with { FatStorageCapacityCalories = Baseline.FatStorageCapacityCalories };
+        }
 
-        if (ReproductionEnergyThreshold < OffspringEnergyInvestment)
+        if (normalized.FatStorageEfficiency <= 0f || !float.IsFinite(normalized.FatStorageEfficiency))
+        {
+            normalized = normalized with { FatStorageEfficiency = Baseline.FatStorageEfficiency };
+        }
+
+        EnsurePositive(normalized.BodyRadius, nameof(BodyRadius));
+        EnsurePositive(normalized.MaxSpeed, nameof(MaxSpeed));
+        EnsurePositive(normalized.MaxTurnRadiansPerSecond, nameof(MaxTurnRadiansPerSecond));
+        EnsurePositive(normalized.SenseRadius, nameof(SenseRadius));
+        EnsureRange(normalized.VisionAngleRadians, MathF.PI / 12f, MathF.Tau, nameof(VisionAngleRadians));
+        EnsureNonNegative(normalized.BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
+        EnsureNonNegative(normalized.MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));
+        EnsurePositive(normalized.EatCaloriesPerSecond, nameof(EatCaloriesPerSecond));
+        EnsurePositive(normalized.OffspringEnergyInvestment, nameof(OffspringEnergyInvestment));
+        EnsurePositive(normalized.EggProductionEnergyPerSecond, nameof(EggProductionEnergyPerSecond));
+        EnsureNonNegative(normalized.EggIncubationSeconds, nameof(EggIncubationSeconds));
+        EnsurePositive(normalized.ReproductionEnergyThreshold, nameof(ReproductionEnergyThreshold));
+        EnsureNonNegative(normalized.MaturityAgeSeconds, nameof(MaturityAgeSeconds));
+        EnsureNonNegative(normalized.ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
+        EnsureProbability(normalized.DietaryAdaptation, nameof(DietaryAdaptation));
+        EnsureProbability(normalized.CarrionAdaptation, nameof(CarrionAdaptation));
+        EnsureProbability(normalized.TenderPlantAdaptation, nameof(TenderPlantAdaptation));
+        EnsureProbability(normalized.RichPlantAdaptation, nameof(RichPlantAdaptation));
+        EnsureProbability(normalized.ToughPlantAdaptation, nameof(ToughPlantAdaptation));
+        EnsurePositive(normalized.GutCapacityCalories, nameof(GutCapacityCalories));
+        EnsurePositive(normalized.DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
+        EnsureNonNegative(normalized.FatStorageCapacityCalories, nameof(FatStorageCapacityCalories));
+        EnsureRange(normalized.FatStorageEfficiency, 0.05f, 1f, nameof(FatStorageEfficiency));
+        EnsurePositive(normalized.BiteStrength, nameof(BiteStrength));
+        EnsurePositive(normalized.DamageResistance, nameof(DamageResistance));
+        EnsureNonNegative(normalized.MutationStrength, nameof(MutationStrength));
+        EnsureProbability(normalized.TraitMutationRate, nameof(TraitMutationRate));
+        EnsureProbability(normalized.BrainMutationRate, nameof(BrainMutationRate));
+
+        if (normalized.ReproductionEnergyThreshold < normalized.OffspringEnergyInvestment)
         {
             throw new InvalidOperationException("Reproduction threshold must be at least the offspring investment.");
         }
 
-        return this;
+        return normalized;
     }
 
     private static bool[] CreateMutationMask(

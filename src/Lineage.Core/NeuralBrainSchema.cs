@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 4;
+    public const int InputSchemaVersion = 5;
 
     public const int OutputSchemaVersion = 3;
 
@@ -101,7 +101,11 @@ public static class NeuralBrainSchema
 
     public const int SoundToneClarityInput = SoundToneInput + 1;
 
-    public const int InputCount = SoundToneClarityInput + 1;
+    public const int FatRatioInput = SoundToneClarityInput + 1;
+
+    public const int MassBurdenInput = FatRatioInput + 1;
+
+    public const int InputCount = MassBurdenInput + 1;
 
     public const int OutputCount = 10;
 

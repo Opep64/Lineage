@@ -168,6 +168,11 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Ready to lay", FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
         WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
+        WriteMetric(writer, "Fat reserve", FormatPercent(snapshot.AverageFatRatio));
+        WriteMetric(writer, "Fat calories", snapshot.TotalFatCalories.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Fat mass burden", FormatPercent(snapshot.AverageMassBurdenRatio));
+        WriteMetric(writer, "Fat speed retained", $"{snapshot.AverageFatSpeedMultiplier:0.###}x");
+        WriteMetric(writer, "Fat flow", $"{snapshot.TotalFatStoredCaloriesPerSecond:0.###}/s stored, {snapshot.TotalFatReleasedCaloriesPerSecond:0.###}/s released");
         WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
         WriteMetric(writer, "Food energy yield", FormatPercent(snapshot.AverageRecentFoodEnergyYield));
         WriteMetric(writer, "Plant payoff traces", FormatPlantPayoffTraces(snapshot));
@@ -2015,6 +2020,7 @@ public static class ViewerReportWriter
             entries.Add(new("Diet genes", $"diet {FormatCompactNumber(genome.DietaryAdaptation)}, carrion {FormatCompactNumber(genome.CarrionAdaptation)}, tender/rich/tough {FormatCompactNumber(genome.TenderPlantAdaptation)}/{FormatCompactNumber(genome.RichPlantAdaptation)}/{FormatCompactNumber(genome.ToughPlantAdaptation)}"));
             entries.Add(new("Combat genes", $"bite {FormatCompactNumber(genome.BiteStrength)}, resist {FormatCompactNumber(genome.DamageResistance)}"));
             entries.Add(new("Digest genes", $"gut {FormatCompactNumber(genome.GutCapacityCalories)}, digest {FormatCompactNumber(genome.DigestionCaloriesPerSecond)}/s"));
+            entries.Add(new("Fat genes", $"capacity {FormatCompactNumber(genome.FatStorageCapacityCalories)}, efficiency {FormatCompactNumber(genome.FatStorageEfficiency)}"));
         }
         else
         {
@@ -2378,6 +2384,14 @@ public static class ViewerReportWriter
             new ChartSeries("Ready", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Reserve", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageEggReserveRatio * 100f).ToArray()),
             new ChartSeries("Surplus", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageEnergySurplusRatio * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Fat storage",
+            "%",
+            snapshots,
+            new ChartSeries("Reserve", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageFatRatio * 100f).ToArray()),
+            new ChartSeries("Mass burden", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageMassBurdenRatio * 100f).ToArray()),
+            new ChartSeries("Speed retained", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageFatSpeedMultiplier * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Resource calories",

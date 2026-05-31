@@ -93,6 +93,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.SoundDirectionRightInput] = frame.Communication.Sound.DirectionRight;
         inputs[NeuralBrainSchema.SoundToneInput] = frame.Communication.Sound.Tone;
         inputs[NeuralBrainSchema.SoundToneClarityInput] = frame.Communication.Sound.ToneClarity;
+        inputs[NeuralBrainSchema.FatRatioInput] = frame.Internal.FatRatio;
+        inputs[NeuralBrainSchema.MassBurdenInput] = frame.Internal.MassBurdenRatio;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

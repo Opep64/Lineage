@@ -43,6 +43,12 @@ public sealed class StatsRecordingSystem(
         }
 
         var totalCreatureEnergy = 0f;
+        var totalFatCalories = 0f;
+        var totalFatRatio = 0f;
+        var totalMassBurdenRatio = 0f;
+        var totalFatSpeedMultiplier = 0f;
+        var totalFatStoredCalories = 0f;
+        var totalFatReleasedCalories = 0f;
         var totalCreatureX = 0f;
         var maxCreatureX = 0f;
         var totalMaxCreatureXReached = 0f;
@@ -207,6 +213,12 @@ public sealed class StatsRecordingSystem(
             var creature = state.Creatures[i];
             var genome = state.GetGenome(creature.GenomeId);
             totalCreatureEnergy += creature.Energy;
+            totalFatCalories += creature.FatCalories;
+            totalFatRatio += creature.Senses.FatRatio;
+            totalMassBurdenRatio += creature.Senses.MassBurdenRatio;
+            totalFatSpeedMultiplier += CreatureGrowth.FatSpeedMultiplier(creature, genome);
+            totalFatStoredCalories += creature.LastFatStoredCalories;
+            totalFatReleasedCalories += creature.LastFatReleasedCalories;
             totalCreatureX += creature.Position.X;
             maxCreatureX = Math.Max(maxCreatureX, creature.Position.X);
             totalMaxCreatureXReached += creature.MaxXReached;
@@ -926,6 +938,7 @@ public sealed class StatsRecordingSystem(
             activeHiddenOutputShare,
             maxGeneration,
             totalCreatureEnergy,
+            totalFatCalories,
             totalEggEnergy,
             totalEggHealth,
             totalResourceCalories,
@@ -1115,6 +1128,11 @@ public sealed class StatsRecordingSystem(
             reproductionIntentCreatureCount,
             totalEggReserveRatio / divisor,
             totalEnergySurplusRatio / divisor,
+            totalFatRatio / divisor,
+            totalMassBurdenRatio / divisor,
+            totalFatSpeedMultiplier / divisor,
+            Rate(totalFatStoredCalories, deltaSeconds),
+            Rate(totalFatReleasedCalories, deltaSeconds),
             totalRecentFoodSuccess / divisor,
             totalRecentFoodEnergyYield / divisor,
             totalTenderPlantPayoffTrace / divisor,

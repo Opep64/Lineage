@@ -60,7 +60,10 @@ public static class SimulationPipelines
         int extinctPayloadPruneIntervalTicks = 1_000,
         float mutationStrength = 0.06f,
         float traitMutationRate = 0.2f,
-        float brainMutationRate = 0.08f)
+        float brainMutationRate = 0.08f,
+        float fatDepositEnergyRatio = FatStorageSystem.DefaultDepositEnergyRatio,
+        float fatWithdrawEnergyRatio = FatStorageSystem.DefaultWithdrawEnergyRatio,
+        float fatTransferCapacitySharePerSecond = FatStorageSystem.DefaultTransferCapacitySharePerSecond)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -117,6 +120,10 @@ public static class SimulationPipelines
                 crowdingFertilityPenalty: crowdingFertilityPenalty),
             new EggEnvironmentalDamageSystem(eggEnvironmentalDamagePerSecond),
             new EggSystem(eggEnergyCostPerSecond),
+            new FatStorageSystem(
+                fatDepositEnergyRatio,
+                fatWithdrawEnergyRatio,
+                fatTransferCapacitySharePerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
             .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
             new StatsRecordingSystem(
@@ -200,7 +207,10 @@ public static class SimulationPipelines
         int extinctPayloadPruneIntervalTicks = 1_000,
         float mutationStrength = 0.06f,
         float traitMutationRate = 0.2f,
-        float brainMutationRate = 0.08f)
+        float brainMutationRate = 0.08f,
+        float fatDepositEnergyRatio = FatStorageSystem.DefaultDepositEnergyRatio,
+        float fatWithdrawEnergyRatio = FatStorageSystem.DefaultWithdrawEnergyRatio,
+        float fatTransferCapacitySharePerSecond = FatStorageSystem.DefaultTransferCapacitySharePerSecond)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -283,6 +293,10 @@ public static class SimulationPipelines
                 biteEnergyCostPerSecond,
                 biteRangePadding,
                 requireAttackIntent: true),
+            new FatStorageSystem(
+                fatDepositEnergyRatio,
+                fatWithdrawEnergyRatio,
+                fatTransferCapacitySharePerSecond),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
             .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
             new StatsRecordingSystem(

@@ -291,6 +291,16 @@ public sealed record SimulationScenario
 
     public float DigestionCaloriesPerSecond { get; init; } = 5f;
 
+    public float FatStorageCapacityCalories { get; init; } = CreatureGenome.Baseline.FatStorageCapacityCalories;
+
+    public float FatStorageEfficiency { get; init; } = CreatureGenome.Baseline.FatStorageEfficiency;
+
+    public float FatDepositEnergyRatio { get; init; } = FatStorageSystem.DefaultDepositEnergyRatio;
+
+    public float FatWithdrawEnergyRatio { get; init; } = FatStorageSystem.DefaultWithdrawEnergyRatio;
+
+    public float FatTransferCapacitySharePerSecond { get; init; } = FatStorageSystem.DefaultTransferCapacitySharePerSecond;
+
     public float ReproductionEnergyThreshold { get; init; } = 84f;
 
     public float OffspringEnergyInvestment { get; init; } = 28f;
@@ -487,6 +497,11 @@ public sealed record SimulationScenario
         EnsurePositive(EatCaloriesPerSecond, nameof(EatCaloriesPerSecond));
         EnsurePositive(GutCapacityCalories, nameof(GutCapacityCalories));
         EnsurePositive(DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
+        EnsureNonNegative(FatStorageCapacityCalories, nameof(FatStorageCapacityCalories));
+        EnsureRange(FatStorageEfficiency, 0.05f, 1f, nameof(FatStorageEfficiency));
+        EnsureNonNegative(FatDepositEnergyRatio, nameof(FatDepositEnergyRatio));
+        EnsureNonNegative(FatWithdrawEnergyRatio, nameof(FatWithdrawEnergyRatio));
+        EnsureNonNegative(FatTransferCapacitySharePerSecond, nameof(FatTransferCapacitySharePerSecond));
         EnsurePositive(ReproductionEnergyThreshold, nameof(ReproductionEnergyThreshold));
         EnsurePositive(OffspringEnergyInvestment, nameof(OffspringEnergyInvestment));
         EnsurePositive(EggProductionEnergyPerSecond, nameof(EggProductionEnergyPerSecond));

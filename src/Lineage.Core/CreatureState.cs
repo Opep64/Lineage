@@ -55,6 +55,11 @@ public struct CreatureState
     public float Energy { get; set; }
 
     /// <summary>
+    /// Stored reserve energy that can be released during lean periods.
+    /// </summary>
+    public float FatCalories { get; set; }
+
+    /// <summary>
     /// Energy already committed to the next egg before it is laid.
     /// </summary>
     public float ReproductiveEnergy { get; set; }
@@ -152,6 +157,10 @@ public struct CreatureState
     /// Energy released from gut contents during the most recent digestion pass.
     /// </summary>
     public float LastCaloriesDigested { get; set; }
+
+    public float LastFatStoredCalories { get; set; }
+
+    public float LastFatReleasedCalories { get; set; }
 
     public float LastPlantDigestedEnergy { get; set; }
 

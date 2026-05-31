@@ -285,6 +285,10 @@ public struct CreatureSenseState
 
     public float EnergySurplusRatio { get; set; }
 
+    public float FatRatio { get; set; }
+
+    public float MassBurdenRatio { get; set; }
+
     public float ReproductionReadiness { get; set; }
 
     public float RecentFoodSuccess { get; set; }

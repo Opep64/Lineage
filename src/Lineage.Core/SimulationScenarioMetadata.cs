@@ -353,6 +353,7 @@ public static class SimulationScenarioMetadata
         }
 
         if (name.Contains("Energy", StringComparison.Ordinal)
+            || name.Contains("Fat", StringComparison.Ordinal)
             || name.Contains("Movement", StringComparison.Ordinal)
             || name.Contains("Speed", StringComparison.Ordinal)
             || name.Contains("Turn", StringComparison.Ordinal)

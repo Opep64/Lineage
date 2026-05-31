@@ -100,7 +100,10 @@ public static class SimulationScenarioFactory
                 scenario.ExtinctPayloadPruneIntervalTicks,
                 scenario.MutationStrength,
                 scenario.TraitMutationRate,
-                scenario.BrainMutationRate),
+                scenario.BrainMutationRate,
+                scenario.FatDepositEnergyRatio,
+                scenario.FatWithdrawEnergyRatio,
+                scenario.FatTransferCapacitySharePerSecond),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -156,7 +159,10 @@ public static class SimulationScenarioFactory
                 scenario.ExtinctPayloadPruneIntervalTicks,
                 scenario.MutationStrength,
                 scenario.TraitMutationRate,
-                scenario.BrainMutationRate),
+                scenario.BrainMutationRate,
+                scenario.FatDepositEnergyRatio,
+                scenario.FatWithdrawEnergyRatio,
+                scenario.FatTransferCapacitySharePerSecond),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }
@@ -215,6 +221,8 @@ public static class SimulationScenarioFactory
             EatCaloriesPerSecond = scenario.EatCaloriesPerSecond,
             GutCapacityCalories = scenario.GutCapacityCalories,
             DigestionCaloriesPerSecond = scenario.DigestionCaloriesPerSecond,
+            FatStorageCapacityCalories = scenario.FatStorageCapacityCalories,
+            FatStorageEfficiency = scenario.FatStorageEfficiency,
             VisionAngleRadians = scenario.VisionAngleRadians,
             ReproductionEnergyThreshold = scenario.ReproductionEnergyThreshold,
             OffspringEnergyInvestment = scenario.OffspringEnergyInvestment,

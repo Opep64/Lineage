@@ -63,7 +63,7 @@ public sealed class DeathSystem : ISimulationSystem
         var genome = state.GetGenome(creature.GenomeId);
         var bodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
         var calories = bodyRadius * _meatCaloriesPerBodyRadius
-            + Math.Max(0f, creature.Energy) * _meatEnergyFraction;
+            + (Math.Max(0f, creature.Energy) + Math.Max(0f, creature.FatCalories)) * _meatEnergyFraction;
         if (calories <= 0f)
         {
             return;

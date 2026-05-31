@@ -224,6 +224,16 @@ public static class SimulationSnapshotJson
             genome = genome with { DigestionCaloriesPerSecond = CreatureGenome.Baseline.DigestionCaloriesPerSecond };
         }
 
+        if (genome.FatStorageCapacityCalories <= 0f)
+        {
+            genome = genome with { FatStorageCapacityCalories = CreatureGenome.Baseline.FatStorageCapacityCalories };
+        }
+
+        if (genome.FatStorageEfficiency <= 0f)
+        {
+            genome = genome with { FatStorageEfficiency = CreatureGenome.Baseline.FatStorageEfficiency };
+        }
+
         if (genome.DamageResistance <= 0f)
         {
             genome = genome with { DamageResistance = CreatureGenome.Baseline.DamageResistance };

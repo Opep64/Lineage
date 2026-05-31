@@ -51,6 +51,7 @@ public sealed class MovementSystem(
             creature.Energy -= genome.MovementEnergyPerSecond
                 * biomeMovementCostMultiplier
                 * CreatureGrowth.GrowthFactor(creature, genome)
+                * CreatureGrowth.FatMovementCostMultiplier(creature, genome)
                 * speedCostMultiplier
                 * deltaSeconds;
 

@@ -851,6 +851,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.Hunger = 1f - energyRatio;
         senses.EggReserveRatio = eggReserveRatio;
         senses.EnergySurplusRatio = energySurplusRatio;
+        senses.FatRatio = CreatureGrowth.FatStorageRatio(creature, genome);
+        senses.MassBurdenRatio = CreatureGrowth.FatMassBurdenRatio(creature, genome);
         senses.RecentFoodSuccess = recentFoodSuccess;
         senses.RecentPlantRawYield = recentPlantRawYield;
         senses.RecentPlantEnergyYield = recentPlantEnergyYield;

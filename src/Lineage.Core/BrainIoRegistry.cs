@@ -188,7 +188,9 @@ public static class BrainIoRegistry
             Input("sound.forward", "Sound direction forward", NeuralBrainSchema.SoundDirectionForwardInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Sound direction projected onto the creature's forward axis.", introducedVersion: 4),
             Input("sound.right", "Sound direction right", NeuralBrainSchema.SoundDirectionRightInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Sound direction projected onto the creature's right axis.", introducedVersion: 4),
             Input("sound.tone", "Sound tone", NeuralBrainSchema.SoundToneInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Weighted average tone of nearby intentional sound.", introducedVersion: 4),
-            Input("sound.tone_clarity", "Sound tone clarity", NeuralBrainSchema.SoundToneClarityInput, BrainIoSignalGroup.Sound, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Confidence that heard sound is a coherent tone rather than a mixed signal.", introducedVersion: 4)
+            Input("sound.tone_clarity", "Sound tone clarity", NeuralBrainSchema.SoundToneClarityInput, BrainIoSignalGroup.Sound, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Confidence that heard sound is a coherent tone rather than a mixed signal.", introducedVersion: 4),
+            Input("internal.fat_ratio", "Fat ratio", NeuralBrainSchema.FatRatioInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current stored fat divided by fat capacity.", introducedVersion: 5),
+            Input("internal.mass_burden", "Mass burden", NeuralBrainSchema.MassBurdenInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current fat-derived movement burden.", introducedVersion: 5)
         });
 
         return ValidateInputs(inputs);
