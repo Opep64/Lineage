@@ -206,6 +206,8 @@ public partial class Main : Node2D
     private int _drawnResourceAggregateCount;
     private int _drawnCreatureCount;
     private int _drawnCreatureAggregateCount;
+    private int _livingMinGeneration;
+    private int _livingMaxGeneration;
     private float _drawVisualTimeSeconds;
     private double _telemetryWindowSeconds;
     private int _telemetryFrameCount;
@@ -2269,12 +2271,7 @@ public partial class Main : Node2D
     {
         return _colorMode switch
         {
-            CreatureColorMode.Generation => new[]
-            {
-                new ColorLegendEntry("Gen 0", ColorForGeneration(0)),
-                new ColorLegendEntry("Gen 5", ColorForGeneration(5)),
-                new ColorLegendEntry("Gen 10", ColorForGeneration(10))
-            },
+            CreatureColorMode.Generation => GetGenerationLegendEntries(),
             CreatureColorMode.Energy => new[]
             {
                 new ColorLegendEntry("red = low energy", ColorForEnergy(0f, 1f)),
@@ -2289,6 +2286,40 @@ public partial class Main : Node2D
             },
             _ => Array.Empty<ColorLegendEntry>()
         };
+    }
+
+    private ColorLegendEntry[] GetGenerationLegendEntries()
+    {
+        if (_simulation.State.Creatures.Count == 0)
+        {
+            return Array.Empty<ColorLegendEntry>();
+        }
+
+        var entries = new List<ColorLegendEntry>(3);
+        AddGenerationLegendEntry(entries, _livingMinGeneration, "low");
+        if (_livingMaxGeneration > _livingMinGeneration + 1)
+        {
+            AddGenerationLegendEntry(entries, (_livingMinGeneration + _livingMaxGeneration) / 2, "mid");
+        }
+
+        AddGenerationLegendEntry(entries, _livingMaxGeneration, "max");
+        return entries.ToArray();
+    }
+
+    private void AddGenerationLegendEntry(List<ColorLegendEntry> entries, int generation, string label)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.Generation == generation)
+            {
+                return;
+            }
+        }
+
+        entries.Add(new ColorLegendEntry(
+            $"Gen {generation} ({label})",
+            ColorForGeneration(generation, _livingMinGeneration, _livingMaxGeneration),
+            generation));
     }
 
     private void DrawColorLegendSample(Vector2 center, Color color)
@@ -2884,6 +2915,7 @@ public partial class Main : Node2D
     private void DrawCreatures()
     {
         UpdateCreatureRenderCache();
+        UpdateLivingGenerationRange();
         _drawnCreatureCount = 0;
         _drawnCreatureAggregateCount = 0;
 
@@ -3014,7 +3046,9 @@ public partial class Main : Node2D
                 var alpha = Mathf.Clamp(0.10f + MathF.Log2(summary.CreatureCount + 1f) * 0.035f, 0.10f, MaxCreatureDensityAlpha);
                 var generationRatio = Mathf.Clamp(summary.MaxGeneration / 10f, 0f, 1f);
                 var densityTint = Mathf.Clamp(creaturesPerMillion / 200f, 0f, 1f);
-                var color = new Color(0.88f, 0.76f - generationRatio * 0.18f, 0.28f + densityTint * 0.18f, alpha);
+                var color = _colorMode == CreatureColorMode.Generation
+                    ? WithAlpha(ColorForGeneration(summary.MaxGeneration, _livingMinGeneration, _livingMaxGeneration), alpha)
+                    : new Color(0.88f, 0.76f - generationRatio * 0.18f, 0.28f + densityTint * 0.18f, alpha);
                 var center = clippedScreenRect.Position + clippedScreenRect.Size * 0.5f;
                 var maxRadius = MathF.Max(3f, MathF.Min(clippedScreenRect.Size.X, clippedScreenRect.Size.Y) * 0.42f);
                 var radius = Math.Clamp(3f + MathF.Sqrt(summary.CreatureCount) * 0.55f, 3f, maxRadius);
@@ -3798,10 +3832,11 @@ public partial class Main : Node2D
         return _colorMode switch
         {
             CreatureColorMode.FounderLineage => ColorForStableId(ResolveFounderId(creature.Id).Value),
+            CreatureColorMode.Generation => ColorForGeneration(creature.Generation, _livingMinGeneration, _livingMaxGeneration),
             CreatureColorMode.Energy => ColorForEnergy(creature.Energy, genome.ReproductionEnergyThreshold),
             CreatureColorMode.Age => ColorForAge(creature.AgeSeconds),
             CreatureColorMode.Off => new Color(0.92f, 0.90f, 0.82f),
-            _ => ColorForGeneration(creature.Generation)
+            _ => new Color(0.92f, 0.90f, 0.82f)
         };
     }
 
@@ -5661,9 +5696,34 @@ public partial class Main : Node2D
         string CheckpointDirectory,
         string LatestCheckpointPath);
 
-    private static Color ColorForGeneration(int generation)
+    private void UpdateLivingGenerationRange()
     {
-        var hue = Mathf.PosMod(generation * 0.075f + 0.13f, 1f);
+        var creatures = _simulation.State.Creatures;
+        if (creatures.Count == 0)
+        {
+            _livingMinGeneration = 0;
+            _livingMaxGeneration = 0;
+            return;
+        }
+
+        var minGeneration = int.MaxValue;
+        var maxGeneration = int.MinValue;
+        foreach (var creature in creatures)
+        {
+            minGeneration = Math.Min(minGeneration, creature.Generation);
+            maxGeneration = Math.Max(maxGeneration, creature.Generation);
+        }
+
+        _livingMinGeneration = minGeneration;
+        _livingMaxGeneration = maxGeneration;
+    }
+
+    private static Color ColorForGeneration(int generation, int minGeneration, int maxGeneration)
+    {
+        var ratio = maxGeneration > minGeneration
+            ? Mathf.Clamp((generation - minGeneration) / (float)(maxGeneration - minGeneration), 0f, 1f)
+            : 0f;
+        var hue = Mathf.Lerp(0.13f, 0.83f, ratio);
         return Color.FromHsv(hue, 0.46f, 0.92f);
     }
 
@@ -6179,7 +6239,7 @@ public partial class Main : Node2D
         float AverageStrength,
         float MaxStrength);
 
-    private readonly record struct ColorLegendEntry(string Label, Color Color);
+    private readonly record struct ColorLegendEntry(string Label, Color Color, int Generation = -1);
 
     private enum CreatureColorMode
     {
