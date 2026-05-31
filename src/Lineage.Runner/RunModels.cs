@@ -227,6 +227,42 @@ public sealed record BrainCatalogDeleteResult(
     string Path,
     string ArchivedPath);
 
+public sealed record BrainLabSnapshotOption(
+    string Name,
+    string Path,
+    long SizeBytes,
+    DateTimeOffset ModifiedAtUtc);
+
+public sealed record BrainLabSnapshotDetails(
+    string Path,
+    string ScenarioName,
+    ulong Seed,
+    long Tick,
+    double ElapsedSeconds,
+    int CreatureCount,
+    int ReturnedCreatureCount,
+    bool CreatureListTruncated,
+    IReadOnlyList<BrainLabCreatureOption> Creatures);
+
+public sealed record BrainLabCreatureOption(
+    int Id,
+    int Generation,
+    int BrainId,
+    int GenomeId,
+    string BrainArchitectureKind,
+    double AgeSeconds,
+    double EnergyRatio,
+    double HealthRatio,
+    double Hunger,
+    bool HeardSound,
+    double SoundDensity,
+    double SoundAmplitude);
+
+public sealed record BrainLabEvaluateRequest(
+    string SnapshotPath,
+    int CreatureId,
+    Dictionary<string, float>? InputOverrides);
+
 public sealed record RunCreateRequest(
     string ScenarioPath,
     int Ticks,

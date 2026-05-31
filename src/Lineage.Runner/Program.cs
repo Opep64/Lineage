@@ -21,6 +21,32 @@ api.MapGet("/species-catalog", (LineageRunManager manager) => Results.Ok(manager
 
 api.MapGet("/brain-catalog", (LineageRunManager manager) => Results.Ok(manager.ListBrainCatalog()));
 
+api.MapGet("/brain-lab/snapshots", (LineageRunManager manager) => Results.Ok(manager.ListBrainLabSnapshots()));
+
+api.MapGet("/brain-lab/snapshot", (string path, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.GetBrainLabSnapshot(path));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/brain-lab/evaluate", (BrainLabEvaluateRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.EvaluateBrainLab(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/species-catalog/delete", (SpeciesCatalogDeleteRequest request, LineageRunManager manager) =>
 {
     try

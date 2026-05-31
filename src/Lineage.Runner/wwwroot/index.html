@@ -184,6 +184,66 @@
       <div id="brainCatalogDetails" class="catalog-details">Choose a brain profile to inspect it.</div>
     </section>
 
+    <section class="brain-lab-panel">
+      <div class="section-title">
+        <h2>Brain Lab</h2>
+        <div class="section-actions">
+          <button id="refreshBrainLabSnapshotsButton" class="secondary" type="button">Refresh Snapshots</button>
+          <button id="loadBrainLabSnapshotButton" class="secondary" type="button">Load Snapshot</button>
+          <button id="evaluateBrainLabButton" type="button" disabled>Evaluate</button>
+        </div>
+      </div>
+      <div class="brain-lab-tools">
+        <label>
+          Snapshot
+          <select id="brainLabSnapshotSelect">
+            <option value="">No snapshots loaded</option>
+          </select>
+        </label>
+        <label>
+          Path
+          <input id="brainLabSnapshotPath" type="text" placeholder="out/run/final_snapshot.json">
+        </label>
+        <label>
+          Creature
+          <select id="brainLabCreatureSelect" disabled>
+            <option value="">Load a snapshot</option>
+          </select>
+        </label>
+        <label>
+          Input group
+          <select id="brainLabGroupFilter">
+            <option value="Sound">Sound</option>
+            <option value="Internal">Internal</option>
+            <option value="Contact">Contact</option>
+            <option value="Vision">Vision</option>
+            <option value="Scent">Scent</option>
+            <option value="Terrain">Terrain</option>
+            <option value="Habitat">Habitat</option>
+            <option value="Obstacle">Obstacle</option>
+            <option value="Memory">Memory</option>
+            <option value="all">All</option>
+          </select>
+        </label>
+        <div class="brain-lab-actions">
+          <button id="muteBrainLabSoundButton" class="secondary" type="button" disabled>Mute Sound</button>
+          <button id="resetBrainLabOverridesButton" class="secondary" type="button" disabled>Reset Inputs</button>
+        </div>
+      </div>
+      <div id="brainLabMeta" class="brain-lab-meta">No snapshot loaded.</div>
+      <div class="brain-lab-workbench">
+        <div class="brain-lab-input-panel">
+          <h3>Inputs</h3>
+          <div id="brainLabInputs" class="brain-lab-inputs"></div>
+        </div>
+        <div class="brain-lab-output-panel">
+          <h3>Outputs</h3>
+          <div id="brainLabOutputs" class="brain-lab-outputs">No evaluation yet.</div>
+        </div>
+      </div>
+      <p id="brainLabStatus" class="form-message" role="status"></p>
+    </section>
+
     <section class="species-panel">
       <div class="section-title">
         <h2>Species Catalog</h2>

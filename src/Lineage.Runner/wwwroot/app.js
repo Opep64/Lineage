@@ -66,6 +66,19 @@ const brainCatalogSelect = document.querySelector("#brainCatalogSelect");
 const brainCatalogDetails = document.querySelector("#brainCatalogDetails");
 const refreshBrainCatalogButton = document.querySelector("#refreshBrainCatalogButton");
 const deleteBrainCatalogButton = document.querySelector("#deleteBrainCatalogButton");
+const brainLabSnapshotSelect = document.querySelector("#brainLabSnapshotSelect");
+const brainLabSnapshotPath = document.querySelector("#brainLabSnapshotPath");
+const brainLabCreatureSelect = document.querySelector("#brainLabCreatureSelect");
+const brainLabGroupFilter = document.querySelector("#brainLabGroupFilter");
+const refreshBrainLabSnapshotsButton = document.querySelector("#refreshBrainLabSnapshotsButton");
+const loadBrainLabSnapshotButton = document.querySelector("#loadBrainLabSnapshotButton");
+const evaluateBrainLabButton = document.querySelector("#evaluateBrainLabButton");
+const muteBrainLabSoundButton = document.querySelector("#muteBrainLabSoundButton");
+const resetBrainLabOverridesButton = document.querySelector("#resetBrainLabOverridesButton");
+const brainLabMeta = document.querySelector("#brainLabMeta");
+const brainLabInputs = document.querySelector("#brainLabInputs");
+const brainLabOutputs = document.querySelector("#brainLabOutputs");
+const brainLabStatus = document.querySelector("#brainLabStatus");
 const speciesCatalogSelect = document.querySelector("#speciesCatalogSelect");
 const speciesCatalogDetails = document.querySelector("#speciesCatalogDetails");
 const speciesRosterDetails = document.querySelector("#speciesRosterDetails");
@@ -84,6 +97,11 @@ let mapArtifacts = [];
 let scenarioRecipes = [];
 let brainCatalog = [];
 let speciesCatalog = [];
+let brainLabSnapshots = [];
+let brainLabSnapshot = null;
+let brainLabEvaluation = null;
+let brainLabOverrides = {};
+let brainLabEvaluateTimer = null;
 let appliedRecipes = [];
 let recipeBaseScenario = null;
 let recipeDiffCheckpoint = null;
@@ -311,6 +329,387 @@ function updateBrainCatalogButtons() {
   if (deleteBrainCatalogButton) {
     deleteBrainCatalogButton.disabled = !brain?.canDelete;
   }
+}
+
+async function loadBrainLabSnapshots(selectedPath = brainLabSelectedPath()) {
+  if (!brainLabSnapshotSelect) {
+    return;
+  }
+
+  const response = await fetch("/api/brain-lab/snapshots");
+  brainLabSnapshots = response.ok ? await response.json() : [];
+  renderBrainLabSnapshotOptions(selectedPath);
+}
+
+function renderBrainLabSnapshotOptions(selectedPath = "") {
+  if (!brainLabSnapshotSelect) {
+    return;
+  }
+
+  brainLabSnapshotSelect.innerHTML = "";
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = brainLabSnapshots.length > 0 ? "Choose snapshot" : "No snapshots found";
+  brainLabSnapshotSelect.append(empty);
+
+  for (const snapshot of brainLabSnapshots) {
+    const option = document.createElement("option");
+    option.value = snapshot.path;
+    option.textContent = `${snapshot.path}${snapshot.sizeBytes ? ` (${formatFileSize(snapshot.sizeBytes)})` : ""}`;
+    option.title = formatDateTime(snapshot.modifiedAtUtc);
+    brainLabSnapshotSelect.append(option);
+  }
+
+  const selected = [...brainLabSnapshotSelect.options].some((option) => option.value === selectedPath)
+    ? selectedPath
+    : brainLabSnapshots[0]?.path || "";
+  brainLabSnapshotSelect.value = selected;
+  if (selected && brainLabSnapshotPath && !brainLabSnapshotPath.value.trim()) {
+    brainLabSnapshotPath.value = selected;
+  }
+}
+
+async function loadBrainLabSnapshot() {
+  const path = brainLabSelectedPath();
+  if (!path) {
+    brainLabStatus.textContent = "Choose a snapshot.";
+    return;
+  }
+
+  brainLabStatus.textContent = "Loading snapshot";
+  const response = await fetch(`/api/brain-lab/snapshot?path=${encodeURIComponent(path)}`);
+  if (!response.ok) {
+    brainLabStatus.textContent = await responseErrorMessage(response, "Snapshot load failed.");
+    return;
+  }
+
+  brainLabSnapshot = await response.json();
+  brainLabEvaluation = null;
+  brainLabOverrides = {};
+  if (brainLabSnapshotPath) {
+    brainLabSnapshotPath.value = brainLabSnapshot.path;
+  }
+  if (brainLabSnapshotSelect && [...brainLabSnapshotSelect.options].some((option) => option.value === brainLabSnapshot.path)) {
+    brainLabSnapshotSelect.value = brainLabSnapshot.path;
+  }
+
+  renderBrainLabSnapshot();
+  brainLabStatus.textContent = `Loaded ${brainLabSnapshot.path}`;
+  if (brainLabSnapshot.creatures?.length > 0) {
+    await evaluateBrainLab();
+  }
+}
+
+function renderBrainLabSnapshot() {
+  renderBrainLabMeta();
+  renderBrainLabCreatureOptions();
+  renderBrainLabInputs();
+  renderBrainLabOutputs();
+  updateBrainLabButtons();
+}
+
+function renderBrainLabCreatureOptions() {
+  if (!brainLabCreatureSelect) {
+    return;
+  }
+
+  brainLabCreatureSelect.innerHTML = "";
+  const creatures = brainLabSnapshot?.creatures || [];
+  if (creatures.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No creatures";
+    brainLabCreatureSelect.append(option);
+    brainLabCreatureSelect.disabled = true;
+    return;
+  }
+
+  for (const creature of creatures) {
+    const option = document.createElement("option");
+    option.value = String(creature.id);
+    option.textContent = `#${formatNumber(creature.id)} gen ${formatNumber(creature.generation)} ${creature.brainArchitectureKind}`;
+    option.title = [
+      `energy ${formatBrainLabNumber(creature.energyRatio)}`,
+      `health ${formatBrainLabNumber(creature.healthRatio)}`,
+      `sound ${formatBrainLabNumber(creature.soundDensity)}`
+    ].join(" | ");
+    brainLabCreatureSelect.append(option);
+  }
+
+  brainLabCreatureSelect.disabled = false;
+}
+
+async function evaluateBrainLab() {
+  const path = brainLabSelectedPath();
+  const creatureId = Number(brainLabCreatureSelect?.value || 0);
+  if (!path || !creatureId) {
+    updateBrainLabButtons();
+    return;
+  }
+
+  if (brainLabEvaluateTimer) {
+    clearTimeout(brainLabEvaluateTimer);
+    brainLabEvaluateTimer = null;
+  }
+
+  brainLabStatus.textContent = "Evaluating";
+  const response = await fetch("/api/brain-lab/evaluate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      creatureId,
+      inputOverrides: brainLabOverrides
+    })
+  });
+
+  if (!response.ok) {
+    brainLabStatus.textContent = await responseErrorMessage(response, "Evaluation failed.");
+    return;
+  }
+
+  brainLabEvaluation = await response.json();
+  renderBrainLabMeta();
+  renderBrainLabInputs();
+  renderBrainLabOutputs();
+  updateBrainLabButtons();
+  brainLabStatus.textContent = [
+    `${formatNumber(brainLabEvaluation.changedOutputCount)} changed outputs`,
+    `${formatNumber(brainLabEvaluation.gateFlipCount)} gate flips`,
+    `max delta ${formatBrainLabNumber(brainLabEvaluation.maxAbsoluteOutputDelta)}`,
+    brainLabEvaluation.supportsRawInputOverrides === false ? "raw overrides unavailable for rtNEAT" : null
+  ].filter(Boolean).join(" | ");
+}
+
+function scheduleBrainLabEvaluate(delay = 160) {
+  if (brainLabEvaluateTimer) {
+    clearTimeout(brainLabEvaluateTimer);
+  }
+
+  brainLabEvaluateTimer = setTimeout(() => {
+    brainLabEvaluateTimer = null;
+    evaluateBrainLab();
+  }, delay);
+}
+
+function renderBrainLabMeta() {
+  if (!brainLabMeta) {
+    return;
+  }
+
+  if (!brainLabSnapshot) {
+    brainLabMeta.textContent = "No snapshot loaded.";
+    return;
+  }
+
+  const creature = brainLabEvaluation?.creature;
+  const creatureText = creature
+    ? ` | creature #${formatNumber(creature.id)} gen ${formatNumber(creature.generation)} ${creature.brainArchitectureKind}`
+    : "";
+  brainLabMeta.textContent = [
+    brainLabSnapshot.scenarioName || "snapshot",
+    `seed ${formatSeed(brainLabSnapshot.seed)}`,
+    `tick ${formatNumber(brainLabSnapshot.tick)}`,
+    `${formatNumber(brainLabSnapshot.creatureCount)} creatures${brainLabSnapshot.creatureListTruncated ? ` (${formatNumber(brainLabSnapshot.returnedCreatureCount)} shown)` : ""}`
+  ].join(" | ") + creatureText;
+}
+
+function renderBrainLabInputs() {
+  if (!brainLabInputs) {
+    return;
+  }
+
+  const inputs = brainLabEvaluation?.inputs || [];
+  if (inputs.length === 0) {
+    brainLabInputs.innerHTML = `<div class="empty">No inputs.</div>`;
+    return;
+  }
+
+  const group = brainLabGroupFilter?.value || "Sound";
+  const visible = inputs.filter((input) => group === "all" ? input.group !== "Bias" : input.group === group);
+  if (visible.length === 0) {
+    brainLabInputs.innerHTML = `<div class="empty">No ${escapeHtml(group)} inputs.</div>`;
+    return;
+  }
+
+  brainLabInputs.innerHTML = visible.map(renderBrainLabInput).join("");
+}
+
+function renderBrainLabInput(input) {
+  const min = Number(input.minimumValue);
+  const max = Number(input.maximumValue);
+  const value = Number(input.modifiedValue);
+  const disabled = min === max || brainLabEvaluation?.supportsRawInputOverrides === false ? " disabled" : "";
+  const step = max - min <= 2 ? "0.01" : "0.05";
+  const overrideClass = input.overridden ? " is-overridden" : "";
+  return `
+    <div class="brain-lab-input-row${overrideClass}" title="${escapeHtml(input.meaning)}">
+      <div class="brain-lab-input-heading">
+        <span>${escapeHtml(input.name)}</span>
+        <code>${escapeHtml(input.key)}</code>
+      </div>
+      <div class="brain-lab-input-values">
+        <span>base ${formatBrainLabNumber(input.baselineValue)}</span>
+        <span>edit ${formatBrainLabNumber(input.modifiedValue)}</span>
+      </div>
+      <div class="brain-lab-input-controls">
+        <input data-brain-lab-input-key="${escapeHtml(input.key)}" type="range" min="${min}" max="${max}" step="${step}" value="${formatBrainLabControlValue(value)}"${disabled}>
+        <input data-brain-lab-input-key="${escapeHtml(input.key)}" type="number" min="${min}" max="${max}" step="${step}" value="${formatBrainLabControlValue(value)}"${disabled}>
+        <button class="secondary" data-brain-lab-reset-input="${escapeHtml(input.key)}" type="button"${input.overridden ? "" : " disabled"}>Base</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderBrainLabOutputs() {
+  if (!brainLabOutputs) {
+    return;
+  }
+
+  const outputs = brainLabEvaluation?.outputs || [];
+  if (outputs.length === 0) {
+    brainLabOutputs.textContent = "No evaluation yet.";
+    return;
+  }
+
+  brainLabOutputs.innerHTML = `
+    <div class="brain-lab-output-summary">
+      <strong>${formatNumber(brainLabEvaluation.overrideCount)} overrides</strong>
+      <span>${formatNumber(brainLabEvaluation.changedOutputCount)} changed</span>
+      <span>${formatNumber(brainLabEvaluation.gateFlipCount)} gate flips</span>
+    </div>
+    <table class="brain-lab-output-table">
+      <thead>
+        <tr>
+          <th>Output</th>
+          <th>Base</th>
+          <th>Edit</th>
+          <th>Delta</th>
+          <th>Gate</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${outputs.map(renderBrainLabOutputRow).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderBrainLabOutputRow(output) {
+  const deltaClass = output.delta > 0 ? "is-positive" : output.delta < 0 ? "is-negative" : "";
+  const gate = output.activationThreshold === null || output.activationThreshold === undefined
+    ? ""
+    : `${output.baselineActive ? "on" : "off"} -> ${output.modifiedActive ? "on" : "off"}`;
+  return `
+    <tr class="${output.changed ? "is-changed" : ""}">
+      <td><strong>${escapeHtml(output.name)}</strong><code>${escapeHtml(output.key)}</code></td>
+      <td>${formatBrainLabNumber(output.baselineValue)}</td>
+      <td>${formatBrainLabNumber(output.modifiedValue)}</td>
+      <td class="${deltaClass}">${formatBrainLabDelta(output.delta)}</td>
+      <td>${escapeHtml(gate)}</td>
+    </tr>
+  `;
+}
+
+function updateBrainLabInputOverride(control) {
+  if (brainLabEvaluation?.supportsRawInputOverrides === false) {
+    return;
+  }
+
+  const key = control.dataset.brainLabInputKey;
+  const input = brainLabEvaluation?.inputs?.find((candidate) => candidate.key === key);
+  if (!input) {
+    return;
+  }
+
+  const rawValue = Number(control.value);
+  if (!Number.isFinite(rawValue)) {
+    return;
+  }
+
+  const clamped = Math.min(Math.max(rawValue, Number(input.minimumValue)), Number(input.maximumValue));
+  if (Math.abs(clamped - Number(input.baselineValue)) <= 0.0005) {
+    delete brainLabOverrides[key];
+  } else {
+    brainLabOverrides[key] = clamped;
+  }
+
+  syncBrainLabInputControls(key, clamped);
+  scheduleBrainLabEvaluate();
+}
+
+function resetBrainLabInput(key) {
+  const input = brainLabEvaluation?.inputs?.find((candidate) => candidate.key === key);
+  if (!input) {
+    return;
+  }
+
+  delete brainLabOverrides[key];
+  syncBrainLabInputControls(key, Number(input.baselineValue));
+  scheduleBrainLabEvaluate();
+}
+
+function syncBrainLabInputControls(key, value) {
+  if (!brainLabInputs) {
+    return;
+  }
+
+  for (const control of brainLabInputs.querySelectorAll("[data-brain-lab-input-key]")) {
+    if (control.dataset.brainLabInputKey === key) {
+      control.value = formatBrainLabControlValue(value);
+    }
+  }
+}
+
+function muteBrainLabSound() {
+  if (brainLabEvaluation?.supportsRawInputOverrides === false) {
+    return;
+  }
+
+  const inputs = brainLabEvaluation?.inputs || [];
+  for (const input of inputs.filter((candidate) => candidate.group === "Sound")) {
+    brainLabOverrides[input.key] = Number(input.neutralValue);
+  }
+  evaluateBrainLab();
+}
+
+function resetBrainLabOverrides() {
+  brainLabOverrides = {};
+  evaluateBrainLab();
+}
+
+function updateBrainLabButtons() {
+  const hasSnapshot = Boolean(brainLabSnapshot);
+  const hasCreature = Boolean(brainLabCreatureSelect?.value);
+  const hasEvaluation = Boolean(brainLabEvaluation);
+  const supportsOverrides = brainLabEvaluation?.supportsRawInputOverrides !== false;
+  if (evaluateBrainLabButton) {
+    evaluateBrainLabButton.disabled = !hasSnapshot || !hasCreature;
+  }
+  if (muteBrainLabSoundButton) {
+    muteBrainLabSoundButton.disabled = !hasEvaluation || !supportsOverrides;
+  }
+  if (resetBrainLabOverridesButton) {
+    resetBrainLabOverridesButton.disabled = !hasEvaluation || !supportsOverrides || Object.keys(brainLabOverrides).length === 0;
+  }
+}
+
+function brainLabSelectedPath() {
+  return (brainLabSnapshotPath?.value || brainLabSnapshotSelect?.value || "").trim();
+}
+
+function formatBrainLabNumber(value) {
+  return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
+function formatBrainLabDelta(value) {
+  const number = Number(value || 0);
+  const formatted = formatBrainLabNumber(number);
+  return number > 0 ? `+${formatted}` : formatted;
+}
+
+function formatBrainLabControlValue(value) {
+  return Number(value || 0).toFixed(4).replace(/\.?0+$/, "");
 }
 
 function formatBrainSource(brain) {
@@ -3722,6 +4121,34 @@ if (speciesRosterDetails) {
 brainCatalogSelect.addEventListener("change", renderBrainCatalogDetails);
 refreshBrainCatalogButton.addEventListener("click", () => loadBrainCatalog());
 deleteBrainCatalogButton.addEventListener("click", deleteSelectedBrainCatalogEntry);
+refreshBrainLabSnapshotsButton.addEventListener("click", () => loadBrainLabSnapshots());
+loadBrainLabSnapshotButton.addEventListener("click", loadBrainLabSnapshot);
+evaluateBrainLabButton.addEventListener("click", evaluateBrainLab);
+muteBrainLabSoundButton.addEventListener("click", muteBrainLabSound);
+resetBrainLabOverridesButton.addEventListener("click", resetBrainLabOverrides);
+brainLabSnapshotSelect.addEventListener("change", () => {
+  brainLabSnapshotPath.value = brainLabSnapshotSelect.value;
+  if (brainLabSnapshotSelect.value) {
+    loadBrainLabSnapshot();
+  }
+});
+brainLabCreatureSelect.addEventListener("change", () => {
+  brainLabOverrides = {};
+  evaluateBrainLab();
+});
+brainLabGroupFilter.addEventListener("change", renderBrainLabInputs);
+brainLabInputs.addEventListener("input", (event) => {
+  const control = event.target.closest("[data-brain-lab-input-key]");
+  if (control) {
+    updateBrainLabInputOverride(control);
+  }
+});
+brainLabInputs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-brain-lab-reset-input]");
+  if (button) {
+    resetBrainLabInput(button.dataset.brainLabResetInput);
+  }
+});
 
 scenarioTabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-group]");
@@ -4177,6 +4604,7 @@ async function boot() {
   setBiomePreviewCollapsed(readBiomePreviewCollapsed(), false);
   await loadMapArtifacts();
   await loadBrainCatalog();
+  await loadBrainLabSnapshots();
   await loadSpeciesCatalog();
   await loadScenarioRecipes();
   await loadScenarios();
