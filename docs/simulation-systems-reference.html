@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lineage Simulation Systems Reference</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #fffdf8;
+      --mist: #f4f7f1;
+      --ink: #17211b;
+      --muted: #5e6b60;
+      --line: #cfd8ca;
+      --forest: #28543c;
+      --leaf: #4b9b5f;
+      --water: #427aa1;
+      --gold: #bf8f2f;
+      --rust: #a35e45;
+      --berry: #8d5578;
+      --panel: #ffffff;
+      --code: #eef4ea;
+      --shadow: 0 14px 30px rgba(23, 33, 27, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--mist);
+      font: 15px/1.55 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    a {
+      color: #245c82;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    a:hover {
+      color: #153e59;
+    }
+
+    code {
+      padding: 0.12rem 0.3rem;
+      background: var(--code);
+      border-radius: 4px;
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.93em;
+    }
+
+    pre {
+      overflow: auto;
+      padding: 14px 16px;
+      background: #17231c;
+      color: #edf6e9;
+      border-radius: 8px;
+      line-height: 1.45;
+    }
+
+    pre code {
+      padding: 0;
+      color: inherit;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+
+    th {
+      color: #23382b;
+      background: #e9f1e5;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .side {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px 22px;
+      color: #eff6ec;
+      background: #16251c;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .side h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .side p {
+      margin: 0 0 20px;
+      color: #bdd0bc;
+      font-size: 13px;
+    }
+
+    .side nav {
+      display: grid;
+      gap: 4px;
+    }
+
+    .side a {
+      display: block;
+      padding: 8px 10px;
+      color: #eff6ec;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .side a:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    main {
+      padding: 34px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .hero-copy,
+    .diagram,
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-copy {
+      padding: 32px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--forest);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2,
+    h3,
+    h4 {
+      letter-spacing: 0;
+    }
+
+    .hero h2 {
+      margin: 0 0 12px;
+      font-size: 36px;
+      line-height: 1.08;
+    }
+
+    .hero p {
+      max-width: 76ch;
+      margin: 0 0 14px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 9px;
+      color: #24382c;
+      background: #e9f1e5;
+      border: 1px solid #c9d7c4;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .diagram {
+      display: grid;
+      place-items: center;
+      min-height: 280px;
+      padding: 24px;
+    }
+
+    .diagram svg {
+      width: 100%;
+      max-width: 640px;
+      height: auto;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    section {
+      padding: 26px;
+    }
+
+    section h2 {
+      margin: 0 0 12px;
+      color: #1b3a29;
+      font-size: 26px;
+      line-height: 1.2;
+    }
+
+    section h3 {
+      margin: 22px 0 8px;
+      color: #294b36;
+      font-size: 18px;
+    }
+
+    section h4 {
+      margin: 18px 0 6px;
+      color: #3d5946;
+      font-size: 15px;
+    }
+
+    section p {
+      max-width: 92ch;
+      margin: 0 0 12px;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .callout {
+      margin: 16px 0;
+      padding: 14px 16px;
+      background: #f2f6ef;
+      border: 1px solid #cfddc8;
+      border-left: 5px solid var(--leaf);
+      border-radius: 8px;
+    }
+
+    .warning {
+      border-left-color: var(--rust);
+      background: #fbf1ec;
+      border-color: #e5cbbf;
+    }
+
+    .formula {
+      margin: 10px 0 14px;
+      padding: 12px 14px;
+      background: #f7faf4;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      overflow-x: auto;
+    }
+
+    .twocol {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .mini {
+      padding: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .mini h3 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+
+    .compact-list {
+      margin: 8px 0 16px;
+      padding-left: 22px;
+    }
+
+    .compact-list li {
+      margin: 4px 0;
+    }
+
+    .pipeline {
+      display: grid;
+      gap: 8px;
+      margin: 14px 0 20px;
+    }
+
+    .step-row {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      color: #fff;
+      background: var(--forest);
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .step {
+      padding: 8px 10px;
+      background: #f8fbf6;
+      border: 1px solid #d8e1d2;
+      border-radius: 6px;
+    }
+
+    .step strong {
+      color: #1f3f2d;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 0.85em;
+      height: 0.85em;
+      margin-right: 0.35em;
+      vertical-align: -0.1em;
+      border-radius: 3px;
+      border: 1px solid rgba(0, 0, 0, 0.18);
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1040px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .side {
+        position: static;
+        height: auto;
+      }
+
+      .side nav {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+
+      main {
+        padding: 22px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .twocol {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding: 14px;
+      }
+
+      .hero-copy,
+      section {
+        padding: 20px;
+      }
+
+      .hero h2 {
+        font-size: 30px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <h1>Systems Reference</h1>
+      <p>Current simulation systems, formulas, and examples. Last reviewed 2026-05-31.</p>
+      <nav aria-label="Reference index">
+        <a href="#overview">Overview</a>
+        <a href="#tick-pipeline">Tick Pipeline</a>
+        <a href="#world">World, Maps, Biomes</a>
+        <a href="#resources">Resources And Seasons</a>
+        <a href="#creatures">Creature Body</a>
+        <a href="#metabolism">Metabolism</a>
+        <a href="#fat-storage">Fat Storage</a>
+        <a href="#sensing">Sensing</a>
+        <a href="#brains">Brains And Actions</a>
+        <a href="#movement">Movement</a>
+        <a href="#feeding">Eating And Digestion</a>
+        <a href="#reproduction">Reproduction</a>
+        <a href="#eggs">Eggs</a>
+        <a href="#interaction">Grab And Combat</a>
+        <a href="#death">Death And Meat</a>
+        <a href="#stats">Stats And History</a>
+        <a href="#species">Species And Catalogs</a>
+        <a href="#examples">Worked Examples</a>
+        <a href="#appendix">Formula Appendix</a>
+      </nav>
+    </aside>
+
+    <main>
+      <div class="hero" id="overview">
+        <div class="hero-copy">
+          <p class="eyebrow">Lineage Core</p>
+          <h2>Simulation Systems Reference</h2>
+          <p class="lead">This document describes the active simulation mechanics in the C# core: the order systems run, the important calculations they perform, and practical examples for reading or tuning a run.</p>
+          <p>The simulation is a continuous 2D world advanced by fixed ticks. Godot, the CLI, and the launcher configure or visualize the world, but the rules below live in <code>src/Lineage.Core</code>.</p>
+          <div class="meta">
+            <span class="pill">Default dt: 1/30 sec</span>
+            <span class="pill">Brain inputs: 228</span>
+            <span class="pill">Brain outputs: 10</span>
+            <span class="pill">Canonical biomes: 8</span>
+          </div>
+        </div>
+        <div class="diagram" aria-label="High level simulation loop illustration">
+          <svg viewBox="0 0 640 360" role="img" aria-labelledby="loop-title loop-desc">
+            <title id="loop-title">Simulation loop</title>
+            <desc id="loop-desc">World state flows through ecology, sensing, brains, action systems, reproduction, death, and stats.</desc>
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#28543c"></path>
+              </marker>
+              <style>
+                .box { fill: #f8fbf6; stroke: #c7d5c1; stroke-width: 2; }
+                .accent { fill: #e3f0e0; stroke: #4b9b5f; stroke-width: 2; }
+                .label { fill: #17211b; font: 16px Segoe UI, sans-serif; font-weight: 700; }
+                .note { fill: #5e6b60; font: 12px Segoe UI, sans-serif; }
+                .arrow { stroke: #28543c; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+              </style>
+            </defs>
+            <rect class="accent" x="245" y="18" width="150" height="58" rx="8"></rect>
+            <text class="label" x="320" y="43" text-anchor="middle">World State</text>
+            <text class="note" x="320" y="61" text-anchor="middle">creatures, eggs, food, maps</text>
+            <rect class="box" x="42" y="118" width="146" height="56" rx="8"></rect>
+            <text class="label" x="115" y="143" text-anchor="middle">Ecology</text>
+            <text class="note" x="115" y="160" text-anchor="middle">regrowth, metabolism</text>
+            <rect class="box" x="246" y="118" width="148" height="56" rx="8"></rect>
+            <text class="label" x="320" y="143" text-anchor="middle">Perception</text>
+            <text class="note" x="320" y="160" text-anchor="middle">senses and brain frame</text>
+            <rect class="box" x="452" y="118" width="146" height="56" rx="8"></rect>
+            <text class="label" x="525" y="143" text-anchor="middle">Brains</text>
+            <text class="note" x="525" y="160" text-anchor="middle">actions and memory</text>
+            <rect class="box" x="42" y="236" width="146" height="56" rx="8"></rect>
+            <text class="label" x="115" y="261" text-anchor="middle">Actions</text>
+            <text class="note" x="115" y="278" text-anchor="middle">move, eat, grab, attack</text>
+            <rect class="box" x="246" y="236" width="148" height="56" rx="8"></rect>
+            <text class="label" x="320" y="261" text-anchor="middle">Life Cycle</text>
+            <text class="note" x="320" y="278" text-anchor="middle">digestion, eggs, death</text>
+            <rect class="box" x="452" y="236" width="146" height="56" rx="8"></rect>
+            <text class="label" x="525" y="261" text-anchor="middle">Stats</text>
+            <text class="note" x="525" y="278" text-anchor="middle">snapshots, heatmaps</text>
+            <path class="arrow" d="M245 58 C178 68 130 90 118 115"></path>
+            <path class="arrow" d="M188 146 H238"></path>
+            <path class="arrow" d="M394 146 H444"></path>
+            <path class="arrow" d="M525 174 C525 206 167 201 120 232"></path>
+            <path class="arrow" d="M188 264 H238"></path>
+            <path class="arrow" d="M394 264 H444"></path>
+            <path class="arrow" d="M525 236 C525 84 410 64 398 55"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <section id="tick-pipeline">
+          <h2>Tick Pipeline</h2>
+          <p>Each call to <code>Simulation.Step()</code> runs the configured systems in order, then advances the clock by <code>dt</code>. The default fixed step is <code>1/30</code> second, so 30 ticks equal one simulated second.</p>
+
+          <div class="twocol">
+            <div class="mini">
+              <h3>Neural Pipeline</h3>
+              <div class="pipeline">
+                <div class="step-row"><span class="num">1</span><div class="step"><strong>ResourceRegrowthSystem</strong>: plant regrowth, dormancy, relocation, meat decay.</div></div>
+                <div class="step-row"><span class="num">2</span><div class="step"><strong>MetabolismSystem</strong>: age, cooldown, basal and trait upkeep.</div></div>
+                <div class="step-row"><span class="num">3</span><div class="step"><strong>SpatialIndexRebuildSystem</strong>: resource, egg, and creature query grid.</div></div>
+                <div class="step-row"><span class="num">4</span><div class="step"><strong>CreatureSensingSystem</strong>: internal, contact, vision, scent, terrain, sound.</div></div>
+                <div class="step-row"><span class="num">5</span><div class="step"><strong>NeuralControllerSystem</strong>: evaluate brain or reuse cached action.</div></div>
+                <div class="step-row"><span class="num">6</span><div class="step"><strong>CreatureGrabSystem</strong>: apply creature holds and movement pressure.</div></div>
+                <div class="step-row"><span class="num">7</span><div class="step"><strong>MovementSystem</strong>: move, collide with obstacles, charge movement energy.</div></div>
+                <div class="step-row"><span class="num">8</span><div class="step"><strong>CreatureSpatialIndexRebuildSystem</strong>: refresh moved creature positions.</div></div>
+                <div class="step-row"><span class="num">9</span><div class="step"><strong>EatingSystem</strong>: gated by eat intent.</div></div>
+                <div class="step-row"><span class="num">10</span><div class="step"><strong>DigestionSystem</strong>: gut contents become energy or rotten damage.</div></div>
+                <div class="step-row"><span class="num">11</span><div class="step"><strong>ReproductionSystem</strong>: egg reserve transfer and egg laying.</div></div>
+                <div class="step-row"><span class="num">12</span><div class="step"><strong>EggEnvironmentalDamageSystem</strong>: passive biome or void exposure.</div></div>
+                <div class="step-row"><span class="num">13</span><div class="step"><strong>EggSystem</strong>: age eggs, hatch, or remove dead eggs.</div></div>
+                <div class="step-row"><span class="num">14</span><div class="step"><strong>CreatureAttackSystem</strong>: gated bite damage.</div></div>
+                <div class="step-row"><span class="num">15</span><div class="step"><strong>FatStorageSystem</strong>: deposit surplus energy and release stored reserves.</div></div>
+                <div class="step-row"><span class="num">16</span><div class="step"><strong>DeathSystem</strong>: starvation, injury, rotten meat deaths and meat creation.</div></div>
+                <div class="step-row"><span class="num">17</span><div class="step"><strong>ExtinctPayloadPruningSystem</strong>: optional compact history payloads.</div></div>
+                <div class="step-row"><span class="num">18</span><div class="step"><strong>StatsRecordingSystem</strong>: sampled snapshots and exposure heatmaps.</div></div>
+              </div>
+            </div>
+            <div class="mini">
+              <h3>Simple Pipeline</h3>
+              <p>The simple pipeline is still available for controlled ecology tests. It replaces sensing plus neural control plus grab/attack with <code>SimpleForagingSystem</code>.</p>
+              <div class="formula">
+target score = proximity * digestionEfficiency<br>
+proximity = 1 - clamp(edgeDistance / senseRadius, 0, 1)
+              </div>
+              <p>If food is visible in the cone, the creature turns directly toward the best target and moves at effective max speed. Otherwise it wanders at <code>0.25x</code> speed with deterministic heading jitter.</p>
+              <div class="callout">
+                <strong>Why the order matters:</strong> eating happens after movement, digestion happens after eating, reproduction happens after digestion, fat storage happens late, and death happens near the end. A creature can eat, digest, lay an egg, attack, release fat, and die in the same simulated tick if the conditions line up.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="world">
+          <h2>World, Maps, Biomes</h2>
+          <p>Worlds are rectangular continuous spaces with hard bounds. Positions are floating point, while biome and obstacle maps are coarse grids layered over the world.</p>
+
+          <h3>Spatial Index</h3>
+          <p>Local queries use a uniform grid. The default spatial cell size is <code>64</code>. Resources and eggs are only rebuilt when their versions change; creature positions are rebuilt before sensing and again after movement.</p>
+          <div class="formula">
+cellX = floor(position.X / spatialCellSize)<br>
+cellY = floor(position.Y / spatialCellSize)<br>
+query scans cells intersecting the requested radius plus target radius
+          </div>
+
+          <h3>Canonical Biomes</h3>
+          <p>The current canonical biome list is Desert, Scrubland, Grassland, Fertile, Forest, Wetland, Tundra, and Highland. Legacy names still load: Barren means Desert, Sparse means Scrubland, and Rich means Fertile.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Biome</th>
+                <th>Resource Density</th>
+                <th>Resource Regrowth</th>
+                <th>Pressure Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="swatch" style="background:#d7b16f"></span>Desert</td><td><code>0.05</code></td><td><code>0.25</code></td><td>Very sparse; eggs take <code>0.5x</code> environmental exposure.</td></tr>
+              <tr><td><span class="swatch" style="background:#b8a36d"></span>Scrubland</td><td><code>0.35</code></td><td><code>0.65</code></td><td>Low but usable; eggs take <code>0.2x</code> exposure.</td></tr>
+              <tr><td><span class="swatch" style="background:#78a95a"></span>Grassland</td><td><code>1.10</code></td><td><code>1.05</code></td><td>Baseline productive travel space.</td></tr>
+              <tr><td><span class="swatch" style="background:#4f9b58"></span>Fertile</td><td><code>2.15</code></td><td><code>1.35</code></td><td>Highest plant density and strong regrowth.</td></tr>
+              <tr><td><span class="swatch" style="background:#2f6d42"></span>Forest</td><td><code>1.15</code></td><td><code>1.05</code></td><td>Forest pressure is biome-level; there are no tree objects yet.</td></tr>
+              <tr><td><span class="swatch" style="background:#4f8e8a"></span>Wetland</td><td><code>1.85</code></td><td><code>1.35</code></td><td>Productive but often slower or costlier depending on scenario pressure.</td></tr>
+              <tr><td><span class="swatch" style="background:#9eb7c8"></span>Tundra</td><td><code>0.20</code></td><td><code>0.45</code></td><td>Cold sparse pressure; eggs take <code>0.35x</code> exposure.</td></tr>
+              <tr><td><span class="swatch" style="background:#8b8e75"></span>Highland</td><td><code>0.45</code></td><td><code>0.70</code></td><td>Moderately sparse; eggs take <code>0.15x</code> exposure.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Biome Pressure Profiles</h3>
+          <p>Scenarios provide per-biome multipliers for movement energy cost, basal cost, speed, vision range, and seasonal amplitude. Any biome pressure profile is a simple lookup:</p>
+          <div class="formula">
+effectivePressure = profile.For(currentBiome)
+          </div>
+          <p>For example, if Wetland speed is <code>0.68</code>, a creature asking for <code>20 px/s</code> moves at <code>13.6 px/s</code> before obstacle resolution.</p>
+
+          <h3>World Generation</h3>
+          <p>Biome maps can be uniform, generated noise, natural climate, several band/corridor layouts, or manual/reusable map artifacts. Natural climate generation computes deterministic elevation, moisture, temperature, forest fitness, and fertility fields from seeded fractal noise, then ranks cells into ecological categories and smooths regions.</p>
+          <div class="formula">
+temperature = clamp01(latitudeTemperature * 0.76 + temperatureNoise * 0.25 - elevation * 0.12 + 0.04)<br>
+moisture = clamp01(moistureNoise * 0.78 + detail * 0.14 + (1 - elevation) * 0.14 - rainShadow)<br>
+fertility = clamp01(moisture * 0.42 + temperateFitness * 0.28 + (1 - elevation) * 0.18 + detail * 0.08 - wetnessPenalty)
+          </div>
+        </section>
+
+        <section id="resources">
+          <h2>Resources And Seasons</h2>
+          <p>Resources are either plants or meat. Plants are long-lived patches that regrow or enter dormancy after depletion. Meat is created by creature deaths and decays over time.</p>
+
+          <div class="diagram" aria-label="Energy flow illustration">
+            <svg viewBox="0 0 700 260" role="img" aria-labelledby="energy-title energy-desc">
+              <title id="energy-title">Energy and resource flow</title>
+              <desc id="energy-desc">Plants, meat, and eggs enter the gut, digestion releases creature energy, and upkeep drains it.</desc>
+              <defs>
+                <marker id="arrow2" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L8,3 z" fill="#28543c"></path>
+                </marker>
+                <style>
+                  .e-box { fill: #f8fbf6; stroke: #c7d5c1; stroke-width: 2; }
+                  .e-green { fill: #dff0da; stroke: #4b9b5f; stroke-width: 2; }
+                  .e-gold { fill: #f4e7c6; stroke: #bf8f2f; stroke-width: 2; }
+                  .e-red { fill: #f4ddd3; stroke: #a35e45; stroke-width: 2; }
+                  .e-text { fill: #17211b; font: 15px Segoe UI, sans-serif; font-weight: 700; }
+                  .e-note { fill: #5e6b60; font: 12px Segoe UI, sans-serif; }
+                  .e-arrow { stroke: #28543c; stroke-width: 2.3; fill: none; marker-end: url(#arrow2); }
+                </style>
+              </defs>
+              <rect class="e-green" x="25" y="24" width="130" height="54" rx="8"></rect>
+              <text class="e-text" x="90" y="48" text-anchor="middle">Plants</text>
+              <text class="e-note" x="90" y="65" text-anchor="middle">typed raw kcal</text>
+              <rect class="e-gold" x="25" y="104" width="130" height="54" rx="8"></rect>
+              <text class="e-text" x="90" y="128" text-anchor="middle">Meat / Eggs</text>
+              <text class="e-note" x="90" y="145" text-anchor="middle">freshness matters</text>
+              <rect class="e-box" x="245" y="64" width="140" height="74" rx="8"></rect>
+              <text class="e-text" x="315" y="94" text-anchor="middle">Gut Stores</text>
+              <text class="e-note" x="315" y="113" text-anchor="middle">plant + meat capacity</text>
+              <rect class="e-green" x="475" y="46" width="150" height="54" rx="8"></rect>
+              <text class="e-text" x="550" y="70" text-anchor="middle">Energy</text>
+              <text class="e-note" x="550" y="87" text-anchor="middle">movement, eggs, survival</text>
+              <rect class="e-red" x="475" y="138" width="150" height="54" rx="8"></rect>
+              <text class="e-text" x="550" y="162" text-anchor="middle">Health Damage</text>
+              <text class="e-note" x="550" y="179" text-anchor="middle">rotten meat or attacks</text>
+              <path class="e-arrow" d="M155 51 H237"></path>
+              <path class="e-arrow" d="M155 131 C190 131 204 101 237 101"></path>
+              <path class="e-arrow" d="M385 91 H467"></path>
+              <path class="e-arrow" d="M385 112 C429 112 431 165 467 165"></path>
+              <path class="e-arrow" d="M550 100 C550 118 550 123 550 134"></path>
+              <text class="e-note" x="606" y="123" text-anchor="middle">stale penalty</text>
+            </svg>
+          </div>
+
+          <h3>Plant Type Multipliers</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Initial Calories</th>
+                <th>Max Calories</th>
+                <th>Regrowth</th>
+                <th>Eat Rate</th>
+                <th>Digestion Energy</th>
+                <th>Radius</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Generic</td><td><code>1.00</code></td><td><code>1.00</code></td><td><code>1.00</code></td><td><code>1.00</code></td><td><code>1.00</code></td><td><code>1.00</code></td></tr>
+              <tr><td>Tender</td><td><code>0.68</code></td><td><code>0.70</code></td><td><code>1.60</code></td><td><code>1.50</code></td><td><code>0.85</code></td><td><code>0.85</code></td></tr>
+              <tr><td>Rich</td><td><code>1.45</code></td><td><code>1.70</code></td><td><code>0.55</code></td><td><code>0.65</code></td><td><code>1.05</code></td><td><code>1.15</code></td></tr>
+              <tr><td>Tough</td><td><code>1.05</code></td><td><code>1.10</code></td><td><code>0.75</code></td><td><code>0.45</code></td><td><code>0.50</code></td><td><code>1.10</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>Plant Regrowth</h3>
+          <div class="formula">
+fertilityMultiplier = seasonalMultiplier * localFertilityMultiplier<br>
+calories = min(maxCalories, calories + regrowthCaloriesPerSecond * fertilityMultiplier * dt)
+          </div>
+          <p>When plants are depleted and respawn delay is enabled, they enter dormancy. Dormancy countdown is also scaled by fertility, so a plant in a fertile season returns faster than a plant in a poor season.</p>
+
+          <h3>Local Fertility</h3>
+          <p>Local fertility is short-lived depletion pressure, separate from biome identity. A depleted plant reduces its cell by <code>depletionPerPlant</code>, adjacent cardinal cells by <code>neighborDepletionShare</code>, and diagonal cells by half that neighbor share. Recovery adds <code>recoveryPerSecond * dt</code> until the cell reaches <code>1.0</code>.</p>
+          <div class="formula">
+centerCell = max(minimumMultiplier, centerCell - depletionPerPlant)<br>
+neighborCell = max(minimumMultiplier, neighborCell - depletionPerPlant * neighborShare)<br>
+cell = min(1, cell + recoveryPerSecond * dt)
+          </div>
+
+          <h3>Seasonal Fertility</h3>
+          <div class="formula">
+phase = ((elapsedSeconds + phaseOffset + spatialOffset) mod seasonLength) / seasonLength<br>
+seasonalMultiplier = max(0, 1 + amplitude * sin(phase * tau))<br>
+effectiveAmplitude = clamp(baseAmplitude * biomeAmplitudeMultiplier, 0, 0.95)
+          </div>
+          <p>Horizontal or vertical opposed season modes offset one half of the world by half a season, creating simultaneous good and bad regions.</p>
+
+          <h3>Meat Decay</h3>
+          <div class="formula">
+meatAge += dt<br>
+freshKillSecondsRemaining = max(0, freshKillSecondsRemaining - dt)<br>
+calories -= decayCaloriesPerSecond * dt
+          </div>
+          <p>Meat is removed when calories reach zero. Fresh-kill attribution expires when the fresh-kill timer reaches zero.</p>
+        </section>
+
+        <section id="creatures">
+          <h2>Creature Body</h2>
+          <p>A creature genome stores adult traits. Juveniles use effective traits scaled from birth size toward adult size.</p>
+
+          <h3>Baseline Adult Genome</h3>
+          <table>
+            <thead><tr><th>Trait</th><th>Baseline</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td>Body radius</td><td><code>3</code></td><td>Adult collision and meat-size baseline.</td></tr>
+              <tr><td>Max speed</td><td><code>24 px/s</code></td><td>Movement ceiling before biome and grab multipliers.</td></tr>
+              <tr><td>Turn rate</td><td><code>3 rad/s</code></td><td>Heading change from neural turn output.</td></tr>
+              <tr><td>Sense radius</td><td><code>90 px</code></td><td>Base range for vision, scent range multipliers, and local probes.</td></tr>
+              <tr><td>Vision angle</td><td><code>2*pi/3</code></td><td>120 degree forward cone by default.</td></tr>
+              <tr><td>Basal energy</td><td><code>0.25 /s</code></td><td>Baseline passive energy drain in the genome.</td></tr>
+              <tr><td>Movement energy</td><td><code>0.35 /s</code></td><td>Genome movement energy coefficient.</td></tr>
+              <tr><td>Eat rate</td><td><code>18 kcal/s</code></td><td>Raw calories transferred into gut before plant type multipliers.</td></tr>
+              <tr><td>Gut capacity</td><td><code>55 kcal</code></td><td>Maximum raw gut storage before growth scaling.</td></tr>
+              <tr><td>Digestion rate</td><td><code>5 kcal/s</code></td><td>Raw gut calories processed per second before growth scaling.</td></tr>
+              <tr><td>Fat storage capacity</td><td><code>42 kcal</code></td><td>Stored reserve capacity before growth scaling.</td></tr>
+              <tr><td>Fat storage efficiency</td><td><code>0.85</code></td><td>Fraction of transferred working energy recovered as stored fat, and fraction of burned fat returned as usable energy.</td></tr>
+              <tr><td>Bite strength</td><td><code>0.55</code></td><td>Attack damage and bite cost multiplier.</td></tr>
+              <tr><td>Damage resistance</td><td><code>1.0</code></td><td>Incoming attack damage divisor via square root.</td></tr>
+            </tbody>
+          </table>
+          <p class="small">Fat storage is automatic rather than directly brain-controlled. Full reserves add a small movement burden through speed and movement-cost multipliers.</p>
+
+          <h3>Growth</h3>
+          <div class="formula">
+maturityProgress = maturityAge &lt;= 0 ? 1 : clamp(age / maturityAge, 0, 1)<br>
+smooth = progress * progress * (3 - 2 * progress)<br>
+newbornScale = clamp(0.35 * juvenileGrowthScale(birthInvestmentRatio), 0.18, 0.7)<br>
+growthFactor = newbornScale + (1 - newbornScale) * smooth
+          </div>
+          <p>Body, eating, gut, fat capacity, digestion, bite, and resistance scale directly by <code>growthFactor</code>. Speed, turning, and sense radius scale by <code>sqrt(growthFactor)</code>; speed also receives the current fat burden multiplier. Vision angle is not scaled by growth.</p>
+          <div class="callout">
+            Example: a baseline-investment juvenile halfway to maturity has <code>progress = 0.5</code>, <code>smooth = 0.5</code>, <code>newbornScale = 0.35</code>, and <code>growthFactor = 0.675</code>. Its body radius is <code>3 * 0.675 = 2.025</code>, while max speed is <code>24 * sqrt(0.675) = 19.7 px/s</code>.
+          </div>
+
+          <h3>Investment Scaling</h3>
+          <div class="formula">
+investmentRatio = clamp(investedEnergy / baselineOffspringInvestment, 0.25, 4)<br>
+eggMaxHealth = clamp(sqrt(investmentRatio), 0.5, 2)<br>
+hatchlingHealth = clamp(sqrt(investmentRatio) * eggHealthRatio, 0.1, 2)<br>
+juvenileGrowthScale = clamp(sqrt(investmentRatio), 0.5, 2)
+          </div>
+        </section>
+
+        <section id="metabolism">
+          <h2>Metabolism</h2>
+          <p>Metabolism updates age, meal timers, reproduction cooldown, and passive energy loss.</p>
+          <div class="formula">
+traitUpkeep = sum(effectiveTrait * matchingTraitCost)<br>
+traitUpkeep += plantSpecializationFactor * plantSpecializationCost<br>
+traitUpkeep += clamp(memoryVector.length, 0, 1) * memoryCost<br>
+energy -= (basalEnergyPerSecond * biomeBasalMultiplier + traitUpkeep) * dt
+          </div>
+          <p>Plant specialization upkeep uses squared typed plant adaptations:</p>
+          <div class="formula">
+plantSpecializationFactor = tenderAdaptation^2 + richAdaptation^2 + toughAdaptation^2
+          </div>
+          <div class="callout">
+            Example: if basal is <code>0.25/s</code>, current biome basal multiplier is <code>1.2</code>, trait upkeep is <code>0.05/s</code>, and <code>dt = 1/30</code>, the tick drains <code>(0.25 * 1.2 + 0.05) / 30 = 0.0117</code> energy.
+          </div>
+        </section>
+
+        <section id="fat-storage">
+          <h2>Fat Storage</h2>
+          <p>Fat storage is an automatic late-pipeline reserve system. It stores surplus working energy as fat when a creature is well above its reproduction threshold, and releases stored fat when working energy falls into starvation pressure.</p>
+
+          <h3>Reserve Capacity And Burden</h3>
+          <div class="formula">
+effectiveFatCapacity = genome.FatStorageCapacityCalories * growthFactor<br>
+fatStorageRatio = capacity &gt; 0 ? clamp(fatCalories / capacity, 0, 1) : 0<br>
+fatMassBurdenRatio = clamp(fatCalories / max(1, reproductionEnergyThreshold), 0, 1)<br>
+fatSpeedMultiplier = clamp(1 - fatMassBurdenRatio * 0.12, 0.78, 1)<br>
+fatMovementCostMultiplier = 1 + fatMassBurdenRatio * 0.25
+          </div>
+          <p>Effective max speed includes <code>fatSpeedMultiplier</code>, and movement energy cost includes <code>fatMovementCostMultiplier</code>.</p>
+
+          <h3>Deposit And Release</h3>
+          <p>Defaults are deposit ratio <code>1.25</code>, withdraw ratio <code>0.25</code>, and transfer capacity share <code>0.45/s</code>.</p>
+          <div class="formula">
+transferLimit = effectiveFatCapacity * transferCapacitySharePerSecond * dt<br>
+withdrawTarget = reproductionEnergyThreshold * withdrawEnergyRatio<br>
+if energy &lt; withdrawTarget:<br>
+&nbsp;&nbsp;fatToBurn = min(fatCalories, (withdrawTarget - energy) / efficiency, transferLimit)<br>
+&nbsp;&nbsp;energy += fatToBurn * efficiency<br>
+&nbsp;&nbsp;fatCalories -= fatToBurn<br><br>
+depositTarget = reproductionEnergyThreshold * depositEnergyRatio<br>
+if energy &gt; depositTarget:<br>
+&nbsp;&nbsp;energyToStore = min(energy - depositTarget, (capacity - fatCalories) / efficiency, transferLimit)<br>
+&nbsp;&nbsp;energy -= energyToStore<br>
+&nbsp;&nbsp;fatCalories += energyToStore * efficiency
+          </div>
+          <div class="callout">
+            Example: with threshold <code>84</code>, withdraw target is <code>21</code> energy and deposit target is <code>105</code>. A creature at <code>15</code> energy with <code>20</code> fat and <code>0.85</code> efficiency needs <code>6</code> usable energy, so it burns about <code>7.06</code> fat if the transfer limit allows it.
+          </div>
+        </section>
+
+        <section id="sensing">
+          <h2>Sensing</h2>
+          <p>Sensing converts world state plus internal creature state into compact neural inputs. The expensive world portion can be skipped for several ticks and reused unless a close contact or other cue forces refresh.</p>
+
+          <div class="diagram" aria-label="Vision and scent geometry illustration">
+            <svg viewBox="0 0 650 310" role="img" aria-labelledby="sense-title sense-desc">
+              <title id="sense-title">Creature perception geometry</title>
+              <desc id="sense-desc">A creature has a forward vision cone, larger scent and sound radii, and local terrain probes.</desc>
+              <defs>
+                <style>
+                  .s-bg { fill: #123521; }
+                  .cone { fill: rgba(66,122,161,0.28); stroke: #5aa3c7; stroke-width: 2; }
+                  .ring { fill: none; stroke-width: 2; }
+                  .line { stroke: #e8f3dd; stroke-width: 2; }
+                  .plant { fill: #4b9b5f; stroke: #e8f3dd; stroke-width: 1.5; }
+                  .meat { fill: #a35e45; stroke: #e8f3dd; stroke-width: 1.5; }
+                  .creature { fill: #f7e8ad; stroke: #17211b; stroke-width: 2; }
+                  .s-text { fill: #17211b; font: 13px Segoe UI, sans-serif; font-weight: 700; }
+                  .s-label { fill: #e8f3dd; font: 12px Segoe UI, sans-serif; }
+                </style>
+              </defs>
+              <rect class="s-bg" x="30" y="25" width="385" height="250" rx="10"></rect>
+              <path class="cone" d="M198 157 L330 97 A150 150 0 0 1 330 217 Z"></path>
+              <circle class="ring" cx="198" cy="157" r="86" stroke="#d64de6"></circle>
+              <circle class="ring" cx="198" cy="157" r="130" stroke="#35dbea"></circle>
+              <circle class="ring" cx="198" cy="157" r="170" stroke="#bf8f2f" stroke-dasharray="7 5"></circle>
+              <line class="line" x1="198" y1="157" x2="348" y2="157"></line>
+              <circle class="creature" cx="198" cy="157" r="13"></circle>
+              <circle class="plant" cx="285" cy="125" r="11"></circle>
+              <circle class="plant" cx="312" cy="197" r="9"></circle>
+              <circle class="meat" cx="112" cy="102" r="10"></circle>
+              <circle class="creature" cx="258" cy="227" r="11"></circle>
+              <text class="s-label" x="342" y="94">vision cone</text>
+              <text class="s-label" x="292" y="73">sense radius</text>
+              <text class="s-label" x="341" y="250">meat/sound can extend farther</text>
+              <rect x="440" y="54" width="165" height="42" rx="8" fill="#f8fbf6" stroke="#c7d5c1"></rect>
+              <text class="s-text" x="523" y="80" text-anchor="middle">Density = count / 8</text>
+              <rect x="440" y="120" width="165" height="54" rx="8" fill="#f8fbf6" stroke="#c7d5c1"></rect>
+              <text class="s-text" x="523" y="142" text-anchor="middle">Direction</text>
+              <text class="s-text" x="523" y="160" text-anchor="middle">projected forward/right</text>
+              <rect x="440" y="198" width="165" height="54" rx="8" fill="#f8fbf6" stroke="#c7d5c1"></rect>
+              <text class="s-text" x="523" y="220" text-anchor="middle">Refresh skips</text>
+              <text class="s-text" x="523" y="238" text-anchor="middle">unless contact/close</text>
+            </svg>
+          </div>
+
+          <h3>World Sense Refresh</h3>
+          <div class="formula">
+forced if worldSenseIntervalTicks &lt;= 1, tick == 0, or no prior sense tick<br>
+close refresh if touching food, touching creature, movement blocked, or high proximity<br>
+scheduled refresh if (tick + creatureId) mod worldSenseIntervalTicks == 0<br>
+otherwise reuse previous world senses and age them
+          </div>
+          <p>The default world sense interval is <code>10</code> ticks. Close refresh uses a default proximity threshold of <code>0.85</code> and a minimum age of <code>1</code> tick.</p>
+
+          <h3>Internal Senses</h3>
+          <div class="formula">
+energyRatio = clamp(energy / reproductionEnergyThreshold, 0, 1)<br>
+healthRatio = clamp(health / maxJuvenileHealth, 0, 1)<br>
+hunger = 1 - energyRatio<br>
+eggReserveRatio = clamp(reproductiveEnergy / offspringInvestment, 0, 1)<br>
+energySurplusRatio = clamp((energy - reproductionThreshold) / max(1, offspringInvestment), 0, 1)
+          </div>
+          <p>Recent food, digestion, and typed plant payoff traces provide short-term feedback. Plant payoff traces decay with a half-life of <code>45</code> seconds by default:</p>
+          <div class="formula">
+decay = 0.5 ^ (dt / halfLifeSeconds)<br>
+newTrace = clamp(max(oldTrace * decay, immediateYield), 0, 1)
+          </div>
+
+          <h3>Vision</h3>
+          <p>A target is visible when it is within edge range and inside the vision cone:</p>
+          <div class="formula">
+insideCone = visionAngle &gt;= tau || dot(directionToTarget, forward) &gt;= cos(visionAngle / 2)<br>
+proximity = 1 - clamp(edgeDistance / effectiveVisionRadius, 0, 1)<br>
+visibleDensity = clamp(visibleCount / 8, 0, 1)
+          </div>
+          <p>Optional sector vision samples 9 ordered sectors from left to right across the vision arc. Each sector has 18 channels: plant, meat, egg, creature, smaller/similar/larger creature density and proximity, plant quality/ease, creature approach, and facing alignment.</p>
+
+          <h3>Scent And Sound</h3>
+          <p>Meat scent uses the effective sense radius times a scent multiplier, default <code>2x</code>. Sound uses a default <code>2.5x</code> range multiplier.</p>
+          <div class="formula">
+distanceFactor = 1 - clamp(edgeDistance / scentRadius, 0, 1)<br>
+meatScentStrength = clamp(calories / 60, 0, 1) * distanceFactor^2<br>
+density = clamp(totalStrength / densitySaturation, 0, 1)<br>
+directionalConfidence = clamp(vectorLength / totalStrength, 0, 1) * density
+          </div>
+          <p>Rotten meat scent is meat scent multiplied by staleness. Creature similarity scent is weighted by genetic similarity and has a <code>1.5x</code> sense-radius range. Sound strength is emitted sound amplitude times squared distance falloff; tone is the weighted average of heard tones, and tone clarity falls as nearby tones conflict.</p>
+        </section>
+
+        <section id="brains">
+          <h2>Brains And Actions</h2>
+          <p>The current neural adapter exposes <code>228</code> inputs and <code>10</code> outputs. The brain stores direct input-to-output weights plus optional hidden nodes. Every evaluated output is passed through <code>tanh</code>.</p>
+
+          <h3>Brain Schema</h3>
+          <table>
+            <thead><tr><th>Group</th><th>Current Contents</th></tr></thead>
+            <tbody>
+              <tr><td>Internal</td><td>Energy, hunger, health, egg reserve, surplus, reproduction readiness, recent food and plant payoff traces.</td></tr>
+              <tr><td>Vision</td><td>Food density, plant density, meat density, creature density, plant quality/ease, meat freshness, plant preference, optional 9-sector channels.</td></tr>
+              <tr><td>Scent</td><td>Meat scent, rotten meat scent, creature similarity scent.</td></tr>
+              <tr><td>Sound</td><td>Sound density, direction, tone, tone clarity.</td></tr>
+              <tr><td>Terrain, habitat, obstacle</td><td>Current/forward/left/right terrain drag and habitat quality, obstacle probes, movement blocked.</td></tr>
+              <tr><td>Contact and grab</td><td>Food/plant/meat/egg/creature contact, contact plant cues, creature similarity, grab pressure/direction, can grab, is holding.</td></tr>
+              <tr><td>Memory</td><td>Legacy memory direction forward/right and strength.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Outputs</h3>
+          <table>
+            <thead><tr><th>Output</th><th>Range After Adapter</th><th>Use</th></tr></thead>
+            <tbody>
+              <tr><td>Move forward</td><td><code>0..1</code></td><td>Scales effective max speed.</td></tr>
+              <tr><td>Turn</td><td><code>-1..1</code></td><td>Scales effective turn rate.</td></tr>
+              <tr><td>Eat</td><td>raw tanh</td><td><code>WantsEat</code> when output is greater than <code>0</code>.</td></tr>
+              <tr><td>Reproduce</td><td>raw tanh</td><td><code>WantsReproduce</code> when output is greater than <code>0.25</code>.</td></tr>
+              <tr><td>Attack</td><td>raw tanh</td><td><code>WantsAttack</code> when output is greater than <code>0.25</code>.</td></tr>
+              <tr><td>Grab</td><td><code>0..1</code></td><td><code>WantsGrab</code> when output is greater than <code>0.35</code>.</td></tr>
+              <tr><td>Sound amplitude</td><td><code>0..1</code></td><td>Intentional sound loudness.</td></tr>
+              <tr><td>Sound tone</td><td><code>-1..1</code></td><td>Intentional sound tone.</td></tr>
+              <tr><td>Memory forward</td><td><code>-1..1</code></td><td>Writes legacy memory along current forward axis.</td></tr>
+              <tr><td>Memory right</td><td><code>-1..1</code></td><td>Writes legacy memory along current right axis.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Evaluation</h3>
+          <div class="formula">
+directOutput[o] = sum(input[i] * directWeight[o, i])<br>
+hidden[h] = tanh(sum(input[i] * hiddenInputWeight[h, i]))<br>
+output[o] = tanh(directOutput[o] + sum(hidden[h] * hiddenOutputWeight[o, h]))
+          </div>
+          <p>Hybrid neural brains support direct weights plus hidden nodes. Hidden-layer neural brains keep the same payload layout for compatibility but force direct weights to zero so all behavior routes through hidden nodes.</p>
+          <div class="callout">
+            With 228 inputs and 10 outputs, direct weights alone use <code>2280</code> floats. A default 4-hidden-node hybrid uses <code>2280 + 4*228 + 4*10 = 3232</code> weights. A default 10-hidden-node hidden-layer brain uses <code>2280 + 10*228 + 10*10 = 4660</code> stored weights, though the direct block is inactive for hidden-layer behavior.
+          </div>
+
+          <h3>Action Reuse And Memory</h3>
+          <p>Optional neural action reuse skips brain evaluation when world senses are stale. It still updates movement and memory from cached actions. Reuse is broken by fresh world sense, first decision, contact, blocked movement, attack damage, grab state, rotten meat damage, internal energy/hunger/reproduction deltas of <code>0.2</code>, health drop of <code>0.05</code>, or max reuse age.</p>
+          <div class="formula">
+memory *= exp(-memoryDecayPerSecond * dt)<br>
+writeVector = forward * memoryForward + right * memoryRight<br>
+blend = 1 - exp(-memoryWriteRatePerSecond * dt)<br>
+memory = clampLength(memory * (1 - blend) + desiredMemory * blend, 1)
+          </div>
+        </section>
+
+        <section id="movement">
+          <h2>Movement</h2>
+          <p>The brain writes desired velocity indirectly through move and turn outputs. Movement then applies grab pressure, biome speed, bounds, obstacles, and movement energy cost.</p>
+          <div class="formula">
+desiredVelocity = clampLength(creature.DesiredVelocity, effectiveMaxSpeed)<br>
+desiredVelocity *= grabMovementMultiplier<br>
+terrainAdjustedVelocity = desiredVelocity * biomeSpeedMultiplier<br>
+intendedPosition = boundsClamp(previousPosition + terrainAdjustedVelocity * dt)
+          </div>
+          <p>Obstacle resolution first tries the intended position, then x-only movement, then y-only movement, then stays at the previous position.</p>
+          <div class="formula">
+speedCostMultiplier = speed &lt;= 0 ? 0 : (speed / baselineMaxSpeed) ^ movementSpeedCostExponent<br>
+energy -= movementEnergyPerSecond * biomeMovementCostMultiplier * growthFactor * fatMovementCostMultiplier * speedCostMultiplier * dt
+          </div>
+          <div class="callout">
+            Example: an adult baseline creature moving at <code>12 px/s</code> with exponent <code>1</code> has speed multiplier <code>12 / 24 = 0.5</code>. With movement energy <code>0.35/s</code>, neutral biome, and <code>dt=1/30</code>, movement costs <code>0.35 * 0.5 / 30 = 0.0058</code> energy that tick.
+          </div>
+        </section>
+
+        <section id="feeding">
+          <h2>Eating And Digestion</h2>
+          <p>Eating transfers raw calories into gut stores. Digestion later turns those raw calories into energy according to diet, plant type, meat freshness, and carrion adaptation.</p>
+
+          <h3>Eating Contact And Target Choice</h3>
+          <div class="formula">
+contactRadius = effectiveBodyRadius + reachPadding<br>
+availableGutCapacity = max(0, effectiveGutCapacity - gutPlantCalories - gutMeatCalories)
+          </div>
+          <p>The best touching food is the highest digestion-efficiency candidate, with ties broken by smaller edge distance and then smaller center distance. Eggs count as meat-like food.</p>
+          <div class="formula">
+plantAmount = min(resourceCalories, effectiveEatRate * plantEatRateMultiplier * dt, availableGutCapacity)<br>
+meatAmount = min(resourceCalories, effectiveEatRate * dt, availableGutCapacity)<br>
+eggAmount = min(eggEnergy, effectiveEatRate * dt, availableGutCapacity)
+          </div>
+
+          <h3>Diet Efficiency</h3>
+          <div class="formula">
+plantEfficiency = 0.2 + 0.8 * clamp(1 - dietaryAdaptation, 0, 1)<br>
+meatEfficiency = 0.2 + 0.8 * clamp(dietaryAdaptation, 0, 1)<br>
+plantTypeEnergy = plantEfficiency * plantDigestionMultiplier * plantTypeAdaptationMultiplier<br>
+meatEnergy = meatEfficiency * meatFreshnessEfficiency
+          </div>
+          <p>Dietary adaptation near <code>0</code> favors plants; near <code>1</code> favors meat. Typed plant adaptations can improve matching plant types and penalize cross-specialization.</p>
+
+          <h3>Meat Freshness And Carrion</h3>
+          <div class="formula">
+freshness = 0.35 + 0.65 * (1 - clamp(meatAgeSeconds / 300, 0, 1))<br>
+staleFactor = (1 - freshness) / (1 - 0.35)<br>
+rottenDamage = meatDigested * rottenDamagePerRawKcal * rottenMeatDamageMultiplier
+          </div>
+          <p>Carrion adaptation trades fresh-meat efficiency for better stale-meat recovery and rotten-meat protection.</p>
+
+          <h3>Digestion Budget</h3>
+          <div class="formula">
+digestionBudget = effectiveDigestionCaloriesPerSecond * dt<br>
+rawDigested = min(totalGutCalories, digestionBudget)<br>
+plantDigested = min(gutPlantCalories, rawDigested * gutPlantCalories / totalGutCalories)<br>
+meatDigested = min(gutMeatCalories, rawDigested - plantDigested)<br>
+releasedEnergy = plantReleasedEnergy + meatReleasedEnergy
+          </div>
+          <div class="callout">
+            Example: a plant specialist with <code>dietaryAdaptation = 0.1</code> has plant efficiency <code>0.2 + 0.8 * 0.9 = 0.92</code> and meat efficiency <code>0.2 + 0.8 * 0.1 = 0.28</code>. Ten generic plant raw calories release about <code>9.2</code> energy; ten fresh meat calories release about <code>2.8</code> energy.
+          </div>
+        </section>
+
+        <section id="reproduction">
+          <h2>Reproduction</h2>
+          <p>Creatures reproduce by building an egg reserve from surplus energy, then laying an egg when reserve is full and reproduction intent is satisfied.</p>
+
+          <h3>Reserve Transfer</h3>
+          <div class="formula">
+availableEnergy = max(0, energy - reproductionEnergyThreshold)<br>
+remainingEggEnergy = offspringInvestment - reproductiveEnergy<br>
+eggProductionRate = eggProductionEnergyPerSecond * fertilityMultiplier<br>
+transfer = min(eggProductionRate * dt, availableEnergy, remainingEggEnergy)
+          </div>
+
+          <h3>Fertility</h3>
+          <div class="formula">
+ageFertility = 0 before maturity<br>
+ageFertility = 1 from maturity through prime age<br>
+ageFertility = lerp(1, senescentFertilityMultiplier, smoothstep(progress)) after prime age<br>
+crowdingFertility = 1 - crowdingPenalty * smoothstep(clamp(visibleCreatureDensity, 0, 1))<br>
+fertilityMultiplier = clamp(ageFertility * crowdingFertility, 0, 1)
+          </div>
+          <p>Default reproductive prime age is <code>240s</code>, senescence age is <code>900s</code>, senescent fertility multiplier is <code>0.18</code>, and crowding penalty is <code>0.65</code>.</p>
+
+          <h3>Mutation</h3>
+          <p>Effective mutation pressure is world/scenario-bound at reproduction time. Legacy mutation fields still exist on genomes and species profiles for compatibility, but reproduction uses <code>WorldMutationPolicy</code>.</p>
+          <div class="formula">
+trait mutates if random() &lt; traitMutationRate<br>
+if no trait selected and strength &gt; 0, one random trait is selected<br>
+numericTrait = clamp(value * (1 + random(-1, 1) * mutationStrength), min, max)<br>
+unitTrait = clamp(value + random(-strength, strength), 0, 1)<br>
+brainWeight = clamp(weight + random(-strength, strength), -8, 8)
+          </div>
+          <p>The current world mutation default is strength <code>0.06</code>, trait mutation rate <code>0.20</code>, and brain mutation rate <code>0.08</code>.</p>
+        </section>
+
+        <section id="eggs">
+          <h2>Eggs</h2>
+          <p>Eggs are first-class entities. They store parent, generation, genome, brain, energy, health, max health, investment ratio, incubation time, and birth mutation metadata.</p>
+
+          <h3>Laying And Hatching</h3>
+          <div class="formula">
+eggEnergy = parentGenome.OffspringEnergyInvestment<br>
+eggPosition = boundsClamp(parentPosition + randomDirection * (parentRadius + childRadius + 1))<br>
+age += dt<br>
+energy -= eggEnergyCostPerSecond * dt<br>
+if age &gt;= incubationSeconds: spawn hatchling at egg position
+          </div>
+
+          <h3>Environmental Exposure</h3>
+          <div class="formula">
+eggHealth -= eggEnvironmentalDamagePerSecond * exposureMultiplier * dt
+          </div>
+          <table>
+            <thead><tr><th>Location</th><th>Exposure Multiplier</th></tr></thead>
+            <tbody>
+              <tr><td>Resource void border</td><td><code>1.00</code></td></tr>
+              <tr><td>Desert</td><td><code>0.50</code></td></tr>
+              <tr><td>Tundra</td><td><code>0.35</code></td></tr>
+              <tr><td>Scrubland</td><td><code>0.20</code></td></tr>
+              <tr><td>Highland</td><td><code>0.15</code></td></tr>
+              <tr><td>Grassland, Fertile, Forest, Wetland</td><td><code>0.00</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>Egg Predation Radius</h3>
+          <div class="formula">
+eggContactRadius = clamp(2 + sqrt(maxHealth) * 1.2, 2, 7)
+          </div>
+          <p>If a creature eats an egg to zero energy, the egg is marked as a predation death.</p>
+        </section>
+
+        <section id="interaction">
+          <h2>Grab And Combat</h2>
+          <p>Creature interaction currently has two physical mechanisms: grabbing and attacking. Both require brain intent in the neural pipeline.</p>
+
+          <h3>Grab</h3>
+          <p>A creature can grab a contacted creature, or continue holding a held target within body radii plus padding. Grab strength depends on output and relative body size.</p>
+          <div class="formula">
+grabPressure = clamp(grabOutput * sqrt(grabberRadius / targetRadius), 0, 1)<br>
+targetEffort = clamp(target.MoveForward, 0, 1) + abs(target.Turn) * 0.35<br>
+breaks if targetEffort * sqrt(targetRadius / grabberRadius) &gt; grabPressure + 0.65<br>
+movementMultiplier = clamp(1 - 0.85 * clamp(grabPressure, 0, 1), 0, 1)
+          </div>
+          <div class="callout">
+            Example: a same-sized grabber with <code>grabOutput = 0.7</code> applies <code>0.7</code> pressure. The grabbed creature's movement multiplier is <code>1 - 0.85 * 0.7 = 0.405</code>, so a requested <code>20 px/s</code> movement becomes about <code>8.1 px/s</code> before biome speed.
+          </div>
+
+          <h3>Attack</h3>
+          <p>Attacks require a living contact target, attack intent, enough energy to pay bite cost, and target position in the attacker's forward half-arc.</p>
+          <div class="formula">
+biteCost = baseBiteCostPerSecond * max(0.05, effectiveBiteStrength) * dt<br>
+rawDamagePerSecond = baseBiteDamagePerSecond * max(0.05, effectiveBiteStrength) * sqrt(max(0.1, effectiveBodyRadius / baselineBodyRadius))<br>
+finalDamage = rawDamagePerSecond * dt / sqrt(max(0.1, effectiveTargetDamageResistance))
+          </div>
+          <div class="callout warning">
+            Current default combat is intentionally first-pass and can be slow to kill. With base bite damage <code>0.18/s</code>, adult baseline bite <code>0.55</code>, body radius <code>3</code>, and target resistance <code>1</code>, damage is <code>0.099/s</code>, or <code>0.0033</code> per 30 Hz tick. A full-health target takes about <code>10.1s</code> of sustained biting to die.
+          </div>
+        </section>
+
+        <section id="death">
+          <h2>Death And Meat</h2>
+          <p>Death is resolved near the end of the tick. Creatures die from starvation, injury, or rotten meat damage, then become meat resources.</p>
+          <div class="formula">
+dies if energy &lt;= 0 or health &lt;= 0<br>
+meatCalories = effectiveBodyRadius * meatCaloriesPerBodyRadius + (max(0, energy) + max(0, fatCalories)) * meatEnergyFraction<br>
+meatRadius = clamp(effectiveBodyRadius * 0.85, 1.5, 12)
+          </div>
+          <p>Injury deaths can carry attacker attribution. Fresh-kill credit lasts <code>20s</code>, allowing reports and stats to distinguish live-prey calories from ordinary carcass scavenging.</p>
+        </section>
+
+        <section id="stats">
+          <h2>Stats And History</h2>
+          <p>The run stores event counters continuously and sampled snapshots at <code>statsSnapshotIntervalTicks</code>. The default interval is <code>300</code> ticks, which is <code>10</code> simulated seconds at 30 Hz. The Long Run Performance recipe uses <code>54000</code> ticks, which is <code>1800</code> simulated seconds, or 30 minutes.</p>
+
+          <h3>What Snapshot Interval Changes</h3>
+          <table>
+            <thead><tr><th>Data</th><th>Effect Of Larger Interval</th></tr></thead>
+            <tbody>
+              <tr><td>Time-series snapshots</td><td>Fewer rows for population, resources, energy, traits, diet, combat, memory, region, and biome graphs.</td></tr>
+              <tr><td>Per-snapshot rates</td><td>Recorded less often. Many rates describe the sampled tick's recent per-creature counters, not an average over all skipped ticks.</td></tr>
+              <tr><td>Creature exposure heatmap</td><td>Sampled less often. Each sample adds <code>sampleIntervalTicks * dt</code> seconds at the creature's current position and biome.</td></tr>
+              <tr><td>Event counters</td><td>Births, deaths, eggs, plant dormancy, and death causes still accumulate when events happen.</td></tr>
+              <tr><td>Event heatmaps</td><td>Birth, death, food eaten, egg eaten, and attack damage heatmaps are event-driven and are not lost just because snapshots are sparse.</td></tr>
+              <tr><td>Lineage records</td><td>Birth/death records are separate from snapshot interval.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Snapshot Categories</h3>
+          <p>Snapshots include clock/season, population, eggs, plant and meat resources, local fertility, brain counts and hidden-node magnitudes, generation, energy, biome occupancy and deaths, eastward progress, sensing densities, food intake, digestion, gut composition, attack/grab/sound, travel efficiency, reproduction, diet traits, rotten meat, lifespan, memory, and left/middle/right region summaries.</p>
+
+          <h3>Spatial Heatmaps</h3>
+          <p>Heatmaps use a maximum axis of <code>48</code> cells while preserving aspect ratio.</p>
+          <div class="formula">
+if width &gt;= height: cellCountX = 48, cellCountY = round(48 * height / width)<br>
+else: cellCountY = 48, cellCountX = round(48 * width / height)<br>
+cellIndex = floor(x / worldWidth * cellCountX) + floor(y / worldHeight * cellCountY) * cellCountX
+          </div>
+          <p>Stored heatmap layers include births, deaths by cause, plant/meat/egg calories eaten, attack damage, spatial creature exposure seconds, and aggregate biome exposure seconds.</p>
+
+          <h3>Extinct Payload Pruning</h3>
+          <p>Optional extinct payload pruning removes genome and brain payloads no longer referenced by living creatures, eggs, or survivor ancestry. Lineage records remain, with retained payload IDs remapped to compact arrays.</p>
+        </section>
+
+        <section id="species">
+          <h2>Species And Catalogs</h2>
+          <p>Species systems are report and catalog layers; they do not change simulation behavior. They help compare evolved populations, export representatives, and seed later runs.</p>
+
+          <h3>Species Profiles</h3>
+          <p>A species profile is a portable representative creature: name, notes, source metadata, genome, brain architecture, hidden node count, and neural weights. Profiles can also point to a default brain profile path so body and controller can be swapped later.</p>
+          <div class="formula">
+profile = representative genome + embedded fallback brain + source metadata + optional defaultBrainPath
+          </div>
+
+          <h3>Cluster Analysis</h3>
+          <p>Current species clusters group living creatures by genome features and brain features. Defaults are genome distance threshold <code>0.16</code>, brain distance threshold <code>0.028</code>, combined threshold <code>0.16</code>, genome weight <code>0.55</code>, and brain weight <code>0.45</code>.</p>
+          <div class="formula">
+combinedDistance = genomeDistance * 0.55 + brainDistance * 0.45<br>
+same cluster when genome, brain, and combined distances are all within thresholds
+          </div>
+          <p>Cluster summaries include living share, founders, representative creature, generation range, average traits, diet label, tactic label, region label, behavior fingerprints, and brain input diagnostics.</p>
+
+          <h3>Lineage</h3>
+          <p>Every creature receives a lineage record at birth: entity ID, parent ID, birth tick/time/position, generation, genome ID, brain ID, birth energy, effective birth mutation values, and max eastward progress. Death fills in death tick/time/position, death reason, and attacker if applicable.</p>
+        </section>
+
+        <section id="examples">
+          <h2>Worked Examples</h2>
+
+          <h3>One Baseline Tick</h3>
+          <p>Assume a baseline adult in neutral biome at 30 Hz, moving at half speed and not eating this tick.</p>
+          <pre><code>dt = 1 / 30 = 0.0333s
+basal loss = 0.25 * 0.0333 = 0.0083
+movement speed = 12 px/s
+movement speed multiplier = 12 / 24 = 0.5
+movement loss = 0.35 * 0.5 * 0.0333 = 0.0058
+total tick loss before trait upkeep = 0.0141 energy</code></pre>
+
+          <h3>Plant Bite To Energy</h3>
+          <p>A baseline adult touches a tender plant with empty gut for one tick.</p>
+          <pre><code>effectiveEatRate = 18 kcal/s
+tender eat multiplier = 1.5
+raw eaten = 18 * 1.5 / 30 = 0.9 kcal
+
+baseline dietaryAdaptation = 0.1
+plant efficiency = 0.2 + 0.8 * 0.9 = 0.92
+tender digestion multiplier = 0.85
+tender plant energy efficiency = 0.92 * 0.85 = 0.782 before typed adaptation
+
+if digestion budget is available, 0.9 raw tender kcal releases about 0.704 energy</code></pre>
+
+          <h3>Snapshot Storage Choice</h3>
+          <p>At 30 Hz, a 24-hour simulated run is <code>2,592,000</code> ticks.</p>
+          <pre><code>default interval 300 ticks:
+2,592,000 / 300 = 8,640 snapshots
+
+long-run interval 54,000 ticks:
+2,592,000 / 54,000 = 48 snapshots</code></pre>
+          <p>The larger interval keeps event counters and event heatmaps, but the population and trait time series become coarse. It is a good long-run starting point when you care about final/tail ecology and do not need minute-by-minute curves.</p>
+        </section>
+
+        <section id="appendix">
+          <h2>Formula Appendix</h2>
+          <table>
+            <thead><tr><th>System</th><th>Key Calculation</th></tr></thead>
+            <tbody>
+              <tr><td>Clock</td><td><code>elapsedSeconds += dt</code> after systems finish.</td></tr>
+              <tr><td>Growth</td><td><code>growthFactor = newbornScale + (1 - newbornScale) * smoothstep(age / maturityAge)</code>.</td></tr>
+              <tr><td>Metabolism</td><td><code>energy -= (basal * biomeBasal + traitUpkeep) * dt</code>.</td></tr>
+              <tr><td>Fat storage</td><td><code>deposit above threshold * 1.25; withdraw below threshold * 0.25; transfer limit = capacity * 0.45/s * dt</code>.</td></tr>
+              <tr><td>Movement</td><td><code>position += desiredVelocity * grabMultiplier * biomeSpeed * dt</code>, then obstacle resolution; fat reserves slow speed and raise movement cost.</td></tr>
+              <tr><td>Eating</td><td><code>amount = min(foodCalories, effectiveEatRate * foodMultiplier * dt, gutSpace)</code>.</td></tr>
+              <tr><td>Digestion</td><td><code>releasedEnergy = plantDigested * plantEfficiency + meatDigested * meatEfficiency</code>.</td></tr>
+              <tr><td>Reproduction</td><td><code>transfer = min(eggProductionRate * fertility * dt, surplusEnergy, remainingReserve)</code>.</td></tr>
+              <tr><td>Egg exposure</td><td><code>health -= eggDamagePerSecond * exposure * dt</code>.</td></tr>
+              <tr><td>Grab</td><td><code>grabPressure = grabOutput * sqrt(grabberRadius / targetRadius)</code>, clamped to <code>0..1</code>.</td></tr>
+              <tr><td>Attack</td><td><code>damage = baseDamage * bite * sqrt(body / baselineBody) * dt / sqrt(resistance)</code>.</td></tr>
+              <tr><td>Death meat</td><td><code>meatCalories = bodyRadius * meatCaloriesPerBodyRadius + (remainingEnergy + storedFat) * meatEnergyFraction</code>.</td></tr>
+              <tr><td>Stats interval</td><td><code>record snapshot only when tick % statsSnapshotIntervalTicks == 0</code>.</td></tr>
+            </tbody>
+          </table>
+          <div class="callout">
+            The biggest rule of thumb: genes describe adult potential, growth scales what juveniles can currently do, biomes and local fertility multiply environmental pressure, and brain outputs only become physical effects after system-specific gates and costs.
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
