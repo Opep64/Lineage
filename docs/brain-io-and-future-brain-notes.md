@@ -459,6 +459,8 @@ Output:
 - `out/rtneat_sparse_starter_compare_20260531/scavenger_20k.html`
 - `out/rtneat_sparse_starter_compare_20260531/predation_20k.csv`
 - `out/rtneat_sparse_starter_compare_20260531/predation_20k.html`
+- `out/rtneat_sparse_starter_compare_20260531/balanced_30k.csv`
+- `out/rtneat_sparse_starter_compare_20260531/balanced_30k.html`
 
 | Scenario | Variant | Avg final | Avg births | Avg max gen | Avg hidden | Max hidden | Avg connections | Max connections | Read |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -478,6 +480,7 @@ Behavior read:
 - The scavenger starter ate meat in `Scavenger Pressure`: average meat-calorie share was 18.8% versus 0% for rtNEAT forager, with low rotten-meat damage.
 - The predator starter did not translate its contact attack/grab graph into useful predation in `Predation Pressure`: average attack intent stayed at 0%, while grab intent appeared only around 1%. The likely cause is the strong same/similar-contact suppression in a mostly single-population predation world.
 - `Predator Prey Pressure` is not a clean simple override probe because the scenario uses species profiles with saved hybrid brain payloads. Testing a sparse predator there needs either rtNEAT starter species profiles or roster brain overrides, not just `initialBrainKind=sparseGraphPredator`.
+- The balanced-only 30K artifact completed despite the console command timing out before reporting: hybrid base averaged 50.3 final creatures, rtNEAT forager 38.7, rtNEAT scavenger 39.7, and rtNEAT predator 30.3. This supports keeping scavenger as the promising diet variant and treating the predator starter as not ready.
 
 Open design questions after the first pass:
 
