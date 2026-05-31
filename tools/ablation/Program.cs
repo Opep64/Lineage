@@ -122,6 +122,8 @@ internal sealed record MemoryAblationReport(
     double ElapsedSeconds,
     int CreatureCount,
     int EvaluatedCreatureCount,
+    int SkippedCreatureCount,
+    int SkippedUnsupportedBrainCount,
     int HiddenNodeCount,
     Summary MemoryStrength,
     Summary MemoryForwardInput,
@@ -147,6 +149,11 @@ internal sealed record MemoryAblationReport(
         writer.WriteLine($"Scenario: `{Scenario}`");
         writer.WriteLine($"Tick: `{Tick}`  Elapsed: `{ElapsedSeconds:0.###}s`");
         writer.WriteLine($"Creatures evaluated: `{EvaluatedCreatureCount}` / `{CreatureCount}`");
+        if (SkippedCreatureCount > 0)
+        {
+            writer.WriteLine($"Creatures skipped: `{SkippedCreatureCount}` (unsupported brain architecture: `{SkippedUnsupportedBrainCount}`)");
+        }
+
         writer.WriteLine($"Hidden nodes: `{HiddenNodeCount}`");
         writer.WriteLine();
         writer.WriteLine("## Memory State");
@@ -250,23 +257,18 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
 {
     private const float EatThreshold = 0f;
     private const float ReproduceThreshold = 0.25f;
-    private const float AttackThreshold = 0.25f;
+    private const float AttackThreshold = NeuralControllerSystem.DefaultAttackThreshold;
     private const float MeaningfulDelta = 0.1f;
 
-    private static readonly string[] OutputNames =
-    [
-        "Move",
-        "Turn",
-        "Eat",
-        "Reproduce",
-        "Attack",
-        "Memory forward write",
-        "Memory right write"
-    ];
+    private static readonly BrainInputDefinition[] MemoryInputs = BrainIoRegistry.Inputs
+        .Where(static input => input.Group == BrainIoSignalGroup.Memory)
+        .ToArray();
+
+    private static readonly BrainOutputDefinition[] Outputs = BrainIoRegistry.Outputs.ToArray();
 
     public MemoryAblationReport Run()
     {
-        var outputStats = OutputNames.Select(_ => new OutputStats()).ToArray();
+        var outputStats = Outputs.Select(_ => new OutputStats()).ToArray();
         var memoryStrengths = new List<float>();
         var memoryForwardInputs = new List<float>();
         var memoryRightInputs = new List<float>();
@@ -282,31 +284,42 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
         var attackOn = 0;
         var attackOff = 0;
         var evaluated = 0;
+        var skipped = 0;
+        var skippedUnsupported = 0;
         var hiddenNodeCount = 0;
+        var brains = CreateBrains(snapshot);
 
-        Span<float> actualInputs = stackalloc float[NeuralBrainSchema.InputCount];
-        Span<float> zeroMemoryInputs = stackalloc float[NeuralBrainSchema.InputCount];
-        Span<float> memoryOnlyInputs = stackalloc float[NeuralBrainSchema.InputCount];
-        Span<float> actualOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
-        Span<float> zeroMemoryOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
-        Span<float> memoryOnlyOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
+        var actualInputs = new float[BrainIoRegistry.Inputs.Count];
+        var zeroMemoryInputs = new float[BrainIoRegistry.Inputs.Count];
+        var memoryOnlyInputs = new float[BrainIoRegistry.Inputs.Count];
+        var actualOutputs = new float[BrainIoRegistry.Outputs.Count];
+        var zeroMemoryOutputs = new float[BrainIoRegistry.Outputs.Count];
+        var memoryOnlyOutputs = new float[BrainIoRegistry.Outputs.Count];
 
         foreach (var creature in snapshot.Creatures)
         {
             if ((uint)creature.GenomeId >= (uint)snapshot.Genomes.Length ||
-                (uint)creature.BrainId >= (uint)snapshot.BrainWeights.Length)
+                (uint)creature.BrainId >= (uint)brains.Length)
             {
+                skipped++;
                 continue;
             }
 
             var genome = snapshot.Genomes[creature.GenomeId];
-            var brain = new NeuralBrainGenome(snapshot.BrainWeights[creature.BrainId]);
+            var brain = brains[creature.BrainId];
+            if (brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph)
+            {
+                skipped++;
+                skippedUnsupported++;
+                continue;
+            }
+
             hiddenNodeCount = Math.Max(hiddenNodeCount, brain.HiddenNodeCount);
             evaluated++;
 
             FillInputs(creature.Senses, genome, actualInputs);
-            FillInputs(creature.Senses, genome, zeroMemoryInputs);
-            FillInputs(creature.Senses, genome, memoryOnlyInputs);
+            actualInputs.CopyTo(zeroMemoryInputs, 0);
+            actualInputs.CopyTo(memoryOnlyInputs, 0);
             ZeroMemoryInputs(zeroMemoryInputs);
             KeepOnlyMemoryInputs(memoryOnlyInputs);
 
@@ -314,13 +327,20 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
             brain.Evaluate(zeroMemoryInputs, zeroMemoryOutputs);
             brain.Evaluate(memoryOnlyInputs, memoryOnlyOutputs);
 
-            for (var i = 0; i < NeuralBrainSchema.OutputCount; i++)
+            var actualResult = ReadResult(actualOutputs);
+            var zeroMemoryResult = ReadResult(zeroMemoryOutputs);
+            var memoryOnlyResult = ReadResult(memoryOnlyOutputs);
+
+            for (var i = 0; i < Outputs.Length; i++)
             {
-                outputStats[i].Add(actualOutputs[i], zeroMemoryOutputs[i], memoryOnlyOutputs[i]);
+                outputStats[i].Add(
+                    ReadOutput(Outputs[i], actualResult),
+                    ReadOutput(Outputs[i], zeroMemoryResult),
+                    ReadOutput(Outputs[i], memoryOnlyResult));
             }
 
-            var actualGate = Gates.From(actualOutputs);
-            var zeroMemoryGate = Gates.From(zeroMemoryOutputs);
+            var actualGate = Gates.From(actualResult);
+            var zeroMemoryGate = Gates.From(zeroMemoryResult);
             eatOn += actualGate.Eat && !zeroMemoryGate.Eat ? 1 : 0;
             eatOff += !actualGate.Eat && zeroMemoryGate.Eat ? 1 : 0;
             reproduceOn += actualGate.Reproduce && !zeroMemoryGate.Reproduce ? 1 : 0;
@@ -330,8 +350,8 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
 
             var memoryForward = creature.Senses.MemoryDirectionForward;
             var memoryRight = creature.Senses.MemoryDirectionRight;
-            var memoryWriteForward = actualOutputs[NeuralBrainSchema.MemoryForwardOutput];
-            var memoryWriteRight = actualOutputs[NeuralBrainSchema.MemoryRightOutput];
+            var memoryWriteForward = actualResult.Memory.DirectionForward;
+            var memoryWriteRight = actualResult.Memory.DirectionRight;
 
             memoryStrengths.Add(creature.Senses.MemoryStrength);
             memoryForwardInputs.Add(memoryForward);
@@ -349,6 +369,8 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
             snapshot.ElapsedSeconds,
             snapshot.Creatures.Length,
             evaluated,
+            skipped,
+            skippedUnsupported,
             hiddenNodeCount,
             Summary.From(memoryStrengths),
             Summary.From(memoryForwardInputs),
@@ -357,70 +379,92 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
             Summary.From(memoryWriteForwards),
             Summary.From(memoryWriteRights),
             new AblationGateChanges(eatOn, eatOff, reproduceOn, reproduceOff, attackOn, attackOff),
-            outputStats.Select((stats, index) => stats.ToSummary(OutputNames[index])).ToArray(),
+            outputStats.Select((stats, index) => stats.ToSummary(Outputs[index].Key)).ToArray(),
             alignments.ToSummaries());
     }
 
     private static void FillInputs(CreatureSenseState senses, CreatureGenome genome, Span<float> inputs)
     {
-        inputs.Clear();
-        inputs[NeuralBrainSchema.BiasInput] = 1f;
-        inputs[NeuralBrainSchema.EnergyRatioInput] = senses.EnergyRatio;
-        inputs[NeuralBrainSchema.HungerInput] = senses.Hunger;
-        inputs[NeuralBrainSchema.FoodProximityInput] = senses.FoodProximity;
-        inputs[NeuralBrainSchema.FoodForwardInput] = senses.FoodDirectionForward;
-        inputs[NeuralBrainSchema.FoodRightInput] = senses.FoodDirectionRight;
-        inputs[NeuralBrainSchema.VisibleFoodDensityInput] = senses.VisibleFoodDensity;
-        inputs[NeuralBrainSchema.VisiblePlantDensityInput] = senses.VisiblePlantDensity;
-        inputs[NeuralBrainSchema.PlantProximityInput] = senses.PlantProximity;
-        inputs[NeuralBrainSchema.PlantForwardInput] = senses.PlantDirectionForward;
-        inputs[NeuralBrainSchema.PlantRightInput] = senses.PlantDirectionRight;
-        inputs[NeuralBrainSchema.VisibleMeatDensityInput] = senses.VisibleMeatDensity;
-        inputs[NeuralBrainSchema.MeatProximityInput] = senses.MeatProximity;
-        inputs[NeuralBrainSchema.MeatForwardInput] = senses.MeatDirectionForward;
-        inputs[NeuralBrainSchema.MeatRightInput] = senses.MeatDirectionRight;
-        inputs[NeuralBrainSchema.DietaryMeatBiasInput] = genome.DietaryAdaptation;
-        inputs[NeuralBrainSchema.EggReserveRatioInput] = senses.EggReserveRatio;
-        inputs[NeuralBrainSchema.ReproductionReadinessInput] = senses.ReproductionReadiness;
-        inputs[NeuralBrainSchema.VisibleCreatureDensityInput] = senses.VisibleCreatureDensity;
-        inputs[NeuralBrainSchema.CreatureProximityInput] = senses.CreatureProximity;
-        inputs[NeuralBrainSchema.CreatureForwardInput] = senses.CreatureDirectionForward;
-        inputs[NeuralBrainSchema.CreatureRightInput] = senses.CreatureDirectionRight;
-        inputs[NeuralBrainSchema.MeatScentDensityInput] = senses.MeatScentDensity;
-        inputs[NeuralBrainSchema.MeatScentForwardInput] = senses.MeatScentDirectionForward;
-        inputs[NeuralBrainSchema.MeatScentRightInput] = senses.MeatScentDirectionRight;
-        inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput] = senses.CreatureRelativeBodySize;
-        inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = senses.CreatureRelativeSpeed;
-        inputs[NeuralBrainSchema.CreatureApproachRateInput] = senses.CreatureApproachRate;
-        inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = senses.CreatureFacingAlignment;
-        inputs[NeuralBrainSchema.CurrentTerrainDragInput] = senses.CurrentTerrainDrag;
-        inputs[NeuralBrainSchema.ForwardTerrainDragInput] = senses.ForwardTerrainDrag;
-        inputs[NeuralBrainSchema.LeftTerrainDragInput] = senses.LeftTerrainDrag;
-        inputs[NeuralBrainSchema.RightTerrainDragInput] = senses.RightTerrainDrag;
-        inputs[NeuralBrainSchema.EnergySurplusInput] = senses.EnergySurplusRatio;
-        inputs[NeuralBrainSchema.RecentFoodSuccessInput] = senses.RecentFoodSuccess;
-        inputs[NeuralBrainSchema.MemoryForwardInput] = senses.MemoryDirectionForward;
-        inputs[NeuralBrainSchema.MemoryRightInput] = senses.MemoryDirectionRight;
-        inputs[NeuralBrainSchema.MemoryStrengthInput] = senses.MemoryStrength;
+        var inputFrame = BrainInputFrame.FromSenses(senses, genome);
+        var memoryFrame = LegacyNeuralMemoryInputFrame.FromSenses(senses);
+        LegacyNeuralBrainAdapter.FillInputs(inputFrame, memoryFrame, inputs);
     }
 
     private static void ZeroMemoryInputs(Span<float> inputs)
     {
-        inputs[NeuralBrainSchema.MemoryForwardInput] = 0f;
-        inputs[NeuralBrainSchema.MemoryRightInput] = 0f;
-        inputs[NeuralBrainSchema.MemoryStrengthInput] = 0f;
+        foreach (var input in MemoryInputs)
+        {
+            inputs[input.FlatIndex] = input.NeutralValue;
+        }
     }
 
     private static void KeepOnlyMemoryInputs(Span<float> inputs)
     {
-        var memoryForward = inputs[NeuralBrainSchema.MemoryForwardInput];
-        var memoryRight = inputs[NeuralBrainSchema.MemoryRightInput];
-        var memoryStrength = inputs[NeuralBrainSchema.MemoryStrengthInput];
+        var memoryValues = new float[MemoryInputs.Length];
+        for (var i = 0; i < MemoryInputs.Length; i++)
+        {
+            memoryValues[i] = inputs[MemoryInputs[i].FlatIndex];
+        }
+
         inputs.Clear();
-        inputs[NeuralBrainSchema.BiasInput] = 1f;
-        inputs[NeuralBrainSchema.MemoryForwardInput] = memoryForward;
-        inputs[NeuralBrainSchema.MemoryRightInput] = memoryRight;
-        inputs[NeuralBrainSchema.MemoryStrengthInput] = memoryStrength;
+        foreach (var input in BrainIoRegistry.Inputs)
+        {
+            if (input.Group == BrainIoSignalGroup.Bias)
+            {
+                inputs[input.FlatIndex] = input.NeutralValue;
+            }
+        }
+
+        for (var i = 0; i < MemoryInputs.Length; i++)
+        {
+            inputs[MemoryInputs[i].FlatIndex] = memoryValues[i];
+        }
+    }
+
+    private static BrainGenome[] CreateBrains(SimulationSnapshot snapshot)
+    {
+        if (snapshot.BrainPayloads.Length > 0)
+        {
+            return snapshot.BrainPayloads.Select(static payload => payload.CreateBrain()).ToArray();
+        }
+
+        var brains = new BrainGenome[snapshot.BrainWeights.Length];
+        for (var i = 0; i < brains.Length; i++)
+        {
+            var architectureKind = snapshot.BrainArchitectureKinds.Length == snapshot.BrainWeights.Length
+                ? snapshot.BrainArchitectureKinds[i]
+                : snapshot.Scenario.BrainArchitectureKind;
+            brains[i] = BrainGenome.FromNeural(
+                architectureKind,
+                new NeuralBrainGenome(snapshot.BrainWeights[i]));
+        }
+
+        return brains;
+    }
+
+    private static BrainEvaluationResult ReadResult(ReadOnlySpan<float> outputs)
+    {
+        return new BrainEvaluationResult(
+            LegacyNeuralBrainAdapter.ReadStandardOutputs(outputs),
+            LegacyNeuralBrainAdapter.ReadMemoryOutputs(outputs));
+    }
+
+    private static float ReadOutput(BrainOutputDefinition output, in BrainEvaluationResult result)
+    {
+        return output.Key switch
+        {
+            "action.move_forward" => result.Actions.MoveForward,
+            "action.turn" => result.Actions.Turn,
+            "action.eat" => result.Actions.Eat,
+            "action.reproduce" => result.Actions.Reproduce,
+            "action.attack" => result.Actions.Attack,
+            "action.grab" => result.Actions.Grab,
+            "action.sound_amplitude" => result.Actions.SoundAmplitude,
+            "action.sound_tone" => result.Actions.SoundTone,
+            "dense_memory.write_forward" => result.Memory.DirectionForward,
+            "dense_memory.write_right" => result.Memory.DirectionRight,
+            _ => throw new ArgumentOutOfRangeException(nameof(output), output.Key, "Unknown brain output key.")
+        };
     }
 
     private static float VectorLength(float x, float y)
@@ -430,12 +474,12 @@ internal sealed class SnapshotMemoryAblation(SimulationSnapshot snapshot)
 
     private readonly record struct Gates(bool Eat, bool Reproduce, bool Attack)
     {
-        public static Gates From(ReadOnlySpan<float> outputs)
+        public static Gates From(in BrainEvaluationResult result)
         {
             return new Gates(
-                outputs[NeuralBrainSchema.EatOutput] > EatThreshold,
-                outputs[NeuralBrainSchema.ReproduceOutput] > ReproduceThreshold,
-                outputs[NeuralBrainSchema.AttackOutput] > AttackThreshold);
+                result.Actions.Eat > EatThreshold,
+                result.Actions.Reproduce > ReproduceThreshold,
+                result.Actions.Attack > AttackThreshold);
         }
     }
 
