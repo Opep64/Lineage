@@ -3317,6 +3317,9 @@ public static class ViewerReportWriter
             .Where(candidate => candidate.Brain is not null)
             .OrderByDescending(candidate => candidate.LivingCreatures)
             .ThenByDescending(candidate => candidate.Eggs)
+            .ThenByDescending(candidate => candidate.Brain.HiddenNodeCount)
+            .ThenByDescending(candidate => candidate.Brain.ConnectionCount)
+            .ThenByDescending(candidate => candidate.Brain.EnabledConnectionCount)
             .ThenBy(candidate => candidate.BrainId)
             .Take(limit)
             .ToArray();
