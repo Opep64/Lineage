@@ -305,9 +305,12 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
         WriteMetric(writer, "Grab intent", FormatPercent(Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Can grab", FormatPercent(Share(snapshot.CanGrabCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Grab while touching", FormatPercent(Share(snapshot.GrabIntentWhileCanGrabCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Grab off contact", FormatPercent(Share(snapshot.GrabIntentWithoutCanGrabCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Holding", $"{FormatPercent(Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount))} ({snapshot.HoldingCreatureCount})");
         WriteMetric(writer, "Grabbed", $"{FormatPercent(Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount))} ({snapshot.GrabbedCreatureCount})");
         WriteMetric(writer, "Avg grab output", snapshot.AverageGrabOutput.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg touch grab output", snapshot.AverageCanGrabGrabOutput.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Avg grab pressure", snapshot.AverageGrabPressure.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Avg grab strength", snapshot.AverageGrabStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Sound emitting", FormatPercent(Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount)));
@@ -2490,6 +2493,7 @@ public static class ViewerReportWriter
             new ChartSeries("Avg raw attack", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageAttackOutput).ToArray()),
             new ChartSeries("Avg touch attack", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageTouchingAttackOutput).ToArray()),
             new ChartSeries("Avg grab output", "#ff8a30", snapshots.Select(snapshot => snapshot.AverageGrabOutput).ToArray()),
+            new ChartSeries("Avg touch grab", "#ffcc66", snapshots.Select(snapshot => snapshot.AverageCanGrabGrabOutput).ToArray()),
             new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()));
         WriteLineChart(
             writer,
@@ -2573,7 +2577,10 @@ public static class ViewerReportWriter
             "Grab And Sound",
             "%",
             snapshots,
+            new ChartSeries("Can grab", "#f5c26b", snapshots.Select(snapshot => Share(snapshot.CanGrabCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Grab intent", "#ff8a30", snapshots.Select(snapshot => Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Grab+touch", "#ffcc66", snapshots.Select(snapshot => Share(snapshot.GrabIntentWhileCanGrabCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Off-touch grab", "#b96cff", snapshots.Select(snapshot => Share(snapshot.GrabIntentWithoutCanGrabCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Holding", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Grabbed", "#9d3434", snapshots.Select(snapshot => Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Sound emit", "#29b6f6", snapshots.Select(snapshot => Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),

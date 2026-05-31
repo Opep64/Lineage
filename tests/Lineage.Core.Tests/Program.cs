@@ -7466,9 +7466,12 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
     AssertEqual(1, snapshot.GrabIntentCreatureCount, "Grab intent count");
     AssertEqual(1, snapshot.CanGrabCreatureCount, "Can grab creature count");
+    AssertEqual(1, snapshot.GrabIntentWhileCanGrabCreatureCount, "Grab intent while can grab count");
+    AssertEqual(0, snapshot.GrabIntentWithoutCanGrabCreatureCount, "Grab intent without can grab count");
     AssertEqual(1, snapshot.HoldingCreatureCount, "Holding creature count");
     AssertEqual(1, snapshot.GrabbedCreatureCount, "Grabbed creature count");
     AssertClose(0.35f, snapshot.AverageGrabOutput, 0.000001, "Average grab output");
+    AssertClose(0.7f, snapshot.AverageCanGrabGrabOutput, 0.000001, "Average can-grab grab output");
     AssertClose(0.5f, snapshot.AverageGrabPressure, 0.000001, "Average grab pressure");
     AssertClose(0.5f, snapshot.AverageGrabStrength, 0.000001, "Average grab strength");
     AssertEqual(1, snapshot.SoundEmittingCreatureCount, "Sound emitting count");

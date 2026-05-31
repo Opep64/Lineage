@@ -156,6 +156,8 @@ public sealed class StatsRecordingSystem(
         var rawAttackNearGateWhileTouchingCreatureCount = 0;
         var grabIntentCreatureCount = 0;
         var canGrabCreatureCount = 0;
+        var grabIntentWhileCanGrabCreatureCount = 0;
+        var grabIntentWithoutCanGrabCreatureCount = 0;
         var holdingCreatureCount = 0;
         var grabbedCreatureCount = 0;
         var soundEmittingCreatureCount = 0;
@@ -177,6 +179,7 @@ public sealed class StatsRecordingSystem(
         var totalTouchingAttackOutput = 0f;
         var totalCreatureContactSimilarity = 0f;
         var totalGrabOutput = 0f;
+        var totalCanGrabGrabOutput = 0f;
         var totalGrabPressure = 0f;
         var totalGrabStrength = 0f;
         var totalSoundAmplitude = 0f;
@@ -500,6 +503,15 @@ public sealed class StatsRecordingSystem(
             if (creature.Senses.CanGrabCreature > 0f)
             {
                 canGrabCreatureCount++;
+                totalCanGrabGrabOutput += creature.Actions.GrabOutput;
+                if (creature.Actions.WantsGrab)
+                {
+                    grabIntentWhileCanGrabCreatureCount++;
+                }
+            }
+            else if (creature.Actions.WantsGrab)
+            {
+                grabIntentWithoutCanGrabCreatureCount++;
             }
 
             if (creature.HeldCreatureId != default)
@@ -1032,9 +1044,12 @@ public sealed class StatsRecordingSystem(
             attackDamagePerSecond,
             grabIntentCreatureCount,
             canGrabCreatureCount,
+            grabIntentWhileCanGrabCreatureCount,
+            grabIntentWithoutCanGrabCreatureCount,
             holdingCreatureCount,
             grabbedCreatureCount,
             totalGrabOutput / divisor,
+            canGrabCreatureCount > 0 ? totalCanGrabGrabOutput / canGrabCreatureCount : 0f,
             grabbedCreatureCount > 0 ? totalGrabPressure / grabbedCreatureCount : 0f,
             holdingCreatureCount > 0 ? totalGrabStrength / holdingCreatureCount : 0f,
             soundEmittingCreatureCount,
