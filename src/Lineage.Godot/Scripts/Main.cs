@@ -21,6 +21,7 @@ public partial class Main : Node2D
     private const string SpeciesProfileDirectoryName = "species";
     private const string BrainProfileDirectoryName = "brains";
     private const string ReadableTokensThemePath = "res://Assets/SpriteThemes/readable_tokens.png";
+    private const string ReadableTokensColorMaskPath = "res://Assets/SpriteThemes/readable_tokens_color_mask.png";
     private const float LauncherPanelWidth = 520f;
     private const float RightPanelWidth = 640f;
     private const float ViewMargin = 24f;
@@ -41,7 +42,7 @@ public partial class Main : Node2D
     private const int PreferredBiomeTexturePixelsPerCell = 16;
     private const int MaxBiomeTextureDimension = 2048;
     private const int SpriteAtlasColumns = 4;
-    private const int SpriteAtlasRows = 5;
+    private const int SpriteAtlasRows = 6;
     private const float MinCreatureSpriteRadiusPixels = 0.5f;
     private const float MinResourceSpriteRadiusPixels = 0.5f;
     private const float CreatureSpriteScalePixels = 8.0f;
@@ -66,6 +67,7 @@ public partial class Main : Node2D
     private const float CreatureSpriteMotionSquash = 0.08f;
     private const float CreatureSpriteGaitStretch = 0.035f;
     private const float CreatureSpriteGaitSquash = 0.025f;
+    private const float CreatureSpriteColorMaskAlpha = 0.48f;
     private const float MinResourceSpriteSizePixels = 14f;
     private const float MaxPlantSpriteSizePixels = 50f;
     private const float MaxMeatSpriteSizePixels = 54f;
@@ -272,7 +274,7 @@ public partial class Main : Node2D
     private void LoadSpriteThemes()
     {
         _spriteThemes.Clear();
-        AddSpriteTheme("Readable Tokens", ReadableTokensThemePath, drawProceduralCreatureEyes: false);
+        AddSpriteTheme("Readable Tokens", ReadableTokensThemePath, ReadableTokensColorMaskPath, drawProceduralCreatureEyes: false);
 
         if (_spriteThemes.Count == 0)
         {
@@ -281,7 +283,7 @@ public partial class Main : Node2D
         }
     }
 
-    private void AddSpriteTheme(string name, string resourcePath, bool drawProceduralCreatureEyes)
+    private void AddSpriteTheme(string name, string resourcePath, string? colorMaskResourcePath, bool drawProceduralCreatureEyes)
     {
         var filePath = ProjectSettings.GlobalizePath(resourcePath);
         if (!System.IO.File.Exists(filePath))
@@ -298,7 +300,35 @@ public partial class Main : Node2D
         }
 
         var texture = ImageTexture.CreateFromImage(image);
-        _spriteThemes.Add(new SpriteTheme(name, resourcePath, texture, BuildSpriteAtlasRegions(texture.GetSize()), drawProceduralCreatureEyes));
+        Texture2D? colorMaskTexture = null;
+        if (!string.IsNullOrWhiteSpace(colorMaskResourcePath))
+        {
+            var maskFilePath = ProjectSettings.GlobalizePath(colorMaskResourcePath);
+            if (System.IO.File.Exists(maskFilePath))
+            {
+                var maskImage = Image.LoadFromFile(maskFilePath);
+                if (maskImage is not null && !maskImage.IsEmpty())
+                {
+                    colorMaskTexture = ImageTexture.CreateFromImage(maskImage);
+                }
+                else
+                {
+                    GD.PushWarning($"Sprite color mask could not be loaded: {colorMaskResourcePath}");
+                }
+            }
+            else
+            {
+                GD.PushWarning($"Sprite color mask not found: {colorMaskResourcePath}");
+            }
+        }
+
+        _spriteThemes.Add(new SpriteTheme(
+            name,
+            resourcePath,
+            texture,
+            colorMaskTexture,
+            BuildSpriteAtlasRegions(texture.GetSize()),
+            drawProceduralCreatureEyes));
     }
 
     private static Rect2[] BuildSpriteAtlasRegions(Vector2 atlasSize)
@@ -1280,7 +1310,7 @@ public partial class Main : Node2D
             $"Repro attempts {state.Stats.ReproductionAttemptCount}  success {FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount))}\n" +
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +
             $"Egg health {snapshot.AverageEggHealthRatio * 100f:0}%  Birth inv {snapshot.AverageBirthInvestmentRatio:0.00}x\n" +
-            $"Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}  burden {FormatPercent(snapshot.AverageMassBurdenRatio)}  speed {snapshot.AverageFatSpeedMultiplier:0.00}x\n" +
+            $"Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}  burden {FormatPercent(snapshot.AverageMassBurdenRatio)}  speed {snapshot.AverageFatSpeedMultiplier:0.00}x  cap {snapshot.AverageFatStorageCapacityCalories:0} eff {FormatPercent(snapshot.AverageFatStorageEfficiency)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}  Rotten {state.Stats.RottenMeatDeathCount}\n" +
             $"Repro intent {FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount))}  ready {FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount))}\n" +
             $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
@@ -1472,11 +1502,15 @@ public partial class Main : Node2D
     {
         return SpriteSlotForCreature(genome) switch
         {
-            SpriteAtlasSlot.CreatureGrazer => "Grazer",
-            SpriteAtlasSlot.CreaturePredator => "Predator",
             SpriteAtlasSlot.CreatureScavenger => "Scavenger",
-            SpriteAtlasSlot.CreatureFast => "Fast",
+            SpriteAtlasSlot.CreaturePredator => "Predator",
+            SpriteAtlasSlot.CreatureOmnivore => "Omnivore",
+            SpriteAtlasSlot.CreaturePlantSpecialist => "Plant Specialist",
+            SpriteAtlasSlot.CreatureGrazer => "Grazer",
             SpriteAtlasSlot.CreatureArmored => "Armored",
+            SpriteAtlasSlot.CreatureFast => "Fast",
+            SpriteAtlasSlot.CreatureScout => "Scout",
+            SpriteAtlasSlot.CreatureTiny => "Tiny",
             _ => "Generalist"
         };
     }
@@ -2167,6 +2201,24 @@ public partial class Main : Node2D
         return true;
     }
 
+    private bool TryDrawSpriteColorMask(SpriteTheme theme, SpriteAtlasSlot slot, Vector2 center, Vector2 size, float rotation, Color color)
+    {
+        var index = (int)slot;
+        if (index < 0 || index >= theme.Regions.Length || theme.ColorMaskTexture is null)
+        {
+            return false;
+        }
+
+        DrawSetTransform(center, rotation, Vector2.One);
+        DrawTextureRectRegion(
+            theme.ColorMaskTexture,
+            new Rect2(size * -0.5f, size),
+            theme.Regions[index],
+            new Color(color.R, color.G, color.B, CreatureSpriteColorMaskAlpha));
+        DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+        return true;
+    }
+
     private void DrawSpriteBackplate(Vector2 center, float radius, Color color, float alpha)
     {
         if (radius <= 0f)
@@ -2330,14 +2382,11 @@ public partial class Main : Node2D
         var animationScale = CreatureSpriteAnimationScale(creature, genome);
         var animatedSize = new Vector2(sizePixels * animationScale.X, sizePixels * animationScale.Y);
         var selected = creature.Id == _selectedCreatureId;
-        var colorModeEnabled = _colorMode != CreatureColorMode.Off || selected;
-        var modulate = colorModeEnabled
-            ? Colors.White.Lerp(color, selected ? 0.10f : 0.16f)
-            : Colors.White;
+        var colorModeEnabled = _colorMode != CreatureColorMode.Off;
         var backplateRadius = sizePixels * 0.34f * MathF.Max(animationScale.X, animationScale.Y);
-        if (colorModeEnabled)
+        if (selected)
         {
-            DrawSpriteBackplate(screenPosition, backplateRadius, color, selected ? 0.62f : 0.38f);
+            DrawSpriteBackplate(screenPosition, backplateRadius, _selectedColor, 0.54f);
         }
         else
         {
@@ -2349,7 +2398,12 @@ public partial class Main : Node2D
             screenPosition,
             animatedSize,
             creature.HeadingRadians,
-            modulate);
+            Colors.White);
+        if (drawn && colorModeEnabled)
+        {
+            TryDrawSpriteColorMask(theme, slot, screenPosition, animatedSize, creature.HeadingRadians, color);
+        }
+
         if (drawn && theme.DrawProceduralCreatureEyes)
         {
             DrawCreatureSpriteEyes(creature, screenPosition, sizePixels, animationScale);
@@ -2455,7 +2509,20 @@ public partial class Main : Node2D
 
     private static SpriteAtlasSlot SpriteSlotForCreature(CreatureGenome genome)
     {
-        var plantScore = MathF.Max(genome.TenderPlantAdaptation, MathF.Max(genome.RichPlantAdaptation, genome.ToughPlantAdaptation));
+        var plantScore = genome.TenderPlantAdaptation;
+        var secondPlantScore = MathF.Max(genome.RichPlantAdaptation, genome.ToughPlantAdaptation);
+        if (genome.RichPlantAdaptation > plantScore)
+        {
+            secondPlantScore = MathF.Max(plantScore, genome.ToughPlantAdaptation);
+            plantScore = genome.RichPlantAdaptation;
+        }
+        else if (genome.ToughPlantAdaptation > plantScore)
+        {
+            secondPlantScore = MathF.Max(plantScore, genome.RichPlantAdaptation);
+            plantScore = genome.ToughPlantAdaptation;
+        }
+
+        var animalScore = MathF.Max(genome.DietaryAdaptation, genome.CarrionAdaptation);
         var predatorScore = MathF.Max(genome.DietaryAdaptation, genome.BiteStrength / 2.5f);
         if (genome.CarrionAdaptation >= 0.48f && genome.CarrionAdaptation >= predatorScore * 0.8f)
         {
@@ -2465,6 +2532,16 @@ public partial class Main : Node2D
         if (predatorScore >= 0.62f)
         {
             return SpriteAtlasSlot.CreaturePredator;
+        }
+
+        if (plantScore >= 0.38f && animalScore >= 0.38f)
+        {
+            return SpriteAtlasSlot.CreatureOmnivore;
+        }
+
+        if (plantScore >= 0.56f && plantScore - secondPlantScore >= 0.18f)
+        {
+            return SpriteAtlasSlot.CreaturePlantSpecialist;
         }
 
         if (plantScore >= 0.45f && plantScore >= predatorScore)
@@ -2480,6 +2557,16 @@ public partial class Main : Node2D
         if (genome.MaxSpeed >= 34f && genome.BodyRadius <= 4.0f)
         {
             return SpriteAtlasSlot.CreatureFast;
+        }
+
+        if (genome.SenseRadius >= 130f || genome.VisionAngleRadians >= MathF.PI * 1.25f)
+        {
+            return SpriteAtlasSlot.CreatureScout;
+        }
+
+        if (genome.BodyRadius <= 2.25f)
+        {
+            return SpriteAtlasSlot.CreatureTiny;
         }
 
         return SpriteAtlasSlot.CreatureGeneralist;
@@ -6019,26 +6106,30 @@ public partial class Main : Node2D
 
     private enum SpriteAtlasSlot
     {
-        CreatureGrazer = 0,
+        CreatureScavenger = 0,
         CreaturePredator = 1,
-        CreatureScavenger = 2,
-        CreatureFast = 3,
-        CreatureArmored = 4,
-        CreatureGeneralist = 5,
-        PlantGeneric = 6,
-        PlantTender = 7,
-        PlantRich = 8,
-        PlantTough = 9,
-        PlantDormant = 10,
-        EggA = 11,
-        EggB = 12,
-        MeatFresh = 13,
-        MeatStale = 14,
-        FoodParticleA = 15,
-        FoodParticleB = 16,
-        FoodParticleC = 17,
-        EyeOverlay = 18,
-        MarkingOverlay = 19
+        CreatureOmnivore = 2,
+        CreaturePlantSpecialist = 3,
+        CreatureGrazer = 4,
+        CreatureArmored = 5,
+        CreatureFast = 6,
+        CreatureScout = 7,
+        CreatureTiny = 8,
+        CreatureGeneralist = 9,
+        PlantGeneric = 10,
+        PlantTender = 11,
+        PlantRich = 12,
+        PlantTough = 13,
+        PlantDormant = 14,
+        EggA = 15,
+        EggB = 16,
+        MeatFresh = 17,
+        MeatStale = 18,
+        FoodParticleA = 19,
+        FoodParticleB = 20,
+        FoodParticleC = 21,
+        EyeOverlay = 22,
+        MarkingOverlay = 23
     }
 
     private enum ResourceRenderMode
@@ -6057,6 +6148,7 @@ public partial class Main : Node2D
         string Name,
         string ResourcePath,
         Texture2D Texture,
+        Texture2D? ColorMaskTexture,
         Rect2[] Regions,
         bool DrawProceduralCreatureEyes);
 }

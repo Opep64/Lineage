@@ -7631,6 +7631,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.375f, snapshot.AverageFatRatio, 0.000001, "Average fat ratio");
     AssertClose(0.075f, snapshot.AverageMassBurdenRatio, 0.000001, "Average fat mass burden");
     AssertClose(0.993142843f, snapshot.AverageFatSpeedMultiplier, 0.000001, "Average fat speed multiplier");
+    AssertClose(CreatureGenome.Baseline.FatStorageCapacityCalories, snapshot.AverageFatStorageCapacityCalories, 0.000001, "Average fat storage capacity");
+    AssertClose(CreatureGenome.Baseline.FatStorageEfficiency, snapshot.AverageFatStorageEfficiency, 0.000001, "Average fat storage efficiency");
     AssertClose(1f, snapshot.TotalFatStoredCaloriesPerSecond, 0.000001, "Fat stored calories per second");
     AssertClose(0.4f, snapshot.TotalFatReleasedCaloriesPerSecond, 0.000001, "Fat released calories per second");
     AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");

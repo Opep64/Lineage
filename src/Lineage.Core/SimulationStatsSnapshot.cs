@@ -225,6 +225,8 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageFatRatio,
     float AverageMassBurdenRatio,
     float AverageFatSpeedMultiplier,
+    float AverageFatStorageCapacityCalories,
+    float AverageFatStorageEfficiency,
     float TotalFatStoredCaloriesPerSecond,
     float TotalFatReleasedCaloriesPerSecond,
     float AverageRecentFoodSuccess,

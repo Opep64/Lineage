@@ -47,6 +47,8 @@ public sealed class StatsRecordingSystem(
         var totalFatRatio = 0f;
         var totalMassBurdenRatio = 0f;
         var totalFatSpeedMultiplier = 0f;
+        var totalFatStorageCapacityCalories = 0f;
+        var totalFatStorageEfficiency = 0f;
         var totalFatStoredCalories = 0f;
         var totalFatReleasedCalories = 0f;
         var totalCreatureX = 0f;
@@ -217,6 +219,8 @@ public sealed class StatsRecordingSystem(
             totalFatRatio += creature.Senses.FatRatio;
             totalMassBurdenRatio += creature.Senses.MassBurdenRatio;
             totalFatSpeedMultiplier += CreatureGrowth.FatSpeedMultiplier(creature, genome);
+            totalFatStorageCapacityCalories += genome.FatStorageCapacityCalories;
+            totalFatStorageEfficiency += genome.FatStorageEfficiency;
             totalFatStoredCalories += creature.LastFatStoredCalories;
             totalFatReleasedCalories += creature.LastFatReleasedCalories;
             totalCreatureX += creature.Position.X;
@@ -1131,6 +1135,8 @@ public sealed class StatsRecordingSystem(
             totalFatRatio / divisor,
             totalMassBurdenRatio / divisor,
             totalFatSpeedMultiplier / divisor,
+            totalFatStorageCapacityCalories / divisor,
+            totalFatStorageEfficiency / divisor,
             Rate(totalFatStoredCalories, deltaSeconds),
             Rate(totalFatReleasedCalories, deltaSeconds),
             totalRecentFoodSuccess / divisor,

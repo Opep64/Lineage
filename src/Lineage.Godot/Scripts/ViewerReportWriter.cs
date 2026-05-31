@@ -172,6 +172,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Fat calories", snapshot.TotalFatCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Fat mass burden", FormatPercent(snapshot.AverageMassBurdenRatio));
         WriteMetric(writer, "Fat speed retained", $"{snapshot.AverageFatSpeedMultiplier:0.###}x");
+        WriteMetric(writer, "Fat genes", $"capacity {snapshot.AverageFatStorageCapacityCalories:0.###}, efficiency {FormatPercent(snapshot.AverageFatStorageEfficiency)}");
         WriteMetric(writer, "Fat flow", $"{snapshot.TotalFatStoredCaloriesPerSecond:0.###}/s stored, {snapshot.TotalFatReleasedCaloriesPerSecond:0.###}/s released");
         WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
         WriteMetric(writer, "Food energy yield", FormatPercent(snapshot.AverageRecentFoodEnergyYield));
@@ -426,6 +427,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Starting diet", $"{scenario.DietaryAdaptation:0.###} meat bias");
         WriteMetric(writer, "Starting carrion", $"{scenario.CarrionAdaptation:0.###} stale-meat bias");
         WriteMetric(writer, "Starting plant adaptation", $"T {scenario.TenderPlantAdaptation:0.###}, R {scenario.RichPlantAdaptation:0.###}, Tough {scenario.ToughPlantAdaptation:0.###}");
+        WriteMetric(writer, "Starting fat storage", $"capacity {scenario.FatStorageCapacityCalories:0.###}, efficiency {FormatPercent(scenario.FatStorageEfficiency)}");
         WriteMetric(writer, "Starting bite strength", scenario.BiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting damage resistance", scenario.DamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting plant digestion", FormatPercent(CreatureDigestion.PlantEfficiency(startingGenome)));
@@ -2392,6 +2394,13 @@ public static class ViewerReportWriter
             new ChartSeries("Reserve", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageFatRatio * 100f).ToArray()),
             new ChartSeries("Mass burden", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageMassBurdenRatio * 100f).ToArray()),
             new ChartSeries("Speed retained", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageFatSpeedMultiplier * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Fat Storage Genes",
+            " value",
+            snapshots,
+            new ChartSeries("Capacity", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageFatStorageCapacityCalories).ToArray()),
+            new ChartSeries("Efficiency %", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageFatStorageEfficiency * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Resource calories",
