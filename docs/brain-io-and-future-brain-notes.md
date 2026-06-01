@@ -490,12 +490,39 @@ Behavior read:
 - `Predator Prey Pressure` is not a clean simple override probe because the scenario uses species profiles with saved hybrid brain payloads. Testing a sparse predator there needs either rtNEAT starter species profiles or roster brain overrides, not just `initialBrainKind=sparseGraphPredator`.
 - The balanced-only 30K artifact completed despite the console command timing out before reporting: hybrid base averaged 50.3 final creatures, rtNEAT forager 38.7, rtNEAT scavenger 39.7, and rtNEAT predator 30.3. This supports keeping scavenger as the promising diet variant and treating the predator starter as not ready.
 
+20K predator-prey roster comparison:
+
+Output:
+
+- `scenarios/rtneat-predator-prey-forager-roster.json`
+- `scenarios/rtneat-predator-prey-predator-roster.json`
+- `out/rtneat_predator_prey_roster_20260531/smoke_5k.csv`
+- `out/rtneat_predator_prey_roster_20260531/smoke_5k.html`
+- `out/rtneat_predator_prey_roster_20260531/roster_20k.csv`
+- `out/rtneat_predator_prey_roster_20260531/roster_20k.html`
+- `out/rtneat_predator_prey_roster_20260531/hybrid_reference_20k.csv`
+- `out/rtneat_predator_prey_roster_20260531/hybrid_reference_20k.html`
+
+The two rtNEAT roster scenarios preserve the predator-prey species bodies from `Predator Prey Pressure`, but override all roster brains to generated rtNEAT starters. The control gives the predator body a sparse forager brain; the test gives the same predator body the sparse predator brain.
+
+| Scenario | Avg final | Avg births | Avg max gen | Avg hidden | Max hidden | Avg connections | Max connections | Attack intent | Grab intent | Injury deaths | Meat share | Read |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Hybrid Predator Prey Pressure | 149.0 | 459.7 | 3.0 | 0.00 | 0 | 0.00 | 0 | 4.76% | 0.00% | 31.0 | 3.72% | Reference row; still much healthier overall. |
+| rtNEAT forager-brain predator body | 110.0 | 369.3 | 3.0 | 0.44 | 4 | 6.87 | 14 | 0.00% | 0.00% | 0.0 | 0.00% | Control with predator body but no predator starter. |
+| rtNEAT predator-brain predator body | 113.3 | 367.7 | 3.0 | 0.54 | 3 | 7.50 | 21 | 0.65% | 0.65% | 22.0 | 0.00% | Slight survival lift and real attack/grab/holding behavior, but no meat conversion yet. |
+
+Read:
+
+- The predator starter is more credible in a distinct predator-prey roster than in single-species `Predation Pressure`; it generated attack, grab, holding, and injury deaths where the rtNEAT forager-brain predator control generated none.
+- It still does not convert predation into diet. Meat share stayed 0%, so the next predator-specific problem is likely "kill/contact into feeding" rather than attack intent alone.
+- Do not promote sparse predator as a default yet. It is now a viable experiment handle for predator-prey rosters, while sparse scavenger remains the stronger near-term diet variant.
+
 Open design questions after the first pass:
 
 - Should detailed rtNEAT mutation probabilities be exposed as scenario/launcher/Godot settings, or remain architecture defaults until we tune survivability?
 - Should graph complexity have an immediate energy cost, or should we first measure bloat without adding another pressure?
 - Should rtNEAT eventually get recurrent/self connections for memory, or should memory wait for a separate recurrent/plastic architecture pass?
-- Should the sparse predator starter move to a predator-prey roster/profile test before more single-species predation tuning?
+- Should the sparse predator starter add a kill/contact-to-feeding scaffold, or should that wait until predator-prey rtNEAT lineages show stronger attack/grab inheritance?
 
 ### HyperNEAT
 
