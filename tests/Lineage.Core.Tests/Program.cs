@@ -148,6 +148,8 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
     ("Brain factory supports hidden-layer neural architecture", BrainFactorySupportsHiddenLayerNeuralArchitecture),
     ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
+    ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
+    ("rtNEAT mutation prunes inactive hidden nodes", RtNeatMutationPrunesInactiveHiddenNodes),
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -6644,6 +6646,183 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
     var restoredBrain = restored.Simulation.State.GetBrain(restoredCreature.BrainId);
     AssertEqual(BrainArchitectureKind.RtNeatGraph, restoredBrain.ArchitectureKind, "Restored rtNEAT brain architecture");
     AssertTrue(restoredBrain.RtNeat is not null, "Restored rtNEAT brain should retain graph payload");
+}
+
+static void RtNeatMutationCreatesBranchedDiverseGraphGrowth()
+{
+    var random = new DeterministicRandom(260601);
+    var brain = RtNeatBrainGenome.CreateStarterForager();
+    var structuralPolicy = new RtNeatMutationPolicy
+    {
+        BackgroundMutationChance = 1f,
+        BackgroundMutationVariance = 0f,
+        SynapseMutationProbability = 0f,
+        NeuronMutationProbability = 1f,
+        NeuronAddProbability = 1f,
+        NeuronRemovalProbability = 0f,
+        NeuronActivationMutationProbability = 0f,
+        NeuronBiasMutationProbability = 0f,
+        NeuronSplitSideConnectionProbability = 1f
+    };
+
+    for (var i = 0; i < 16; i++)
+    {
+        brain = brain.Mutated(
+            random,
+            mutationStrength: 0.5f,
+            brainMutationRate: MutationProfile.Default.BrainMutationRate,
+            structuralPolicy);
+    }
+
+    var hiddenActivationCount = brain.Nodes
+        .Where(node => node.Kind == RtNeatNodeKind.Hidden)
+        .Select(node => node.Activation)
+        .Distinct()
+        .Count();
+    var longestHiddenPath = LongestEnabledRtNeatHiddenPath(brain);
+    var branchingHiddenNodeCount = CountBranchingRtNeatHiddenNodes(brain);
+
+    AssertEqual(16, brain.HiddenNodeCount, "rtNEAT structural mutation should add hidden nodes");
+    AssertTrue(hiddenActivationCount >= 3, "rtNEAT structural mutation should seed varied hidden activations");
+    AssertTrue(
+        longestHiddenPath <= brain.HiddenNodeCount / 2,
+        $"rtNEAT structural mutation should avoid making one hidden chain dominate; longest path was {longestHiddenPath}");
+    AssertTrue(
+        branchingHiddenNodeCount >= 4,
+        $"rtNEAT structural mutation should create branch points around hidden nodes; branch points were {branchingHiddenNodeCount}");
+}
+
+static void RtNeatMutationPrunesInactiveHiddenNodes()
+{
+    var starter = RtNeatBrainGenome.CreateStarterForager();
+    var nodes = starter.Nodes.ToList();
+    var connections = starter.Connections.ToList();
+    var inputId = starter.Nodes.First(node =>
+        node.Kind == RtNeatNodeKind.Input
+        && node.Key == "vision.plant.direction_forward").Id;
+    var outputId = starter.Nodes.First(node =>
+        node.Kind == RtNeatNodeKind.Output
+        && node.Key == "action.move_forward").Id;
+    var activeHiddenId = starter.NextNodeId;
+    var sinkHiddenId = activeHiddenId + 1;
+    var nextInnovationId = starter.NextInnovationId;
+    nodes.Add(new RtNeatNodeGene
+    {
+        Id = activeHiddenId,
+        Kind = RtNeatNodeKind.Hidden,
+        Key = "hidden.active.test",
+        Activation = RtNeatActivationKind.Tanh,
+        Depth = 0.5f
+    });
+    nodes.Add(new RtNeatNodeGene
+    {
+        Id = sinkHiddenId,
+        Kind = RtNeatNodeKind.Hidden,
+        Key = "hidden.sink.test",
+        Activation = RtNeatActivationKind.Relu,
+        Depth = 0.5f
+    });
+    connections.Add(new RtNeatConnectionGene
+    {
+        InnovationId = nextInnovationId++,
+        SourceNodeId = inputId,
+        TargetNodeId = activeHiddenId,
+        Weight = 0.5f
+    });
+    connections.Add(new RtNeatConnectionGene
+    {
+        InnovationId = nextInnovationId++,
+        SourceNodeId = activeHiddenId,
+        TargetNodeId = outputId,
+        Weight = 0.75f
+    });
+    connections.Add(new RtNeatConnectionGene
+    {
+        InnovationId = nextInnovationId++,
+        SourceNodeId = inputId,
+        TargetNodeId = sinkHiddenId,
+        Weight = 0.5f
+    });
+    var brain = (starter with
+    {
+        Nodes = nodes.ToArray(),
+        Connections = connections.ToArray(),
+        NextNodeId = sinkHiddenId + 1,
+        NextInnovationId = nextInnovationId
+    }).Validated();
+
+    var mutated = brain.Mutated(
+        new DeterministicRandom(260602),
+        mutationStrength: 0.1f,
+        brainMutationRate: MutationProfile.Default.BrainMutationRate,
+        new RtNeatMutationPolicy
+        {
+            BackgroundMutationChance = 1f,
+            BackgroundMutationVariance = 0f,
+            SynapseMutationProbability = 0f,
+            NeuronMutationProbability = 1f,
+            NeuronAddProbability = 0f,
+            NeuronRemovalProbability = 0f,
+            NeuronActivationMutationProbability = 0f,
+            NeuronBiasMutationProbability = 1f
+        });
+
+    AssertTrue(
+        mutated.Nodes.Any(node => node.Id == activeHiddenId),
+        "rtNEAT pruning should keep hidden nodes on enabled input-output paths");
+    AssertTrue(
+        mutated.Nodes.All(node => node.Id != sinkHiddenId),
+        "rtNEAT pruning should remove hidden sinks with no enabled output path");
+    AssertTrue(
+        mutated.Connections.All(connection =>
+            connection.SourceNodeId != sinkHiddenId && connection.TargetNodeId != sinkHiddenId),
+        "rtNEAT pruning should remove connections attached to inactive hidden nodes");
+}
+
+static int LongestEnabledRtNeatHiddenPath(RtNeatBrainGenome brain)
+{
+    var nodeById = brain.Nodes.ToDictionary(node => node.Id);
+    var distances = new Dictionary<int, int>();
+    foreach (var node in brain.Nodes.Where(node => node.Kind == RtNeatNodeKind.Input))
+    {
+        distances[node.Id] = 0;
+    }
+
+    foreach (var connection in brain.Connections
+        .Where(connection => connection.Enabled)
+        .OrderBy(connection => nodeById[connection.TargetNodeId].Depth)
+        .ThenBy(connection => connection.InnovationId))
+    {
+        if (!distances.TryGetValue(connection.SourceNodeId, out var sourceDistance))
+        {
+            continue;
+        }
+
+        var target = nodeById[connection.TargetNodeId];
+        var targetDistance = sourceDistance + (target.Kind == RtNeatNodeKind.Hidden ? 1 : 0);
+        if (!distances.TryGetValue(target.Id, out var currentDistance) || targetDistance > currentDistance)
+        {
+            distances[target.Id] = targetDistance;
+        }
+    }
+
+    return brain.Nodes
+        .Where(node => node.Kind == RtNeatNodeKind.Output)
+        .Select(node => distances.GetValueOrDefault(node.Id))
+        .DefaultIfEmpty()
+        .Max();
+}
+
+static int CountBranchingRtNeatHiddenNodes(RtNeatBrainGenome brain)
+{
+    var enabledConnections = brain.Connections
+        .Where(connection => connection.Enabled)
+        .ToArray();
+
+    return brain.Nodes.Count(node =>
+        node.Kind == RtNeatNodeKind.Hidden
+        && (enabledConnections.Count(connection => connection.TargetNodeId == node.Id) > 1
+            || enabledConnections.Count(connection => connection.SourceNodeId == node.Id) > 1));
 }
 
 static void WorldStateTracksBrainArchitectureMetadata()

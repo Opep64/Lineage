@@ -59,23 +59,25 @@ public sealed record RtNeatMutationPolicy
 
     public float NeuronMutationProbability { get; init; } = 0.4f;
 
-    public float SynapseStrengthMutationProbability { get; init; } = 0.75f;
+    public float SynapseStrengthMutationProbability { get; init; } = 0.6f;
 
     public float SynapseFlipProbability { get; init; } = 0.025f;
 
     public float SynapseToggleProbability { get; init; } = 0.025f;
 
-    public float SynapseAddProbability { get; init; } = 0.1f;
+    public float SynapseAddProbability { get; init; } = 0.25f;
 
     public float SynapseRemovalProbability { get; init; } = 0.1f;
 
-    public float NeuronAddProbability { get; init; } = 0.45f;
+    public float NeuronAddProbability { get; init; } = 0.35f;
 
     public float NeuronRemovalProbability { get; init; } = 0.15f;
 
-    public float NeuronActivationMutationProbability { get; init; } = 0.2f;
+    public float NeuronActivationMutationProbability { get; init; } = 0.25f;
 
-    public float NeuronBiasMutationProbability { get; init; } = 0.2f;
+    public float NeuronBiasMutationProbability { get; init; } = 0.25f;
+
+    public float NeuronSplitSideConnectionProbability { get; init; } = 0.65f;
 
     public RtNeatMutationPolicy Validated()
     {
@@ -93,6 +95,7 @@ public sealed record RtNeatMutationPolicy
         EnsureNonNegative(NeuronRemovalProbability, nameof(NeuronRemovalProbability));
         EnsureNonNegative(NeuronActivationMutationProbability, nameof(NeuronActivationMutationProbability));
         EnsureNonNegative(NeuronBiasMutationProbability, nameof(NeuronBiasMutationProbability));
+        EnsureRange(NeuronSplitSideConnectionProbability, 0f, 1f, nameof(NeuronSplitSideConnectionProbability));
         EnsurePositiveSum(SynapseMutationProbability, NeuronMutationProbability, "rtNEAT top-level mutation probabilities");
         EnsurePositiveSum(
             SynapseStrengthMutationProbability,
@@ -339,6 +342,13 @@ public sealed record RtNeatBrainGenome
     private const float WeightLimit = 8f;
     private const int OutputNodeIdOffset = 10_000;
     private const int FirstHiddenNodeId = 20_000;
+    private static readonly RtNeatActivationKind[] HiddenActivationKinds =
+    [
+        RtNeatActivationKind.Tanh,
+        RtNeatActivationKind.Sigmoid,
+        RtNeatActivationKind.Relu,
+        RtNeatActivationKind.Linear
+    ];
 
     public const int CurrentVersion = 1;
 
@@ -823,6 +833,8 @@ public sealed record RtNeatBrainGenome
             }
         }
 
+        PruneInactiveHiddenNodes(nodes, connections);
+
         return (mutated with
         {
             Nodes = nodes.ToArray(),
@@ -952,7 +964,9 @@ public sealed record RtNeatBrainGenome
         }
 
         var variance = mean * policy.BackgroundMutationVariance;
-        var sample = mean + random.NextSingle(-variance, variance);
+        var sample = variance > 0f
+            ? mean + random.NextSingle(-variance, variance)
+            : mean;
         var floor = MathF.Floor(sample);
         var count = (int)floor;
         if (random.NextSingle() < sample - floor)
@@ -1028,7 +1042,14 @@ public sealed record RtNeatBrainGenome
         switch (choice)
         {
             case 0:
-                AddHiddenNodeBySplittingConnection(random, nodes, connections, ref nextNodeId, ref nextInnovationId);
+                AddHiddenNodeBySplittingConnection(
+                    random,
+                    strength,
+                    policy,
+                    nodes,
+                    connections,
+                    ref nextNodeId,
+                    ref nextInnovationId);
                 break;
             case 1:
                 RemoveHiddenNode(random, nodes, connections);
@@ -1136,9 +1157,15 @@ public sealed record RtNeatBrainGenome
                 ref nextInnovationId,
                 source.Id,
                 target.Id,
-                random.NextSingle(-Math.Max(0.05f, strength), Math.Max(0.05f, strength)));
+                RandomNewConnectionWeight(random, strength));
             return;
         }
+    }
+
+    private static float RandomNewConnectionWeight(DeterministicRandom random, float strength)
+    {
+        var scale = Math.Max(0.1f, strength * 2f);
+        return random.NextSingle(-scale, scale);
     }
 
     private static void RemoveRandomConnection(DeterministicRandom random, List<RtNeatConnectionGene> connections)
@@ -1153,6 +1180,8 @@ public sealed record RtNeatBrainGenome
 
     private static void AddHiddenNodeBySplittingConnection(
         DeterministicRandom random,
+        float strength,
+        RtNeatMutationPolicy policy,
         List<RtNeatNodeGene> nodes,
         List<RtNeatConnectionGene> connections,
         ref int nextNodeId,
@@ -1168,7 +1197,7 @@ public sealed record RtNeatBrainGenome
             return;
         }
 
-        var selected = candidates[random.NextInt32(candidates.Length)];
+        var selected = SelectSplitConnectionCandidate(random, candidates, nodes);
         var source = nodes.First(node => node.Id == selected.connection.SourceNodeId);
         var target = nodes.First(node => node.Id == selected.connection.TargetNodeId);
         var hidden = new RtNeatNodeGene
@@ -1176,7 +1205,7 @@ public sealed record RtNeatBrainGenome
             Id = nextNodeId++,
             Kind = RtNeatNodeKind.Hidden,
             Key = $"hidden.{nextNodeId - FirstHiddenNodeId - 1}",
-            Activation = RtNeatActivationKind.Tanh,
+            Activation = RandomHiddenActivation(random),
             Bias = 0f,
             Depth = Math.Clamp((source.Depth + target.Depth) * 0.5f, source.Depth + 0.0001f, target.Depth - 0.0001f)
         };
@@ -1185,6 +1214,160 @@ public sealed record RtNeatBrainGenome
         connections[selected.index] = selected.connection with { Enabled = false };
         AddConnection(connections, ref nextInnovationId, source.Id, hidden.Id, selected.connection.Weight);
         AddConnection(connections, ref nextInnovationId, hidden.Id, target.Id, 1f);
+
+        if (random.NextSingle() < policy.NeuronSplitSideConnectionProbability)
+        {
+            AddRandomConnectionInvolvingNode(random, strength, hidden, nodes, connections, ref nextInnovationId);
+        }
+    }
+
+    private static (RtNeatConnectionGene connection, int index) SelectSplitConnectionCandidate(
+        DeterministicRandom random,
+        (RtNeatConnectionGene connection, int index)[] candidates,
+        List<RtNeatNodeGene> nodes)
+    {
+        var nodeById = nodes.ToDictionary(node => node.Id);
+        var totalWeight = 0f;
+        Span<float> weights = candidates.Length <= 128
+            ? stackalloc float[candidates.Length]
+            : new float[candidates.Length];
+
+        for (var i = 0; i < candidates.Length; i++)
+        {
+            var candidate = candidates[i];
+            var source = nodeById[candidate.connection.SourceNodeId];
+            var target = nodeById[candidate.connection.TargetNodeId];
+            var weight = SplitCandidateWeight(source, target);
+            weights[i] = weight;
+            totalWeight += weight;
+        }
+
+        if (totalWeight <= 0f)
+        {
+            return candidates[random.NextInt32(candidates.Length)];
+        }
+
+        var roll = random.NextSingle(0f, totalWeight);
+        for (var i = 0; i < candidates.Length; i++)
+        {
+            if (roll < weights[i])
+            {
+                return candidates[i];
+            }
+
+            roll -= weights[i];
+        }
+
+        return candidates[^1];
+    }
+
+    private static float SplitCandidateWeight(RtNeatNodeGene source, RtNeatNodeGene target)
+    {
+        if (source.Kind == RtNeatNodeKind.Hidden && target.Kind == RtNeatNodeKind.Hidden)
+        {
+            return 0.15f;
+        }
+
+        if (source.Kind == RtNeatNodeKind.Input && target.Kind == RtNeatNodeKind.Output)
+        {
+            return 4f;
+        }
+
+        if (source.Kind == RtNeatNodeKind.Input || target.Kind == RtNeatNodeKind.Output)
+        {
+            return 1.6f;
+        }
+
+        return 0.75f;
+    }
+
+    private static void AddRandomConnectionInvolvingNode(
+        DeterministicRandom random,
+        float strength,
+        RtNeatNodeGene hidden,
+        List<RtNeatNodeGene> nodes,
+        List<RtNeatConnectionGene> connections,
+        ref int nextInnovationId)
+    {
+        var candidates = new List<(int SourceNodeId, int TargetNodeId, float Weight)>();
+        foreach (var node in nodes)
+        {
+            if (node.Id == hidden.Id)
+            {
+                continue;
+            }
+
+            if (node.Kind != RtNeatNodeKind.Output
+                && node.Depth < hidden.Depth
+                && !ConnectionExists(connections, node.Id, hidden.Id))
+            {
+                candidates.Add((node.Id, hidden.Id, SideConnectionCandidateWeight(node, hidden)));
+            }
+
+            if (node.Kind != RtNeatNodeKind.Input
+                && hidden.Depth < node.Depth
+                && !ConnectionExists(connections, hidden.Id, node.Id))
+            {
+                candidates.Add((hidden.Id, node.Id, SideConnectionCandidateWeight(hidden, node)));
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            AddRandomConnection(random, strength, nodes, connections, ref nextInnovationId);
+            return;
+        }
+
+        var selected = SelectWeightedConnectionCandidate(random, candidates);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            selected.SourceNodeId,
+            selected.TargetNodeId,
+            RandomNewConnectionWeight(random, strength));
+    }
+
+    private static bool ConnectionExists(
+        List<RtNeatConnectionGene> connections,
+        int sourceNodeId,
+        int targetNodeId)
+    {
+        return connections.Any(connection =>
+            connection.SourceNodeId == sourceNodeId && connection.TargetNodeId == targetNodeId);
+    }
+
+    private static float SideConnectionCandidateWeight(RtNeatNodeGene source, RtNeatNodeGene target)
+    {
+        if (source.Kind == RtNeatNodeKind.Hidden && target.Kind == RtNeatNodeKind.Hidden)
+        {
+            return 0.5f;
+        }
+
+        return 3f;
+    }
+
+    private static (int SourceNodeId, int TargetNodeId, float Weight) SelectWeightedConnectionCandidate(
+        DeterministicRandom random,
+        List<(int SourceNodeId, int TargetNodeId, float Weight)> candidates)
+    {
+        var totalWeight = candidates.Sum(candidate => candidate.Weight);
+        if (totalWeight <= 0f)
+        {
+            return candidates[random.NextInt32(candidates.Count)];
+        }
+
+        var roll = random.NextSingle(0f, totalWeight);
+        foreach (var candidate in candidates)
+        {
+            if (roll < candidate.Weight)
+            {
+                return candidate;
+            }
+
+            roll -= candidate.Weight;
+        }
+
+        return candidates[^1];
     }
 
     private static void RemoveHiddenNode(
@@ -1204,6 +1387,74 @@ public sealed record RtNeatBrainGenome
             connection.SourceNodeId == remove.Id || connection.TargetNodeId == remove.Id);
     }
 
+    private static void PruneInactiveHiddenNodes(
+        List<RtNeatNodeGene> nodes,
+        List<RtNeatConnectionGene> connections)
+    {
+        var inputReachable = EnabledReachableFromInputs(nodes, connections);
+        var outputReachable = EnabledCanReachOutputs(nodes, connections);
+        var inactiveHiddenNodeIds = nodes
+            .Where(node =>
+                node.Kind == RtNeatNodeKind.Hidden
+                && (!inputReachable.Contains(node.Id) || !outputReachable.Contains(node.Id)))
+            .Select(node => node.Id)
+            .ToHashSet();
+
+        if (inactiveHiddenNodeIds.Count == 0)
+        {
+            return;
+        }
+
+        nodes.RemoveAll(node => inactiveHiddenNodeIds.Contains(node.Id));
+        connections.RemoveAll(connection =>
+            inactiveHiddenNodeIds.Contains(connection.SourceNodeId)
+            || inactiveHiddenNodeIds.Contains(connection.TargetNodeId));
+    }
+
+    private static HashSet<int> EnabledReachableFromInputs(
+        List<RtNeatNodeGene> nodes,
+        List<RtNeatConnectionGene> connections)
+    {
+        var nodeById = nodes.ToDictionary(node => node.Id);
+        var reachable = nodes
+            .Where(node => node.Kind == RtNeatNodeKind.Input)
+            .Select(node => node.Id)
+            .ToHashSet();
+        foreach (var connection in connections
+            .Where(connection => connection.Enabled)
+            .OrderBy(connection => nodeById[connection.TargetNodeId].Depth))
+        {
+            if (reachable.Contains(connection.SourceNodeId))
+            {
+                reachable.Add(connection.TargetNodeId);
+            }
+        }
+
+        return reachable;
+    }
+
+    private static HashSet<int> EnabledCanReachOutputs(
+        List<RtNeatNodeGene> nodes,
+        List<RtNeatConnectionGene> connections)
+    {
+        var nodeById = nodes.ToDictionary(node => node.Id);
+        var reachable = nodes
+            .Where(node => node.Kind == RtNeatNodeKind.Output)
+            .Select(node => node.Id)
+            .ToHashSet();
+        foreach (var connection in connections
+            .Where(connection => connection.Enabled)
+            .OrderByDescending(connection => nodeById[connection.SourceNodeId].Depth))
+        {
+            if (reachable.Contains(connection.TargetNodeId))
+            {
+                reachable.Add(connection.SourceNodeId);
+            }
+        }
+
+        return reachable;
+    }
+
     private static void MutateHiddenActivation(DeterministicRandom random, List<RtNeatNodeGene> nodes)
     {
         var hidden = nodes
@@ -1216,17 +1467,15 @@ public sealed record RtNeatBrainGenome
         }
 
         var selected = hidden[random.NextInt32(hidden.Length)];
-        var activations = new[]
-        {
-            RtNeatActivationKind.Tanh,
-            RtNeatActivationKind.Sigmoid,
-            RtNeatActivationKind.Relu,
-            RtNeatActivationKind.Linear
-        };
         nodes[selected.index] = selected.node with
         {
-            Activation = activations[random.NextInt32(activations.Length)]
+            Activation = RandomHiddenActivation(random)
         };
+    }
+
+    private static RtNeatActivationKind RandomHiddenActivation(DeterministicRandom random)
+    {
+        return HiddenActivationKinds[random.NextInt32(HiddenActivationKinds.Length)];
     }
 
     private static void MutateNodeBias(
