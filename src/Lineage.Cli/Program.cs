@@ -3934,7 +3934,7 @@ internal static class RosterLineageSummaryCsvWriter
         long? finalTick = null)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,unknown_deaths,tail_avg_living_creatures,extinction_tick,extinction_elapsed_seconds,injury_deaths_from_same_profile,injury_deaths_from_other_profile,injury_deaths_unattributed,same_profile_injury_kills_dealt,cross_profile_injury_kills_dealt,genome_ids,brain_ids");
+        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,unknown_deaths,tail_avg_living_creatures,extinction_tick,extinction_elapsed_seconds,injury_deaths_from_same_profile,injury_deaths_from_other_profile,injury_deaths_unattributed,same_profile_injury_kills_dealt,cross_profile_injury_kills_dealt,telemetry_living_seconds,calories_eaten_per_second,plant_calories_eaten_per_second,meat_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,fresh_kill_calories_eaten_per_second,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,attack_damage_dealt_per_second,attack_damage_taken_per_second,eating_share,meat_eating_share,food_contact_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,rotten_meat_scent_detected_share,creature_contact_share,similar_creature_contact_share,attack_intent_share,attack_intent_touching_share,attack_damage_dealing_share,genome_ids,brain_ids");
 
         foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections, finalTick))
         {
@@ -3959,9 +3959,42 @@ internal static class RosterLineageSummaryCsvWriter
                 summary.InjuryDeathsFromUnknownProfile.ToString(CultureInfo.InvariantCulture),
                 summary.SameProfileInjuryKillsDealt.ToString(CultureInfo.InvariantCulture),
                 summary.CrossProfileInjuryKillsDealt.ToString(CultureInfo.InvariantCulture),
+                Format(summary.TelemetryLivingSeconds),
+                Format(summary.CaloriesEatenPerSecond),
+                Format(summary.PlantCaloriesEatenPerSecond),
+                Format(summary.MeatCaloriesEatenPerSecond),
+                Format(summary.CarcassCaloriesEatenPerSecond),
+                Format(summary.EggCaloriesEatenPerSecond),
+                Format(summary.FreshKillCaloriesEatenPerSecond),
+                Format(summary.FreshMeatCaloriesEatenPerSecond),
+                Format(summary.StaleMeatCaloriesEatenPerSecond),
+                Format(summary.MeatCaloriesEatenShare),
+                Format(summary.FreshKillCaloriesEatenShare),
+                Format(summary.FreshMeatCaloriesEatenShare),
+                Format(summary.StaleMeatCaloriesEatenShare),
+                Format(summary.RottenMeatDamagePerSecond),
+                Format(summary.AttackDamageDealtPerSecond),
+                Format(summary.AttackDamageTakenPerSecond),
+                Format(summary.EatingShare),
+                Format(summary.MeatEatingShare),
+                Format(summary.FoodContactShare),
+                Format(summary.MeatDetectedShare),
+                Format(summary.FreshMeatDetectedShare),
+                Format(summary.StaleMeatDetectedShare),
+                Format(summary.RottenMeatScentDetectedShare),
+                Format(summary.CreatureContactShare),
+                Format(summary.SimilarCreatureContactShare),
+                Format(summary.AttackIntentShare),
+                Format(summary.AttackIntentTouchingShare),
+                Format(summary.AttackDamageDealingShare),
                 EscapeCsv(string.Join("|", summary.GenomeIds)),
                 EscapeCsv(string.Join("|", summary.BrainIds))));
         }
+    }
+
+    private static string Format(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
     }
 
     private static string EscapeCsv(string value)
@@ -5778,7 +5811,7 @@ internal static class RunReportWriter
             writer.WriteLine("<section>");
             writer.WriteLine("<h2>Injected Profile Lineages</h2>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
-            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Tail Living</th><th>Extinct At</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Same-Profile Injury</th><th>Other-Profile Injury</th><th>Unattributed Injury</th><th>Cross Kills Dealt</th><th>Same Kills Dealt</th><th>Rotten</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Tail Living</th><th>kcal/s</th><th>Meat</th><th>Fresh Kill</th><th>Meat Seen</th><th>Attack</th><th>Touch Attack</th><th>Damage/s</th><th>Rot Damage/s</th><th>Extinct At</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Same-Profile Injury</th><th>Other-Profile Injury</th><th>Unattributed Injury</th><th>Cross Kills Dealt</th><th>Same Kills Dealt</th><th>Rotten</th><th>Other</th></tr></thead>");
             writer.WriteLine("<tbody>");
             foreach (var summary in rosterSummaries)
             {
@@ -5790,6 +5823,14 @@ internal static class RunReportWriter
                     $"<td>{Html(summary.DescendantCount)}</td>" +
                     $"<td>{Html(summary.LivingCreatures)}</td>" +
                     $"<td>{Html(summary.TailAverageLivingCreatures.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(summary.CaloriesEatenPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(FormatPercent(summary.MeatCaloriesEatenShare))}</td>" +
+                    $"<td>{Html(FormatPercent(summary.FreshKillCaloriesEatenShare))}</td>" +
+                    $"<td>{Html(FormatPercent(summary.MeatDetectedShare))}</td>" +
+                    $"<td>{Html(FormatPercent(summary.AttackIntentShare))}</td>" +
+                    $"<td>{Html(FormatPercent(summary.AttackIntentTouchingShare))}</td>" +
+                    $"<td>{Html(summary.AttackDamageDealtPerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(summary.RottenMeatDamagePerSecond.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                     $"<td>{Html(FormatOptionalTick(summary.ExtinctionTick))}</td>" +
                     $"<td>{Html(summary.DeadCreatures)}</td>" +
                     $"<td>{Html(summary.MaxGeneration)}</td>" +

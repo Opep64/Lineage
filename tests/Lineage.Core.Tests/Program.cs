@@ -10486,6 +10486,51 @@ static void RosterLineageSummariesGroupInjectedProfileDescendants()
     AssertEqual(3, foragerSummary.LivingCreatures, "Forager living count");
     AssertEqual(1, foragerSummary.MaxGeneration, "Forager max generation");
 
+    var forager = simulation.State.Creatures.First(creature => creature.Id == foragerInjection.CreatureIds[0]);
+    forager.IsTouchingFood = true;
+    forager.IsTouchingCreature = true;
+    forager.LastCaloriesEaten = 10f;
+    forager.LastPlantCaloriesEaten = 4f;
+    forager.LastCarcassCaloriesEaten = 3f;
+    forager.LastEggCaloriesEaten = 1f;
+    forager.LastLivePreyCaloriesEaten = 2f;
+    forager.LastFreshMeatCaloriesEaten = 5f;
+    forager.LastStaleMeatCaloriesEaten = 1f;
+    forager.LastRottenMeatDamage = 0.5f;
+    forager.LastAttackDamageDealt = 0.25f;
+    forager.LastAttackDamageTaken = 0.1f;
+    forager.Actions = new CreatureActionState { WantsAttack = true };
+    var foragerSenses = forager.Senses;
+    foragerSenses.MeatDetected = true;
+    foragerSenses.VisibleMeatFreshness = 1f;
+    foragerSenses.RottenMeatScentDetected = true;
+    foragerSenses.CreatureContactSimilarity = 1f;
+    forager.Senses = foragerSenses;
+    var foragerIndex = simulation.State.Creatures.FindIndex(creature => creature.Id == forager.Id);
+    simulation.State.Creatures[foragerIndex] = forager;
+    new LineageTelemetrySystem().Update(simulation.State, 2f);
+
+    summaries = RosterLineageAnalyzer.Analyze(
+            simulation.State.LineageRecords,
+            [foragerInjection, scavengerInjection])
+        .ToDictionary(summary => summary.ProfileName);
+    foragerSummary = summaries["Roster forager"];
+    AssertClose(6f, foragerSummary.TelemetryLivingSeconds, 0.000001, "Forager telemetry seconds");
+    AssertClose(10f / 6f, foragerSummary.CaloriesEatenPerSecond, 0.000001, "Forager calories per second");
+    AssertClose(4f / 6f, foragerSummary.PlantCaloriesEatenPerSecond, 0.000001, "Forager plant calories per second");
+    AssertClose(1f, foragerSummary.MeatCaloriesEatenPerSecond, 0.000001, "Forager meat calories per second");
+    AssertClose(2f / 6f, foragerSummary.FreshKillCaloriesEatenPerSecond, 0.000001, "Forager fresh-kill calories per second");
+    AssertClose(0.6f, foragerSummary.MeatCaloriesEatenShare, 0.000001, "Forager meat calorie share");
+    AssertClose(0.2f, foragerSummary.FreshKillCaloriesEatenShare, 0.000001, "Forager fresh-kill calorie share");
+    AssertClose(5f / 6f, foragerSummary.FreshMeatCaloriesEatenShare, 0.000001, "Forager fresh meat share");
+    AssertClose(0.5f / 6f, foragerSummary.RottenMeatDamagePerSecond, 0.000001, "Forager rotten damage per second");
+    AssertClose(0.25f / 6f, foragerSummary.AttackDamageDealtPerSecond, 0.000001, "Forager attack damage per second");
+    AssertClose(0.1f / 6f, foragerSummary.AttackDamageTakenPerSecond, 0.000001, "Forager damage taken per second");
+    AssertClose(1f / 3f, foragerSummary.EatingShare, 0.000001, "Forager eating share");
+    AssertClose(1f / 3f, foragerSummary.MeatEatingShare, 0.000001, "Forager meat eating share");
+    AssertClose(1f / 3f, foragerSummary.MeatDetectedShare, 0.000001, "Forager meat detected share");
+    AssertClose(1f / 3f, foragerSummary.AttackIntentTouchingShare, 0.000001, "Forager touching attack share");
+
     var scavenger = simulation.State.Creatures.First(creature => creature.Id == scavengerInjection.CreatureIds[0]);
     scavenger.Health = 0f;
     scavenger.LastAttackDamageTaken = 1f;

@@ -124,6 +124,7 @@ public static class SimulationPipelines
                 fatDepositEnergyRatio,
                 fatWithdrawEnergyRatio,
                 fatTransferCapacitySharePerSecond),
+            new LineageTelemetrySystem(),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
             .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
             new StatsRecordingSystem(
@@ -297,6 +298,7 @@ public static class SimulationPipelines
                 fatDepositEnergyRatio,
                 fatWithdrawEnergyRatio,
                 fatTransferCapacitySharePerSecond),
+            new LineageTelemetrySystem(),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
             .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
             new StatsRecordingSystem(

@@ -406,6 +406,87 @@ public sealed class WorldState
         _lineageRecords[index] = record;
     }
 
+    internal void RecordCreatureTelemetry(CreatureState creature, float deltaSeconds)
+    {
+        if (!_lineageRecordByEntityId.TryGetValue(creature.Id, out var index))
+        {
+            return;
+        }
+
+        var record = _lineageRecords[index];
+        if (!record.IsAlive)
+        {
+            return;
+        }
+
+        var seconds = float.IsFinite(deltaSeconds) && deltaSeconds > 0f
+            ? deltaSeconds
+            : 0f;
+        record.TelemetryLivingSeconds = AddTelemetry(record.TelemetryLivingSeconds, seconds);
+        record.TelemetryEatingSeconds = AddTelemetrySeconds(
+            record.TelemetryEatingSeconds,
+            seconds,
+            creature.LastCaloriesEaten > 0f);
+        record.TelemetryMeatEatingSeconds = AddTelemetrySeconds(
+            record.TelemetryMeatEatingSeconds,
+            seconds,
+            creature.LastCarcassCaloriesEaten + creature.LastEggCaloriesEaten + creature.LastLivePreyCaloriesEaten > 0f);
+        record.TelemetryFoodContactSeconds = AddTelemetrySeconds(
+            record.TelemetryFoodContactSeconds,
+            seconds,
+            creature.IsTouchingFood);
+        record.TelemetryCreatureContactSeconds = AddTelemetrySeconds(
+            record.TelemetryCreatureContactSeconds,
+            seconds,
+            creature.IsTouchingCreature);
+        record.TelemetrySimilarCreatureContactSeconds = AddTelemetrySeconds(
+            record.TelemetrySimilarCreatureContactSeconds,
+            seconds,
+            creature.IsTouchingCreature
+                && creature.Senses.CreatureContactSimilarity >= CreatureSimilarity.SimilarContactThreshold);
+        record.TelemetryAttackIntentSeconds = AddTelemetrySeconds(
+            record.TelemetryAttackIntentSeconds,
+            seconds,
+            creature.Actions.WantsAttack);
+        record.TelemetryAttackIntentTouchingSeconds = AddTelemetrySeconds(
+            record.TelemetryAttackIntentTouchingSeconds,
+            seconds,
+            creature.Actions.WantsAttack && creature.IsTouchingCreature);
+        record.TelemetryAttackDamageDealingSeconds = AddTelemetrySeconds(
+            record.TelemetryAttackDamageDealingSeconds,
+            seconds,
+            creature.LastAttackDamageDealt > 0f);
+        record.TelemetryMeatDetectedSeconds = AddTelemetrySeconds(
+            record.TelemetryMeatDetectedSeconds,
+            seconds,
+            creature.Senses.MeatDetected);
+        record.TelemetryFreshMeatDetectedSeconds = AddTelemetrySeconds(
+            record.TelemetryFreshMeatDetectedSeconds,
+            seconds,
+            creature.Senses.MeatDetected && MeatQuality.IsFresh(creature.Senses.VisibleMeatFreshness));
+        record.TelemetryStaleMeatDetectedSeconds = AddTelemetrySeconds(
+            record.TelemetryStaleMeatDetectedSeconds,
+            seconds,
+            creature.Senses.MeatDetected && !MeatQuality.IsFresh(creature.Senses.VisibleMeatFreshness));
+        record.TelemetryRottenMeatScentDetectedSeconds = AddTelemetrySeconds(
+            record.TelemetryRottenMeatScentDetectedSeconds,
+            seconds,
+            creature.Senses.RottenMeatScentDetected);
+
+        record.TelemetryCaloriesEaten = AddTelemetry(record.TelemetryCaloriesEaten, creature.LastCaloriesEaten);
+        record.TelemetryPlantCaloriesEaten = AddTelemetry(record.TelemetryPlantCaloriesEaten, creature.LastPlantCaloriesEaten);
+        record.TelemetryCarcassCaloriesEaten = AddTelemetry(record.TelemetryCarcassCaloriesEaten, creature.LastCarcassCaloriesEaten);
+        record.TelemetryEggCaloriesEaten = AddTelemetry(record.TelemetryEggCaloriesEaten, creature.LastEggCaloriesEaten);
+        record.TelemetryFreshKillCaloriesEaten = AddTelemetry(record.TelemetryFreshKillCaloriesEaten, creature.LastLivePreyCaloriesEaten);
+        record.TelemetryFreshMeatCaloriesEaten = AddTelemetry(record.TelemetryFreshMeatCaloriesEaten, creature.LastFreshMeatCaloriesEaten);
+        record.TelemetryStaleMeatCaloriesEaten = AddTelemetry(record.TelemetryStaleMeatCaloriesEaten, creature.LastStaleMeatCaloriesEaten);
+        record.TelemetryRottenMeatDamage = AddTelemetry(record.TelemetryRottenMeatDamage, creature.LastRottenMeatDamage);
+        record.TelemetryAttackDamageDealt = AddTelemetry(record.TelemetryAttackDamageDealt, creature.LastAttackDamageDealt);
+        record.TelemetryAttackDamageTaken = AddTelemetry(record.TelemetryAttackDamageTaken, creature.LastAttackDamageTaken);
+
+        _lineageRecords[index] = record;
+    }
+
     public EntityId SpawnResourcePatch(ResourcePatchState patch)
     {
         if (!patch.Position.IsFinite)
@@ -563,6 +644,20 @@ public sealed class WorldState
         _lineageRecordByEntityId.Add(record.Id, _lineageRecords.Count);
         _lineageRecords.Add(record);
         Stats.RecordCreatureBirth(record, Bounds);
+    }
+
+    private static float AddTelemetry(float current, float value)
+    {
+        return float.IsFinite(value) && value > 0f
+            ? current + value
+            : current;
+    }
+
+    private static float AddTelemetrySeconds(float current, float seconds, bool condition)
+    {
+        return condition
+            ? AddTelemetry(current, seconds)
+            : current;
     }
 
     private IEnumerable<int> EnumerateActiveGenomeIds()

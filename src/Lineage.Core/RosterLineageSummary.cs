@@ -58,6 +58,29 @@ public static class RosterLineageAnalyzer
             profile.DeadCreatures += record.IsAlive ? 0 : 1;
             profile.MaxGeneration = Math.Max(profile.MaxGeneration, record.Generation);
             profile.TailLivingTickTotal += TailLivingTicks(record, resolvedFinalTick, tailStartTick);
+            profile.TelemetryLivingSeconds += record.TelemetryLivingSeconds;
+            profile.TelemetryEatingSeconds += record.TelemetryEatingSeconds;
+            profile.TelemetryMeatEatingSeconds += record.TelemetryMeatEatingSeconds;
+            profile.TelemetryFoodContactSeconds += record.TelemetryFoodContactSeconds;
+            profile.TelemetryCreatureContactSeconds += record.TelemetryCreatureContactSeconds;
+            profile.TelemetrySimilarCreatureContactSeconds += record.TelemetrySimilarCreatureContactSeconds;
+            profile.TelemetryAttackIntentSeconds += record.TelemetryAttackIntentSeconds;
+            profile.TelemetryAttackIntentTouchingSeconds += record.TelemetryAttackIntentTouchingSeconds;
+            profile.TelemetryAttackDamageDealingSeconds += record.TelemetryAttackDamageDealingSeconds;
+            profile.TelemetryMeatDetectedSeconds += record.TelemetryMeatDetectedSeconds;
+            profile.TelemetryFreshMeatDetectedSeconds += record.TelemetryFreshMeatDetectedSeconds;
+            profile.TelemetryStaleMeatDetectedSeconds += record.TelemetryStaleMeatDetectedSeconds;
+            profile.TelemetryRottenMeatScentDetectedSeconds += record.TelemetryRottenMeatScentDetectedSeconds;
+            profile.TelemetryCaloriesEaten += record.TelemetryCaloriesEaten;
+            profile.TelemetryPlantCaloriesEaten += record.TelemetryPlantCaloriesEaten;
+            profile.TelemetryCarcassCaloriesEaten += record.TelemetryCarcassCaloriesEaten;
+            profile.TelemetryEggCaloriesEaten += record.TelemetryEggCaloriesEaten;
+            profile.TelemetryFreshKillCaloriesEaten += record.TelemetryFreshKillCaloriesEaten;
+            profile.TelemetryFreshMeatCaloriesEaten += record.TelemetryFreshMeatCaloriesEaten;
+            profile.TelemetryStaleMeatCaloriesEaten += record.TelemetryStaleMeatCaloriesEaten;
+            profile.TelemetryRottenMeatDamage += record.TelemetryRottenMeatDamage;
+            profile.TelemetryAttackDamageDealt += record.TelemetryAttackDamageDealt;
+            profile.TelemetryAttackDamageTaken += record.TelemetryAttackDamageTaken;
 
             if (!record.IsAlive)
             {
@@ -185,12 +208,39 @@ public static class RosterLineageAnalyzer
         public int InjuryDeathsFromUnknownProfile;
         public int SameProfileInjuryKillsDealt;
         public int CrossProfileInjuryKillsDealt;
+        public float TelemetryLivingSeconds;
+        public float TelemetryEatingSeconds;
+        public float TelemetryMeatEatingSeconds;
+        public float TelemetryFoodContactSeconds;
+        public float TelemetryCreatureContactSeconds;
+        public float TelemetrySimilarCreatureContactSeconds;
+        public float TelemetryAttackIntentSeconds;
+        public float TelemetryAttackIntentTouchingSeconds;
+        public float TelemetryAttackDamageDealingSeconds;
+        public float TelemetryMeatDetectedSeconds;
+        public float TelemetryFreshMeatDetectedSeconds;
+        public float TelemetryStaleMeatDetectedSeconds;
+        public float TelemetryRottenMeatScentDetectedSeconds;
+        public float TelemetryCaloriesEaten;
+        public float TelemetryPlantCaloriesEaten;
+        public float TelemetryCarcassCaloriesEaten;
+        public float TelemetryEggCaloriesEaten;
+        public float TelemetryFreshKillCaloriesEaten;
+        public float TelemetryFreshMeatCaloriesEaten;
+        public float TelemetryStaleMeatCaloriesEaten;
+        public float TelemetryRottenMeatDamage;
+        public float TelemetryAttackDamageDealt;
+        public float TelemetryAttackDamageTaken;
         public HashSet<int> GenomeIds { get; } = [];
         public HashSet<int> BrainIds { get; } = [];
 
         public RosterLineageSummary ToSummary(long tailWindowTicks)
         {
             var extinct = TotalCreatures > 0 && LivingCreatures == 0;
+            var meatCaloriesEaten = TelemetryCarcassCaloriesEaten
+                + TelemetryEggCaloriesEaten
+                + TelemetryFreshKillCaloriesEaten;
+            var carcassMeatCaloriesEaten = TelemetryFreshMeatCaloriesEaten + TelemetryStaleMeatCaloriesEaten;
             return new RosterLineageSummary(
                 ProfileName,
                 FounderCount,
@@ -211,8 +261,50 @@ public static class RosterLineageAnalyzer
                 InjuryDeathsFromUnknownProfile,
                 SameProfileInjuryKillsDealt,
                 CrossProfileInjuryKillsDealt,
+                TelemetryLivingSeconds,
+                Rate(TelemetryCaloriesEaten, TelemetryLivingSeconds),
+                Rate(TelemetryPlantCaloriesEaten, TelemetryLivingSeconds),
+                Rate(meatCaloriesEaten, TelemetryLivingSeconds),
+                Rate(TelemetryCarcassCaloriesEaten, TelemetryLivingSeconds),
+                Rate(TelemetryEggCaloriesEaten, TelemetryLivingSeconds),
+                Rate(TelemetryFreshKillCaloriesEaten, TelemetryLivingSeconds),
+                Rate(TelemetryFreshMeatCaloriesEaten, TelemetryLivingSeconds),
+                Rate(TelemetryStaleMeatCaloriesEaten, TelemetryLivingSeconds),
+                Share(meatCaloriesEaten, TelemetryCaloriesEaten),
+                Share(TelemetryFreshKillCaloriesEaten, TelemetryCaloriesEaten),
+                Share(TelemetryFreshMeatCaloriesEaten, carcassMeatCaloriesEaten),
+                Share(TelemetryStaleMeatCaloriesEaten, carcassMeatCaloriesEaten),
+                Rate(TelemetryRottenMeatDamage, TelemetryLivingSeconds),
+                Rate(TelemetryAttackDamageDealt, TelemetryLivingSeconds),
+                Rate(TelemetryAttackDamageTaken, TelemetryLivingSeconds),
+                Share(TelemetryEatingSeconds, TelemetryLivingSeconds),
+                Share(TelemetryMeatEatingSeconds, TelemetryLivingSeconds),
+                Share(TelemetryFoodContactSeconds, TelemetryLivingSeconds),
+                Share(TelemetryMeatDetectedSeconds, TelemetryLivingSeconds),
+                Share(TelemetryFreshMeatDetectedSeconds, TelemetryLivingSeconds),
+                Share(TelemetryStaleMeatDetectedSeconds, TelemetryLivingSeconds),
+                Share(TelemetryRottenMeatScentDetectedSeconds, TelemetryLivingSeconds),
+                Share(TelemetryCreatureContactSeconds, TelemetryLivingSeconds),
+                Share(TelemetrySimilarCreatureContactSeconds, TelemetryLivingSeconds),
+                Share(TelemetryAttackIntentSeconds, TelemetryLivingSeconds),
+                Share(TelemetryAttackIntentTouchingSeconds, TelemetryLivingSeconds),
+                Share(TelemetryAttackDamageDealingSeconds, TelemetryLivingSeconds),
                 GenomeIds.OrderBy(id => id).ToArray(),
                 BrainIds.OrderBy(id => id).ToArray());
+        }
+
+        private static float Rate(float value, float seconds)
+        {
+            return seconds > 0f
+                ? value / seconds
+                : 0f;
+        }
+
+        private static float Share(float value, float total)
+        {
+            return total > 0f
+                ? value / total
+                : 0f;
         }
     }
 }
@@ -237,5 +329,33 @@ public readonly record struct RosterLineageSummary(
     int InjuryDeathsFromUnknownProfile,
     int SameProfileInjuryKillsDealt,
     int CrossProfileInjuryKillsDealt,
+    float TelemetryLivingSeconds,
+    float CaloriesEatenPerSecond,
+    float PlantCaloriesEatenPerSecond,
+    float MeatCaloriesEatenPerSecond,
+    float CarcassCaloriesEatenPerSecond,
+    float EggCaloriesEatenPerSecond,
+    float FreshKillCaloriesEatenPerSecond,
+    float FreshMeatCaloriesEatenPerSecond,
+    float StaleMeatCaloriesEatenPerSecond,
+    float MeatCaloriesEatenShare,
+    float FreshKillCaloriesEatenShare,
+    float FreshMeatCaloriesEatenShare,
+    float StaleMeatCaloriesEatenShare,
+    float RottenMeatDamagePerSecond,
+    float AttackDamageDealtPerSecond,
+    float AttackDamageTakenPerSecond,
+    float EatingShare,
+    float MeatEatingShare,
+    float FoodContactShare,
+    float MeatDetectedShare,
+    float FreshMeatDetectedShare,
+    float StaleMeatDetectedShare,
+    float RottenMeatScentDetectedShare,
+    float CreatureContactShare,
+    float SimilarCreatureContactShare,
+    float AttackIntentShare,
+    float AttackIntentTouchingShare,
+    float AttackDamageDealingShare,
     IReadOnlyList<int> GenomeIds,
     IReadOnlyList<int> BrainIds);

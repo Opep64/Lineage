@@ -46,6 +46,52 @@ public struct CreatureLineageRecord
 
     public EntityId DeathAttackerId { get; set; }
 
+    public float TelemetryLivingSeconds { get; set; }
+
+    public float TelemetryEatingSeconds { get; set; }
+
+    public float TelemetryMeatEatingSeconds { get; set; }
+
+    public float TelemetryFoodContactSeconds { get; set; }
+
+    public float TelemetryCreatureContactSeconds { get; set; }
+
+    public float TelemetrySimilarCreatureContactSeconds { get; set; }
+
+    public float TelemetryAttackIntentSeconds { get; set; }
+
+    public float TelemetryAttackIntentTouchingSeconds { get; set; }
+
+    public float TelemetryAttackDamageDealingSeconds { get; set; }
+
+    public float TelemetryMeatDetectedSeconds { get; set; }
+
+    public float TelemetryFreshMeatDetectedSeconds { get; set; }
+
+    public float TelemetryStaleMeatDetectedSeconds { get; set; }
+
+    public float TelemetryRottenMeatScentDetectedSeconds { get; set; }
+
+    public float TelemetryCaloriesEaten { get; set; }
+
+    public float TelemetryPlantCaloriesEaten { get; set; }
+
+    public float TelemetryCarcassCaloriesEaten { get; set; }
+
+    public float TelemetryEggCaloriesEaten { get; set; }
+
+    public float TelemetryFreshKillCaloriesEaten { get; set; }
+
+    public float TelemetryFreshMeatCaloriesEaten { get; set; }
+
+    public float TelemetryStaleMeatCaloriesEaten { get; set; }
+
+    public float TelemetryRottenMeatDamage { get; set; }
+
+    public float TelemetryAttackDamageDealt { get; set; }
+
+    public float TelemetryAttackDamageTaken { get; set; }
+
     public bool IsFounder => ParentId == default;
 
     public bool IsAlive => DeathTick is null;

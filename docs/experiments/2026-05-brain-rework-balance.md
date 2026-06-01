@@ -2046,6 +2046,36 @@ Readout:
 - Do not raise global/default bite damage yet. If testing a checked-in scenario tweak, `0.25` is the safest candidate for `Predator Prey Pressure`; `0.30` should remain an experiment variant until predator self-attrition and meat conversion improve.
 - Healing should wait until after TTK is tuned; adding healing now would mask whether predators can secure and exploit kills.
 
+## 2026-06-01 Roster Payoff Telemetry
+
+Added per-lineage accumulated behavior/diet telemetry and roster-profile rollups so predator payoff can be diagnosed by injected profile, not only whole-population totals.
+
+New roster CSV/report signals include:
+
+- lifetime living seconds;
+- raw calories per living second split into plant, meat, carcass, egg, fresh-kill credit, fresh meat, and stale meat;
+- meat, fresh-kill, fresh-meat, and stale-meat shares;
+- rotten-meat damage per living second;
+- attack damage dealt/taken per living second;
+- eating, meat-eating, food-contact, meat-detection, rotten-scent, creature-contact, similar-contact, attack-intent, touching-attack, and damage-dealing shares.
+
+Implementation note:
+
+- `LineageTelemetrySystem` accumulates the current tick's creature signals onto `CreatureLineageRecord` before `DeathSystem` removes dead creatures. This preserves lethal attack/rotten-damage evidence for roster attribution.
+- `RosterLineageAnalyzer` rolls those lineage records up to injected species profiles.
+
+Validation:
+
+- `dotnet run --project tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release`
+- `dotnet build tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj -c Release -v:minimal`
+- `dotnet build src\Lineage.Cli\Lineage.Cli.csproj -c Release -v:minimal`
+- Smoke run: `out/roster_telemetry_smoke_20260601/seed42_3k_roster.csv`
+
+Readout:
+
+- The 3k predator-prey smoke populated differentiated profile rows. For example, `Meat Predator Forager` showed nonzero meat calorie share while prey rows remained plant-only in the sampled window.
+- Full-solution build was not used for this patch because a live `Lineage.Runner` process had the Runner output DLL locked; Core/Cli/tests build and run cleanly.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
