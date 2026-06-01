@@ -219,6 +219,8 @@ var tests = new (string Name, Action Body)[]
     ("Species clustering groups injected profile founders", SpeciesClusteringGroupsInjectedProfileFounders),
     ("Species clustering splits distinct brains", SpeciesClusteringSplitsDistinctBrains),
     ("Species clustering separates starter ecotypes", SpeciesClusteringSeparatesStarterEcotypes),
+    ("Species clustering groups equivalent rtNEAT graph variants", SpeciesClusteringGroupsEquivalentRtNeatGraphVariants),
+    ("Species clustering separates rtNEAT starter ecotypes", SpeciesClusteringSeparatesRtNeatStarterEcotypes),
     ("Species clustering handles non-neural creatures", SpeciesClusteringHandlesNonNeuralCreatures),
     ("Species cluster history tracks snapshots", SpeciesClusterHistoryTracksSnapshots),
     ("Species behavior change highlights notable shifts", SpeciesBehaviorChangeHighlightsNotableShifts),
@@ -10285,6 +10287,150 @@ static void SpeciesClusteringSeparatesStarterEcotypes()
     AssertEqual(predatorFingerprint.SpeciesId, representative.SpeciesId, "Cluster representative species id");
     AssertEqual(predatorFingerprint.Name, profile.Name, "Cluster export default profile name");
     AssertEqual(representative.CreatureId.Value, profile.Source.CreatureId, "Cluster export representative creature");
+}
+
+static void SpeciesClusteringGroupsEquivalentRtNeatGraphVariants()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 916,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        WorldWidth = 300f,
+        WorldHeight = 100f,
+        ResourceVoidBorderWidth = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var starter = RtNeatBrainGenome.CreateStarterForager();
+    var bridged = SplitRtNeatConnection(
+        starter,
+        "vision.plant.direction_forward",
+        "action.move_forward",
+        RtNeatActivationKind.Tanh);
+    var starterBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(starter));
+    var rebasedStarterBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(RebaseRtNeatInnovations(starter)));
+    var bridgedBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(bridged));
+    var rebasedBridgedBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(RebaseRtNeatInnovations(bridged)));
+
+    SpawnBrainClusterMember(simulation.State, genomeId, starterBrainId, 20f);
+    SpawnBrainClusterMember(simulation.State, genomeId, starterBrainId, 30f);
+    SpawnBrainClusterMember(simulation.State, genomeId, rebasedStarterBrainId, 50f);
+    SpawnBrainClusterMember(simulation.State, genomeId, rebasedStarterBrainId, 60f);
+    SpawnBrainClusterMember(simulation.State, genomeId, bridgedBrainId, 90f);
+    SpawnBrainClusterMember(simulation.State, genomeId, bridgedBrainId, 100f);
+    SpawnBrainClusterMember(simulation.State, genomeId, rebasedBridgedBrainId, 130f);
+    SpawnBrainClusterMember(simulation.State, genomeId, rebasedBridgedBrainId, 140f);
+
+    var clusters = SpeciesClusterAnalyzer.Analyze(simulation.State);
+
+    AssertEqual(1, clusters.Count, "Equivalent rtNEAT graph variant cluster count");
+    AssertEqual(8, clusters[0].LivingCreatures, "Equivalent rtNEAT graph variant living count");
+}
+
+static void SpeciesClusteringSeparatesRtNeatStarterEcotypes()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 917,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f,
+        WorldWidth = 300f,
+        WorldHeight = 100f,
+        ResourceVoidBorderWidth = 0f
+    };
+    var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var foragerBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateStarterForager()));
+    var scavengerBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateStarterScavenger()));
+    var predatorBrainId = simulation.State.AddBrain(BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateStarterPredator()));
+
+    SpawnBrainClusterMember(simulation.State, genomeId, foragerBrainId, 30f);
+    SpawnBrainClusterMember(simulation.State, genomeId, foragerBrainId, 40f);
+    SpawnBrainClusterMember(simulation.State, genomeId, scavengerBrainId, 130f);
+    SpawnBrainClusterMember(simulation.State, genomeId, scavengerBrainId, 140f);
+    SpawnBrainClusterMember(simulation.State, genomeId, predatorBrainId, 230f);
+    SpawnBrainClusterMember(simulation.State, genomeId, predatorBrainId, 240f);
+
+    var clusters = SpeciesClusterAnalyzer.Analyze(simulation.State);
+
+    AssertEqual(3, clusters.Count, "rtNEAT starter ecotype cluster count");
+    AssertTrue(clusters.All(cluster => cluster.LivingCreatures == 2), "rtNEAT starter ecotypes should split into even pairs");
+}
+
+static RtNeatBrainGenome RebaseRtNeatInnovations(RtNeatBrainGenome brain)
+{
+    var rebasedConnections = brain.Connections
+        .Select((connection, index) => connection with { InnovationId = brain.Connections.Length - index })
+        .ToArray();
+
+    return (brain with
+    {
+        Connections = rebasedConnections,
+        NextInnovationId = rebasedConnections.Length + 1
+    }).Validated();
+}
+
+static RtNeatBrainGenome SplitRtNeatConnection(
+    RtNeatBrainGenome brain,
+    string inputKey,
+    string outputKey,
+    RtNeatActivationKind activation)
+{
+    var nodes = brain.Nodes.ToList();
+    var connections = brain.Connections.ToList();
+    var source = nodes.First(node => node.Kind == RtNeatNodeKind.Input && node.Key == inputKey);
+    var target = nodes.First(node => node.Kind == RtNeatNodeKind.Output && node.Key == outputKey);
+    var directConnectionIndex = connections.FindIndex(connection =>
+        connection.Enabled
+        && connection.SourceNodeId == source.Id
+        && connection.TargetNodeId == target.Id);
+    AssertTrue(directConnectionIndex >= 0, "rtNEAT split test should find direct starter connection");
+
+    var directConnection = connections[directConnectionIndex];
+    var hiddenId = brain.NextNodeId;
+    var nextInnovationId = Math.Max(
+        brain.NextInnovationId,
+        connections.Select(connection => connection.InnovationId).DefaultIfEmpty(0).Max() + 1);
+    nodes.Add(new RtNeatNodeGene
+    {
+        Id = hiddenId,
+        Kind = RtNeatNodeKind.Hidden,
+        Key = $"hidden.test.{hiddenId}",
+        Activation = activation,
+        Bias = 0.05f,
+        Depth = (source.Depth + target.Depth) * 0.5f
+    });
+    connections[directConnectionIndex] = directConnection with { Enabled = false };
+    connections.Add(new RtNeatConnectionGene
+    {
+        InnovationId = nextInnovationId++,
+        SourceNodeId = source.Id,
+        TargetNodeId = hiddenId,
+        Weight = 1f
+    });
+    connections.Add(new RtNeatConnectionGene
+    {
+        InnovationId = nextInnovationId++,
+        SourceNodeId = hiddenId,
+        TargetNodeId = target.Id,
+        Weight = directConnection.Weight
+    });
+
+    return (brain with
+    {
+        Nodes = nodes.ToArray(),
+        Connections = connections.ToArray(),
+        NextNodeId = hiddenId + 1,
+        NextInnovationId = nextInnovationId
+    }).Validated();
+}
+
+static void SpawnBrainClusterMember(WorldState state, int genomeId, int brainId, float x)
+{
+    state.SpawnCreature(genomeId, new SimVector2(x, 30f), energy: 35f, brainId: brainId);
 }
 
 static void SpeciesClusteringHandlesNonNeuralCreatures()

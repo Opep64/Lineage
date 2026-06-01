@@ -14,6 +14,7 @@ public static class SpeciesClusterAnalyzer
 {
     private const float BrainWeightLimit = 8f;
     private const int BrainFeatureBucketCount = 64;
+    private const float RtNeatBrainFeatureScale = 0.35f;
 
     private static readonly string[] NamePrefixes =
     [
@@ -1027,6 +1028,11 @@ public static class SpeciesClusterAnalyzer
 
     private static float[] CreateBrainFeatures(BrainGenome brain)
     {
+        if (brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph && brain.RtNeat is { } rtNeat)
+        {
+            return CreateRtNeatBrainFeatures(rtNeat);
+        }
+
         var features = new float[1 + BrainFeatureBucketCount * 2];
         features[0] = brain.HiddenNodeCount / (float)NeuralBrainSchema.MaxHiddenNodeCount;
         if (brain.Weights.Length == 0)
@@ -1058,6 +1064,82 @@ public static class SpeciesClusterAnalyzer
         }
 
         return features;
+    }
+
+    private static float[] CreateRtNeatBrainFeatures(RtNeatBrainGenome brain)
+    {
+        var features = new float[1 + BrainFeatureBucketCount * 2];
+        features[0] = brain.HiddenNodeCount / (float)NeuralBrainSchema.MaxHiddenNodeCount * RtNeatBrainFeatureScale;
+        if (brain.ConnectionCount == 0)
+        {
+            return features;
+        }
+
+        var nodesById = brain.Nodes.ToDictionary(node => node.Id);
+        var counts = new int[BrainFeatureBucketCount];
+        foreach (var connection in brain.Connections)
+        {
+            if (!connection.Enabled
+                || !nodesById.TryGetValue(connection.SourceNodeId, out var source)
+                || !nodesById.TryGetValue(connection.TargetNodeId, out var target))
+            {
+                continue;
+            }
+
+            var bucket = StableBucket($"{RtNeatFeatureKey(source)}>{RtNeatFeatureKey(target)}");
+            AddBrainFeature(features, counts, bucket, connection.Weight * RtNeatBrainFeatureScale);
+        }
+
+        foreach (var node in brain.Nodes.Where(node => node.Kind != RtNeatNodeKind.Input && Math.Abs(node.Bias) > 0.000001f))
+        {
+            var bucket = StableBucket($"bias:{RtNeatFeatureKey(node)}");
+            AddBrainFeature(features, counts, bucket, node.Bias * RtNeatBrainFeatureScale);
+        }
+
+        for (var bucket = 0; bucket < BrainFeatureBucketCount; bucket++)
+        {
+            if (counts[bucket] == 0)
+            {
+                continue;
+            }
+
+            features[1 + bucket] /= counts[bucket];
+        }
+
+        return features;
+    }
+
+    private static void AddBrainFeature(float[] features, int[] counts, int bucket, float rawValue)
+    {
+        var value = Math.Clamp(rawValue / BrainWeightLimit, -1f, 1f);
+        var magnitude = MathF.Abs(value);
+        features[1 + bucket] += value;
+        features[1 + BrainFeatureBucketCount + bucket] = MathF.Max(
+            features[1 + BrainFeatureBucketCount + bucket],
+            magnitude);
+        counts[bucket]++;
+    }
+
+    private static int StableBucket(string value)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var c in value)
+            {
+                hash ^= c;
+                hash *= 16777619u;
+            }
+
+            return (int)(hash % BrainFeatureBucketCount);
+        }
+    }
+
+    private static string RtNeatFeatureKey(RtNeatNodeGene node)
+    {
+        return node.Kind == RtNeatNodeKind.Hidden
+            ? $"{node.Kind}:{node.Activation}"
+            : $"{node.Kind}:{node.Key}";
     }
 
     private static float[] CreateBrainFeatures(WorldState state, int brainId)
