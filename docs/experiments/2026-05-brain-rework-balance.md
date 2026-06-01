@@ -1995,6 +1995,57 @@ Added a fuzzy creature-similarity scent so brains can distinguish close genetica
 - Stats, CLI CSVs, reports, and the Godot runtime panel now surface similarity scent, similar contact, average contact similarity, and attack intent while touching similar creatures.
 - A 10k `predator-prey-pressure` seed `45` smoke run wrote `out/similarity_scent_smoke_20260526/seed45_10k_stats.csv` and showed the new diagnostics populating: the final sampled row had `52` similarity-scent detections, `5` creature contacts, `4` similar contacts, and `1` attack intent while touching a similar creature.
 
+## 2026-06-01 Bite Damage / TTK Matrix
+
+Ran a bite-damage override matrix before adding any healing mechanics.
+
+Probe files:
+
+- `out/ttk_damage_matrix_20260601/smoke_5k.csv` and `.html`
+- `out/ttk_damage_matrix_20260601/hybrid_60k.csv` and `.html`
+- `out/ttk_damage_matrix_20260601/rtneat_predator_roster_20k.csv` and `.html`
+- Roster lineage sidecars in `out/ttk_damage_matrix_20260601/roster_*_seed*_roster.csv`
+
+60k hybrid probe, seeds `42-44`:
+
+| Scenario | Variant | Final pop | Starvation | Injury | Tail meat | Tail fresh kill | Tail injury/s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Predation Pressure | base `0.18` | 34.7 | 419.7 | 94.0 | 13.3% | 4.4% | 0.042 |
+| Predation Pressure | `0.25` | 38.3 | 383.7 | 128.7 | 12.3% | 4.1% | 0.055 |
+| Predation Pressure | `0.30` | 36.3 | 366.7 | 135.7 | 13.0% | 5.7% | 0.064 |
+| Predation Pressure | `0.35` | 43.0 | 391.3 | 136.7 | 13.0% | 4.8% | 0.061 |
+| Predator Prey Pressure | base `0.18` | 120.7 | 790.0 | 70.7 | 5.7% | 1.0% | 0.029 |
+| Predator Prey Pressure | `0.25` | 99.3 | 684.0 | 125.3 | 10.9% | 3.2% | 0.056 |
+| Predator Prey Pressure | `0.30` | 78.7 | 639.3 | 142.3 | 11.6% | 3.7% | 0.074 |
+| Predator Prey Pressure | `0.35` | 72.3 | 633.7 | 198.7 | 13.6% | 3.8% | 0.096 |
+
+Predator-prey roster lineage readout, 60k seeds `42-44`:
+
+| Variant | Meat predator living | Meat predator tail living | Predator descendants | Predator cross-profile kills dealt | Predator same-profile kills dealt |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| base `0.18` | 14.0 | 12.9 | 77.3 | 54.0 | 16.7 |
+| `0.25` | 15.7 | 16.7 | 124.0 | 90.7 | 34.7 |
+| `0.30` | 29.3 | 24.0 | 149.3 | 90.3 | 52.0 |
+| `0.35` | 34.7 | 34.8 | 204.3 | 128.3 | 70.3 |
+
+20k rtNEAT predator-roster probe, seeds `42-44`:
+
+| Variant | Final pop | Injury | Tail meat | Tail fresh kill | Tail injury/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| base `0.18` | 113.3 | 22.0 | 0.0% | 0.0% | 0.023 |
+| `0.25` | 102.3 | 20.3 | 0.0% | 0.0% | 0.019 |
+| `0.30` | 103.7 | 28.3 | 0.0% | 0.0% | 0.056 |
+| `0.35` | 97.0 | 39.3 | 0.0% | 0.0% | 0.073 |
+
+Readout:
+
+- Current damage is conservative enough that raising it does shorten practical TTK and increases injury pressure.
+- The single-species `Predation Pressure` probe tolerated `0.25-0.35`; `0.30` gave the strongest fresh-kill tail signal, while `0.35` had the best sampled final population but higher tail death pressure.
+- Mixed `Predator Prey Pressure` is more sensitive. Higher damage improves predator lineage survival and cross-profile kills, but it also depresses total population and increases same-profile predator attrition.
+- The rtNEAT predator roster does not benefit yet: higher damage creates more injury deaths but still yields `0%` meat/fresh-kill calories. That keeps the current rtNEAT bottleneck at behavior/payoff conversion, not raw damage alone.
+- Do not raise global/default bite damage yet. If testing a checked-in scenario tweak, `0.25` is the safest candidate for `Predator Prey Pressure`; `0.30` should remain an experiment variant until predator self-attrition and meat conversion improve.
+- Healing should wait until after TTK is tuned; adding healing now would mask whether predators can secure and exploit kills.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?
