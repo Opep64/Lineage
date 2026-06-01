@@ -57,6 +57,7 @@ var tests = new (string Name, Action Body)[]
     ("Metabolism can charge body-size upkeep", MetabolismChargesBodySizeUpkeep),
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
     ("Metabolism charges plant specialization upkeep", MetabolismChargesPlantSpecializationUpkeep),
+    ("Metabolism charges rtNEAT topology upkeep", MetabolismChargesRtNeatTopologyUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
     ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
     ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
@@ -150,6 +151,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
     ("Brain probe edits rtNEAT graph inputs", BrainProbeEditsRtNeatGraphInputs),
     ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
+    ("rtNEAT mutation can remove graph structure", RtNeatMutationCanRemoveGraphStructure),
     ("rtNEAT mutation prunes inactive hidden nodes", RtNeatMutationPrunesInactiveHiddenNodes),
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
@@ -2281,6 +2283,34 @@ static void MetabolismChargesPlantSpecializationUpkeep()
     simulation.Step();
 
     AssertClose(7.6875f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after plant specialization upkeep");
+}
+
+static void MetabolismChargesRtNeatTopologyUpkeep()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 134,
+        systems:
+        [
+            new MetabolismSystem(
+                rtNeatHiddenNodeEnergyCostPerSecond: 0.5f,
+                rtNeatEnabledConnectionEnergyCostPerSecond: 0.25f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 1f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(
+        hiddenNodeCount: 2,
+        disabledHiddenOutputCount: 1));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f, brainId: brainId);
+
+    simulation.Step();
+
+    AssertClose(5.75f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after rtNEAT topology upkeep");
 }
 
 static void MetabolismBasalCostFollowsBiomeMultiplier()
@@ -6779,6 +6809,51 @@ static void RtNeatMutationCreatesBranchedDiverseGraphGrowth()
         $"rtNEAT structural mutation should create branch points around hidden nodes; branch points were {branchingHiddenNodeCount}");
 }
 
+static void RtNeatMutationCanRemoveGraphStructure()
+{
+    var connectionPolicy = new RtNeatMutationPolicy
+    {
+        BackgroundMutationChance = 1f,
+        BackgroundMutationVariance = 0f,
+        SynapseMutationProbability = 1f,
+        NeuronMutationProbability = 0f,
+        SynapseStrengthMutationProbability = 0f,
+        SynapseFlipProbability = 0f,
+        SynapseToggleProbability = 0f,
+        SynapseAddProbability = 0f,
+        SynapseRemovalProbability = 1f
+    };
+    var starter = RtNeatBrainGenome.CreateStarterForager();
+    var connectionPruned = starter.Mutated(
+        new DeterministicRandom(260602),
+        mutationStrength: 0.5f,
+        brainMutationRate: MutationProfile.Default.BrainMutationRate,
+        connectionPolicy);
+
+    AssertEqual(starter.ConnectionCount - 1, connectionPruned.ConnectionCount, "rtNEAT connection removal mutation");
+
+    var nodePolicy = new RtNeatMutationPolicy
+    {
+        BackgroundMutationChance = 1f,
+        BackgroundMutationVariance = 0f,
+        SynapseMutationProbability = 0f,
+        NeuronMutationProbability = 1f,
+        NeuronAddProbability = 0f,
+        NeuronRemovalProbability = 1f,
+        NeuronActivationMutationProbability = 0f,
+        NeuronBiasMutationProbability = 0f
+    };
+    var expanded = CreateRtNeatTopologyTestBrain(hiddenNodeCount: 2).RtNeat!;
+    var nodePruned = expanded.Mutated(
+        new DeterministicRandom(260603),
+        mutationStrength: 0.5f,
+        brainMutationRate: MutationProfile.Default.BrainMutationRate,
+        nodePolicy);
+
+    AssertEqual(expanded.HiddenNodeCount - 1, nodePruned.HiddenNodeCount, "rtNEAT hidden-node removal mutation");
+    AssertTrue(nodePruned.ConnectionCount < expanded.ConnectionCount, "rtNEAT hidden-node removal should remove incident connections");
+}
+
 static void RtNeatMutationPrunesInactiveHiddenNodes()
 {
     var starter = RtNeatBrainGenome.CreateStarterForager();
@@ -11192,6 +11267,8 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         BiteStrengthEnergyCostPerSecond = 0.05f,
         DamageResistanceEnergyCostPerSecond = 0.02f,
         PlantSpecializationEnergyCostPerSecond = 0f,
+        RtNeatHiddenNodeEnergyCostPerSecond = 0.004f,
+        RtNeatEnabledConnectionEnergyCostPerSecond = 0.0007f,
         EggEnergyCostPerSecond = 0.02f,
         EggEnvironmentalDamagePerSecond = 0.04f,
         MovementEnergyPerSecond = 1.25f,
@@ -11239,6 +11316,8 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(0.05f, scenario.BiteStrengthEnergyCostPerSecond, 0.000001, "Scenario bite-strength energy");
     AssertClose(0.02f, scenario.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
     AssertClose(0f, scenario.PlantSpecializationEnergyCostPerSecond, 0.000001, "Scenario plant specialization energy");
+    AssertClose(0.004f, scenario.RtNeatHiddenNodeEnergyCostPerSecond, 0.000001, "Scenario rtNEAT hidden-node energy");
+    AssertClose(0.0007f, scenario.RtNeatEnabledConnectionEnergyCostPerSecond, 0.000001, "Scenario rtNEAT connection energy");
     AssertClose(0.02f, scenario.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");
     AssertClose(0.04f, scenario.EggEnvironmentalDamagePerSecond, 0.000001, "Scenario egg environmental damage");
     AssertClose(1.25f, genome.MovementEnergyPerSecond, 0.000001, "Seeded movement energy");
@@ -11497,6 +11576,8 @@ static void ScenarioJsonRoundTrips()
         DamageResistanceEnergyCostPerSecond = 0.032f,
         PlantSpecializationEnergyCostPerSecond = 0.019f,
         MemoryEnergyCostPerSecond = 0.021f,
+        RtNeatHiddenNodeEnergyCostPerSecond = 0.003f,
+        RtNeatEnabledConnectionEnergyCostPerSecond = 0.0009f,
         MemoryDecayPerSecond = 0.09f,
         MemoryWriteRatePerSecond = 1.75f,
         EggEnergyCostPerSecond = 0.023f,
@@ -11581,6 +11662,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"neuralControllerThreadCount\""), "JSON should serialize neural controller thread count");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertTrue(json.Contains("\"plantSpecializationEnergyCostPerSecond\""), "JSON should serialize plant specialization cost");
+    AssertTrue(json.Contains("\"rtNeatHiddenNodeEnergyCostPerSecond\""), "JSON should serialize rtNEAT hidden-node cost");
+    AssertTrue(json.Contains("\"rtNeatEnabledConnectionEnergyCostPerSecond\""), "JSON should serialize rtNEAT connection cost");
     AssertTrue(json.Contains("\"tenderPlantAdaptation\""), "JSON should serialize tender plant adaptation");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
@@ -11686,6 +11769,8 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.DamageResistanceEnergyCostPerSecond, roundTripped.DamageResistanceEnergyCostPerSecond, 0.000001, "Scenario damage-resistance energy");
     AssertClose(scenario.PlantSpecializationEnergyCostPerSecond, roundTripped.PlantSpecializationEnergyCostPerSecond, 0.000001, "Scenario plant specialization energy");
     AssertClose(scenario.MemoryEnergyCostPerSecond, roundTripped.MemoryEnergyCostPerSecond, 0.000001, "Scenario memory energy");
+    AssertClose(scenario.RtNeatHiddenNodeEnergyCostPerSecond, roundTripped.RtNeatHiddenNodeEnergyCostPerSecond, 0.000001, "Scenario rtNEAT hidden-node energy");
+    AssertClose(scenario.RtNeatEnabledConnectionEnergyCostPerSecond, roundTripped.RtNeatEnabledConnectionEnergyCostPerSecond, 0.000001, "Scenario rtNEAT connection energy");
     AssertClose(scenario.MemoryDecayPerSecond, roundTripped.MemoryDecayPerSecond, 0.000001, "Scenario memory decay");
     AssertClose(scenario.MemoryWriteRatePerSecond, roundTripped.MemoryWriteRatePerSecond, 0.000001, "Scenario memory write rate");
     AssertClose(scenario.EggEnergyCostPerSecond, roundTripped.EggEnergyCostPerSecond, 0.000001, "Scenario egg energy");

@@ -16,8 +16,13 @@ public sealed class MetabolismSystem(
     float damageResistanceEnergyCostPerSecond = 0f,
     float plantSpecializationEnergyCostPerSecond = 0f,
     float memoryEnergyCostPerSecond = 0f,
+    float rtNeatHiddenNodeEnergyCostPerSecond = MetabolismSystem.DefaultRtNeatHiddenNodeEnergyCostPerSecond,
+    float rtNeatEnabledConnectionEnergyCostPerSecond = MetabolismSystem.DefaultRtNeatEnabledConnectionEnergyCostPerSecond,
     BiomePressureProfile? biomeBasalCostProfile = null) : ISimulationSystem
 {
+    public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0.002f;
+    public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0.0005f;
+
     private readonly BiomePressureProfile _biomeBasalCostProfile =
         BiomePressureProfile.Validate(biomeBasalCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeBasalCostProfile));
     private readonly float _bodyRadiusEnergyCostPerSecond =
@@ -44,6 +49,10 @@ public sealed class MetabolismSystem(
         ValidateCost(plantSpecializationEnergyCostPerSecond, nameof(plantSpecializationEnergyCostPerSecond));
     private readonly float _memoryEnergyCostPerSecond =
         ValidateCost(memoryEnergyCostPerSecond, nameof(memoryEnergyCostPerSecond));
+    private readonly float _rtNeatHiddenNodeEnergyCostPerSecond =
+        ValidateCost(rtNeatHiddenNodeEnergyCostPerSecond, nameof(rtNeatHiddenNodeEnergyCostPerSecond));
+    private readonly float _rtNeatEnabledConnectionEnergyCostPerSecond =
+        ValidateCost(rtNeatEnabledConnectionEnergyCostPerSecond, nameof(rtNeatEnabledConnectionEnergyCostPerSecond));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -69,12 +78,26 @@ public sealed class MetabolismSystem(
                 + CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond
                 + CreatureGrowth.EffectiveDamageResistance(creature, genome) * _damageResistanceEnergyCostPerSecond
                 + CreatureDigestion.PlantSpecializationUpkeepFactor(genome) * _plantSpecializationEnergyCostPerSecond
-                + Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond;
+                + Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond
+                + BrainTopologyUpkeep(state, creature.BrainId);
             var biomeBasalCostMultiplier = _biomeBasalCostProfile.For(state.Biomes.GetKindAt(creature.Position));
             creature.Energy -= (genome.BasalEnergyPerSecond * biomeBasalCostMultiplier + traitUpkeep) * deltaSeconds;
 
             state.Creatures[i] = creature;
         }
+    }
+
+    private float BrainTopologyUpkeep(WorldState state, int brainId)
+    {
+        if (brainId < 0
+            || !state.TryGetBrain(brainId, out var brain)
+            || brain?.RtNeat is not { } rtNeat)
+        {
+            return 0f;
+        }
+
+        return rtNeat.HiddenNodeCount * _rtNeatHiddenNodeEnergyCostPerSecond
+            + rtNeat.EnabledConnectionCount * _rtNeatEnabledConnectionEnergyCostPerSecond;
     }
 
     private static float ValidateCost(float value, string name)

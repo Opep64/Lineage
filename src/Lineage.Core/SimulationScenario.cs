@@ -273,6 +273,12 @@ public sealed record SimulationScenario
 
     public float MemoryEnergyCostPerSecond { get; init; } = 0.01f;
 
+    public float RtNeatHiddenNodeEnergyCostPerSecond { get; init; } =
+        MetabolismSystem.DefaultRtNeatHiddenNodeEnergyCostPerSecond;
+
+    public float RtNeatEnabledConnectionEnergyCostPerSecond { get; init; } =
+        MetabolismSystem.DefaultRtNeatEnabledConnectionEnergyCostPerSecond;
+
     public float MemoryDecayPerSecond { get; init; } = NeuralControllerSystem.DefaultMemoryDecayPerSecond;
 
     public float MemoryWriteRatePerSecond { get; init; } = NeuralControllerSystem.DefaultMemoryWriteRatePerSecond;
@@ -488,6 +494,8 @@ public sealed record SimulationScenario
         EnsureNonNegative(DamageResistanceEnergyCostPerSecond, nameof(DamageResistanceEnergyCostPerSecond));
         EnsureNonNegative(PlantSpecializationEnergyCostPerSecond, nameof(PlantSpecializationEnergyCostPerSecond));
         EnsureNonNegative(MemoryEnergyCostPerSecond, nameof(MemoryEnergyCostPerSecond));
+        EnsureNonNegative(RtNeatHiddenNodeEnergyCostPerSecond, nameof(RtNeatHiddenNodeEnergyCostPerSecond));
+        EnsureNonNegative(RtNeatEnabledConnectionEnergyCostPerSecond, nameof(RtNeatEnabledConnectionEnergyCostPerSecond));
         EnsureNonNegative(MemoryDecayPerSecond, nameof(MemoryDecayPerSecond));
         EnsureNonNegative(MemoryWriteRatePerSecond, nameof(MemoryWriteRatePerSecond));
         EnsureNonNegative(EggEnergyCostPerSecond, nameof(EggEnergyCostPerSecond));
