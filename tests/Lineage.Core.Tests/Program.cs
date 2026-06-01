@@ -6708,6 +6708,29 @@ static void BrainProbeEditsRtNeatGraphInputs()
     AssertEqual(1, population.EvaluatedCreatureCount, "rtNEAT population evaluated creature count");
     AssertEqual(0, population.UnsupportedOverrideCreatureCount, "rtNEAT population unsupported override count");
     AssertEqual(1, population.ChangedCreatureCount, "rtNEAT population should report changed behavior");
+
+    creature.Senses = new CreatureSenseState
+    {
+        WorldSenseRefreshed = true,
+        WorldSenseTick = 0,
+        EnergyRatio = 1f,
+        HealthRatio = 1f
+    };
+    simulation.State.Creatures[0] = creature;
+    var modifiedSenses = creature.Senses;
+    modifiedSenses.PlantDetected = true;
+    modifiedSenses.PlantProximity = 0.6f;
+    modifiedSenses.PlantDirectionForward = 0.35f;
+    modifiedSenses.PlantDirectionRight = 1f;
+    modifiedSenses.VisiblePlantDensity = 1f;
+
+    var senseEvaluation = service.EvaluateWithModifiedSenses(
+        simulation.State,
+        creatureId,
+        modifiedSenses);
+    var turnOutput = senseEvaluation.Outputs.Single(output => output.Key == "action.turn");
+    AssertTrue(senseEvaluation.OverrideCount > 0, "rtNEAT modified senses should count changed inputs");
+    AssertTrue(turnOutput.ModifiedValue > turnOutput.BaselineValue + 0.25f, "rtNEAT modified semantic plant direction should turn right");
 }
 
 static void RtNeatMutationCreatesBranchedDiverseGraphGrowth()

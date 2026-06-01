@@ -306,6 +306,15 @@
             <label><input type="checkbox" data-brain-lab-world-toggle="meatEggs" checked> Meat/Eggs</label>
             <label><input type="checkbox" data-brain-lab-world-toggle="creatures" checked> Creatures</label>
             <label><input type="checkbox" data-brain-lab-world-toggle="sound" checked> Sound</label>
+            <div class="brain-lab-world-probe-tools" aria-label="World Probe tools">
+              <button class="secondary is-active" type="button" data-brain-lab-world-tool="select">Select</button>
+              <button class="secondary" type="button" data-brain-lab-world-tool="move">Move</button>
+              <button class="secondary" type="button" data-brain-lab-world-tool="addPlant">Plant</button>
+              <button class="secondary" type="button" data-brain-lab-world-tool="addMeat">Meat</button>
+              <button class="secondary" type="button" data-brain-lab-world-tool="addEgg">Egg</button>
+              <button class="secondary" type="button" data-brain-lab-world-tool="addCreature">Creature</button>
+              <button class="secondary" type="button" data-brain-lab-world-tool="addSound">Sound</button>
+            </div>
           </div>
           <div class="brain-lab-world-probe-body">
             <div class="brain-lab-world-probe-map">
@@ -321,7 +330,7 @@
               <div class="brain-lab-world-probe-selection">
                 <div id="brainLabWorldProbeSelection" class="brain-lab-world-probe-selection-text">No selection.</div>
                 <div class="brain-lab-world-probe-actions">
-                  <button id="hideBrainLabWorldProbeSelectionButton" class="secondary" type="button" disabled>Hide Selected</button>
+                  <button id="hideBrainLabWorldProbeSelectionButton" class="secondary" type="button" disabled>Delete Selected</button>
                   <button id="muteBrainLabWorldProbeSelectionSoundButton" class="secondary" type="button" disabled>Mute Sound</button>
                   <button id="clearBrainLabWorldProbeEditsButton" class="secondary" type="button" disabled>Clear Edits</button>
                 </div>

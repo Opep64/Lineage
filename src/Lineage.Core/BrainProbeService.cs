@@ -39,6 +39,27 @@ public sealed class BrainProbeService
         return EvaluateCreature(creature, genome, brain, provider);
     }
 
+    public BrainProbeEvaluation EvaluateWithModifiedSenses(
+        WorldState state,
+        EntityId creatureId,
+        CreatureSenseState modifiedSenses,
+        IReadOnlyDictionary<string, float>? inputOverrides = null)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        if (!TryFindCreature(state, creatureId, out var creature))
+        {
+            throw new ArgumentException($"Creature {creatureId.Value} was not found.", nameof(creatureId));
+        }
+
+        var genome = state.GetGenome(creature.GenomeId);
+        var brain = state.GetBrain(creature.BrainId);
+        var overrides = NormalizeOverrides(inputOverrides);
+        var provider = CreateFixedOverrideProvider(overrides);
+
+        return EvaluateCreature(creature, genome, brain, provider, modifiedSenses);
+    }
+
     public BrainProbePopulationEvaluation EvaluatePopulation(
         WorldState state,
         IReadOnlyDictionary<string, float>? inputOverrides = null,
@@ -161,30 +182,50 @@ public sealed class BrainProbeService
         CreatureState creature,
         CreatureGenome genome,
         BrainGenome brain,
-        BrainProbeInputOverrideProvider overrideProvider)
+        BrainProbeInputOverrideProvider overrideProvider,
+        CreatureSenseState? modifiedSenses = null)
     {
         var inputFrame = BrainInputFrame.FromSenses(creature.Senses, genome);
         var memoryInputs = LegacyNeuralMemoryInputFrame.FromSenses(creature.Senses);
+        var modifiedInputFrame = modifiedSenses.HasValue
+            ? BrainInputFrame.FromSenses(modifiedSenses.Value, genome)
+            : inputFrame;
+        var modifiedMemoryInputs = modifiedSenses.HasValue
+            ? LegacyNeuralMemoryInputFrame.FromSenses(modifiedSenses.Value)
+            : memoryInputs;
         var baselineInputs = new float[NeuralBrainSchema.InputCount];
         LegacyNeuralBrainAdapter.FillInputs(inputFrame, memoryInputs, baselineInputs);
 
-        var modifiedInputs = baselineInputs.ToArray();
+        var modifiedInputs = new float[NeuralBrainSchema.InputCount];
+        LegacyNeuralBrainAdapter.FillInputs(modifiedInputFrame, modifiedMemoryInputs, modifiedInputs);
         var modifiedInputCount = 0;
+        var inputModified = new bool[BrainIoRegistry.Inputs.Count];
         foreach (var input in BrainIoRegistry.Inputs)
         {
+            if (Math.Abs(modifiedInputs[input.FlatIndex] - baselineInputs[input.FlatIndex]) > 0.0005f)
+            {
+                inputModified[input.FlatIndex] = true;
+            }
+
             if (!overrideProvider(input, baselineInputs, out var value))
             {
                 continue;
             }
 
             modifiedInputs[input.FlatIndex] = Math.Clamp(value, input.MinimumValue, input.MaximumValue);
-            modifiedInputCount++;
+            inputModified[input.FlatIndex] = true;
         }
 
+        modifiedInputCount = inputModified.Count(static modified => modified);
         var baseline = EvaluateBrain(brain, inputFrame, memoryInputs, baselineInputs);
-        var modified = modifiedInputCount == 0
+        var modified = modifiedInputCount == 0 && !modifiedSenses.HasValue
             ? baseline
-            : EvaluateDenseInputs(brain, inputFrame, memoryInputs, baselineInputs, modifiedInputs);
+            : EvaluateDenseInputs(
+                brain,
+                modifiedInputFrame,
+                modifiedMemoryInputs,
+                baselineInputs,
+                modifiedInputs);
 
         var inputs = BrainIoRegistry.Inputs
             .Select(input => new BrainProbeInputValue(
@@ -197,7 +238,7 @@ public sealed class BrainProbeService
                 input.NeutralValue,
                 baselineInputs[input.FlatIndex],
                 modifiedInputs[input.FlatIndex],
-                overrideProvider(input, baselineInputs, out _),
+                inputModified[input.FlatIndex],
                 input.Meaning))
             .ToArray();
 

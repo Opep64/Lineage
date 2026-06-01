@@ -103,6 +103,19 @@ public sealed partial class LineageRunManager
 
         var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
         var restored = LoadBrainLabSimulation(resolvedPath);
+        if (request.WorldProbe is not null)
+        {
+            var editedSenses = RecomputeBrainLabWorldProbeSenses(
+                restored,
+                new EntityId(request.CreatureId),
+                request.WorldProbe);
+            return _brainProbeService.EvaluateWithModifiedSenses(
+                restored.Simulation.State,
+                new EntityId(request.CreatureId),
+                editedSenses,
+                request.InputOverrides);
+        }
+
         return _brainProbeService.Evaluate(
             restored.Simulation.State,
             new EntityId(request.CreatureId),
@@ -252,6 +265,350 @@ public sealed partial class LineageRunManager
             returnedResources,
             returnedEggs,
             returnedCreatures);
+    }
+
+    private static CreatureSenseState RecomputeBrainLabWorldProbeSenses(
+        RestoredSimulation restored,
+        EntityId focusId,
+        BrainLabWorldProbeEditSet edits)
+    {
+        var sourceState = restored.Simulation.State;
+        if (!TryFindBrainLabCreature(sourceState, focusId, out var focus))
+        {
+            throw new ArgumentException($"Creature {focusId.Value} was not found.");
+        }
+
+        var scenario = restored.Scenario;
+        var editedSimulation = new Simulation(
+            new SimulationConfig
+            {
+                WorldWidth = sourceState.Bounds.Width,
+                WorldHeight = sourceState.Bounds.Height,
+                FixedDeltaSeconds = scenario.FixedDeltaSeconds
+            },
+            scenario.Seed,
+            systems: []);
+        var editedState = editedSimulation.State;
+        editedState.SetBiomes(sourceState.Biomes);
+        editedState.SetObstacles(sourceState.Obstacles);
+        editedState.SetLocalFertility(sourceState.LocalFertility);
+
+        foreach (var genome in sourceState.Genomes)
+        {
+            editedState.AddGenome(genome);
+        }
+
+        foreach (var brain in sourceState.Brains)
+        {
+            editedState.AddBrain(brain);
+        }
+
+        editedState.Creatures.Add(focus);
+        var center = focus.Position;
+
+        foreach (var resourceEdit in edits.Resources ?? [])
+        {
+            editedState.Resources.Add(CreateEditedBrainLabResource(resourceEdit, center, editedState.Bounds));
+        }
+
+        foreach (var eggEdit in edits.Eggs ?? [])
+        {
+            editedState.Eggs.Add(CreateEditedBrainLabEgg(eggEdit, center, focus, editedState.Bounds));
+        }
+
+        foreach (var creatureEdit in edits.Creatures ?? [])
+        {
+            editedState.Creatures.Add(CreateEditedBrainLabCreature(
+                creatureEdit,
+                center,
+                focus,
+                sourceState,
+                editedState,
+                editedState.Bounds));
+        }
+
+        ApplyEditedBrainLabContacts(editedState, scenario.BiteRangePadding);
+
+        var spatialIndex = new UniformSpatialIndex(scenario.SpatialCellSize);
+        spatialIndex.Rebuild(editedState);
+        var sensing = new CreatureSensingSystem(
+            spatialIndex,
+            meatScentRangeMultiplier: scenario.MeatScentRangeMultiplier,
+            meatScentCaloriesForFullStrength: scenario.MeatScentCaloriesForFullStrength,
+            meatScentDensitySaturation: scenario.MeatScentDensitySaturation,
+            biomeSpeedProfile: scenario.CreateBiomeSpeedProfile(),
+            biomeVisionRangeProfile: scenario.CreateBiomeVisionRangeProfile(),
+            worldSenseIntervalTicks: 1,
+            closeSenseRefreshProximity: scenario.CloseSenseRefreshProximity,
+            closeSenseRefreshMinimumTicks: scenario.CloseSenseRefreshMinimumTicks,
+            enableSectorVision: scenario.EnableSectorVision,
+            plantPayoffTraceHalfLifeSeconds: scenario.PlantPayoffTraceHalfLifeSeconds,
+            sensingThreadCount: 1,
+            soundRangeMultiplier: scenario.SoundRangeMultiplier,
+            soundDensitySaturation: scenario.SoundDensitySaturation);
+        sensing.Update(editedState, 0f);
+        return editedState.Creatures[0].Senses;
+    }
+
+    private static ResourcePatchState CreateEditedBrainLabResource(
+        BrainLabWorldProbeEditedResource edit,
+        SimVector2 center,
+        WorldBounds bounds)
+    {
+        var kind = ParseEnumOrDefault(edit.Kind, ResourceKind.Plant);
+        var plantKind = kind == ResourceKind.Plant
+            ? ParseEnumOrDefault(edit.PlantKind, PlantResourceKind.Generic)
+            : default;
+        var calories = PositiveFinite(edit.Calories, kind == ResourceKind.Plant ? 25f : 12f);
+        var maxCalories = Math.Max(calories, PositiveFinite(edit.MaxCalories, calories));
+        return new ResourcePatchState
+        {
+            Id = new EntityId(edit.Id),
+            Kind = kind,
+            PlantKind = plantKind,
+            Position = BrainLabProbeWorldPosition(center, edit.X, edit.Y, bounds),
+            Radius = PositiveFinite(edit.Radius, kind == ResourceKind.Plant ? 8f : 5f),
+            Calories = calories,
+            MaxCalories = maxCalories,
+            MeatAgeSeconds = kind == ResourceKind.Meat
+                ? MeatAgeSecondsFromFreshness(UnitFinite(edit.Freshness, 1f))
+                : 0f
+        };
+    }
+
+    private static EggState CreateEditedBrainLabEgg(
+        BrainLabWorldProbeEditedEgg edit,
+        SimVector2 center,
+        CreatureState focus,
+        WorldBounds bounds)
+    {
+        var energy = PositiveFinite(edit.Energy, 12f);
+        return new EggState
+        {
+            Id = new EntityId(edit.Id),
+            ParentId = focus.Id,
+            Position = BrainLabProbeWorldPosition(center, edit.X, edit.Y, bounds),
+            Energy = energy,
+            Health = PositiveFinite(edit.Health, 1f),
+            MaxHealth = Math.Max(1f, PositiveFinite(edit.Health, 1f)),
+            IncubationSeconds = 1f,
+            InvestmentRatio = 1f,
+            Generation = edit.Generation,
+            GenomeId = focus.GenomeId,
+            BrainId = focus.BrainId
+        };
+    }
+
+    private static CreatureState CreateEditedBrainLabCreature(
+        BrainLabWorldProbeEditedCreature edit,
+        SimVector2 center,
+        CreatureState focus,
+        WorldState sourceState,
+        WorldState editedState,
+        WorldBounds bounds)
+    {
+        var existing = TryFindBrainLabCreature(sourceState, new EntityId(edit.Id), out var sourceCreature);
+        var creature = existing ? sourceCreature : focus;
+        if (!existing)
+        {
+            var genome = sourceState.GetGenome(focus.GenomeId) with
+            {
+                BodyRadius = Math.Max(0.1f, PositiveFinite(edit.Radius, CreatureGenome.Baseline.BodyRadius))
+            };
+            creature = new CreatureState
+            {
+                Id = new EntityId(edit.Id),
+                Generation = edit.Generation,
+                AgeSeconds = Math.Max(CreatureGenome.Baseline.MaturityAgeSeconds, focus.AgeSeconds),
+                Energy = Math.Max(1f, sourceState.GetGenome(focus.GenomeId).ReproductionEnergyThreshold * UnitFinite(edit.EnergyRatio, 1f)),
+                Health = Math.Max(0.1f, UnitFinite(edit.HealthRatio, 1f)),
+                GenomeId = editedState.AddGenome(genome),
+                BrainId = focus.BrainId,
+                BirthInvestmentRatio = 1f
+            };
+        }
+
+        creature.Position = BrainLabProbeWorldPosition(center, edit.X, edit.Y, bounds);
+        creature.HeadingRadians = Finite(edit.HeadingRadians, creature.HeadingRadians);
+        creature.Senses = new CreatureSenseState { WorldSenseTick = -1 };
+        var actions = creature.Actions;
+        actions.SoundAmplitude = UnitFinite(edit.SoundAmplitude, 0f);
+        actions.SoundTone = ClampFinite(edit.SoundTone, -1f, 1f, 0f);
+        creature.Actions = actions;
+        if (edit.IsProbeSoundOnly && !existing)
+        {
+            creature.IsTouchingCreature = false;
+            creature.IsTouchingFood = false;
+        }
+
+        return creature;
+    }
+
+    private static void ApplyEditedBrainLabContacts(WorldState state, float biteRangePadding)
+    {
+        if (state.Creatures.Count == 0)
+        {
+            return;
+        }
+
+        var focus = state.Creatures[0];
+        var focusGenome = state.GetGenome(focus.GenomeId);
+        var focusRadius = CreatureGrowth.EffectiveBodyRadius(focus, focusGenome);
+        focus.IsTouchingFood = false;
+        focus.FoodContactKind = FoodContactKind.None;
+        focus.FoodContactResourceKind = default;
+        focus.FoodContactPlantKind = default;
+        focus.FoodContactResourceId = default;
+        focus.FoodContactEdgeDistance = 0f;
+        focus.FoodContactCalories = 0f;
+        focus.IsTouchingCreature = false;
+        focus.CreatureContactId = default;
+        focus.CreatureContactEdgeDistance = 0f;
+
+        var bestFoodEfficiency = float.NegativeInfinity;
+        var bestFoodDistance = float.PositiveInfinity;
+        foreach (var resource in state.Resources)
+        {
+            if (resource.Calories <= 0f)
+            {
+                continue;
+            }
+
+            var centerDistance = SimVector2.Distance(focus.Position, resource.Position);
+            var edgeDistance = Math.Max(0f, centerDistance - resource.Radius);
+            if (edgeDistance > focusRadius)
+            {
+                continue;
+            }
+
+            var efficiency = resource.Kind == ResourceKind.Meat
+                ? CreatureDigestion.MeatEnergyEfficiency(focusGenome, MeatQuality.Freshness(resource))
+                : CreatureDigestion.PlantTypeEnergyEfficiency(focusGenome, resource.PlantKind);
+            if (efficiency < bestFoodEfficiency
+                || (Math.Abs(efficiency - bestFoodEfficiency) <= 0.0001f && edgeDistance >= bestFoodDistance))
+            {
+                continue;
+            }
+
+            focus.IsTouchingFood = true;
+            focus.FoodContactKind = FoodContactKind.Resource;
+            focus.FoodContactResourceKind = resource.Kind;
+            focus.FoodContactPlantKind = resource.PlantKind;
+            focus.FoodContactResourceId = resource.Id;
+            focus.FoodContactEdgeDistance = edgeDistance;
+            focus.FoodContactCalories = resource.Calories;
+            bestFoodEfficiency = efficiency;
+            bestFoodDistance = edgeDistance;
+        }
+
+        foreach (var egg in state.Eggs)
+        {
+            if (egg.Energy <= 0f || egg.Health <= 0f)
+            {
+                continue;
+            }
+
+            var centerDistance = SimVector2.Distance(focus.Position, egg.Position);
+            var edgeDistance = Math.Max(0f, centerDistance - EggPredation.ContactRadius(egg));
+            if (edgeDistance > focusRadius)
+            {
+                continue;
+            }
+
+            var efficiency = CreatureDigestion.FreshMeatEnergyEfficiency(focusGenome);
+            if (efficiency < bestFoodEfficiency
+                || (Math.Abs(efficiency - bestFoodEfficiency) <= 0.0001f && edgeDistance >= bestFoodDistance))
+            {
+                continue;
+            }
+
+            focus.IsTouchingFood = true;
+            focus.FoodContactKind = FoodContactKind.Egg;
+            focus.FoodContactResourceKind = default;
+            focus.FoodContactPlantKind = default;
+            focus.FoodContactResourceId = egg.Id;
+            focus.FoodContactEdgeDistance = edgeDistance;
+            focus.FoodContactCalories = egg.Energy;
+            bestFoodEfficiency = efficiency;
+            bestFoodDistance = edgeDistance;
+        }
+
+        var forward = SimVector2.FromAngle(focus.HeadingRadians);
+        var bestCreatureDistance = float.PositiveInfinity;
+        for (var i = 1; i < state.Creatures.Count; i++)
+        {
+            var other = state.Creatures[i];
+            if (other.Health <= 0f || other.Energy <= 0f)
+            {
+                continue;
+            }
+
+            var otherGenome = state.GetGenome(other.GenomeId);
+            var otherRadius = CreatureGrowth.EffectiveBodyRadius(other, otherGenome);
+            var toOther = other.Position - focus.Position;
+            var centerDistance = toOther.Length;
+            var edgeDistance = Math.Max(0f, centerDistance - focusRadius - otherRadius);
+            if (edgeDistance > biteRangePadding
+                || (centerDistance > 0.0001f && SimVector2.Dot(toOther / centerDistance, forward) < 0f)
+                || edgeDistance >= bestCreatureDistance)
+            {
+                continue;
+            }
+
+            focus.IsTouchingCreature = true;
+            focus.CreatureContactId = other.Id;
+            focus.CreatureContactEdgeDistance = edgeDistance;
+            bestCreatureDistance = edgeDistance;
+        }
+
+        state.Creatures[0] = focus;
+    }
+
+    private static SimVector2 BrainLabProbeWorldPosition(
+        SimVector2 center,
+        double x,
+        double y,
+        WorldBounds bounds)
+    {
+        return bounds.Clamp(new SimVector2(
+            center.X + Finite(x, 0f),
+            center.Y + Finite(y, 0f)));
+    }
+
+    private static TEnum ParseEnumOrDefault<TEnum>(string? value, TEnum fallback)
+        where TEnum : struct
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed)
+                ? parsed
+                : fallback;
+    }
+
+    private static float MeatAgeSecondsFromFreshness(float freshness)
+    {
+        var ageFactor = (freshness - MeatQuality.MinimumFreshness) / (1f - MeatQuality.MinimumFreshness);
+        return (1f - Math.Clamp(ageFactor, 0f, 1f)) * MeatQuality.StaleAgeSeconds;
+    }
+
+    private static float PositiveFinite(double value, float fallback)
+    {
+        var finite = Finite(value, fallback);
+        return finite > 0f ? finite : fallback;
+    }
+
+    private static float UnitFinite(double value, float fallback)
+    {
+        return ClampFinite(value, 0f, 1f, fallback);
+    }
+
+    private static float ClampFinite(double value, float minimum, float maximum, float fallback)
+    {
+        return Math.Clamp(Finite(value, fallback), minimum, maximum);
+    }
+
+    private static float Finite(double value, float fallback)
+    {
+        return double.IsFinite(value) ? (float)value : fallback;
     }
 
     private RestoredSimulation LoadBrainLabSimulation(string resolvedPath)

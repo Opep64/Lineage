@@ -262,7 +262,8 @@ public sealed record BrainLabCreatureOption(
 public sealed record BrainLabEvaluateRequest(
     string SnapshotPath,
     int CreatureId,
-    Dictionary<string, float>? InputOverrides);
+    Dictionary<string, float>? InputOverrides,
+    BrainLabWorldProbeEditSet? WorldProbe = null);
 
 public sealed record BrainLabPopulationEvaluateRequest(
     string SnapshotPath,
@@ -305,6 +306,46 @@ public sealed record BrainLabPresetMatrixOutput(
 public sealed record BrainLabWorldProbeRequest(
     string SnapshotPath,
     int CreatureId);
+
+public sealed record BrainLabWorldProbeEditSet(
+    IReadOnlyList<BrainLabWorldProbeEditedResource>? Resources,
+    IReadOnlyList<BrainLabWorldProbeEditedEgg>? Eggs,
+    IReadOnlyList<BrainLabWorldProbeEditedCreature>? Creatures);
+
+public sealed record BrainLabWorldProbeEditedResource(
+    int Id,
+    string Kind,
+    string? PlantKind,
+    double X,
+    double Y,
+    double Radius,
+    double Calories,
+    double MaxCalories,
+    double Freshness);
+
+public sealed record BrainLabWorldProbeEditedEgg(
+    int Id,
+    int Generation,
+    double X,
+    double Y,
+    double Radius,
+    double Energy,
+    double Health);
+
+public sealed record BrainLabWorldProbeEditedCreature(
+    int Id,
+    int Generation,
+    string? BrainArchitectureKind,
+    double X,
+    double Y,
+    double Radius,
+    double HeadingRadians,
+    double EnergyRatio,
+    double HealthRatio,
+    double Hunger,
+    double SoundAmplitude,
+    double SoundTone,
+    bool IsProbeSoundOnly = false);
 
 public sealed record BrainLabWorldProbeScene(
     string SnapshotPath,

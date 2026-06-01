@@ -933,6 +933,25 @@ button.scenario-tab.is-active {
   min-height: 0;
 }
 
+.brain-lab-world-probe-tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.brain-lab-world-probe-tools button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.brain-lab-world-probe-tools button.is-active {
+  border-color: var(--accent);
+  background: #eaf1ff;
+  color: var(--accent);
+}
+
 .brain-lab-world-probe-body {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(260px, 340px);
