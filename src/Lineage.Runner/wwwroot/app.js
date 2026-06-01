@@ -141,17 +141,6 @@ let recipeDiffCheckpoint = null;
 let pendingRecipeSave = null;
 let selectedRunIds = new Set();
 
-const speciesGeneratedBrainChoices = [
-  ["scenario", "Scenario initial brain"],
-  ["seedForager", "Seed forager"],
-  ["explorerForager", "Explorer forager"],
-  ["sectorForager", "Sector forager"],
-  ["opportunisticForager", "Opportunistic forager"],
-  ["scavengerForager", "Scavenger forager"],
-  ["freshnessAwareScavenger", "Freshness-aware scavenger"],
-  ["foragerPredator", "Forager predator"],
-  ["randomPerFounder", "Random per founder"]
-];
 let expandedRunId = null;
 let runDetailsById = new Map();
 let sortKey = "createdAtUtc";
@@ -275,39 +264,52 @@ function renderSpeciesBrainChoiceOptions(selectedValue = speciesSeedBrainSelect?
     return;
   }
 
-  speciesSeedBrainSelect.innerHTML = brainChoiceOptionsHtml(selectedValue, null, true);
+  speciesSeedBrainSelect.innerHTML = brainChoiceOptionsHtml(selectedValue);
   if (![...speciesSeedBrainSelect.options].some((option) => option.value === selectedValue && !option.disabled)) {
     speciesSeedBrainSelect.value = "profile";
   }
 }
 
-function brainChoiceOptionsHtml(selectedValue = "profile", missingBrainPath = null, includeScenario = false) {
-  const selected = selectedValue || "profile";
+function brainChoiceOptionsHtml(selectedValue = "profile", missingBrainPath = null) {
+  const selected = normalizeBrainChoiceValue(selectedValue || "profile");
+  const scenarioDefaultKind = scenarioEditor?.scenario?.initialBrainKind || null;
   const pieces = [
     `<option value="profile"${selected === "profile" ? " selected" : ""}>Profile/default brain</option>`
   ];
 
-  pieces.push(`<optgroup label="Generated starter brain">`);
-  for (const [kind, label] of speciesGeneratedBrainChoices) {
-    if (!includeScenario && kind === "scenario") {
+  for (const kind of generatedBrainKinds()) {
+    const value = `generated:${kind}`;
+    if (catalogHasScenarioStarterBrain(kind) && selected !== value) {
       continue;
     }
 
-    const value = `generated:${kind}`;
-    pieces.push(`<option value="${escapeHtml(value)}"${selected === value ? " selected" : ""}>${escapeHtml(label)}</option>`);
+    const label = [
+      formatEnumLabel(kind),
+      kind === scenarioDefaultKind ? "scenario default" : null,
+      "generated"
+    ].filter(Boolean).join(" - ");
+    pieces.push([
+      `<option value="${escapeHtml(value)}"`,
+      selected === value ? " selected" : "",
+      ` title="${escapeHtml(generatedBrainChoiceTitle(kind))}">`,
+      `${escapeHtml(label)}`,
+      `</option>`
+    ].join(""));
   }
-  pieces.push(`</optgroup>`);
 
   if (brainCatalog.length > 0 || missingBrainPath) {
-    pieces.push(`<optgroup label="Catalog brain profile">`);
     for (const brain of brainCatalog) {
       const value = `catalog:${brain.path}`;
+      const label = [
+        `${brain.name} (${brain.brainArchitectureKind})`,
+        catalogBrainMatchesScenarioDefault(brain) ? "scenario default" : null
+      ].filter(Boolean).join(" - ");
       pieces.push([
         `<option value="${escapeHtml(value)}"`,
         selected === value ? " selected" : "",
         brain.isCompatible === false ? " disabled" : "",
         ` title="${escapeHtml(`${brain.path} | hidden ${formatNumber(brain.hiddenNodeCount)} | ${formatNumber(brain.weightCount)} weights | ${brainCompatibilityStatus(brain)}`)}">`,
-        `${escapeHtml(brain.name)} (${escapeHtml(brain.brainArchitectureKind)})${brain.isCompatible === false ? " [incompatible]" : ""}`,
+        `${escapeHtml(label)}${brain.isCompatible === false ? " [incompatible]" : ""}`,
         `</option>`
       ].join(""));
     }
@@ -316,10 +318,68 @@ function brainChoiceOptionsHtml(selectedValue = "profile", missingBrainPath = nu
       const value = `catalog:${missingBrainPath}`;
       pieces.push(`<option value="${escapeHtml(value)}"${selected === value ? " selected" : ""}>Missing catalog brain: ${escapeHtml(missingBrainPath)}</option>`);
     }
-    pieces.push(`</optgroup>`);
   }
 
   return pieces.join("");
+}
+
+function normalizeBrainChoiceValue(value) {
+  if (value === "generated:scenario") {
+    const scenarioDefaultKind = scenarioEditor?.scenario?.initialBrainKind;
+    return scenarioDefaultKind ? `generated:${scenarioDefaultKind}` : "profile";
+  }
+
+  return value;
+}
+
+function generatedBrainKinds() {
+  const field = scenarioEditor?.fields?.find((candidate) => candidate.jsonName === "initialBrainKind");
+  return Array.isArray(field?.enumValues)
+    ? field.enumValues
+    : [];
+}
+
+function catalogHasScenarioStarterBrain(kind) {
+  const architecture = scenarioEditor?.scenario?.brainArchitectureKind;
+  return brainCatalog.some((brain) =>
+    brain.isCompatible !== false
+    && catalogBrainIsStarterProfile(brain, kind)
+    && sameEnumValue(brain.sourceInitialBrainKind, kind)
+    && (!architecture || sameEnumValue(brain.brainArchitectureKind, architecture)));
+}
+
+function catalogBrainMatchesScenarioDefault(brain) {
+  return brain.isCompatible !== false
+    && catalogBrainIsStarterProfile(brain, scenarioEditor?.scenario?.initialBrainKind)
+    && sameEnumValue(brain.sourceInitialBrainKind, scenarioEditor?.scenario?.initialBrainKind)
+    && sameEnumValue(brain.brainArchitectureKind, scenarioEditor?.scenario?.brainArchitectureKind);
+}
+
+function catalogBrainIsStarterProfile(brain, kind) {
+  if (!kind || !sameEnumValue(brain.sourceInitialBrainKind, kind)) {
+    return false;
+  }
+
+  const normalizedPath = String(brain.path || "").replace(/\\/g, "/").toLowerCase();
+  const fileName = normalizedPath.split("/").pop() || "";
+  return fileName.startsWith("starter-");
+}
+
+function sameEnumValue(left, right) {
+  return String(left ?? "").toLowerCase() === String(right ?? "").toLowerCase();
+}
+
+function generatedBrainChoiceTitle(kind) {
+  const architecture = scenarioEditor?.scenario?.brainArchitectureKind || "scenario architecture";
+  const pieces = [`Generated ${formatEnumLabel(kind)} starter`];
+  pieces.push(kind === "randomPerFounder"
+    ? "Creates randomized founder brains"
+    : `Created with ${formatEnumLabel(architecture)}`);
+  if (kind === scenarioEditor?.scenario?.initialBrainKind) {
+    pieces.push("Scenario default");
+  }
+
+  return pieces.join(" | ");
 }
 
 function selectedBrainCatalogEntry() {
@@ -2163,7 +2223,7 @@ function renderSpeciesRosterRow(seed, index) {
       </td>
       <td>
         <select class="species-roster-select" data-species-roster-field="brain" data-index="${index}">
-          ${brainChoiceOptionsHtml(speciesSeedBrainChoiceValue(seed), seed?.brainProfilePath || null, false)}
+          ${brainChoiceOptionsHtml(speciesSeedBrainChoiceValue(seed), seed?.brainProfilePath || null)}
         </select>
       </td>
       <td>
@@ -2670,6 +2730,7 @@ function renderScenarioEditor() {
   }
 
   updateScenarioEditorStatus();
+  renderSpeciesBrainChoiceOptions();
   renderSpeciesRoster();
 }
 
@@ -5513,6 +5574,7 @@ scenarioFields.addEventListener("change", () => {
     storeVisibleScenarioValues();
     updateScenarioFieldChangeMarkers();
     renderMapArtifactDetails();
+    renderSpeciesBrainChoiceOptions();
     renderSpeciesRoster();
     scheduleBiomePreview();
   } catch (error) {
@@ -5525,6 +5587,7 @@ scenarioFields.addEventListener("input", () => {
     storeVisibleScenarioValues();
     updateScenarioFieldChangeMarkers();
     renderMapArtifactDetails();
+    renderSpeciesBrainChoiceOptions();
     renderSpeciesRoster();
     scheduleBiomePreview();
   } catch (error) {

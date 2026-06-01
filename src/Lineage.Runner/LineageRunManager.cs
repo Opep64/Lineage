@@ -2392,6 +2392,7 @@ public sealed partial class LineageRunManager
             OutputCount: validated.OutputCount,
             HiddenNodeCount: validated.HiddenNodeCount,
             WeightCount: validated.WeightCount,
+            SourceInitialBrainKind: FormatEnumJsonValue(validated.Source.InitialBrainKind),
             SourceScenarioName: validated.Source.ScenarioName,
             SourceSeed: validated.Source.Seed,
             SourceTick: validated.Source.Tick,
@@ -2425,6 +2426,7 @@ public sealed partial class LineageRunManager
             OutputCount: profile.OutputCount,
             HiddenNodeCount: profile.HiddenNodeCount,
             WeightCount: profile.WeightCount,
+            SourceInitialBrainKind: FormatEnumJsonValue(profile.Source.InitialBrainKind),
             SourceScenarioName: profile.Source.ScenarioName,
             SourceSeed: profile.Source.Seed,
             SourceTick: profile.Source.Tick,
@@ -2453,6 +2455,7 @@ public sealed partial class LineageRunManager
             OutputCount: 0,
             HiddenNodeCount: 0,
             WeightCount: 0,
+            SourceInitialBrainKind: null,
             SourceScenarioName: string.Empty,
             SourceSeed: 0,
             SourceTick: 0,
@@ -2968,6 +2971,14 @@ public sealed partial class LineageRunManager
             null or "" => "unknown",
             _ => value
         };
+    }
+
+    private static string? FormatEnumJsonValue<TEnum>(TEnum? value)
+        where TEnum : struct, Enum
+    {
+        return value is { } enumValue
+            ? JsonOptions.PropertyNamingPolicy?.ConvertName(enumValue.ToString()) ?? enumValue.ToString()
+            : null;
     }
 
     private static string FormatScenarioVision(RunScenarioSummary? summary)

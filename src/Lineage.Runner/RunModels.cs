@@ -181,6 +181,7 @@ public sealed record BrainCatalogEntry(
     int OutputCount,
     int HiddenNodeCount,
     int WeightCount,
+    string? SourceInitialBrainKind,
     string SourceScenarioName,
     ulong SourceSeed,
     long SourceTick,
