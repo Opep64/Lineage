@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260531-launch-tabs1">
+  <link rel="stylesheet" href="/styles.css?v=20260601-world-probe-pan1">
 </head>
 <body>
   <header class="app-header">
@@ -307,8 +307,28 @@
             <label><input type="checkbox" data-brain-lab-world-toggle="creatures" checked> Creatures</label>
             <label><input type="checkbox" data-brain-lab-world-toggle="sound" checked> Sound</label>
           </div>
-          <canvas id="brainLabWorldProbeCanvas" width="920" height="360"></canvas>
-          <div id="brainLabWorldProbeSummary" class="brain-lab-world-probe-summary">No world probe yet.</div>
+          <div class="brain-lab-world-probe-body">
+            <div class="brain-lab-world-probe-map">
+              <canvas id="brainLabWorldProbeCanvas" width="920" height="360"></canvas>
+              <div class="brain-lab-world-probe-zoom" aria-label="World Probe zoom controls">
+                <button id="brainLabWorldProbeZoomOutButton" class="secondary" type="button" disabled>-</button>
+                <span id="brainLabWorldProbeZoomStatus">100%</span>
+                <button id="brainLabWorldProbeZoomInButton" class="secondary" type="button" disabled>+</button>
+                <button id="brainLabWorldProbeZoomResetButton" class="secondary" type="button" disabled>Reset</button>
+              </div>
+            </div>
+            <div class="brain-lab-world-probe-inspector">
+              <div class="brain-lab-world-probe-selection">
+                <div id="brainLabWorldProbeSelection" class="brain-lab-world-probe-selection-text">No selection.</div>
+                <div class="brain-lab-world-probe-actions">
+                  <button id="hideBrainLabWorldProbeSelectionButton" class="secondary" type="button" disabled>Hide Selected</button>
+                  <button id="muteBrainLabWorldProbeSelectionSoundButton" class="secondary" type="button" disabled>Mute Sound</button>
+                  <button id="clearBrainLabWorldProbeEditsButton" class="secondary" type="button" disabled>Clear Edits</button>
+                </div>
+              </div>
+              <div id="brainLabWorldProbeSummary" class="brain-lab-world-probe-summary">No world probe yet.</div>
+            </div>
+          </div>
         </div>
         <div class="brain-lab-workbench">
           <div class="brain-lab-input-panel">
@@ -420,6 +440,6 @@
     </div>
   </main>
 
-  <script src="/app.js?v=20260531-launch-tabs1"></script>
+  <script src="/app.js?v=20260601-world-probe-pan1"></script>
 </body>
 </html>

@@ -933,7 +933,19 @@ button.scenario-tab.is-active {
   min-height: 0;
 }
 
-.brain-lab-world-probe canvas {
+.brain-lab-world-probe-body {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(260px, 340px);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.brain-lab-world-probe-map {
+  position: relative;
+  min-width: 0;
+}
+
+.brain-lab-world-probe-map canvas {
   display: block;
   width: 100%;
   height: 360px;
@@ -942,13 +954,96 @@ button.scenario-tab.is-active {
   background: #f5f8fb;
 }
 
-.brain-lab-world-probe-summary {
+.brain-lab-world-probe-zoom {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid rgba(101, 115, 125, 0.35);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 4px rgba(17, 24, 32, 0.08);
+}
+
+.brain-lab-world-probe-zoom button {
+  min-width: 30px;
+  min-height: 28px;
+  padding: 4px 7px;
+}
+
+.brain-lab-world-probe-zoom span {
+  min-width: 44px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.brain-lab-world-probe-inspector {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.brain-lab-world-probe-selection {
+  display: grid;
+  gap: 10px;
+}
+
+.brain-lab-world-probe-selection-text {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.brain-lab-world-probe-selection-text strong {
+  color: var(--ink);
+}
+
+.brain-lab-world-probe-selection-text code {
+  margin-left: 6px;
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+}
+
+.brain-lab-world-probe-actions {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.brain-lab-world-probe-actions button {
+  min-height: 32px;
+  padding: 5px 9px;
+}
+
+.brain-lab-world-probe-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 12px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.brain-lab-world-probe-summary span {
+  min-width: 0;
+}
+
+.brain-lab-world-probe-summary strong {
+  color: var(--ink);
 }
 
 .brain-lab-workbench {
@@ -1577,7 +1672,9 @@ tr.is-expanded td {
   }
 
   .details-grid,
-  .log-grid {
+  .log-grid,
+  .brain-lab-world-probe-body,
+  .brain-lab-world-probe-summary {
     grid-template-columns: 1fr;
   }
 }
