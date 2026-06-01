@@ -103,6 +103,30 @@ public sealed record BrainGenome
         NeuralOrThrow.Evaluate(inputs, outputs);
     }
 
+    public BrainEvaluationResult EvaluateWithDenseInputs(
+        in BrainInputFrame inputFrame,
+        in LegacyNeuralMemoryInputFrame legacyMemoryInputs,
+        ReadOnlySpan<float> baselineDenseInputs,
+        ReadOnlySpan<float> modifiedDenseInputs)
+    {
+        if (ArchitectureKind == BrainArchitectureKind.RtNeatGraph)
+        {
+            return new BrainEvaluationResult(
+                RtNeatOrThrow.EvaluateWithDenseInputs(
+                    inputFrame,
+                    legacyMemoryInputs,
+                    baselineDenseInputs,
+                    modifiedDenseInputs),
+                default);
+        }
+
+        var denseOutputs = new float[NeuralBrainSchema.OutputCount];
+        NeuralOrThrow.Evaluate(modifiedDenseInputs, denseOutputs);
+        return new BrainEvaluationResult(
+            LegacyNeuralBrainAdapter.ReadStandardOutputs(denseOutputs),
+            LegacyNeuralBrainAdapter.ReadMemoryOutputs(denseOutputs));
+    }
+
     public float GetWeight(int index)
     {
         var weights = Weights;

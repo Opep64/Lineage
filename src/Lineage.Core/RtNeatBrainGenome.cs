@@ -349,6 +349,8 @@ public sealed record RtNeatBrainGenome
         RtNeatActivationKind.Relu,
         RtNeatActivationKind.Linear
     ];
+    private static readonly IReadOnlyDictionary<string, int> DenseInputIndexByKey =
+        BrainIoRegistry.Inputs.ToDictionary(input => input.Key, input => input.FlatIndex, StringComparer.Ordinal);
 
     public const int CurrentVersion = 1;
 
@@ -759,12 +761,57 @@ public sealed record RtNeatBrainGenome
     public BrainOutputFrame Evaluate(in BrainInputFrame frame, in LegacyNeuralMemoryInputFrame memory)
     {
         var brain = Validated();
+        return EvaluateCore(
+            brain,
+            frame,
+            memory,
+            ReadOnlySpan<float>.Empty,
+            ReadOnlySpan<float>.Empty,
+            useDenseOverrideInputs: false);
+    }
+
+    public BrainOutputFrame EvaluateWithDenseInputs(
+        in BrainInputFrame frame,
+        in LegacyNeuralMemoryInputFrame memory,
+        ReadOnlySpan<float> baselineDenseInputs,
+        ReadOnlySpan<float> modifiedDenseInputs)
+    {
+        if (baselineDenseInputs.Length < NeuralBrainSchema.InputCount)
+        {
+            throw new ArgumentException("Baseline dense input span is shorter than the neural input schema.", nameof(baselineDenseInputs));
+        }
+
+        if (modifiedDenseInputs.Length < NeuralBrainSchema.InputCount)
+        {
+            throw new ArgumentException("Modified dense input span is shorter than the neural input schema.", nameof(modifiedDenseInputs));
+        }
+
+        var brain = Validated();
+        return EvaluateCore(
+            brain,
+            frame,
+            memory,
+            baselineDenseInputs,
+            modifiedDenseInputs,
+            useDenseOverrideInputs: true);
+    }
+
+    private static BrainOutputFrame EvaluateCore(
+        RtNeatBrainGenome brain,
+        in BrainInputFrame frame,
+        in LegacyNeuralMemoryInputFrame memory,
+        ReadOnlySpan<float> baselineDenseInputs,
+        ReadOnlySpan<float> modifiedDenseInputs,
+        bool useDenseOverrideInputs)
+    {
         var activations = new Dictionary<int, float>(brain.Nodes.Length);
         foreach (var node in brain.Nodes)
         {
             if (node.Kind == RtNeatNodeKind.Input)
             {
-                activations[node.Id] = RtNeatBrainIoRegistry.ReadInput(node.Key, frame, memory);
+                activations[node.Id] = useDenseOverrideInputs
+                    ? ReadDenseOverrideInput(node.Key, frame, memory, baselineDenseInputs, modifiedDenseInputs)
+                    : RtNeatBrainIoRegistry.ReadInput(node.Key, frame, memory);
             }
         }
 
@@ -796,6 +843,67 @@ public sealed record RtNeatBrainGenome
             ClampOutput(activations, "action.grab", 0f, 1f),
             ClampOutput(activations, "action.sound_amplitude", 0f, 1f),
             ClampOutput(activations, "action.sound_tone", -1f, 1f));
+    }
+
+    private static float ReadDenseOverrideInput(
+        string key,
+        in BrainInputFrame frame,
+        in LegacyNeuralMemoryInputFrame memory,
+        ReadOnlySpan<float> baselineDenseInputs,
+        ReadOnlySpan<float> modifiedDenseInputs)
+    {
+        if (TryReadDenseInput(key, modifiedDenseInputs, out var denseValue))
+        {
+            return denseValue;
+        }
+
+        var baselineValue = RtNeatBrainIoRegistry.ReadInput(key, frame, memory);
+        var driverKey = DenseOverrideDriverKey(key);
+        if (driverKey is null
+            || !TryReadDenseInput(driverKey, baselineDenseInputs, out var baselineDriver)
+            || !TryReadDenseInput(driverKey, modifiedDenseInputs, out var modifiedDriver)
+            || Math.Abs(modifiedDriver - baselineDriver) <= 0.000001f)
+        {
+            return baselineValue;
+        }
+
+        if (Math.Abs(baselineDriver) <= 0.000001f)
+        {
+            return Math.Abs(modifiedDriver) <= 0.000001f
+                ? 0f
+                : baselineValue;
+        }
+
+        var ratio = Math.Clamp(modifiedDriver / baselineDriver, 0f, 1f);
+        return baselineValue * ratio;
+    }
+
+    private static bool TryReadDenseInput(string key, ReadOnlySpan<float> denseInputs, out float value)
+    {
+        if (DenseInputIndexByKey.TryGetValue(key, out var flatIndex) && flatIndex < denseInputs.Length)
+        {
+            value = denseInputs[flatIndex];
+            return true;
+        }
+
+        value = 0f;
+        return false;
+    }
+
+    private static string? DenseOverrideDriverKey(string key)
+    {
+        return key switch
+        {
+            "vision.food.proximity" or "vision.food.direction_forward" or "vision.food.direction_right"
+                => "vision.food_density",
+            "vision.plant.proximity" or "vision.plant.direction_forward" or "vision.plant.direction_right"
+                => "vision.plant_density",
+            "vision.meat.proximity" or "vision.meat.direction_forward" or "vision.meat.direction_right"
+                => "vision.meat_density",
+            "vision.creature.proximity" or "vision.creature.direction_forward" or "vision.creature.direction_right"
+                => "vision.creature_density",
+            _ => null
+        };
     }
 
     public RtNeatBrainGenome Mutated(

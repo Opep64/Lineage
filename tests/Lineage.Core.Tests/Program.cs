@@ -148,6 +148,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
     ("Brain factory supports hidden-layer neural architecture", BrainFactorySupportsHiddenLayerNeuralArchitecture),
     ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
+    ("Brain probe edits rtNEAT graph inputs", BrainProbeEditsRtNeatGraphInputs),
     ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
     ("rtNEAT mutation prunes inactive hidden nodes", RtNeatMutationPrunesInactiveHiddenNodes),
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
@@ -6646,6 +6647,67 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
     var restoredBrain = restored.Simulation.State.GetBrain(restoredCreature.BrainId);
     AssertEqual(BrainArchitectureKind.RtNeatGraph, restoredBrain.ArchitectureKind, "Restored rtNEAT brain architecture");
     AssertTrue(restoredBrain.RtNeat is not null, "Restored rtNEAT brain should retain graph payload");
+}
+
+static void BrainProbeEditsRtNeatGraphInputs()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 731,
+        systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var brainId = simulation.State.AddBrain(BrainFactory.CreateStarter(
+        BrainArchitectureKind.RtNeatGraph,
+        InitialBrainKind.SparseGraphForager));
+    var creatureId = simulation.State.SpawnCreature(
+        genomeId,
+        new SimVector2(50f, 50f),
+        energy: 20f,
+        brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        WorldSenseRefreshed = true,
+        WorldSenseTick = 0,
+        PlantDetected = true,
+        PlantProximity = 1f,
+        PlantDirectionForward = 1f,
+        VisiblePlantDensity = 1f,
+        FoodContact = 1f,
+        PlantFoodContact = 1f,
+        EnergyRatio = 1f,
+        HealthRatio = 1f
+    };
+    simulation.State.Creatures[0] = creature;
+
+    var service = new BrainProbeService();
+    var evaluation = service.Evaluate(
+        simulation.State,
+        creatureId,
+        new Dictionary<string, float>(StringComparer.Ordinal)
+        {
+            ["contact.plant_food"] = 0f
+        });
+
+    AssertTrue(evaluation.SupportsRawInputOverrides, "rtNEAT brain probe should support edited inputs");
+    AssertEqual(1, evaluation.OverrideCount, "rtNEAT single-creature override count");
+    var eatOutput = evaluation.Outputs.Single(output => output.Key == "action.eat");
+    AssertTrue(eatOutput.BaselineValue > 0.25f, "rtNEAT baseline should eat contacted plants");
+    AssertTrue(eatOutput.ModifiedValue < 0f, "rtNEAT edited plant contact should suppress eating");
+
+    var population = service.EvaluatePopulationPreset(
+        simulation.State,
+        BrainProbePresetKind.NoContact,
+        maxCreatures: 10);
+    AssertTrue(population.SupportsRawInputOverrides, "rtNEAT population probe should support edited inputs");
+    AssertEqual(1, population.EvaluatedCreatureCount, "rtNEAT population evaluated creature count");
+    AssertEqual(0, population.UnsupportedOverrideCreatureCount, "rtNEAT population unsupported override count");
+    AssertEqual(1, population.ChangedCreatureCount, "rtNEAT population should report changed behavior");
 }
 
 static void RtNeatMutationCreatesBranchedDiverseGraphGrowth()

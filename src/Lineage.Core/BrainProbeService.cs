@@ -36,7 +36,7 @@ public sealed class BrainProbeService
         var overrides = NormalizeOverrides(inputOverrides);
         var provider = CreateFixedOverrideProvider(overrides);
 
-        return EvaluateCreature(creature, genome, brain, overrides.Count, provider);
+        return EvaluateCreature(creature, genome, brain, provider);
     }
 
     public BrainProbePopulationEvaluation EvaluatePopulation(
@@ -103,18 +103,10 @@ public sealed class BrainProbeService
             var brain = state.GetBrain(creature.BrainId);
             architectureKinds.Add(brain.ArchitectureKind);
 
-            if (declaredOverrideCount > 0 && brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph)
-            {
-                unsupportedOverrideCount++;
-                skippedCreatureCount++;
-                continue;
-            }
-
             var evaluation = EvaluateCreature(
                 creature,
                 genome,
                 brain,
-                declaredOverrideCount,
                 overrideProvider);
             var creatureChanged = false;
             var creatureGateFlipped = false;
@@ -169,7 +161,6 @@ public sealed class BrainProbeService
         CreatureState creature,
         CreatureGenome genome,
         BrainGenome brain,
-        int declaredOverrideCount,
         BrainProbeInputOverrideProvider overrideProvider)
     {
         var inputFrame = BrainInputFrame.FromSenses(creature.Senses, genome);
@@ -190,10 +181,10 @@ public sealed class BrainProbeService
             modifiedInputCount++;
         }
 
-        var baseline = EvaluateBrain(brain, inputFrame, memoryInputs, baselineInputs, declaredOverrideCount > 0);
+        var baseline = EvaluateBrain(brain, inputFrame, memoryInputs, baselineInputs);
         var modified = modifiedInputCount == 0
             ? baseline
-            : EvaluateDenseBrain(brain, modifiedInputs);
+            : EvaluateDenseInputs(brain, inputFrame, memoryInputs, baselineInputs, modifiedInputs);
 
         var inputs = BrainIoRegistry.Inputs
             .Select(input => new BrainProbeInputValue(
@@ -238,7 +229,7 @@ public sealed class BrainProbeService
                 creature.Senses.SoundDensity,
                 creature.Actions.SoundAmplitude),
             brain.ArchitectureKind.ToString(),
-            brain.ArchitectureKind != BrainArchitectureKind.RtNeatGraph,
+            true,
             modifiedInputCount,
             changedOutputCount,
             gateFlipCount,
@@ -251,16 +242,10 @@ public sealed class BrainProbeService
         BrainGenome brain,
         in BrainInputFrame inputFrame,
         in LegacyNeuralMemoryInputFrame memoryInputs,
-        float[] denseInputs,
-        bool hasOverrides)
+        float[] denseInputs)
     {
         if (brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph)
         {
-            if (hasOverrides)
-            {
-                throw new NotSupportedException("Raw input overrides are currently supported for dense neural brains. rtNEAT support needs semantic frame editing.");
-            }
-
             var scratchInputs = new float[NeuralBrainSchema.InputCount];
             var scratchOutputs = new float[NeuralBrainSchema.OutputCount];
             return brain.Evaluate(inputFrame, memoryInputs, scratchInputs, scratchOutputs);
@@ -269,13 +254,22 @@ public sealed class BrainProbeService
         return EvaluateDenseBrain(brain, denseInputs);
     }
 
+    private static BrainEvaluationResult EvaluateDenseInputs(
+        BrainGenome brain,
+        in BrainInputFrame inputFrame,
+        in LegacyNeuralMemoryInputFrame memoryInputs,
+        float[] baselineInputs,
+        float[] modifiedInputs)
+    {
+        return brain.EvaluateWithDenseInputs(
+            inputFrame,
+            memoryInputs,
+            baselineInputs,
+            modifiedInputs);
+    }
+
     private static BrainEvaluationResult EvaluateDenseBrain(BrainGenome brain, float[] denseInputs)
     {
-        if (brain.ArchitectureKind == BrainArchitectureKind.RtNeatGraph)
-        {
-            throw new NotSupportedException("Raw dense input evaluation is not available for rtNEAT graph brains.");
-        }
-
         var outputs = new float[NeuralBrainSchema.OutputCount];
         brain.Evaluate(denseInputs, outputs);
         return new BrainEvaluationResult(
