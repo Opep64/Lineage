@@ -20,8 +20,8 @@ public sealed class MetabolismSystem(
     float rtNeatEnabledConnectionEnergyCostPerSecond = MetabolismSystem.DefaultRtNeatEnabledConnectionEnergyCostPerSecond,
     BiomePressureProfile? biomeBasalCostProfile = null) : ISimulationSystem
 {
-    public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0.002f;
-    public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0.0005f;
+    public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0.001f;
+    public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0.00025f;
 
     private readonly BiomePressureProfile _biomeBasalCostProfile =
         BiomePressureProfile.Validate(biomeBasalCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeBasalCostProfile));
