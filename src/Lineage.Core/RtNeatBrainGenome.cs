@@ -351,6 +351,14 @@ public sealed record RtNeatBrainGenome
     ];
     private static readonly IReadOnlyDictionary<string, int> DenseInputIndexByKey =
         BrainIoRegistry.Inputs.ToDictionary(input => input.Key, input => input.FlatIndex, StringComparer.Ordinal);
+    private static readonly int MoveForwardOutputNodeId = OutputNodeId("action.move_forward");
+    private static readonly int TurnOutputNodeId = OutputNodeId("action.turn");
+    private static readonly int EatOutputNodeId = OutputNodeId("action.eat");
+    private static readonly int ReproduceOutputNodeId = OutputNodeId("action.reproduce");
+    private static readonly int AttackOutputNodeId = OutputNodeId("action.attack");
+    private static readonly int GrabOutputNodeId = OutputNodeId("action.grab");
+    private static readonly int SoundAmplitudeOutputNodeId = OutputNodeId("action.sound_amplitude");
+    private static readonly int SoundToneOutputNodeId = OutputNodeId("action.sound_tone");
 
     public const int CurrentVersion = 1;
 
@@ -760,9 +768,8 @@ public sealed record RtNeatBrainGenome
 
     public BrainOutputFrame Evaluate(in BrainInputFrame frame, in LegacyNeuralMemoryInputFrame memory)
     {
-        var brain = Validated();
         return EvaluateCore(
-            brain,
+            this,
             frame,
             memory,
             ReadOnlySpan<float>.Empty,
@@ -786,9 +793,8 @@ public sealed record RtNeatBrainGenome
             throw new ArgumentException("Modified dense input span is shorter than the neural input schema.", nameof(modifiedDenseInputs));
         }
 
-        var brain = Validated();
         return EvaluateCore(
-            brain,
+            this,
             frame,
             memory,
             baselineDenseInputs,
@@ -804,19 +810,14 @@ public sealed record RtNeatBrainGenome
         ReadOnlySpan<float> modifiedDenseInputs,
         bool useDenseOverrideInputs)
     {
-        var activations = new Dictionary<int, float>(brain.Nodes.Length);
+        var activations = new Dictionary<int, float>(Math.Min(brain.Nodes.Length, brain.Connections.Length + RtNeatBrainIoRegistry.Outputs.Count));
         foreach (var node in brain.Nodes)
         {
             if (node.Kind == RtNeatNodeKind.Input)
             {
-                activations[node.Id] = useDenseOverrideInputs
-                    ? ReadDenseOverrideInput(node.Key, frame, memory, baselineDenseInputs, modifiedDenseInputs)
-                    : RtNeatBrainIoRegistry.ReadInput(node.Key, frame, memory);
+                continue;
             }
-        }
 
-        foreach (var node in brain.Nodes.Where(node => node.Kind != RtNeatNodeKind.Input))
-        {
             var sum = node.Bias;
             foreach (var connection in brain.Connections)
             {
@@ -825,7 +826,20 @@ public sealed record RtNeatBrainGenome
                     continue;
                 }
 
-                if (activations.TryGetValue(connection.SourceNodeId, out var sourceValue))
+                if (!activations.TryGetValue(connection.SourceNodeId, out var sourceValue)
+                    && TryReadInputNodeActivation(
+                        connection.SourceNodeId,
+                        frame,
+                        memory,
+                        baselineDenseInputs,
+                        modifiedDenseInputs,
+                        useDenseOverrideInputs,
+                        out sourceValue))
+                {
+                    activations[connection.SourceNodeId] = sourceValue;
+                }
+
+                if (activations.TryGetValue(connection.SourceNodeId, out sourceValue))
                 {
                     sum += sourceValue * connection.Weight;
                 }
@@ -835,14 +849,36 @@ public sealed record RtNeatBrainGenome
         }
 
         return new BrainOutputFrame(
-            ClampOutput(activations, "action.move_forward", 0f, 1f),
-            ClampOutput(activations, "action.turn", -1f, 1f),
-            ClampOutput(activations, "action.eat", -1f, 1f),
-            ClampOutput(activations, "action.reproduce", -1f, 1f),
-            ClampOutput(activations, "action.attack", -1f, 1f),
-            ClampOutput(activations, "action.grab", 0f, 1f),
-            ClampOutput(activations, "action.sound_amplitude", 0f, 1f),
-            ClampOutput(activations, "action.sound_tone", -1f, 1f));
+            ClampOutput(activations, MoveForwardOutputNodeId, 0f, 1f),
+            ClampOutput(activations, TurnOutputNodeId, -1f, 1f),
+            ClampOutput(activations, EatOutputNodeId, -1f, 1f),
+            ClampOutput(activations, ReproduceOutputNodeId, -1f, 1f),
+            ClampOutput(activations, AttackOutputNodeId, -1f, 1f),
+            ClampOutput(activations, GrabOutputNodeId, 0f, 1f),
+            ClampOutput(activations, SoundAmplitudeOutputNodeId, 0f, 1f),
+            ClampOutput(activations, SoundToneOutputNodeId, -1f, 1f));
+    }
+
+    private static bool TryReadInputNodeActivation(
+        int nodeId,
+        in BrainInputFrame frame,
+        in LegacyNeuralMemoryInputFrame memory,
+        ReadOnlySpan<float> baselineDenseInputs,
+        ReadOnlySpan<float> modifiedDenseInputs,
+        bool useDenseOverrideInputs,
+        out float value)
+    {
+        if ((uint)nodeId >= (uint)RtNeatBrainIoRegistry.Inputs.Count)
+        {
+            value = 0f;
+            return false;
+        }
+
+        var key = RtNeatBrainIoRegistry.Inputs[nodeId].Key;
+        value = useDenseOverrideInputs
+            ? ReadDenseOverrideInput(key, frame, memory, baselineDenseInputs, modifiedDenseInputs)
+            : RtNeatBrainIoRegistry.ReadInput(key, frame, memory);
+        return true;
     }
 
     private static float ReadDenseOverrideInput(
@@ -1644,9 +1680,8 @@ public sealed record RtNeatBrainGenome
         };
     }
 
-    private static float ClampOutput(Dictionary<int, float> activations, string key, float min, float max)
+    private static float ClampOutput(Dictionary<int, float> activations, int id, float min, float max)
     {
-        var id = OutputNodeId(key);
         return activations.TryGetValue(id, out var value)
             ? Math.Clamp(value, min, max)
             : 0f;
