@@ -485,6 +485,60 @@ public sealed record RtNeatBrainGenome
         AddConnection(
             connections,
             ref nextInnovationId,
+            InputNodeId("vision.meat.direction_right"),
+            OutputNodeId("action.turn"),
+            3.8f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat.direction_forward"),
+            OutputNodeId("action.move_forward"),
+            0.85f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("scent.meat_right"),
+            OutputNodeId("action.turn"),
+            1.1f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("scent.meat_forward"),
+            OutputNodeId("action.move_forward"),
+            0.35f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat.proximity"),
+            OutputNodeId("action.move_forward"),
+            -0.45f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.meat_food"),
+            OutputNodeId("action.move_forward"),
+            -1.5f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("contact.meat_food"),
+            OutputNodeId("action.eat"),
+            5.2f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("vision.meat_freshness"),
+            OutputNodeId("action.eat"),
+            1.4f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
+            InputNodeId("scent.rotten_meat_density"),
+            OutputNodeId("action.eat"),
+            -1.4f);
+        AddConnection(
+            connections,
+            ref nextInnovationId,
             InputNodeId("contact.creature"),
             OutputNodeId("action.move_forward"),
             -1.0f);

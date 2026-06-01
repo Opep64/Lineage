@@ -2076,6 +2076,38 @@ Readout:
 - The 3k predator-prey smoke populated differentiated profile rows. For example, `Meat Predator Forager` showed nonzero meat calorie share while prey rows remained plant-only in the sampled window.
 - Full-solution build was not used for this patch because a live `Lineage.Runner` process had the Runner output DLL locked; Core/Cli/tests build and run cleanly.
 
+## 2026-06-01 rtNEAT Predator Payoff Tuning
+
+The roster payoff telemetry showed that sparse-graph rtNEAT predators could attack and kill, but almost all of their calories still came from plants. Tuned `SparseGraphPredator` by adding meat sight/scent steering, meat-contact eating, fresh-meat eat support, and light rotten-scent eat suppression while keeping the existing creature attack/grab circuit.
+
+Probe files:
+
+- Baseline/tuned 20k roster CSVs: `out/predator_payoff_tuning_20260601/*_roster.csv`
+- Tuned 60k roster CSVs: `out/predator_payoff_tuning_20260601/rtneat_tuned_seed*_60k_roster.csv`
+- Rejected rot-gated variant CSVs: `out/predator_payoff_tuning_20260601/rtneat_tuned_rotgate_seed*_roster.csv`
+
+20k rtNEAT predator-roster probe, seeds `42-44`, predator profile only:
+
+| Variant | Final pop | Predator living | Predator descendants | Cross kills | Meat kcal/s | Fresh-kill kcal/s | Meat share | Fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline starter | 113.3 | 3.7 | 15.7 | 18.3 | 0.0006 | 0.0002 | 0.0% | 0.0% |
+| Meat-circuit starter | 98.0 | 10.3 | 23.0 | 34.3 | 0.9041 | 0.3541 | 34.5% | 13.5% |
+| Rot-gated experiment | 104.3 | 13.7 | 28.3 | 29.3 | 0.7887 | 0.3045 | 31.2% | 12.1% |
+
+60k tuned comparison, seeds `42-44`, predator profile only:
+
+| Variant | Final pop | Predator living | Predator descendants | Starvation | Injury | Rotten | Cross kills | Meat share | Fresh-kill share |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Meat-circuit starter | 123.0 | 8.0 | 95.3 | 48.0 | 34.3 | 17.0 | 55.7 | 30.3% | 8.8% |
+| Rot-gated experiment | 95.0 | 19.0 | 148.3 | 70.7 | 47.3 | 23.3 | 72.0 | 28.4% | 8.5% |
+
+Readout:
+
+- The meat circuit fixed the immediate payoff-conversion bug: predator meat share moved from effectively `0%` to `30-35%`, and fresh-kill share became measurable.
+- The rot-gated variant looked slightly better at 20k for predator headcount, but at 60k it pushed the ecosystem harder, lowered final population, and did not reduce rotten-meat damage. Rejected for now.
+- Current candidate to keep: the meat-circuit starter. It improves rtNEAT predator payoff without the harsher long-run pressure of the rot-gated experiment.
+- Remaining issue: predators still eat enough stale/rotting meat to create nontrivial rotten deaths. This likely needs either stronger evolved carrion/freshness strategy, a scenario carrion-adaptation choice, or a better action/target-choice split than the current single `Eat` gate.
+
 ## Open Questions
 
 - Should vision sectors be fixed-count inputs, or should we add a small preprocessed visual field layer?

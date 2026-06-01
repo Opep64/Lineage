@@ -6519,6 +6519,59 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
         default,
         denseInputs,
         denseOutputs).Actions;
+    var meatToRightForPredator = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 0.45f,
+                MeatDirectionForward = 0.6f,
+                MeatDirectionRight = 0.8f,
+                MeatScentDetected = true,
+                MeatScentDensity = 0.5f,
+                MeatScentDirectionForward = 0.4f,
+                MeatScentDirectionRight = 0.7f,
+                VisibleMeatDensity = 0.7f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline with { DietaryAdaptation = 0.75f }),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var meatContactForPredator = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                Hunger = 1f,
+                MeatDetected = true,
+                MeatProximity = 1f,
+                MeatDirectionForward = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline with { DietaryAdaptation = 0.75f }),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
+    var rottenMeatContactForPredator = predatorStarter.Evaluate(
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                Hunger = 1f,
+                MeatDetected = true,
+                MeatProximity = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                RottenMeatScentDetected = true,
+                RottenMeatScentDensity = 1f
+            },
+            CreatureGenome.Baseline with { DietaryAdaptation = 0.75f }),
+        default,
+        denseInputs,
+        denseOutputs).Actions;
     var similarCreatureContact = predatorStarter.Evaluate(
         BrainInputFrame.FromSenses(
             new CreatureSenseState
@@ -6554,6 +6607,11 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
     AssertTrue(creatureToRight.Turn > 0.25f, "rtNEAT predator starter should turn toward creatures on the right");
     AssertTrue(creatureContact.Attack > 0.25f, "rtNEAT predator starter should attack contacted creatures");
     AssertTrue(creatureContact.Grab > 0.25f, "rtNEAT predator starter should grab contacted creatures");
+    AssertTrue(meatToRightForPredator.Turn > 0.5f, "rtNEAT predator starter should turn toward fresh meat on the right");
+    AssertTrue(meatToRightForPredator.MoveForward > noFood.MoveForward, "rtNEAT predator starter should approach visible fresh meat");
+    AssertTrue(meatContactForPredator.Eat > 0.25f, "rtNEAT predator starter should eat contacted meat");
+    AssertTrue(meatContactForPredator.MoveForward < meatToRightForPredator.MoveForward, "rtNEAT predator starter should slow when it reaches meat");
+    AssertTrue(rottenMeatContactForPredator.Eat < meatContactForPredator.Eat, "rtNEAT predator starter should reduce eating near rotten scent");
     AssertTrue(similarCreatureContact.Attack < creatureContact.Attack, "rtNEAT predator starter should suppress attacks against similar contacts");
     AssertTrue(hungryMeatBiasedSimilarCreatureContact.Attack > 0.25f, "rtNEAT predator starter should let hunger and meat bias overcome similar-contact attack suppression");
     AssertTrue(hungryMeatBiasedSimilarCreatureContact.Grab > 0.35f, "rtNEAT predator starter should let hunger and meat bias overcome similar-contact grab suppression");
