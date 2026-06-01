@@ -5197,14 +5197,14 @@ public partial class Main : Node2D
         {
             _loadedSpeciesProfile = SpeciesProfileJson.Load(path);
             _loadedSpeciesProfilePath = path;
-            _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path));
+            _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path), _loadedSpeciesProfile.DefaultBrainPath);
             _scenarioEditor.SetStatus($"Loaded species profile {_loadedSpeciesProfile.Name}.");
         }
         catch (Exception ex)
         {
             _loadedSpeciesProfile = null;
             _loadedSpeciesProfilePath = null;
-            _scenarioEditor.SetLoadedSpeciesProfilePath(null);
+            _scenarioEditor.SetLoadedSpeciesProfilePath(null, null);
             _scenarioEditor.SetStatus($"Species profile load failed: {ex.Message}");
         }
     }
@@ -5244,7 +5244,7 @@ public partial class Main : Node2D
             _loadedSpeciesProfile = profile;
             _loadedSpeciesProfilePath = path;
             _scenarioEditor.SetLastSpeciesExportPath(path);
-            _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path));
+            _scenarioEditor.SetLoadedSpeciesProfilePath(ToWorkspaceRelativePath(path), profile.DefaultBrainPath);
             _scenarioEditor.SetStatus(pairedBrainPath is null
                 ? $"Exported species profile {profile.Name}."
                 : $"Exported species profile {profile.Name} with paired brain {System.IO.Path.GetFileName(pairedBrainPath)}.");

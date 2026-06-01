@@ -21,7 +21,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private const float FieldLabelWidth = 205f;
     private const string SpeciesProfileBrainOption = "Profile/default brain";
     private const string SpeciesScenarioInitialBrainOption = "Scenario initial brain";
-    private const string NoCatalogBrainOption = "No catalog override";
+    private const string NoCatalogBrainOption = "Profile/default brain";
 
     private static readonly string[] ScenarioGroupOrder =
     [
@@ -96,6 +96,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private string? _lastCheckpointPath;
     private string? _lastCheckpointDirectory;
     private string? _loadedSpeciesProfilePath;
+    private string? _loadedSpeciesDefaultBrainPath;
     private string? _lastSpeciesExportPath;
     private string? _lastBrainExportPath;
     private string? _brainCatalogDirectory;
@@ -255,11 +256,13 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _loadCheckpointButton.Disabled = _lastCheckpointPath is null;
     }
 
-    public void SetLoadedSpeciesProfilePath(string? path)
+    public void SetLoadedSpeciesProfilePath(string? path, string? defaultBrainPath = null)
     {
         _loadedSpeciesProfilePath = string.IsNullOrWhiteSpace(path) ? null : path;
+        _loadedSpeciesDefaultBrainPath = string.IsNullOrWhiteSpace(defaultBrainPath) ? null : defaultBrainPath;
         _loadedSpeciesLabel.Text = _loadedSpeciesProfilePath ?? "No species profile loaded.";
         _injectSpeciesButton.Disabled = _loadedSpeciesProfilePath is null;
+        SelectBrainCatalogPath(_loadedSpeciesDefaultBrainPath);
     }
 
     public void SetLastSpeciesExportPath(string? path)
@@ -607,7 +610,30 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             }
         }
 
+        SelectBrainCatalogPath(_loadedSpeciesDefaultBrainPath);
+    }
+
+    private void SelectBrainCatalogPath(string? brainPath)
+    {
+        if (_speciesBrainProfileInput is null)
+        {
+            return;
+        }
+
         _speciesBrainProfileInput.Selected = 0;
+        if (!string.IsNullOrWhiteSpace(brainPath))
+        {
+            for (var index = 0; index < _brainCatalogOptions.Count; index++)
+            {
+                var option = _brainCatalogOptions[index];
+                if (option.IsCompatible && SameCatalogPath(option.Path, brainPath))
+                {
+                    _speciesBrainProfileInput.Selected = index + 1;
+                    break;
+                }
+            }
+        }
+
         UpdateBrainCatalogSummary();
     }
 
@@ -619,11 +645,31 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         }
 
         var selected = SelectedBrainCatalogOption();
-        _brainCatalogSummaryLabel.Text = selected is null
-            ? _brainCatalogOptions.Count == 0
-                ? "No brain catalog profiles loaded."
-                : $"{_brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount} compatible brain catalog profile{(_brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount == 1 ? string.Empty : "s")} available. {_incompatibleBrainCatalogProfileCount} incompatible profile{(_incompatibleBrainCatalogProfileCount == 1 ? string.Empty : "s")} shown but disabled."
-            : $"Catalog override: {selected.Path} | {selected.WeightCount} weights | {selected.CompatibilityStatus}";
+        if (selected is not null)
+        {
+            _brainCatalogSummaryLabel.Text = $"Catalog brain: {selected.Path} | {selected.WeightCount} weights | {selected.CompatibilityStatus}";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_loadedSpeciesDefaultBrainPath)
+            && _brainCatalogOptions.Count > 0
+            && !_brainCatalogOptions.Any(option => option.IsCompatible && SameCatalogPath(option.Path, _loadedSpeciesDefaultBrainPath)))
+        {
+            _brainCatalogSummaryLabel.Text = $"Species default brain is not available as a compatible catalog profile: {_loadedSpeciesDefaultBrainPath}";
+            return;
+        }
+
+        _brainCatalogSummaryLabel.Text = _brainCatalogOptions.Count == 0
+            ? "No brain catalog profiles loaded."
+            : $"{_brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount} compatible brain catalog profile{(_brainCatalogOptions.Count - _incompatibleBrainCatalogProfileCount == 1 ? string.Empty : "s")} available. {_incompatibleBrainCatalogProfileCount} incompatible profile{(_incompatibleBrainCatalogProfileCount == 1 ? string.Empty : "s")} shown but disabled.";
+    }
+
+    private static bool SameCatalogPath(string? left, string? right)
+    {
+        return string.Equals(
+            (left ?? string.Empty).Replace('\\', '/'),
+            (right ?? string.Empty).Replace('\\', '/'),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryReadScenarioRecipe(string path, out ScenarioRecipeOption? recipe)
@@ -1031,11 +1077,6 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
 
         _speciesBrainOverrideInput = new OptionButton();
         _speciesBrainOverrideInput.AddItem(SpeciesProfileBrainOption);
-        _speciesBrainOverrideInput.AddItem(SpeciesScenarioInitialBrainOption);
-        foreach (var name in Enum.GetNames<InitialBrainKind>())
-        {
-            _speciesBrainOverrideInput.AddItem(name);
-        }
         _speciesBrainProfileInput = new OptionButton();
         _speciesBrainProfileInput.ItemSelected += _ => UpdateBrainCatalogSummary();
         RefreshBrainCatalogOptions();
@@ -1083,8 +1124,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         root.AddChild(CreateFieldRow("Inject count", _speciesInjectCountInput));
         root.AddChild(CreateFieldRow("Inject region", _speciesInjectRegionInput));
         root.AddChild(CreateFieldRow("Inject energy", _speciesInjectEnergyInput));
-        root.AddChild(CreateFieldRow("Species brain", _speciesBrainOverrideInput));
-        root.AddChild(CreateFieldRow("Catalog brain", _speciesBrainProfileInput));
+        root.AddChild(CreateFieldRow("Brain", _speciesBrainProfileInput));
         _brainCatalogSummaryLabel = new Label
         {
             Text = "No brain catalog profiles loaded.",

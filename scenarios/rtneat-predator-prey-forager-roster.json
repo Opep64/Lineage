@@ -114,7 +114,7 @@
       "profilePath": "species/efficient-prey-forager.species.json",
       "count": 84,
       "spawnRegion": "uniform",
-      "brainOverrideKind": "sparseGraphForager",
+      "brainProfilePath": "brains/starter/starter-sparse-graph-forager-rtneat.brain.json",
       "enabled": true
     },
     {
@@ -122,7 +122,7 @@
       "profilePath": "species/efficient-explorer-prey-forager.species.json",
       "count": 36,
       "spawnRegion": "uniform",
-      "brainOverrideKind": "sparseGraphForager",
+      "brainProfilePath": "brains/starter/starter-sparse-graph-forager-rtneat.brain.json",
       "enabled": true
     },
     {
@@ -131,7 +131,7 @@
       "count": 12,
       "spawnRegion": "uniform",
       "energyOverride": 110,
-      "brainOverrideKind": "sparseGraphForager",
+      "brainProfilePath": "brains/starter/starter-sparse-graph-forager-rtneat.brain.json",
       "enabled": true
     }
   ]

@@ -2973,6 +2973,18 @@ public sealed partial class LineageRunManager
         };
     }
 
+    private static string FormatBrainArchitectureKind(string? value)
+    {
+        return value switch
+        {
+            "hybridNeural" => "hybrid neural",
+            "hiddenLayerNeural" => "hidden-layer neural",
+            "rtNeatGraph" => "rtNEAT graph",
+            null or "" => "unknown",
+            _ => value
+        };
+    }
+
     private static string? FormatEnumJsonValue<TEnum>(TEnum? value)
         where TEnum : struct, Enum
     {
@@ -3250,6 +3262,8 @@ public sealed partial class LineageRunManager
             return Array.Empty<RunScenarioSpeciesSeedSummary>();
         }
 
+        var scenarioBrainArchitectureKind = GetString(element, "brainArchitectureKind");
+        var scenarioBrainHiddenNodeCount = GetInt32(element, "brainHiddenNodeCount");
         var summaries = new List<RunScenarioSpeciesSeedSummary>();
         foreach (var speciesSeed in speciesSeeds.EnumerateArray())
         {
@@ -3267,6 +3281,12 @@ public sealed partial class LineageRunManager
             var brainProfilePath = GetString(speciesSeed, "brainProfilePath");
             var brainOverrideKind = GetString(speciesSeed, "brainOverrideKind");
             var speciesProfile = TryLoadSpeciesProfile(profilePath, scenarioPath);
+            var selectedBrainProfile = string.IsNullOrWhiteSpace(brainProfilePath)
+                ? null
+                : TryLoadBrainProfileSummary(brainProfilePath, profilePath, scenarioPath);
+            var defaultBrainProfile = selectedBrainProfile is null && !string.IsNullOrWhiteSpace(speciesProfile?.DefaultBrainPath)
+                ? TryLoadBrainProfileSummary(speciesProfile.DefaultBrainPath, profilePath, scenarioPath)
+                : null;
             var profileName = speciesProfile?.Name;
             if (string.IsNullOrWhiteSpace(profileName))
             {
@@ -3284,7 +3304,11 @@ public sealed partial class LineageRunManager
                 Brain: FormatSpeciesSeedBrain(
                     speciesProfile,
                     brainProfilePath,
+                    selectedBrainProfile,
+                    defaultBrainProfile,
                     brainOverrideKind,
+                    scenarioBrainArchitectureKind,
+                    scenarioBrainHiddenNodeCount,
                     profilePath,
                     scenarioPath),
                 BrainProfilePath: brainProfilePath));
@@ -3312,29 +3336,98 @@ public sealed partial class LineageRunManager
         }
     }
 
+    private sealed record BrainProfileSummary(
+        string Name,
+        string ArchitectureKind,
+        int HiddenNodeCount,
+        int WeightCount);
+
+    private static BrainProfileSummary? TryLoadBrainProfileSummary(
+        string brainProfilePath,
+        string speciesProfilePath,
+        string scenarioPath)
+    {
+        if (string.IsNullOrWhiteSpace(brainProfilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var resolvedSpeciesPath = string.IsNullOrWhiteSpace(speciesProfilePath)
+                ? null
+                : SimulationScenarioSpeciesSeeder.ResolveProfilePath(speciesProfilePath, scenarioPath);
+            var resolvedBrainPath = SimulationScenarioSpeciesSeeder.ResolveBrainProfilePath(
+                brainProfilePath,
+                resolvedSpeciesPath,
+                scenarioPath);
+            var brainProfile = BrainProfileJson.Load(resolvedBrainPath);
+            var name = string.IsNullOrWhiteSpace(brainProfile.Name)
+                ? Path.GetFileName(brainProfilePath)
+                : brainProfile.Name;
+            return new BrainProfileSummary(
+                name,
+                FormatEnumJsonValue<BrainArchitectureKind>(brainProfile.BrainArchitectureKind) ?? brainProfile.BrainArchitectureKind.ToString(),
+                brainProfile.HiddenNodeCount,
+                brainProfile.WeightCount);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static string FormatSpeciesSeedBrain(
         SpeciesProfile? speciesProfile,
         string? brainProfilePath,
+        BrainProfileSummary? selectedBrainProfile,
+        BrainProfileSummary? defaultBrainProfile,
         string? brainOverrideKind,
+        string? scenarioBrainArchitectureKind,
+        int? scenarioBrainHiddenNodeCount,
         string profilePath,
         string scenarioPath)
     {
         if (!string.IsNullOrWhiteSpace(brainProfilePath))
         {
-            return $"{ReadBrainProfileName(brainProfilePath, profilePath, scenarioPath)} brain profile";
+            var brain = selectedBrainProfile
+                ?? TryLoadBrainProfileSummary(brainProfilePath, profilePath, scenarioPath);
+            return brain is null
+                ? $"{ReadBrainProfileName(brainProfilePath, profilePath, scenarioPath)} brain profile"
+                : $"{brain.Name} brain profile ({FormatBrainProfileTopology(brain)})";
         }
 
         if (!string.IsNullOrWhiteSpace(brainOverrideKind))
         {
-            return $"{FormatInitialBrainKind(brainOverrideKind)} generated brain";
+            var architecture = string.IsNullOrWhiteSpace(scenarioBrainArchitectureKind)
+                ? string.Empty
+                : $" {FormatBrainArchitectureKind(scenarioBrainArchitectureKind)}";
+            var hidden = scenarioBrainHiddenNodeCount is null
+                ? string.Empty
+                : $", hidden {scenarioBrainHiddenNodeCount.Value.ToString(CultureInfo.InvariantCulture)}";
+            return $"{FormatInitialBrainKind(brainOverrideKind)} legacy generated{architecture} brain{hidden}";
         }
 
         if (!string.IsNullOrWhiteSpace(speciesProfile?.DefaultBrainPath))
         {
-            return $"{ReadBrainProfileName(speciesProfile.DefaultBrainPath, profilePath, scenarioPath)} default brain profile";
+            var brain = defaultBrainProfile
+                ?? TryLoadBrainProfileSummary(speciesProfile.DefaultBrainPath, profilePath, scenarioPath);
+            return brain is null
+                ? $"{ReadBrainProfileName(speciesProfile.DefaultBrainPath, profilePath, scenarioPath)} default brain profile"
+                : $"{brain.Name} default brain profile ({FormatBrainProfileTopology(brain)})";
         }
 
         return "embedded profile brain";
+    }
+
+    private static string FormatBrainProfileTopology(BrainProfileSummary brain)
+    {
+        var architecture = FormatBrainArchitectureKind(brain.ArchitectureKind);
+        var hidden = brain.HiddenNodeCount.ToString(CultureInfo.InvariantCulture);
+        var weights = brain.WeightCount.ToString(CultureInfo.InvariantCulture);
+        return string.Equals(brain.ArchitectureKind, "rtNeatGraph", StringComparison.OrdinalIgnoreCase)
+            ? $"{architecture}, graph topology, hidden {hidden}, {weights} weights"
+            : $"{architecture}, hidden {hidden}, {weights} weights";
     }
 
     private static string ReadBrainProfileName(string brainProfilePath, string speciesProfilePath, string scenarioPath)

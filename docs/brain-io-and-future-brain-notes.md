@@ -432,7 +432,7 @@ Decision from this sample:
 - Keep the base mutation settings as the default rtNEAT posture for now.
 - Treat strength `0.08` plus brain mutation rate `0.12` as an experiment setting for graph-growth probes, not as the default.
 - Do not jump to brain mutation rate `0.16`; the 50K matrix already showed it bought complexity by burning too much viability.
-- Added the `rtNEAT Graph Growth` scenario recipe so the stronger setting is available deliberately.
+- Retired the rtNEAT scenario recipes after catalog brain selection became the source of truth. Use rtNEAT catalog brains and roster scenarios for brain selection; use generic mutation recipes for mutation-pressure probes.
 
 60K telemetry-backed sanity pass after adding stats columns:
 
