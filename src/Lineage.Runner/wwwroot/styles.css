@@ -1048,6 +1048,56 @@ button.scenario-tab.is-active {
   padding: 5px 9px;
 }
 
+.brain-lab-world-probe-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.brain-lab-world-probe-editor.empty {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.brain-lab-world-probe-editor-field {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) minmax(110px, 1.25fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.brain-lab-world-probe-editor-field label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brain-lab-world-probe-editor-field input,
+.brain-lab-world-probe-editor-field select {
+  min-height: 30px;
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.brain-lab-world-probe-editor-field input[type="range"] {
+  padding: 0;
+}
+
+.brain-lab-world-probe-editor-field.is-range {
+  grid-template-columns: minmax(88px, 0.75fr) minmax(86px, 1fr) 72px;
+}
+
+.brain-lab-world-probe-editor-note {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .brain-lab-world-probe-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

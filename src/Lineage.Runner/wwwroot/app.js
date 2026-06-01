@@ -91,6 +91,7 @@ const brainLabWorldProbe = document.querySelector("#brainLabWorldProbe");
 const brainLabWorldProbeCanvas = document.querySelector("#brainLabWorldProbeCanvas");
 const brainLabWorldProbeSummary = document.querySelector("#brainLabWorldProbeSummary");
 const brainLabWorldProbeSelection = document.querySelector("#brainLabWorldProbeSelection");
+const brainLabWorldProbeEditor = document.querySelector("#brainLabWorldProbeEditor");
 const brainLabWorldProbeZoomOutButton = document.querySelector("#brainLabWorldProbeZoomOutButton");
 const brainLabWorldProbeZoomInButton = document.querySelector("#brainLabWorldProbeZoomInButton");
 const brainLabWorldProbeZoomResetButton = document.querySelector("#brainLabWorldProbeZoomResetButton");
@@ -1428,7 +1429,237 @@ function renderBrainLabWorldProbeSelection() {
     brainLabWorldProbeSelection.innerHTML = `<strong>${escapeHtml(details.title)}</strong><code>${escapeHtml(details.key)}</code>${details.facts.length > 0 ? ` ${details.facts.map(escapeHtml).join(" | ")}` : ""}`;
   }
 
+  renderBrainLabWorldProbeSelectionEditor(selection);
   updateBrainLabWorldProbeActionButtons(selection);
+}
+
+function renderBrainLabWorldProbeSelectionEditor(selection) {
+  if (!brainLabWorldProbeEditor) {
+    return;
+  }
+
+  if (!selection) {
+    brainLabWorldProbeEditor.classList.add("empty");
+    brainLabWorldProbeEditor.textContent = "Select an item to edit.";
+    return;
+  }
+
+  const deleted = isBrainLabWorldProbeSelectionDeleted(selection);
+  const fields = brainLabWorldProbeEditorFields(selection);
+  const note = brainLabWorldProbeEditorNote(selection, deleted);
+  if (fields.length === 0) {
+    brainLabWorldProbeEditor.classList.add("empty");
+    brainLabWorldProbeEditor.textContent = note || "This selection has no editable world properties.";
+    return;
+  }
+
+  brainLabWorldProbeEditor.classList.remove("empty");
+  brainLabWorldProbeEditor.innerHTML = [
+    ...fields.map((field) => renderBrainLabWorldProbeEditorField(field, deleted)),
+    note ? `<div class="brain-lab-world-probe-editor-note">${escapeHtml(note)}</div>` : ""
+  ].join("");
+}
+
+function brainLabWorldProbeEditorFields(selection) {
+  if (!selection || selection.type === "focus") {
+    return [];
+  }
+
+  const item = selection.item;
+  const radius = Math.max(1, Number(brainLabWorldProbeScene?.probeRadius || 1));
+  const fields = [
+    brainLabWorldProbeNumberField("x", "X", item.x, -radius, radius, 1),
+    brainLabWorldProbeNumberField("y", "Y", item.y, -radius, radius, 1)
+  ];
+
+  if (selection.type === "resource") {
+    fields.push(brainLabWorldProbeNumberField("radius", "Radius", item.radius, 0.1, radius, 0.1));
+    if (item.kind === "Plant") {
+      fields.push({
+        key: "plantKind",
+        label: "Plant type",
+        type: "select",
+        value: item.plantKind || "Generic",
+        options: ["Generic", "Tender", "Rich", "Tough"]
+      });
+    }
+    fields.push(brainLabWorldProbeNumberField("calories", "Calories", item.calories, 0, 100000, 0.1));
+    fields.push(brainLabWorldProbeNumberField("maxCalories", "Max kcal", item.maxCalories, 0.1, 100000, 0.1));
+    if (item.kind === "Meat") {
+      fields.push(brainLabWorldProbeRangeField("freshness", "Freshness", item.freshness ?? 1, 0, 1, 0.01));
+    }
+    return fields;
+  }
+
+  if (selection.type === "egg") {
+    fields.push(brainLabWorldProbeNumberField("generation", "Generation", item.generation, 0, 1000000, 1));
+    fields.push(brainLabWorldProbeNumberField("radius", "Radius", item.radius, 0.1, radius, 0.1));
+    fields.push(brainLabWorldProbeNumberField("energy", "Energy", item.energy, 0, 100000, 0.1));
+    fields.push(brainLabWorldProbeNumberField("health", "Health", item.health, 0, 100000, 0.1));
+    return fields;
+  }
+
+  if (selection.type === "creature" || selection.type === "sound") {
+    if (selection.type === "creature") {
+      fields.push(brainLabWorldProbeNumberField("generation", "Generation", item.generation, 0, 1000000, 1));
+      fields.push(brainLabWorldProbeNumberField("radius", "Radius", item.radius, 0.1, radius, 0.1));
+      fields.push(brainLabWorldProbeNumberField("headingDegrees", "Heading", radiansToDegrees(item.headingRadians), -180, 180, 1));
+      fields.push(brainLabWorldProbeRangeField("energyRatio", "Energy", item.energyRatio ?? 1, 0, 1, 0.01));
+      fields.push(brainLabWorldProbeRangeField("healthRatio", "Health", item.healthRatio ?? 1, 0, 1, 0.01));
+    }
+    fields.push(brainLabWorldProbeRangeField("soundAmplitude", "Sound amp", item.soundAmplitude || 0, 0, 1, 0.01));
+    fields.push(brainLabWorldProbeRangeField("soundTone", "Sound tone", item.soundTone || 0, -1, 1, 0.01));
+    return fields;
+  }
+
+  return fields;
+}
+
+function brainLabWorldProbeNumberField(key, label, value, min, max, step) {
+  return {
+    key,
+    label,
+    type: "number",
+    value,
+    min,
+    max,
+    step
+  };
+}
+
+function brainLabWorldProbeRangeField(key, label, value, min, max, step) {
+  return {
+    key,
+    label,
+    type: "range",
+    value,
+    min,
+    max,
+    step
+  };
+}
+
+function renderBrainLabWorldProbeEditorField(field, disabled) {
+  const value = clampBrainLabWorldProbeEditorValue(field.value, field);
+  const disabledAttribute = disabled ? " disabled" : "";
+  if (field.type === "select") {
+    const options = (field.options || [])
+      .map((option) => `<option value="${escapeHtml(option)}"${option === field.value ? " selected" : ""}>${escapeHtml(formatEnumLabel(option))}</option>`)
+      .join("");
+    return `
+      <div class="brain-lab-world-probe-editor-field">
+        <label for="brain-lab-world-probe-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label>
+        <select id="brain-lab-world-probe-${escapeHtml(field.key)}" data-brain-lab-world-edit-field="${escapeHtml(field.key)}"${disabledAttribute}>${options}</select>
+      </div>
+    `;
+  }
+
+  const min = Number(field.min);
+  const max = Number(field.max);
+  const step = Number(field.step);
+  const formatted = formatBrainLabControlValue(value);
+  if (field.type === "range") {
+    return `
+      <div class="brain-lab-world-probe-editor-field is-range">
+        <label for="brain-lab-world-probe-${escapeHtml(field.key)}-range">${escapeHtml(field.label)}</label>
+        <input id="brain-lab-world-probe-${escapeHtml(field.key)}-range" data-brain-lab-world-edit-field="${escapeHtml(field.key)}" type="range" min="${min}" max="${max}" step="${step}" value="${formatted}"${disabledAttribute}>
+        <input data-brain-lab-world-edit-field="${escapeHtml(field.key)}" type="number" min="${min}" max="${max}" step="${step}" value="${formatted}"${disabledAttribute}>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="brain-lab-world-probe-editor-field">
+      <label for="brain-lab-world-probe-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label>
+      <input id="brain-lab-world-probe-${escapeHtml(field.key)}" data-brain-lab-world-edit-field="${escapeHtml(field.key)}" type="number" min="${min}" max="${max}" step="${step}" value="${formatted}"${disabledAttribute}>
+    </div>
+  `;
+}
+
+function brainLabWorldProbeEditorNote(selection, deleted) {
+  if (deleted) {
+    return "Deleted items are excluded from recomputation until edits are cleared.";
+  }
+  if (!selection) {
+    return "";
+  }
+  if (selection.type === "focus") {
+    return "The selected creature is the probe anchor. Edit its brain inputs in the Inputs panel below.";
+  }
+  if (selection.type === "creature") {
+    const hunger = Math.max(0, Math.min(1, 1 - Number(selection.item.energyRatio || 0)));
+    return `Hunger follows energy here; current derived hunger is ${formatPercent(hunger)}.`;
+  }
+  if (selection.type === "sound") {
+    return "Sound edits use the source creature position and emitted tone.";
+  }
+  return "";
+}
+
+function updateBrainLabWorldProbeEditorField(control) {
+  const selection = resolveBrainLabWorldProbeSelection();
+  if (!selection || isBrainLabWorldProbeSelectionDeleted(selection)) {
+    return;
+  }
+
+  const fieldKey = control.dataset.brainLabWorldEditField;
+  const field = brainLabWorldProbeEditorFields(selection).find((candidate) => candidate.key === fieldKey);
+  if (!field) {
+    return;
+  }
+
+  const item = selection.item;
+  if (field.type === "select") {
+    item[fieldKey] = control.value;
+  } else {
+    const rawValue = Number(control.value);
+    if (!Number.isFinite(rawValue)) {
+      return;
+    }
+    const value = clampBrainLabWorldProbeEditorValue(rawValue, field);
+    if (fieldKey === "headingDegrees") {
+      item.headingRadians = degreesToRadians(value);
+    } else {
+      item[fieldKey] = value;
+    }
+  }
+
+  if (fieldKey === "x" || fieldKey === "y") {
+    updateBrainLabWorldProbeItemDistance(item);
+  }
+  if (fieldKey === "calories" && Number(item.maxCalories || 0) < Number(item.calories || 0)) {
+    item.maxCalories = Number(item.calories || 0);
+  }
+  if (fieldKey === "maxCalories" && Number(item.maxCalories || 0) < Number(item.calories || 0)) {
+    item.maxCalories = Number(item.calories || 0);
+  }
+  if (fieldKey === "soundAmplitude" && Number(item.soundAmplitude || 0) > 0.05) {
+    brainLabWorldProbeMutedSoundKeys.delete(brainLabWorldProbeSoundKey(selection.id));
+  }
+
+  markBrainLabWorldProbeEdited();
+}
+
+function clampBrainLabWorldProbeEditorValue(value, field) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return Number(field.min || 0);
+  }
+
+  return Math.min(Math.max(number, Number(field.min)), Number(field.max));
+}
+
+function radiansToDegrees(radians) {
+  const degrees = Number(radians || 0) * 180 / Math.PI;
+  if (!Number.isFinite(degrees)) {
+    return 0;
+  }
+
+  return ((degrees + 180) % 360 + 360) % 360 - 180;
+}
+
+function degreesToRadians(degrees) {
+  return Number(degrees || 0) * Math.PI / 180;
 }
 
 function updateBrainLabWorldProbeActionButtons(selection = resolveBrainLabWorldProbeSelection()) {
@@ -1543,6 +1774,16 @@ function brainLabWorldProbeSelectionTitle(selection) {
 function brainLabWorldProbeSelectionHasSound(selection) {
   return (selection.type === "creature" || selection.type === "sound")
     && Number(selection.item.soundAmplitude || 0) > 0.05;
+}
+
+function isBrainLabWorldProbeSelectionDeleted(selection) {
+  if (!selection) {
+    return false;
+  }
+
+  return brainLabWorldProbeHiddenKeys.has(selection.type === "sound"
+    ? brainLabWorldProbeObjectKey("creature", selection.id)
+    : selection.key);
 }
 
 function isBrainLabWorldProbeResourceVisible(resource) {
@@ -5861,6 +6102,12 @@ brainLabInputs.addEventListener("click", (event) => {
   }
 });
 brainLabWorldProbe.addEventListener("change", (event) => {
+  const editControl = event.target.closest("[data-brain-lab-world-edit-field]");
+  if (editControl) {
+    updateBrainLabWorldProbeEditorField(editControl);
+    return;
+  }
+
   const control = event.target.closest("[data-brain-lab-world-toggle]");
   if (control) {
     applyBrainLabWorldProbeToggles();

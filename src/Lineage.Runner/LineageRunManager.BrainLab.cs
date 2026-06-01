@@ -409,27 +409,37 @@ public sealed partial class LineageRunManager
     {
         var existing = TryFindBrainLabCreature(sourceState, new EntityId(edit.Id), out var sourceCreature);
         var creature = existing ? sourceCreature : focus;
+        var sourceGenome = sourceState.GetGenome(creature.GenomeId);
+        var targetEffectiveRadius = PositiveFinite(edit.Radius, CreatureGrowth.EffectiveBodyRadius(creature, sourceGenome));
+        var growthFactor = Math.Max(0.001f, CreatureGrowth.GrowthFactor(creature, sourceGenome));
+        var editedGenome = sourceGenome with
+        {
+            BodyRadius = Math.Max(0.1f, targetEffectiveRadius / growthFactor)
+        };
+        var editedGenomeId = editedState.AddGenome(editedGenome);
         if (!existing)
         {
-            var genome = sourceState.GetGenome(focus.GenomeId) with
-            {
-                BodyRadius = Math.Max(0.1f, PositiveFinite(edit.Radius, CreatureGenome.Baseline.BodyRadius))
-            };
             creature = new CreatureState
             {
                 Id = new EntityId(edit.Id),
                 Generation = edit.Generation,
                 AgeSeconds = Math.Max(CreatureGenome.Baseline.MaturityAgeSeconds, focus.AgeSeconds),
-                Energy = Math.Max(1f, sourceState.GetGenome(focus.GenomeId).ReproductionEnergyThreshold * UnitFinite(edit.EnergyRatio, 1f)),
-                Health = Math.Max(0.1f, UnitFinite(edit.HealthRatio, 1f)),
-                GenomeId = editedState.AddGenome(genome),
+                GenomeId = editedGenomeId,
                 BrainId = focus.BrainId,
                 BirthInvestmentRatio = 1f
             };
         }
+        else
+        {
+            creature.GenomeId = editedGenomeId;
+        }
 
         creature.Position = BrainLabProbeWorldPosition(center, edit.X, edit.Y, bounds);
         creature.HeadingRadians = Finite(edit.HeadingRadians, creature.HeadingRadians);
+        creature.Energy = Math.Max(0f, editedGenome.ReproductionEnergyThreshold * UnitFinite(edit.EnergyRatio, 1f));
+        creature.Health = Math.Max(
+            0f,
+            OffspringDevelopment.JuvenileGrowthScale(creature.BirthInvestmentRatio) * UnitFinite(edit.HealthRatio, 1f));
         creature.Senses = new CreatureSenseState { WorldSenseTick = -1 };
         var actions = creature.Actions;
         actions.SoundAmplitude = UnitFinite(edit.SoundAmplitude, 0f);
