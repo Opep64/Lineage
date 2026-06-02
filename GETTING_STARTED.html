@@ -335,18 +335,18 @@
       <h3>Example Run</h3>
       <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --scenario .\scenarios\balanced-foraging.json --ticks 20000 --seed 42 --output .\out\seed42_stats.csv --report .\out\seed42_report.html --save-snapshot .\out\seed42_snapshot.json --checkpoint-interval 5000 --checkpoint-dir .\out\seed42_checkpoints</code></pre>
 
-      <h3>Preset Comparison</h3>
-      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --batch-report .\out\preset_comparison.html --batch-output-dir .\out\preset_comparison --ticks 20000 --seed 42</code></pre>
+      <h3>Batch Run</h3>
+      <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -- --batch-report .\out\batch_report.html --batch-output-dir .\out\batch_run --ticks 20000 --seed 42</code></pre>
       <p>
-        Batch comparison writes full per-run reports, snapshots, and CSV suites. Use it when a run deserves
-        deep inspection or you want loadable snapshots.
+        Batch mode writes full per-run reports, snapshots, and CSV suites. Use repeated
+        <code>--batch-scenario &lt;path&gt;</code> values when you want to compare saved scenario variants.
       </p>
 
       <h3>Lightweight Probe</h3>
       <pre><code>dotnet run --project .\src\Lineage.Cli\Lineage.Cli.csproj -c Release -- --probe --ticks 20000 --probe-seeds 42,43,44 --probe-output .\out\probe_summary.csv --probe-report .\out\probe_summary.html --probe-stop-on-extinction --probe-max-population 5000</code></pre>
       <p>
-        Probe mode runs the current pressure presets by default and writes only one compact CSV plus one compact
-        HTML summary. Add repeated <code>--probe-scenario &lt;path&gt;</code> values to test a smaller scenario set.
+        Probe mode runs <code>balanced-foraging</code> by default and writes only one compact CSV plus one compact
+        HTML summary. Add repeated <code>--probe-scenario &lt;path&gt;</code> values to test saved scenario variants.
       </p>
 
       <h3>Scenario Files</h3>
@@ -355,18 +355,18 @@
         population, resource density per 1M world area, biome mode, biome cell size, resource void border,
         food abundance, regrowth, depleted-resource relocation, resource clustering, biome movement/basal cost multipliers, nonlinear movement-speed cost, initial brain mode, metabolism, movement cost, eating rate,
         gut capacity, digestion rate, diet adaptation, bite strength, damage resistance, death-meat output, meat decay, meat scent, vision range and angle, trait upkeep costs, optional egg upkeep, egg production rate, egg incubation, maturity age, mutation strength, trait/brain mutation rates, reproduction threshold, and
-        bite damage, bite energy cost, combat-trait upkeep, bite reach, and snapshot interval. The current starter scenario is:
+        bite damage, bite energy cost, combat-trait upkeep, bite reach, and snapshot interval. The checked-in starter scenario is:
       </p>
-      <p>The saved starter and pressure preset scenarios currently use a <code>2000 x 2000</code> world.</p>
       <pre><code>.\scenarios\balanced-foraging.json</code></pre>
-      <p>Current pressure presets:</p>
+      <p>Current pressure presets are runner recipes under <code>.\scenarios\recipes</code> and are intended to layer on top of <code>balanced-foraging</code>:</p>
       <ul>
-        <li><code>.\scenarios\gentle-foraging.json</code>: abundant food, smaller void border, lower basal/movement pressure, and moderate reproduction delay</li>
-        <li><code>.\scenarios\balanced-foraging.json</code>: baseline food, void border, energy pressure, longer maturity, and higher reproduction threshold</li>
-        <li><code>.\scenarios\harsh-foraging.json</code>: sparse food, wider void border, slower regrowth, and higher basal/movement pressure</li>
-        <li><code>.\scenarios\scavenger-pressure.json</code>: lower plant availability, wider void, richer slower-decaying carcasses, and balanced-style combat/egg rules for testing scavenging pressure</li>
-        <li><code>.\scenarios\omnivore-pressure.json</code>: middle pressure between scavenging and predation, with richer carcasses and modest combat pressure while keeping the seed-forager starter brain</li>
-        <li><code>.\scenarios\predation-pressure.json</code>: lower plant reliability, richer persistent meat, slower reproduction, a forager-predator starter brain, and moderated costly bites for testing active predation pressure</li>
+        <li><code>gentle_ecology</code>: abundant food, smaller void border, lower basal/movement pressure, and lower mutation pressure</li>
+        <li><code>harsh_ecology</code>: sparse food, wider void border, slower regrowth, and higher basal/movement pressure</li>
+        <li><code>lean_season</code>: stronger seasonal scarcity with fat-storage pressure</li>
+        <li><code>scavenger_pressure</code>: lower plant reliability, wider void, richer slower-decaying carcasses, and scavenger starter behavior</li>
+        <li><code>carrion_pressure</code>: stronger carrion economy, stronger meat scent, slower decay, and more rot risk</li>
+        <li><code>omnivore_pressure</code>: middle pressure between foraging and meat use, with an opportunistic starter brain</li>
+        <li><code>migration_pressure</code>: larger edge-ladder world with top-vs-bottom opposed seasons</li>
       </ul>
 
       <p>
@@ -543,7 +543,7 @@ dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj</code>
         <li>Dead creatures leave meat resources. Living creatures can now see other living creatures through neutral creature cues and bite one another at close range when their brain outputs attack intent. Bite strength and damage resistance are heritable and costly. Diet adaptation, gut capacity, and digestion rate are heritable, so lineages can evolve from mostly herbivory toward omnivory or meat specialization when the scenario makes that viable.</li>
         <li>Evolutionary pressure is configurable through biome-shaped food density, resource clustering, no-plant void borders, regrowth, death-meat output, meat decay, meat scent, initial brain mode, bite strength, damage resistance, bite damage/cost/reach, combat-trait upkeep, metabolism, movement cost, shared trait upkeep, vision range/angle upkeep, gut-capacity and digestion-rate upkeep, optional egg upkeep, egg exposure damage, egg production rate, offspring investment, egg incubation, maturity age, reproduction threshold, and body-size upkeep.</li>
         <li>Offspring investment sets egg sturdiness and hatchling birth quality; explicit fat, strength, and clutches can build on this later.</li>
-        <li>The latest pressure tuning added an omnivore preset and softened predation-pressure. At 20k ticks, omnivore-pressure settles near 300 creatures with meat contributing about 7% of energy, while predation-pressure settles near 150 creatures with sustained fresh-kill intake and meat contributing about 12% of energy.</li>
+        <li>Pressure presets now live as runner recipes layered onto <code>balanced-foraging</code>, so the base scenario keeps the full generic/tender/rich/tough plant mix while recipes adjust ecology, seasons, meat pressure, migration pressure, or mutation pressure.</li>
         <li>Local carcass/meat scent and neutral creature perception are now in place. The next simulation work should improve evolved behavior around risk, avoidance, and attack decisions rather than only tuning food and damage numbers.</li>
       </ul>
     </section>

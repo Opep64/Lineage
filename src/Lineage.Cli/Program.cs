@@ -141,7 +141,7 @@ static void PrintHelp()
           dotnet run --project .\src\Lineage.Cli -- --ticks 20000 --seed 42 --output .\out\seed42_stats.csv --report .\out\seed42_report.html
           dotnet run --project .\src\Lineage.Cli -- --batch-report .\out\preset_comparison.html --ticks 20000 --seed 42
           dotnet run --project .\src\Lineage.Cli -- --probe --ticks 20000 --probe-seeds 42,43,44
-          dotnet run --project .\src\Lineage.Cli -- --probe --probe-scenario .\scenarios\scavenger-pressure.json --probe-variant sparse:initialResourcesPerMillionArea=120,resourceRegrowthMax=1.0
+          dotnet run --project .\src\Lineage.Cli -- --probe --probe-scenario .\scenarios\balanced-foraging.json --probe-variant sparse:initialResourcesPerMillionArea=120,resourceRegrowthMax=1.0
         """);
 }
 
@@ -589,12 +589,7 @@ static IReadOnlyList<RunResult> RunBatch(RunOptions options)
 {
     IReadOnlyList<string> scenarioPaths = options.BatchScenarioPaths.Count > 0
         ? options.BatchScenarioPaths
-        : new[]
-        {
-            Path.Combine("scenarios", "gentle-foraging.json"),
-            Path.Combine("scenarios", "balanced-foraging.json"),
-            Path.Combine("scenarios", "harsh-foraging.json")
-        };
+        : [Path.Combine("scenarios", "balanced-foraging.json")];
 
     var results = new List<RunResult>(scenarioPaths.Count);
     for (var i = 0; i < scenarioPaths.Count; i++)
@@ -697,15 +692,7 @@ static IReadOnlyList<string> ResolveProbeScenarioPaths(RunOptions options)
         return options.BatchScenarioPaths;
     }
 
-    return
-    [
-        Path.Combine("scenarios", "gentle-foraging.json"),
-        Path.Combine("scenarios", "balanced-foraging.json"),
-        Path.Combine("scenarios", "harsh-foraging.json"),
-        Path.Combine("scenarios", "scavenger-pressure.json"),
-        Path.Combine("scenarios", "omnivore-pressure.json"),
-        Path.Combine("scenarios", "predation-pressure.json")
-    ];
+    return [Path.Combine("scenarios", "balanced-foraging.json")];
 }
 
 static IReadOnlyList<ulong?> ResolveProbeSeedOverrides(RunOptions options)

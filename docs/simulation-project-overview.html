@@ -1024,7 +1024,7 @@
       <section id="scenarios">
         <h2>Scenarios And Starter Profiles</h2>
         <p>
-          Checked-in primary scenarios now favor 4000 x 4000 worlds, density-based resources, sector vision, no nearest-target shortcut inputs, and sampled stats every 300 ticks. Balanced Foraging uses the natural-climate biome generator; larger scenarios still cover migration, obstacle, and terrain pressure. Roster files can inject saved species bodies with profile/default, starter, or catalog brains, including predator/prey and rookie transplant mixes.
+          The checked-in scenario surface is centered on Balanced Foraging: a 4000 x 4000 natural-climate world with density-based resources, sector vision, no nearest-target shortcut inputs, sampled stats every 300 ticks, and the full generic/tender/rich/tough plant mix. Pressure variants now live as runner recipes, so ecology, seasons, meat pressure, migration pressure, mutation pressure, and long-run performance settings can be layered onto the same base.
         </p>
         <div class="grid-2">
           <div>
@@ -1033,17 +1033,21 @@
               <thead><tr><th>Scenario</th><th>World</th><th>Biome/map</th><th>Starter</th><th>Resources / M area</th><th>Role</th></tr></thead>
               <tbody>
                 <tr><td>Balanced Foraging</td><td>4000 x 4000</td><td>Natural climate</td><td>Sector forager</td><td>26</td><td>Default Godot start.</td></tr>
-                <tr><td>Gentle Foraging</td><td>4000 x 4000</td><td>Generated noise</td><td>Sector forager</td><td>22</td><td>Softer survival baseline.</td></tr>
-                <tr><td>Harsh Foraging</td><td>4000 x 4000</td><td>Generated noise</td><td>Sector forager</td><td>20</td><td>Low-margin foraging pressure.</td></tr>
-                <tr><td>Scavenger Pressure</td><td>4000 x 4000</td><td>Generated noise</td><td>Scavenger forager</td><td>23</td><td>Meat scent and carrion opportunity.</td></tr>
-                <tr><td>Carrion Pressure</td><td>4000 x 4000</td><td>Generated noise</td><td>Scavenger forager</td><td>24</td><td>Freshness/rot behavior window.</td></tr>
-                <tr><td>Omnivore Pressure</td><td>4000 x 4000</td><td>Generated noise</td><td>Opportunistic forager</td><td>20</td><td>Plant/meat flexibility.</td></tr>
-                <tr><td>Predation Pressure</td><td>4000 x 4000</td><td>Generated noise</td><td>Forager predator</td><td>24</td><td>All-predator contact combat pressure.</td></tr>
-                <tr><td>Predator Prey Pressure</td><td>4000 x 4000</td><td>Generated noise</td><td>Species roster</td><td>30</td><td>Prey, explorer-prey, and predator seed mix.</td></tr>
-                <tr><td>Plant Diversity Pressure</td><td>4000 x 4000</td><td>Generated noise</td><td>Sector forager</td><td>17</td><td>Plant-type payoff and preference pressure.</td></tr>
-                <tr><td>Migration Pressure</td><td>8000 x 8000</td><td>Edge ladder bands</td><td>Sector forager</td><td>16</td><td>Large-world region crossing.</td></tr>
-                <tr><td>Obstacle Pressure</td><td>8000 x 5000</td><td>Edge ladder + barrier</td><td>Explorer forager</td><td>18.5</td><td>Navigation around blockers.</td></tr>
-                <tr><td>Terrain Pressure</td><td>6000 x 4000</td><td>Edge corridor bands</td><td>Explorer forager</td><td>26</td><td>Biome cost and corridor pressure.</td></tr>
+              </tbody>
+            </table>
+            <h3>Recipe Surface</h3>
+            <table>
+              <thead><tr><th>Recipe</th><th>Role</th></tr></thead>
+              <tbody>
+                <tr><td>Gentle Ecology</td><td>Softer survival pressure.</td></tr>
+                <tr><td>Harsh Ecology</td><td>Low-margin food and metabolism pressure.</td></tr>
+                <tr><td>Lean Season</td><td>Seasonal scarcity and fat-storage pressure.</td></tr>
+                <tr><td>Scavenger Pressure</td><td>Meat scent and carrion opportunity.</td></tr>
+                <tr><td>Carrion Pressure</td><td>Freshness and rot behavior window.</td></tr>
+                <tr><td>Omnivore Pressure</td><td>Plant/meat flexibility.</td></tr>
+                <tr><td>Migration Pressure</td><td>Large-world edge-ladder map with opposed seasons.</td></tr>
+                <tr><td>Double Mutation</td><td>Higher mutation pressure.</td></tr>
+                <tr><td>Long Run Performance</td><td>Lower overhead settings for larger runs.</td></tr>
               </tbody>
             </table>
           </div>
@@ -1071,17 +1075,10 @@
         </div>
         <h3>Reusable Starter Species Profiles</h3>
         <ul class="pill-list">
-          <li>efficient-prey-forager</li>
-          <li>efficient-explorer-prey-forager</li>
-          <li>meat-predator-forager</li>
-          <li>starter-seed-forager</li>
-          <li>starter-sector-forager</li>
-          <li>starter-explorer-forager</li>
-          <li>starter-scavenger-forager</li>
-          <li>starter-forager-predator</li>
-          <li>rookie-sector-forager</li>
-          <li>rookie-explorer-forager</li>
-          <li>rookie-scavenger-forager</li>
+          <li>starter-forager</li>
+          <li>starter-omnivore</li>
+          <li>starter-predator</li>
+          <li>rookie-omnivore</li>
         </ul>
       </section>
 

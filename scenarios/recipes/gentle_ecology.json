@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "lineage.runner.scenario-recipe.v1",
+  "name": "Gentle Ecology",
+  "description": "Softer survival pressure with richer faster-regrowing plants, lower movement cost, and lower mutation pressure.",
+  "tags": [
+    "ecology",
+    "gentle"
+  ],
+  "changes": {
+    "biomeMapKind": "generatedNoise",
+    "biomeCellSize": 1000,
+    "resourceVoidBorderWidth": 80,
+    "initialCreatureCount": 60,
+    "initialResourcesPerMillionArea": 22,
+    "resourceCaloriesMin": 70,
+    "resourceCaloriesMax": 140,
+    "resourceMaxCalories": 140,
+    "resourceRegrowthMin": 0.7,
+    "resourceRegrowthMax": 2,
+    "plantRespawnDelaySecondsMin": 70,
+    "plantRespawnDelaySecondsMax": 220,
+    "resourceClusterStrength": 0.12,
+    "resourceClusterRadius": 650,
+    "barrenBiomeMovementCostMultiplier": 1.3,
+    "sparseBiomeMovementCostMultiplier": 1.12,
+    "richBiomeMovementCostMultiplier": 0.92,
+    "sparseBiomeSpeedMultiplier": 0.8,
+    "barrenBiomeBasalCostMultiplier": 1.18,
+    "richBiomeBasalCostMultiplier": 0.96,
+    "movementEnergyPerSecond": 0.2,
+    "eatCaloriesPerSecond": 22,
+    "eggIncubationSeconds": 28,
+    "reproductivePrimeAgeSeconds": 330,
+    "reproductiveSenescenceAgeSeconds": 1300,
+    "senescentFertilityMultiplier": 0.22,
+    "crowdingFertilityPenalty": 0.55,
+    "mutationStrength": 0.05,
+    "traitMutationRate": 0.16,
+    "brainMutationRate": 0.06
+  },
+  "createdAtUtc": "2026-06-02T00:00:00Z",
+  "updatedAtUtc": "2026-06-02T00:00:00Z"
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "lineage.runner.scenario-recipe.v1",
+  "name": "Lean Season",
+  "description": "Seasonal scarcity pressure with lower plant density/regrowth, longer respawn delays, stronger season swings, and fat-storage tuning.",
+  "tags": [
+    "ecology",
+    "seasons",
+    "fat"
+  ],
+  "changes": {
+    "initialResourcesPerMillionArea": 24,
+    "resourceRegrowthMin": 0.18,
+    "resourceRegrowthMax": 1.05,
+    "plantRespawnDelaySecondsMin": 90,
+    "plantRespawnDelaySecondsMax": 260,
+    "seasonFertilityAmplitude": 0.7,
+    "fatStorageCapacityCalories": 46,
+    "fatStorageEfficiency": 0.85,
+    "fatDepositEnergyRatio": 1.2,
+    "fatWithdrawEnergyRatio": 0.25,
+    "fatTransferCapacitySharePerSecond": 0.45
+  },
+  "createdAtUtc": "2026-06-02T00:00:00Z",
+  "updatedAtUtc": "2026-06-02T00:00:00Z"
+}

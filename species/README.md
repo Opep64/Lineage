@@ -22,20 +22,10 @@ offspring is applied by the scenario/world policy at reproduction time.
 
 Current starter profiles:
 
-- `starter-seed-forager.species.json`: seed plant forager; older embedded weights are normalized to the current sector-vision schema on load.
-- `starter-sector-forager.species.json`: current sector-vision plant forager baseline.
-- `starter-explorer-forager.species.json`: terrain-aware exploratory forager.
-- `starter-scavenger-forager.species.json`: meat-scent scavenger forager.
-- `starter-forager-predator.species.json`: creature-contact predatory forager.
+- `starter-forager.species.json`: plant-focused baseline starter.
+- `starter-omnivore.species.json`: mixed plant-and-carrion starter with mild scavenging ability.
+- `starter-predator.species.json`: creature-focused predator with basic foraging fallback.
+- `rookie-omnivore.species.json`: deliberately weaker mixed starter for runs that should leave more room for early evolution.
 
-Deliberately weaker starter profiles:
-
-- `rookie-sector-forager.species.json`: weaker sector-vision plant forager for runs that should have more room for early evolution.
-- `rookie-explorer-forager.species.json`: weaker exploratory forager with less decisive steering and tighter body economics.
-- `rookie-scavenger-forager.species.json`: weaker mixed plant/scavenger profile with mild carrion interest.
-
-Specialized profiles:
-
-- `efficient-prey-forager.species.json`: efficient prey/grazer profile used in predator/prey tests.
-- `efficient-explorer-prey-forager.species.json`: exploratory efficient prey variant.
-- `meat-predator-forager.species.json`: meat-biased predator starter used in predator/prey tests.
+Each built-in starter species points at a matching Hybrid 4 default brain. The brain catalog also exposes Hidden 16 and
+rtNEAT variants for the same roles, and those brain profiles can be swapped onto any species roster entry.
