@@ -148,6 +148,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
     ("Brain factory mutates hybrid neural brains", BrainFactoryMutatesHybridNeuralBrains),
     ("Brain factory supports hidden-layer neural architecture", BrainFactorySupportsHiddenLayerNeuralArchitecture),
+    ("Brain factory supports hybrid deep 8x8 neural architecture", BrainFactorySupportsHybridDeep8x8NeuralArchitecture),
     ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
     ("Brain probe edits rtNEAT graph inputs", BrainProbeEditsRtNeatGraphInputs),
     ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
@@ -6390,6 +6391,103 @@ static void BrainFactorySupportsHiddenLayerNeuralArchitecture()
             .Zip(starter.Weights.Skip(NeuralBrainGenome.DirectWeightCount))
             .Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
         "Hidden-layer mutation should change at least one hidden weight");
+}
+
+static void BrainFactorySupportsHybridDeep8x8NeuralArchitecture()
+{
+    var descriptor = BrainFactory.Describe(BrainArchitectureKind.HybridDeep8x8Neural);
+
+    AssertEqual(BrainArchitectureKind.HybridDeep8x8Neural, descriptor.Kind, "Hybrid deep descriptor kind");
+    AssertEqual("Hybrid deep 8x8 neural", descriptor.Name, "Hybrid deep descriptor name");
+    AssertEqual(NeuralBrainSchema.HybridDeep8x8HiddenNodeCount, descriptor.DefaultHiddenNodeCount, "Hybrid deep default node count");
+    AssertEqual(NeuralBrainSchema.HybridDeep8x8HiddenNodeCount, descriptor.MinHiddenNodeCount, "Hybrid deep min node count");
+    AssertEqual(NeuralBrainSchema.HybridDeep8x8HiddenNodeCount, descriptor.MaxHiddenNodeCount, "Hybrid deep max node count");
+    AssertTrue(descriptor.SupportsHiddenNodes, "Hybrid deep architecture should report hidden nodes");
+    AssertTrue(descriptor.SupportsDirectInputOutputWeights, "Hybrid deep architecture should report direct weights");
+
+    var zero = BrainFactory.CreateZero(BrainArchitectureKind.HybridDeep8x8Neural);
+    AssertEqual(BrainArchitectureKind.HybridDeep8x8Neural, zero.ArchitectureKind, "Hybrid deep zero architecture");
+    AssertEqual(NeuralBrainSchema.HybridDeep8x8HiddenNodeCount, zero.HiddenNodeCount, "Hybrid deep zero hidden nodes");
+    AssertEqual(NeuralBrainGenome.GetExpectedHybridDeep8x8WeightCount(), zero.WeightCount, "Hybrid deep zero weight count");
+    AssertEqual(
+        NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+        zero.Neural!.FirstHiddenLayerNodeCount,
+        "Hybrid deep first layer node count");
+    AssertEqual(
+        NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount,
+        zero.Neural!.SecondHiddenLayerNodeCount,
+        "Hybrid deep second layer node count");
+    AssertEqual(
+        NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount * NeuralBrainSchema.InputCount,
+        zero.HiddenInputWeightCount,
+        "Hybrid deep hidden input weight count");
+    AssertEqual(
+        NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount * NeuralBrainSchema.OutputCount,
+        zero.HiddenOutputWeightCount,
+        "Hybrid deep hidden output weight count");
+
+    var starter = BrainFactory.CreateStarter(
+        BrainArchitectureKind.HybridDeep8x8Neural,
+        InitialBrainKind.SectorForager);
+    AssertEqual(BrainArchitectureKind.HybridDeep8x8Neural, starter.ArchitectureKind, "Hybrid deep starter architecture");
+    AssertEqual(NeuralBrainSchema.HybridDeep8x8HiddenNodeCount, starter.HiddenNodeCount, "Hybrid deep starter hidden nodes");
+    AssertEqual(NeuralBrainGenome.GetExpectedHybridDeep8x8WeightCount(), starter.WeightCount, "Hybrid deep starter weight count");
+    AssertTrue(starter.Neural!.HasSecondHiddenLayer, "Hybrid deep starter should use a second hidden layer");
+
+    var source = NeuralBrainGenome.CreateSectorForager(NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount);
+    for (var i = 0; i < NeuralBrainGenome.DirectWeightCount; i++)
+    {
+        AssertClose(source.Weights[i], starter.Weights[i], 0.000001, $"Hybrid deep starter direct weight {i}");
+    }
+
+    Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
+    Span<float> sourceOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
+    Span<float> starterOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
+    inputs[NeuralBrainSchema.BiasInput] = 1f;
+    inputs[NeuralBrainSchema.HungerInput] = 1f;
+    inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex + 1)] = 1f;
+    source.Evaluate(inputs, sourceOutputs);
+    starter.Evaluate(inputs, starterOutputs);
+    for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+    {
+        AssertClose(sourceOutputs[output], starterOutputs[output], 0.000001, $"Hybrid deep starter output {output}");
+    }
+
+    var random = BrainFactory.CreateRandom(
+        BrainArchitectureKind.HybridDeep8x8Neural,
+        new DeterministicRandom(121),
+        scale: 0.5f);
+    AssertEqual(NeuralBrainGenome.GetExpectedHybridDeep8x8WeightCount(), random.WeightCount, "Hybrid deep random weight count");
+    AssertTrue(
+        random.Weights.Skip(NeuralBrainGenome.DirectWeightCount).Any(weight => Math.Abs(weight) > 0.000001f),
+        "Hybrid deep random should initialize hidden path weights");
+
+    var unchanged = BrainFactory.Mutate(
+        BrainArchitectureKind.HybridDeep8x8Neural,
+        starter,
+        new DeterministicRandom(122),
+        mutationStrength: 0.5f,
+        mutationRate: 0f);
+    AssertBrainsClose(starter, unchanged, "Zero-rate hybrid deep mutation");
+
+    var mutated = BrainFactory.Mutate(
+        BrainArchitectureKind.HybridDeep8x8Neural,
+        starter,
+        new DeterministicRandom(122),
+        mutationStrength: 0.5f,
+        mutationRate: 0.05f);
+    AssertTrue(
+        mutated.Weights.Zip(starter.Weights).Any(pair => Math.Abs(pair.First - pair.Second) > 0.000001f),
+        "Hybrid deep mutation should change at least one weight");
+
+    AssertThrows<ArgumentException>(
+        () => BrainGenome.FromNeural(BrainArchitectureKind.HybridNeural, starter.Neural!),
+        "Hybrid deep payload should not be accepted as one-layer hybrid");
+    AssertThrows<ArgumentException>(
+        () => BrainGenome.FromNeural(
+            BrainArchitectureKind.HybridDeep8x8Neural,
+            NeuralBrainGenome.CreateZero(NeuralBrainSchema.HybridDeep8x8HiddenNodeCount)),
+        "One-layer payload should not be accepted as hybrid deep");
 }
 
 static void BrainFactorySupportsRtNeatGraphArchitecture()

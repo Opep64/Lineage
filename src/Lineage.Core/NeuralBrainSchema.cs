@@ -13,6 +13,13 @@ public static class NeuralBrainSchema
 
     public const int DefaultHiddenLayerNodeCount = 10;
 
+    public const int HybridDeep8x8FirstLayerNodeCount = 8;
+
+    public const int HybridDeep8x8SecondLayerNodeCount = 8;
+
+    public const int HybridDeep8x8HiddenNodeCount =
+        HybridDeep8x8FirstLayerNodeCount + HybridDeep8x8SecondLayerNodeCount;
+
     public const int MaxHiddenNodeCount = 64;
 
     public const int VisionSectorInputStart = 30;

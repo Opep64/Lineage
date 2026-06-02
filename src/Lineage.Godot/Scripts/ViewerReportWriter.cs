@@ -3717,6 +3717,7 @@ public static class ViewerReportWriter
             BrainArchitectureKind.HybridNeural => "Hybrid neural",
             BrainArchitectureKind.HiddenLayerNeural => "Hidden-layer neural",
             BrainArchitectureKind.RtNeatGraph => "rtNEAT graph",
+            BrainArchitectureKind.HybridDeep8x8Neural => "Hybrid deep 8x8 neural",
             _ => kind.ToString()
         };
     }

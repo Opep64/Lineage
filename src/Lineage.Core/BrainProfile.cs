@@ -96,6 +96,7 @@ public sealed record BrainProfile
         // NeuralBrainGenome normalizes older dense layouts into the current input/output schema,
         // leaving newly added senses or outputs neutral when possible.
         var brain = new NeuralBrainGenome(Weights);
+        _ = BrainGenome.FromNeural(BrainArchitectureKind, brain);
         return this with
         {
             Name = name,

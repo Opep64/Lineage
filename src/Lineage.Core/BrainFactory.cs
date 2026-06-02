@@ -30,6 +30,18 @@ public static class BrainFactory
         SupportsHiddenNodes: true,
         SupportsDirectInputOutputWeights: false);
 
+    private static readonly BrainArchitectureDescriptor HybridDeep8x8NeuralDescriptor = new(
+        BrainArchitectureKind.HybridDeep8x8Neural,
+        "Hybrid deep 8x8 neural",
+        "Direct input/output neural weights plus two hidden layers of eight nodes each.",
+        NeuralBrainSchema.InputCount,
+        NeuralBrainSchema.OutputCount,
+        NeuralBrainSchema.HybridDeep8x8HiddenNodeCount,
+        NeuralBrainSchema.HybridDeep8x8HiddenNodeCount,
+        NeuralBrainSchema.HybridDeep8x8HiddenNodeCount,
+        SupportsHiddenNodes: true,
+        SupportsDirectInputOutputWeights: true);
+
     private static readonly BrainArchitectureDescriptor RtNeatGraphDescriptor = new(
         BrainArchitectureKind.RtNeatGraph,
         "rtNEAT graph",
@@ -49,6 +61,7 @@ public static class BrainFactory
             BrainArchitectureKind.HybridNeural => HybridNeuralDescriptor,
             BrainArchitectureKind.HiddenLayerNeural => HiddenLayerNeuralDescriptor,
             BrainArchitectureKind.RtNeatGraph => RtNeatGraphDescriptor,
+            BrainArchitectureKind.HybridDeep8x8Neural => HybridDeep8x8NeuralDescriptor,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
@@ -64,6 +77,9 @@ public static class BrainFactory
             BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
                 kind,
                 NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount)),
+            BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHybridDeep8x8Zero()),
             BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateZero()),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
@@ -88,6 +104,9 @@ public static class BrainFactory
                     random,
                     scale,
                     resolvedHiddenNodeCount)),
+            BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHybridDeep8x8Random(random, scale)),
             BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateRandom(random, scale)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
@@ -127,18 +146,24 @@ public static class BrainFactory
         }
 
         var resolvedHiddenNodeCount = ResolveHiddenNodeCount(kind, hiddenNodeCount);
+        var starterHiddenNodeCount = kind switch
+        {
+            BrainArchitectureKind.HybridNeural => resolvedHiddenNodeCount,
+            BrainArchitectureKind.HybridDeep8x8Neural => NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+            _ => 0
+        };
         var starter = initialBrainKind switch
         {
-            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.SectorForager => NeuralBrainGenome.CreateSectorForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.OpportunisticForager => NeuralBrainGenome.CreateOpportunisticForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.SparseGraphForager => NeuralBrainGenome.CreateSectorForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.SparseGraphScavenger => NeuralBrainGenome.CreateScavengerForager(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
-            InitialBrainKind.SparseGraphPredator => NeuralBrainGenome.CreateForagerPredator(kind == BrainArchitectureKind.HybridNeural ? resolvedHiddenNodeCount : 0),
+            InitialBrainKind.SeedForager => NeuralBrainGenome.CreateSeedForager(starterHiddenNodeCount),
+            InitialBrainKind.ExplorerForager => NeuralBrainGenome.CreateExplorerForager(starterHiddenNodeCount),
+            InitialBrainKind.SectorForager => NeuralBrainGenome.CreateSectorForager(starterHiddenNodeCount),
+            InitialBrainKind.OpportunisticForager => NeuralBrainGenome.CreateOpportunisticForager(starterHiddenNodeCount),
+            InitialBrainKind.ScavengerForager => NeuralBrainGenome.CreateScavengerForager(starterHiddenNodeCount),
+            InitialBrainKind.FreshnessAwareScavenger => NeuralBrainGenome.CreateFreshnessAwareScavenger(starterHiddenNodeCount),
+            InitialBrainKind.ForagerPredator => NeuralBrainGenome.CreateForagerPredator(starterHiddenNodeCount),
+            InitialBrainKind.SparseGraphForager => NeuralBrainGenome.CreateSectorForager(starterHiddenNodeCount),
+            InitialBrainKind.SparseGraphScavenger => NeuralBrainGenome.CreateScavengerForager(starterHiddenNodeCount),
+            InitialBrainKind.SparseGraphPredator => NeuralBrainGenome.CreateForagerPredator(starterHiddenNodeCount),
             InitialBrainKind.RandomPerFounder => throw new ArgumentException(
                 "Random-per-founder brains are created individually.",
                 nameof(initialBrainKind)),
@@ -151,6 +176,9 @@ public static class BrainFactory
         return kind switch
         {
             BrainArchitectureKind.HybridNeural => BrainGenome.FromNeural(kind, starter),
+            BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHybridDeep8x8FromHybrid(starter)),
             BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
                 kind,
                 NeuralBrainGenome.CreateHiddenLayerFromDirect(
@@ -176,6 +204,10 @@ public static class BrainFactory
                 kind,
                 brain.Neural?.Mutated(random, mutationStrength, mutationRate)
                     ?? throw new InvalidOperationException("Hybrid neural mutation requires a dense brain payload.")),
+            BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                brain.Neural?.Mutated(random, mutationStrength, mutationRate)
+                    ?? throw new InvalidOperationException("Hybrid deep 8x8 neural mutation requires a dense brain payload.")),
             BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
                 kind,
                 brain.Neural?.MutatedHiddenLayer(

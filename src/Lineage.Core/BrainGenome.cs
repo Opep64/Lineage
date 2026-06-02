@@ -40,9 +40,22 @@ public sealed record BrainGenome
     public static BrainGenome FromNeural(BrainArchitectureKind architectureKind, NeuralBrainGenome neural)
     {
         ArgumentNullException.ThrowIfNull(neural);
-        if (architectureKind is not (BrainArchitectureKind.HybridNeural or BrainArchitectureKind.HiddenLayerNeural))
+        if (architectureKind is not (
+            BrainArchitectureKind.HybridNeural
+            or BrainArchitectureKind.HiddenLayerNeural
+            or BrainArchitectureKind.HybridDeep8x8Neural))
         {
             throw new ArgumentOutOfRangeException(nameof(architectureKind), architectureKind, "Architecture requires a graph brain payload.");
+        }
+
+        if (architectureKind == BrainArchitectureKind.HybridDeep8x8Neural && !neural.HasSecondHiddenLayer)
+        {
+            throw new ArgumentException("Hybrid deep 8x8 neural architecture requires a two-layer dense brain payload.", nameof(neural));
+        }
+
+        if (architectureKind != BrainArchitectureKind.HybridDeep8x8Neural && neural.HasSecondHiddenLayer)
+        {
+            throw new ArgumentException("Two-layer dense brain payloads require the hybrid deep 8x8 neural architecture.", nameof(neural));
         }
 
         _ = BrainFactory.Describe(architectureKind);

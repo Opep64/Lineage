@@ -18,5 +18,10 @@ public enum BrainArchitectureKind
     /// <summary>
     /// Sparse, topology-evolving graph controller inspired by rtNEAT/Bibites-style brains.
     /// </summary>
-    RtNeatGraph = 2
+    RtNeatGraph = 2,
+
+    /// <summary>
+    /// Fixed neural controller with direct input-to-output weights plus two hidden layers of eight nodes each.
+    /// </summary>
+    HybridDeep8x8Neural = 3
 }

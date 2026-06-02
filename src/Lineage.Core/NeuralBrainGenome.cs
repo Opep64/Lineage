@@ -6,9 +6,11 @@ namespace Lineage.Core;
 ///
 /// <remarks>
 /// The model keeps direct input-to-output weights for stable starter behavior, then
-/// optionally adds a small hidden layer for evolvable internal feature detectors.
-/// The flat weight layout is direct weights first, hidden input weights second, and
-/// hidden output weights last so older direct-only brains remain loadable.
+/// optionally adds one or two hidden layers for evolvable internal feature detectors.
+/// The one-layer flat weight layout is direct weights first, hidden input weights second,
+/// and hidden output weights last so older direct-only brains remain loadable. The fixed
+/// deep 8x8 layout keeps the same direct prefix, then stores input-to-layer1 weights,
+/// layer1-to-layer2 weights, and layer2-to-output weights.
 /// </remarks>
 public sealed class NeuralBrainGenome
 {
@@ -67,23 +69,52 @@ public sealed class NeuralBrainGenome
     {
         var normalized = NormalizeWeights(weights.ToArray());
         Weights = normalized.Weights;
-        HiddenNodeCount = normalized.HiddenNodeCount;
-        HasActiveHiddenOutputs = HasNonZeroHiddenOutputWeights(Weights, HiddenNodeCount);
+        if (TryInferHybridDeep8x8WeightLayout(Weights.Length, out var firstHiddenLayerNodeCount, out var secondHiddenLayerNodeCount))
+        {
+            FirstHiddenLayerNodeCount = firstHiddenLayerNodeCount;
+            SecondHiddenLayerNodeCount = secondHiddenLayerNodeCount;
+            HiddenNodeCount = firstHiddenLayerNodeCount + secondHiddenLayerNodeCount;
+        }
+        else
+        {
+            FirstHiddenLayerNodeCount = normalized.HiddenNodeCount;
+            SecondHiddenLayerNodeCount = 0;
+            HiddenNodeCount = normalized.HiddenNodeCount;
+        }
+
+        HasActiveHiddenOutputs = HasNonZeroHiddenOutputWeights(
+            Weights,
+            FirstHiddenLayerNodeCount,
+            SecondHiddenLayerNodeCount);
         SparseDirectWeightIndices = CreateSparseDirectWeightIndex(Weights);
-        ValidateWeights(Weights, HiddenNodeCount);
+        ValidateWeights(Weights, FirstHiddenLayerNodeCount, SecondHiddenLayerNodeCount);
     }
 
     private NeuralBrainGenome(float[] weights, int hiddenNodeCount, bool trusted)
+        : this(weights, hiddenNodeCount, secondHiddenLayerNodeCount: 0, trusted)
     {
-        ValidateHiddenNodeCount(hiddenNodeCount);
+    }
+
+    private NeuralBrainGenome(
+        float[] weights,
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount,
+        bool trusted)
+    {
+        ValidateHiddenNodeLayout(firstHiddenLayerNodeCount, secondHiddenLayerNodeCount);
         if (!trusted)
         {
-            ValidateWeights(weights, hiddenNodeCount);
+            ValidateWeights(weights, firstHiddenLayerNodeCount, secondHiddenLayerNodeCount);
         }
 
         Weights = weights;
-        HiddenNodeCount = hiddenNodeCount;
-        HasActiveHiddenOutputs = HasNonZeroHiddenOutputWeights(Weights, HiddenNodeCount);
+        FirstHiddenLayerNodeCount = firstHiddenLayerNodeCount;
+        SecondHiddenLayerNodeCount = secondHiddenLayerNodeCount;
+        HiddenNodeCount = firstHiddenLayerNodeCount + secondHiddenLayerNodeCount;
+        HasActiveHiddenOutputs = HasNonZeroHiddenOutputWeights(
+            Weights,
+            FirstHiddenLayerNodeCount,
+            SecondHiddenLayerNodeCount);
         SparseDirectWeightIndices = CreateSparseDirectWeightIndex(Weights);
     }
 
@@ -91,11 +122,25 @@ public sealed class NeuralBrainGenome
 
     public int HiddenNodeCount { get; }
 
+    public int FirstHiddenLayerNodeCount { get; }
+
+    public int SecondHiddenLayerNodeCount { get; }
+
+    public bool HasSecondHiddenLayer => SecondHiddenLayerNodeCount > 0;
+
     private bool HasActiveHiddenOutputs { get; }
 
     private int[]? SparseDirectWeightIndices { get; }
 
     public static int DirectWeightCount => NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount;
+
+    private int InterHiddenWeightCount => FirstHiddenLayerNodeCount * SecondHiddenLayerNodeCount;
+
+    private int OutputLayerHiddenNodeCount => HasSecondHiddenLayer
+        ? SecondHiddenLayerNodeCount
+        : FirstHiddenLayerNodeCount;
+
+    private int HiddenOutputWeightOffset => DirectWeightCount + HiddenInputWeightCount + InterHiddenWeightCount;
 
     public static int GetExpectedWeightCount(int hiddenNodeCount)
     {
@@ -105,9 +150,25 @@ public sealed class NeuralBrainGenome
             + hiddenNodeCount * NeuralBrainSchema.OutputCount;
     }
 
+    public static int GetExpectedHybridDeep8x8WeightCount()
+    {
+        return GetHybridDeepWeightCount(
+            NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+            NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount);
+    }
+
     public static NeuralBrainGenome CreateZero(int hiddenNodeCount = 0)
     {
         return new NeuralBrainGenome(new float[GetExpectedWeightCount(hiddenNodeCount)], hiddenNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome CreateHybridDeep8x8Zero()
+    {
+        return new NeuralBrainGenome(
+            new float[GetExpectedHybridDeep8x8WeightCount()],
+            NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+            NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount,
+            trusted: true);
     }
 
     public static NeuralBrainGenome CreateRandom(
@@ -127,6 +188,28 @@ public sealed class NeuralBrainGenome
         }
 
         return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome CreateHybridDeep8x8Random(
+        DeterministicRandom random,
+        float scale = 1f)
+    {
+        if (!float.IsFinite(scale) || scale < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), "Random brain scale must be finite and non-negative.");
+        }
+
+        var weights = new float[GetExpectedHybridDeep8x8WeightCount()];
+        for (var i = 0; i < weights.Length; i++)
+        {
+            weights[i] = random.NextSingle(-scale, scale);
+        }
+
+        return new NeuralBrainGenome(
+            weights,
+            NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+            NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount,
+            trusted: true);
     }
 
     public static NeuralBrainGenome CreateHiddenLayerRandom(
@@ -171,6 +254,63 @@ public sealed class NeuralBrainGenome
         }
 
         return new NeuralBrainGenome(weights, hiddenNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome CreateHybridDeep8x8FromHybrid(NeuralBrainGenome hybridBrain)
+    {
+        ArgumentNullException.ThrowIfNull(hybridBrain);
+        if (hybridBrain.HasSecondHiddenLayer)
+        {
+            throw new ArgumentException("Hybrid deep 8x8 starters must be converted from a one-layer hybrid brain.", nameof(hybridBrain));
+        }
+
+        const int firstLayerNodeCount = NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount;
+        const int secondLayerNodeCount = NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount;
+        var weights = new float[GetExpectedHybridDeep8x8WeightCount()];
+
+        Array.Copy(hybridBrain.Weights, 0, weights, 0, DirectWeightCount);
+
+        var copiedHiddenNodeCount = Math.Min(firstLayerNodeCount, hybridBrain.HiddenNodeCount);
+        for (var hidden = 0; hidden < copiedHiddenNodeCount; hidden++)
+        {
+            for (var input = 0; input < NeuralBrainSchema.InputCount; input++)
+            {
+                SetHybridDeepFirstLayerInput(
+                    weights,
+                    firstLayerNodeCount,
+                    hidden,
+                    input,
+                    hybridBrain.GetHiddenInputWeight(hidden, input));
+            }
+
+            if (hidden < secondLayerNodeCount)
+            {
+                SetHybridDeepInterLayer(
+                    weights,
+                    firstLayerNodeCount,
+                    secondLayerNodeCount,
+                    secondHiddenIndex: hidden,
+                    firstHiddenIndex: hidden,
+                    value: 1.25f);
+            }
+        }
+
+        var copiedOutputLayerNodeCount = Math.Min(secondLayerNodeCount, hybridBrain.HiddenNodeCount);
+        for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+        {
+            for (var hidden = 0; hidden < copiedOutputLayerNodeCount; hidden++)
+            {
+                SetHybridDeepOutput(
+                    weights,
+                    firstLayerNodeCount,
+                    secondLayerNodeCount,
+                    output,
+                    secondHiddenIndex: hidden,
+                    value: hybridBrain.GetHiddenOutputWeight(output, hidden));
+            }
+        }
+
+        return new NeuralBrainGenome(weights, firstLayerNodeCount, secondLayerNodeCount, trusted: true);
     }
 
     /// <summary>
@@ -511,17 +651,46 @@ public sealed class NeuralBrainGenome
 
     public float GetHiddenInputWeight(int hiddenIndex, int inputIndex)
     {
-        return Weights[GetHiddenInputWeightIndex(HiddenNodeCount, hiddenIndex, inputIndex)];
+        if ((uint)hiddenIndex >= (uint)HiddenNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hiddenIndex));
+        }
+
+        if (HasSecondHiddenLayer && hiddenIndex >= FirstHiddenLayerNodeCount)
+        {
+            return 0f;
+        }
+
+        return Weights[GetHiddenInputWeightIndex(FirstHiddenLayerNodeCount, hiddenIndex, inputIndex)];
     }
 
     public float GetHiddenOutputWeight(int outputIndex, int hiddenIndex)
     {
-        return Weights[GetHiddenOutputWeightIndex(HiddenNodeCount, outputIndex, hiddenIndex)];
+        if ((uint)hiddenIndex >= (uint)HiddenNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hiddenIndex));
+        }
+
+        if (!HasSecondHiddenLayer)
+        {
+            return Weights[GetHiddenOutputWeightIndex(FirstHiddenLayerNodeCount, outputIndex, hiddenIndex)];
+        }
+
+        if (hiddenIndex < FirstHiddenLayerNodeCount)
+        {
+            return 0f;
+        }
+
+        return Weights[GetHybridDeepOutputWeightIndex(
+            FirstHiddenLayerNodeCount,
+            SecondHiddenLayerNodeCount,
+            outputIndex,
+            hiddenIndex - FirstHiddenLayerNodeCount)];
     }
 
-    public int HiddenInputWeightCount => HiddenNodeCount * NeuralBrainSchema.InputCount;
+    public int HiddenInputWeightCount => FirstHiddenLayerNodeCount * NeuralBrainSchema.InputCount;
 
-    public int HiddenOutputWeightCount => HiddenNodeCount * NeuralBrainSchema.OutputCount;
+    public int HiddenOutputWeightCount => OutputLayerHiddenNodeCount * NeuralBrainSchema.OutputCount;
 
     public float SumAbsoluteHiddenInputWeights()
     {
@@ -541,7 +710,7 @@ public sealed class NeuralBrainGenome
     {
         var sum = 0f;
         var hiddenOutputWeightCount = HiddenOutputWeightCount;
-        var offset = DirectWeightCount + HiddenInputWeightCount;
+        var offset = HiddenOutputWeightOffset;
 
         for (var i = 0; i < hiddenOutputWeightCount; i++)
         {
@@ -560,7 +729,7 @@ public sealed class NeuralBrainGenome
 
         var count = 0;
         var hiddenOutputWeightCount = HiddenOutputWeightCount;
-        var offset = DirectWeightCount + HiddenInputWeightCount;
+        var offset = HiddenOutputWeightOffset;
 
         for (var i = 0; i < hiddenOutputWeightCount; i++)
         {
@@ -614,11 +783,11 @@ public sealed class NeuralBrainGenome
 
         if (HasActiveHiddenOutputs)
         {
-            Span<float> hiddenValues = HiddenNodeCount <= NeuralBrainSchema.MaxHiddenNodeCount
-                ? stackalloc float[HiddenNodeCount]
-                : new float[HiddenNodeCount];
+            Span<float> firstHiddenValues = FirstHiddenLayerNodeCount <= NeuralBrainSchema.MaxHiddenNodeCount
+                ? stackalloc float[FirstHiddenLayerNodeCount]
+                : new float[FirstHiddenLayerNodeCount];
 
-            for (var hidden = 0; hidden < HiddenNodeCount; hidden++)
+            for (var hidden = 0; hidden < FirstHiddenLayerNodeCount; hidden++)
             {
                 var sum = 0f;
                 var offset = DirectWeightCount + hidden * NeuralBrainSchema.InputCount;
@@ -628,21 +797,58 @@ public sealed class NeuralBrainGenome
                     sum += Weights[offset + input] * inputs[input];
                 }
 
-                hiddenValues[hidden] = MathF.Tanh(sum);
+                firstHiddenValues[hidden] = MathF.Tanh(sum);
             }
 
-            var hiddenOutputOffset = DirectWeightCount + HiddenNodeCount * NeuralBrainSchema.InputCount;
-            for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+            if (HasSecondHiddenLayer)
             {
-                var sum = outputs[output];
-                var offset = hiddenOutputOffset + output * HiddenNodeCount;
+                Span<float> secondHiddenValues = SecondHiddenLayerNodeCount <= NeuralBrainSchema.MaxHiddenNodeCount
+                    ? stackalloc float[SecondHiddenLayerNodeCount]
+                    : new float[SecondHiddenLayerNodeCount];
+                var interLayerOffset = DirectWeightCount + HiddenInputWeightCount;
 
-                for (var hidden = 0; hidden < HiddenNodeCount; hidden++)
+                for (var secondHidden = 0; secondHidden < SecondHiddenLayerNodeCount; secondHidden++)
                 {
-                    sum += Weights[offset + hidden] * hiddenValues[hidden];
+                    var sum = 0f;
+                    var offset = interLayerOffset + secondHidden * FirstHiddenLayerNodeCount;
+
+                    for (var firstHidden = 0; firstHidden < FirstHiddenLayerNodeCount; firstHidden++)
+                    {
+                        sum += Weights[offset + firstHidden] * firstHiddenValues[firstHidden];
+                    }
+
+                    secondHiddenValues[secondHidden] = MathF.Tanh(sum);
                 }
 
-                outputs[output] = sum;
+                var hiddenOutputOffset = HiddenOutputWeightOffset;
+                for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+                {
+                    var sum = outputs[output];
+                    var offset = hiddenOutputOffset + output * SecondHiddenLayerNodeCount;
+
+                    for (var hidden = 0; hidden < SecondHiddenLayerNodeCount; hidden++)
+                    {
+                        sum += Weights[offset + hidden] * secondHiddenValues[hidden];
+                    }
+
+                    outputs[output] = sum;
+                }
+            }
+            else
+            {
+                var hiddenOutputOffset = HiddenOutputWeightOffset;
+                for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
+                {
+                    var sum = outputs[output];
+                    var offset = hiddenOutputOffset + output * FirstHiddenLayerNodeCount;
+
+                    for (var hidden = 0; hidden < FirstHiddenLayerNodeCount; hidden++)
+                    {
+                        sum += Weights[offset + hidden] * firstHiddenValues[hidden];
+                    }
+
+                    outputs[output] = sum;
+                }
             }
         }
 
@@ -652,15 +858,23 @@ public sealed class NeuralBrainGenome
         }
     }
 
-    private static bool HasNonZeroHiddenOutputWeights(float[] weights, int hiddenNodeCount)
+    private static bool HasNonZeroHiddenOutputWeights(
+        float[] weights,
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount)
     {
-        if (hiddenNodeCount <= 0)
+        var outputLayerHiddenNodeCount = secondHiddenLayerNodeCount > 0
+            ? secondHiddenLayerNodeCount
+            : firstHiddenLayerNodeCount;
+        if (outputLayerHiddenNodeCount <= 0)
         {
             return false;
         }
 
-        var offset = DirectWeightCount + hiddenNodeCount * NeuralBrainSchema.InputCount;
-        var count = hiddenNodeCount * NeuralBrainSchema.OutputCount;
+        var offset = DirectWeightCount
+            + firstHiddenLayerNodeCount * NeuralBrainSchema.InputCount
+            + firstHiddenLayerNodeCount * secondHiddenLayerNodeCount;
+        var count = outputLayerHiddenNodeCount * NeuralBrainSchema.OutputCount;
         for (var i = 0; i < count; i++)
         {
             if (weights[offset + i] != 0f)
@@ -727,7 +941,7 @@ public sealed class NeuralBrainGenome
             weights[index] = Math.Clamp(Weights[index] + random.NextSingle(-strength, strength), -WeightLimit, WeightLimit);
         }
 
-        return new NeuralBrainGenome(weights, HiddenNodeCount, trusted: true);
+        return new NeuralBrainGenome(weights, FirstHiddenLayerNodeCount, SecondHiddenLayerNodeCount, trusted: true);
     }
 
     public NeuralBrainGenome MutatedHiddenLayer(
@@ -759,7 +973,7 @@ public sealed class NeuralBrainGenome
             weights[index] = Math.Clamp(weights[index] + random.NextSingle(-strength, strength), -WeightLimit, WeightLimit);
         }
 
-        return new NeuralBrainGenome(weights, HiddenNodeCount, trusted: true);
+        return new NeuralBrainGenome(weights, FirstHiddenLayerNodeCount, SecondHiddenLayerNodeCount, trusted: true);
     }
 
     private static void Set(float[] weights, int outputIndex, int inputIndex, float value)
@@ -785,6 +999,46 @@ public sealed class NeuralBrainGenome
         float value)
     {
         weights[GetHiddenOutputWeightIndex(hiddenNodeCount, outputIndex, hiddenIndex)] = value;
+    }
+
+    private static void SetHybridDeepFirstLayerInput(
+        float[] weights,
+        int firstHiddenLayerNodeCount,
+        int hiddenIndex,
+        int inputIndex,
+        float value)
+    {
+        weights[GetHiddenInputWeightIndex(firstHiddenLayerNodeCount, hiddenIndex, inputIndex)] = value;
+    }
+
+    private static void SetHybridDeepInterLayer(
+        float[] weights,
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount,
+        int secondHiddenIndex,
+        int firstHiddenIndex,
+        float value)
+    {
+        weights[GetHybridDeepInterLayerWeightIndex(
+            firstHiddenLayerNodeCount,
+            secondHiddenLayerNodeCount,
+            secondHiddenIndex,
+            firstHiddenIndex)] = value;
+    }
+
+    private static void SetHybridDeepOutput(
+        float[] weights,
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount,
+        int outputIndex,
+        int secondHiddenIndex,
+        float value)
+    {
+        weights[GetHybridDeepOutputWeightIndex(
+            firstHiddenLayerNodeCount,
+            secondHiddenLayerNodeCount,
+            outputIndex,
+            secondHiddenIndex)] = value;
     }
 
     private static int GetWeightIndex(int outputIndex, int inputIndex)
@@ -837,9 +1091,78 @@ public sealed class NeuralBrainGenome
             + hiddenIndex;
     }
 
+    private static int GetHybridDeepWeightCount(
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount)
+    {
+        ValidateHiddenNodeLayout(firstHiddenLayerNodeCount, secondHiddenLayerNodeCount);
+        return DirectWeightCount
+            + firstHiddenLayerNodeCount * NeuralBrainSchema.InputCount
+            + firstHiddenLayerNodeCount * secondHiddenLayerNodeCount
+            + secondHiddenLayerNodeCount * NeuralBrainSchema.OutputCount;
+    }
+
+    private static int GetHybridDeepInterLayerWeightIndex(
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount,
+        int secondHiddenIndex,
+        int firstHiddenIndex)
+    {
+        ValidateHiddenNodeLayout(firstHiddenLayerNodeCount, secondHiddenLayerNodeCount);
+        if ((uint)secondHiddenIndex >= (uint)secondHiddenLayerNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(secondHiddenIndex));
+        }
+
+        if ((uint)firstHiddenIndex >= (uint)firstHiddenLayerNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(firstHiddenIndex));
+        }
+
+        return DirectWeightCount
+            + firstHiddenLayerNodeCount * NeuralBrainSchema.InputCount
+            + secondHiddenIndex * firstHiddenLayerNodeCount
+            + firstHiddenIndex;
+    }
+
+    private static int GetHybridDeepOutputWeightIndex(
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount,
+        int outputIndex,
+        int secondHiddenIndex)
+    {
+        ValidateHiddenNodeLayout(firstHiddenLayerNodeCount, secondHiddenLayerNodeCount);
+        if ((uint)outputIndex >= NeuralBrainSchema.OutputCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(outputIndex));
+        }
+
+        if ((uint)secondHiddenIndex >= (uint)secondHiddenLayerNodeCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(secondHiddenIndex));
+        }
+
+        return DirectWeightCount
+            + firstHiddenLayerNodeCount * NeuralBrainSchema.InputCount
+            + firstHiddenLayerNodeCount * secondHiddenLayerNodeCount
+            + outputIndex * secondHiddenLayerNodeCount
+            + secondHiddenIndex;
+    }
+
     private static void ValidateWeights(float[] weights, int hiddenNodeCount)
     {
-        if (weights.Length != GetExpectedWeightCount(hiddenNodeCount))
+        ValidateWeights(weights, hiddenNodeCount, secondHiddenLayerNodeCount: 0);
+    }
+
+    private static void ValidateWeights(
+        float[] weights,
+        int firstHiddenLayerNodeCount,
+        int secondHiddenLayerNodeCount)
+    {
+        var expectedWeightCount = secondHiddenLayerNodeCount > 0
+            ? GetHybridDeepWeightCount(firstHiddenLayerNodeCount, secondHiddenLayerNodeCount)
+            : GetExpectedWeightCount(firstHiddenLayerNodeCount);
+        if (weights.Length != expectedWeightCount)
         {
             throw new ArgumentException("Unexpected neural brain weight count.", nameof(weights));
         }
@@ -861,6 +1184,22 @@ public sealed class NeuralBrainGenome
                 nameof(hiddenNodeCount),
                 $"Hidden node count must be between 0 and {NeuralBrainSchema.MaxHiddenNodeCount}.");
         }
+    }
+
+    private static void ValidateHiddenNodeLayout(int firstHiddenLayerNodeCount, int secondHiddenLayerNodeCount)
+    {
+        ValidateHiddenNodeCount(firstHiddenLayerNodeCount);
+        ValidateHiddenNodeCount(secondHiddenLayerNodeCount);
+
+        if (secondHiddenLayerNodeCount > 0 && firstHiddenLayerNodeCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(firstHiddenLayerNodeCount),
+                "Two-layer neural brains require at least one first-layer hidden node.");
+        }
+
+        var totalHiddenNodeCount = firstHiddenLayerNodeCount + secondHiddenLayerNodeCount;
+        ValidateHiddenNodeCount(totalHiddenNodeCount);
     }
 
     private static void ValidateHiddenLayerNodeCount(int hiddenNodeCount)
@@ -890,6 +1229,14 @@ public sealed class NeuralBrainGenome
 
     private static (float[] Weights, int HiddenNodeCount) NormalizeWeights(float[] weights)
     {
+        if (TryInferHybridDeep8x8WeightLayout(
+            weights.Length,
+            out var firstHiddenLayerNodeCount,
+            out var secondHiddenLayerNodeCount))
+        {
+            return (weights, firstHiddenLayerNodeCount + secondHiddenLayerNodeCount);
+        }
+
         if (TryInferCurrentWeightLayout(weights.Length, out var hiddenNodeCount))
         {
             return (weights, hiddenNodeCount);
@@ -1306,6 +1653,16 @@ public sealed class NeuralBrainGenome
             LegacyOutputCountWithoutAttack,
             oldEggReserveInput: -1,
             oldReproductionReadinessInput: 7), 0);
+    }
+
+    private static bool TryInferHybridDeep8x8WeightLayout(
+        int weightCount,
+        out int firstHiddenLayerNodeCount,
+        out int secondHiddenLayerNodeCount)
+    {
+        firstHiddenLayerNodeCount = NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount;
+        secondHiddenLayerNodeCount = NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount;
+        return weightCount == GetHybridDeepWeightCount(firstHiddenLayerNodeCount, secondHiddenLayerNodeCount);
     }
 
     private static bool TryInferCurrentWeightLayout(int weightCount, out int hiddenNodeCount)

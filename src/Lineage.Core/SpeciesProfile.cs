@@ -85,6 +85,7 @@ public sealed record SpeciesProfile
         }
 
         var brain = new NeuralBrainGenome(BrainWeights);
+        _ = BrainGenome.FromNeural(BrainArchitectureKind, brain);
         return this with
         {
             Name = name,
