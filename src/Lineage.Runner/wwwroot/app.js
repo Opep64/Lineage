@@ -910,6 +910,7 @@ function renderBrainLabWorldProbe() {
   drawBrainLabProbeCircle(context, centerX, centerY, Number(scene.soundRadius || 0) * scale, "#e7a13d", [8, 8]);
   drawBrainLabProbeCircle(context, centerX, centerY, Number(scene.senseRadius || 0) * scale, "#5078bd", [4, 7]);
   drawBrainLabProbeCircle(context, centerX, centerY, radius * scale, "#9aa5b1", []);
+  drawBrainLabProbeVisionCone(context, scene, transform);
   drawBrainLabWorldProbeBiomeCues(context, scene, transform);
 
   if (toggles.sound && toggles.creatures) {
@@ -1037,6 +1038,7 @@ function renderBrainLabWorldProbeSummary(scene, toggles) {
     brainLabWorldProbeSummaryCell("Environment", brainLabWorldProbeEnvironmentSummary()),
     activeSamples.currentBiomeKind ? brainLabWorldProbeSummaryCell("Probe biome", formatEnumLabel(activeSamples.currentBiomeKind)) : "",
     activeSamples.currentBiomeKind ? brainLabWorldProbeSummaryCell("Probe samples", brainLabWorldProbeBiomeSampleSummary(activeSamples)) : "",
+    brainLabWorldProbeSummaryCell("Vision cone", brainLabWorldProbeVisionConeSummary(scene)),
     hasActiveEnvironment && scene.environment?.currentBiomeKind
       ? brainLabWorldProbeSummaryCell("Snapshot biome", formatEnumLabel(scene.environment.currentBiomeKind))
       : "",
@@ -1257,6 +1259,81 @@ function drawBrainLabProbeCircle(context, x, y, radius, color, dash) {
   context.arc(x, y, radius, 0, Math.PI * 2);
   context.stroke();
   context.restore();
+}
+
+function drawBrainLabProbeVisionCone(context, scene, transform) {
+  const focus = scene?.focus;
+  if (!focus) {
+    return;
+  }
+
+  const range = Number(scene.senseRadius || 0) * transform.scale;
+  if (!Number.isFinite(range) || range <= 0) {
+    return;
+  }
+
+  const point = brainLabWorldProbeToScreen(focus, transform);
+  const heading = Number(focus.headingRadians || 0);
+  const rawAngle = Number(focus.visionAngleRadians || Math.PI * 2);
+  const angle = Math.max(0, Math.min(Math.PI * 2, rawAngle));
+  if (!Number.isFinite(angle) || angle <= 0) {
+    return;
+  }
+
+  const screenHeading = -heading;
+  context.save();
+  context.fillStyle = "rgba(45, 119, 190, 0.075)";
+  context.strokeStyle = "rgba(45, 119, 190, 0.52)";
+  context.lineWidth = 1.5;
+
+  if (angle >= Math.PI * 2 - 0.001) {
+    context.beginPath();
+    context.arc(point.x, point.y, range, 0, Math.PI * 2);
+    context.fill();
+    context.setLineDash([4, 6]);
+    context.stroke();
+    context.restore();
+    return;
+  }
+
+  const halfAngle = angle * 0.5;
+  const start = screenHeading - halfAngle;
+  const end = screenHeading + halfAngle;
+  const startPoint = {
+    x: point.x + Math.cos(start) * range,
+    y: point.y + Math.sin(start) * range
+  };
+  const endPoint = {
+    x: point.x + Math.cos(end) * range,
+    y: point.y + Math.sin(end) * range
+  };
+
+  context.beginPath();
+  context.moveTo(point.x, point.y);
+  context.lineTo(startPoint.x, startPoint.y);
+  context.arc(point.x, point.y, range, start, end);
+  context.lineTo(point.x, point.y);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  context.strokeStyle = "rgba(45, 119, 190, 0.35)";
+  context.setLineDash([5, 6]);
+  context.beginPath();
+  context.moveTo(point.x, point.y);
+  context.lineTo(point.x + Math.cos(screenHeading) * range, point.y + Math.sin(screenHeading) * range);
+  context.stroke();
+  context.restore();
+}
+
+function brainLabWorldProbeVisionConeSummary(scene) {
+  const radians = Number(scene?.focus?.visionAngleRadians || 0);
+  if (!Number.isFinite(radians) || radians <= 0) {
+    return "unknown";
+  }
+
+  const degrees = radians * 180 / Math.PI;
+  return `${formatBrainLabNumber(degrees)} deg`;
 }
 
 function drawBrainLabWorldProbeBiomeCues(context, scene, transform) {

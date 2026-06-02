@@ -450,6 +450,7 @@ public sealed record BrainLabWorldProbeCreature(
     double Distance,
     double Radius,
     double HeadingRadians,
+    double VisionAngleRadians,
     double EnergyRatio,
     double HealthRatio,
     double Hunger,

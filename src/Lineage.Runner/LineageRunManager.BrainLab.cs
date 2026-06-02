@@ -1134,6 +1134,7 @@ public sealed partial class LineageRunManager
             relative.Length,
             CreatureGrowth.EffectiveBodyRadius(creature, genome),
             creature.HeadingRadians,
+            CreatureGrowth.EffectiveVisionAngleRadians(creature, genome),
             creature.Senses.EnergyRatio,
             creature.Senses.HealthRatio,
             creature.Senses.Hunger,
