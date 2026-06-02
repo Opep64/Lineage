@@ -14,7 +14,8 @@ Built-in starter brain profiles live under `brains/starter/`:
 
 - `*-hybrid.brain.json`: reusable controllers extracted from the matching built-in species profile.
 - `starter-*-hidden.brain.json`: hidden-layer variants generated from the same starter controller family.
-- `starter-*-hidden-16.brain.json`: wider one-layer hidden variants for capacity comparisons.
+- `starter-*-hidden-16.brain.json` and `starter-*-hidden-24.brain.json`: wider one-layer hidden variants for
+  capacity comparisons.
 - `starter-*-hidden-deep-8x8.brain.json`: experimental two-hidden-layer variants with direct input/output weights
   disabled. These are cataloged for comparison, not recommended as defaults yet.
 
