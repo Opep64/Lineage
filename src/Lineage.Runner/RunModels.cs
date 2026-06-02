@@ -263,7 +263,8 @@ public sealed record BrainLabEvaluateRequest(
     string SnapshotPath,
     int CreatureId,
     Dictionary<string, float>? InputOverrides,
-    BrainLabWorldProbeEditSet? WorldProbe = null);
+    BrainLabWorldProbeEditSet? WorldProbe = null,
+    BrainLabWorldProbeEnvironment? WorldProbeEnvironment = null);
 
 public sealed record BrainLabPopulationEvaluateRequest(
     string SnapshotPath,
@@ -306,6 +307,42 @@ public sealed record BrainLabPresetMatrixOutput(
 public sealed record BrainLabWorldProbeRequest(
     string SnapshotPath,
     int CreatureId);
+
+public sealed record BrainLabWorldProbeFixture(
+    string Name,
+    string Path,
+    bool IsBuiltIn,
+    bool CanDelete,
+    string Description,
+    IReadOnlyList<string> Tags,
+    BrainLabWorldProbeEditSet WorldProbe,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record BrainLabWorldProbeFixtureSaveRequest(
+    string Name,
+    string? Description,
+    IReadOnlyList<string>? Tags,
+    BrainLabWorldProbeEditSet WorldProbe);
+
+public sealed record BrainLabWorldProbeFixtureSaveResult(
+    BrainLabWorldProbeFixture Fixture);
+
+public sealed record BrainLabWorldProbeFixtureArchiveResult(
+    string Path,
+    string ArchivedPath);
+
+public sealed record BrainLabWorldProbeEnvironment(
+    string? BiomeKind,
+    double? LocalFertility,
+    string? ObstacleMode,
+    BrainLabWorldProbeBiomeBoundary? BiomeBoundary = null);
+
+public sealed record BrainLabWorldProbeBiomeBoundary(
+    string? Direction,
+    string? NearBiomeKind,
+    string? FarBiomeKind,
+    double? Offset);
 
 public sealed record BrainLabWorldProbeEditSet(
     IReadOnlyList<BrainLabWorldProbeEditedResource>? Resources,
@@ -356,11 +393,21 @@ public sealed record BrainLabWorldProbeScene(
     double WorldWidth,
     double WorldHeight,
     bool Truncated,
+    BrainLabWorldProbeEnvironmentSample Environment,
     BrainLabWorldProbeCounts Counts,
     BrainLabWorldProbeCreature Focus,
     IReadOnlyList<BrainLabWorldProbeResource> Resources,
     IReadOnlyList<BrainLabWorldProbeEgg> Eggs,
     IReadOnlyList<BrainLabWorldProbeCreature> Creatures);
+
+public sealed record BrainLabWorldProbeEnvironmentSample(
+    string CurrentBiomeKind,
+    string ForwardBiomeKind,
+    string LeftBiomeKind,
+    string RightBiomeKind,
+    double LocalFertility,
+    bool CurrentObstacleBlocked,
+    int ObstacleBlockedCellCount);
 
 public sealed record BrainLabWorldProbeCounts(
     int PlantCount,

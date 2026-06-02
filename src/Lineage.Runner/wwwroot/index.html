@@ -306,6 +306,69 @@
             <label><input type="checkbox" data-brain-lab-world-toggle="meatEggs" checked> Meat/Eggs</label>
             <label><input type="checkbox" data-brain-lab-world-toggle="creatures" checked> Creatures</label>
             <label><input type="checkbox" data-brain-lab-world-toggle="sound" checked> Sound</label>
+            <label>
+              Probe setup
+              <select id="brainLabWorldProbeFixtureSelect" disabled>
+                <option value="">No probe setups loaded</option>
+              </select>
+            </label>
+            <button id="applyBrainLabWorldProbeFixtureButton" class="secondary" type="button" disabled>Apply</button>
+            <button id="saveBrainLabWorldProbeFixtureButton" class="secondary" type="button" disabled>Save</button>
+            <button id="deleteBrainLabWorldProbeFixtureButton" class="secondary" type="button" disabled>Delete</button>
+            <label>
+              Environment
+              <select id="brainLabWorldProbeEnvironmentSelect" disabled>
+                <option value="snapshot">Snapshot</option>
+                <option value="grassland">Grassland</option>
+                <option value="fertile">Fertile</option>
+                <option value="desert">Desert</option>
+                <option value="forest">Forest</option>
+                <option value="wetland">Wetland</option>
+                <option value="tundra">Tundra</option>
+                <option value="highland">Highland</option>
+                <option value="boundaryAhead">Boundary Ahead</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label>
+              Biome
+              <select id="brainLabWorldProbeBiomeSelect" disabled>
+                <option value="snapshot">Snapshot</option>
+                <option value="Desert">Desert</option>
+                <option value="Scrubland">Scrubland</option>
+                <option value="Grassland">Grassland</option>
+                <option value="Fertile">Fertile</option>
+                <option value="Forest">Forest</option>
+                <option value="Wetland">Wetland</option>
+                <option value="Tundra">Tundra</option>
+                <option value="Highland">Highland</option>
+              </select>
+            </label>
+            <label>
+              Boundary
+              <select id="brainLabWorldProbeBoundarySelect" disabled>
+                <option value="none">None</option>
+                <option value="forward">Ahead</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+                <option value="behind">Behind</option>
+              </select>
+            </label>
+            <label>
+              Offset
+              <input id="brainLabWorldProbeBoundaryOffsetInput" type="number" min="-1000" max="1000" step="10" value="0" disabled>
+            </label>
+            <label>
+              Fertility
+              <input id="brainLabWorldProbeFertilityInput" type="number" min="0.05" max="1" step="0.05" placeholder="snapshot" disabled>
+            </label>
+            <label>
+              Obstacles
+              <select id="brainLabWorldProbeObstacleSelect" disabled>
+                <option value="snapshot">Snapshot</option>
+                <option value="clear">Clear</option>
+              </select>
+            </label>
             <div class="brain-lab-world-probe-tools" aria-label="World Probe tools">
               <button class="secondary is-active" type="button" data-brain-lab-world-tool="select">Select</button>
               <button class="secondary" type="button" data-brain-lab-world-tool="move">Move</button>

@@ -23,6 +23,8 @@ api.MapGet("/brain-catalog", (LineageRunManager manager) => Results.Ok(manager.L
 
 api.MapGet("/brain-lab/snapshots", (LineageRunManager manager) => Results.Ok(manager.ListBrainLabSnapshots()));
 
+api.MapGet("/brain-lab/probe-fixtures", (LineageRunManager manager) => Results.Ok(manager.ListBrainLabWorldProbeFixtures()));
+
 api.MapGet("/brain-lab/snapshot", (string path, LineageRunManager manager) =>
 {
     try
@@ -76,6 +78,30 @@ api.MapPost("/brain-lab/world-probe", (BrainLabWorldProbeRequest request, Lineag
     try
     {
         return Results.Ok(manager.GetBrainLabWorldProbe(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/brain-lab/probe-fixtures", (BrainLabWorldProbeFixtureSaveRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.SaveBrainLabWorldProbeFixture(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapDelete("/brain-lab/probe-fixtures", (string path, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.ArchiveBrainLabWorldProbeFixture(path));
     }
     catch (Exception ex)
     {

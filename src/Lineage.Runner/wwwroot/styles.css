@@ -933,6 +933,26 @@ button.scenario-tab.is-active {
   min-height: 0;
 }
 
+.brain-lab-world-probe-toolbar input[type="number"] {
+  width: 82px;
+  min-height: 30px;
+  padding: 4px 7px;
+  font-size: 12px;
+}
+
+.brain-lab-world-probe-toolbar select {
+  min-width: 150px;
+  min-height: 30px;
+  padding: 4px 7px;
+  font-size: 12px;
+}
+
+.brain-lab-world-probe-toolbar > button {
+  min-height: 30px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
 .brain-lab-world-probe-tools {
   display: inline-flex;
   flex-wrap: wrap;

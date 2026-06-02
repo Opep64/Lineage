@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Lineage.Core;
 
 namespace Lineage.Runner;
@@ -10,8 +11,13 @@ public sealed partial class LineageRunManager
     private const int MaxBrainLabWorldProbeResources = 500;
     private const int MaxBrainLabWorldProbeEggs = 250;
     private const int MaxBrainLabWorldProbeCreatures = 500;
+    private const string BrainLabWorldProbeFixtureFileExtension = ".lineage-probe.json";
     private const float BrainLabWorldProbePadding = 24f;
     private const float BrainLabSoundEmissionThreshold = 0.05f;
+    private const float BrainLabMinimumHabitatProbeDistance = 16f;
+    private const float BrainLabMaximumHabitatProbeDistance = 80f;
+    private const float BrainLabWorldProbeBoundaryTargetCellSize = 32f;
+    private const int BrainLabWorldProbeBoundaryMaxCells = 200_000;
 
     private readonly object _brainLabSnapshotLock = new();
     private readonly BrainProbeService _brainProbeService = new();
@@ -29,6 +35,60 @@ public sealed partial class LineageRunManager
         new("hungry", "Hungry", BrainProbePresetKind.Hungry),
         new("full", "Full", BrainProbePresetKind.Full),
         new("readyToReproduce", "Ready To Reproduce", BrainProbePresetKind.ReadyToReproduce)
+    ];
+
+    private static readonly IReadOnlyList<BrainLabWorldProbeFixture> BuiltInBrainLabWorldProbeFixtures =
+    [
+        BuiltInBrainLabWorldProbeFixture(
+            "Empty",
+            "empty",
+            "Clear the probe map and evaluate against an empty local fixture.",
+            [],
+            new BrainLabWorldProbeEditSet([], [], [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Plant Ahead",
+            "plant-ahead",
+            "One generic plant in front of the selected creature.",
+            ["plant", "food"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", 110, 0, 8, 25, 25, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Meat Left",
+            "meat-left",
+            "One fresh meat patch to the selected creature's left.",
+            ["meat", "food"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, -110, 6, 18, 18, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Creature Ahead",
+            "creature-ahead",
+            "One healthy creature in front of the selected creature.",
+            ["creature", "contact"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeCreature", 44, 0, 8, Math.PI, 1, 1, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Sound Behind",
+            "sound-behind",
+            "One sound source behind the selected creature.",
+            ["sound"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", -160, 0, 0.5, 0, 1, 1, 0, 1, 0.75, true)
+                ]))
     ];
 
     public IReadOnlyList<BrainLabSnapshotOption> ListBrainLabSnapshots()
@@ -52,6 +112,76 @@ public sealed partial class LineageRunManager
                 file.Length,
                 file.LastWriteTimeUtc))
             .ToArray();
+    }
+
+    public IReadOnlyList<BrainLabWorldProbeFixture> ListBrainLabWorldProbeFixtures()
+    {
+        var root = BrainLabWorldProbeFixtureRoot();
+        var custom = Directory.Exists(root)
+            ? Directory
+                .EnumerateFiles(root, $"*{BrainLabWorldProbeFixtureFileExtension}", SearchOption.TopDirectoryOnly)
+                .Select(TryReadBrainLabWorldProbeFixture)
+                .OfType<BrainLabWorldProbeFixture>()
+                .OrderBy(fixture => fixture.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : [];
+
+        return BuiltInBrainLabWorldProbeFixtures
+            .Concat(custom)
+            .ToArray();
+    }
+
+    public BrainLabWorldProbeFixtureSaveResult SaveBrainLabWorldProbeFixture(BrainLabWorldProbeFixtureSaveRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Probe fixture name is required.");
+        }
+
+        var slug = Slugify(name);
+        var root = BrainLabWorldProbeFixtureRoot();
+        Directory.CreateDirectory(root);
+        var path = Path.GetFullPath(Path.Combine(root, $"{slug}{BrainLabWorldProbeFixtureFileExtension}"));
+        EnsurePathInside(path, root);
+        if (File.Exists(path))
+        {
+            throw new InvalidOperationException($"A probe fixture named {Path.GetFileName(path)} already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var file = new BrainLabWorldProbeFixtureFile
+        {
+            Name = name,
+            Description = (request.Description ?? string.Empty).Trim(),
+            Tags = NormalizeTags(request.Tags),
+            WorldProbe = NormalizeBrainLabWorldProbeEditSet(request.WorldProbe),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        SaveBrainLabWorldProbeFixtureFile(path, file);
+        return new BrainLabWorldProbeFixtureSaveResult(ToBrainLabWorldProbeFixture(path, file));
+    }
+
+    public BrainLabWorldProbeFixtureArchiveResult ArchiveBrainLabWorldProbeFixture(string fixturePath)
+    {
+        if (fixturePath.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Built-in probe fixtures cannot be deleted.");
+        }
+
+        var path = ResolveBrainLabWorldProbeFixturePath(fixturePath);
+        var archiveRoot = Path.Combine(_repoRoot, "out", "brain-lab-probe-trash");
+        Directory.CreateDirectory(archiveRoot);
+        var archivePath = GetUniqueArchivePath(Path.Combine(
+            archiveRoot,
+            $"{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}_{Path.GetFileName(path)}"));
+        File.Move(path, archivePath);
+
+        return new BrainLabWorldProbeFixtureArchiveResult(
+            NormalizeArtifactRelativePath(path),
+            NormalizeArtifactRelativePath(archivePath));
     }
 
     public BrainLabSnapshotDetails GetBrainLabSnapshot(string snapshotPath)
@@ -103,12 +233,13 @@ public sealed partial class LineageRunManager
 
         var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
         var restored = LoadBrainLabSimulation(resolvedPath);
-        if (request.WorldProbe is not null)
+        if (request.WorldProbe is not null || request.WorldProbeEnvironment is not null)
         {
             var editedSenses = RecomputeBrainLabWorldProbeSenses(
                 restored,
                 new EntityId(request.CreatureId),
-                request.WorldProbe);
+                NormalizeBrainLabWorldProbeEditSet(request.WorldProbe),
+                request.WorldProbeEnvironment);
             return _brainProbeService.EvaluateWithModifiedSenses(
                 restored.Simulation.State,
                 new EntityId(request.CreatureId),
@@ -260,6 +391,7 @@ public sealed partial class LineageRunManager
             resourceCandidates.Length > returnedResources.Length
                 || eggCandidates.Length > returnedEggs.Length
                 || creatureCandidates.Length > returnedCreatures.Length,
+            CreateBrainLabProbeEnvironmentSample(state, focus, focusGenome, senseRadius),
             counts,
             CreateBrainLabProbeCreature(state, focus, center, isFocus: true),
             returnedResources,
@@ -270,7 +402,8 @@ public sealed partial class LineageRunManager
     private static CreatureSenseState RecomputeBrainLabWorldProbeSenses(
         RestoredSimulation restored,
         EntityId focusId,
-        BrainLabWorldProbeEditSet edits)
+        BrainLabWorldProbeEditSet edits,
+        BrainLabWorldProbeEnvironment? environment)
     {
         var sourceState = restored.Simulation.State;
         if (!TryFindBrainLabCreature(sourceState, focusId, out var focus))
@@ -289,9 +422,7 @@ public sealed partial class LineageRunManager
             scenario.Seed,
             systems: []);
         var editedState = editedSimulation.State;
-        editedState.SetBiomes(sourceState.Biomes);
-        editedState.SetObstacles(sourceState.Obstacles);
-        editedState.SetLocalFertility(sourceState.LocalFertility);
+        ApplyBrainLabWorldProbeEnvironment(editedState, sourceState, focus, environment);
 
         foreach (var genome in sourceState.Genomes)
         {
@@ -348,6 +479,154 @@ public sealed partial class LineageRunManager
             soundDensitySaturation: scenario.SoundDensitySaturation);
         sensing.Update(editedState, 0f);
         return editedState.Creatures[0].Senses;
+    }
+
+    private static void ApplyBrainLabWorldProbeEnvironment(
+        WorldState editedState,
+        WorldState sourceState,
+        CreatureState focus,
+        BrainLabWorldProbeEnvironment? environment)
+    {
+        editedState.SetBiomes(sourceState.Biomes);
+        editedState.SetObstacles(sourceState.Obstacles);
+        editedState.SetLocalFertility(sourceState.LocalFertility);
+
+        if (environment is null)
+        {
+            return;
+        }
+
+        if (TryCreateBrainLabWorldProbeBoundaryBiomeMap(sourceState, focus, environment.BiomeBoundary, out var boundaryBiomes))
+        {
+            editedState.SetBiomes(boundaryBiomes);
+        }
+        else if (!string.IsNullOrWhiteSpace(environment.BiomeKind)
+            && !string.Equals(environment.BiomeKind, "snapshot", StringComparison.OrdinalIgnoreCase))
+        {
+            var biome = ParseBiomeKindName(environment.BiomeKind);
+            editedState.SetBiomes(BiomeMap.CreateUniform(
+                editedState.Bounds,
+                sourceState.Biomes.CellSize,
+                biome,
+                sourceState.Biomes.ResourceVoidBorderWidth));
+        }
+
+        if (environment.LocalFertility is { } localFertility)
+        {
+            var fertility = ClampFinite(localFertility, 0.05f, 1f, 1f);
+            editedState.SetLocalFertility(LocalFertilityMap.CreateFromCells(
+                bounds: editedState.Bounds,
+                enabled: true,
+                cellSize: MathF.Max(editedState.Bounds.Width, editedState.Bounds.Height),
+                cellCountX: 1,
+                cellCountY: 1,
+                minimumMultiplier: fertility,
+                recoveryPerSecond: 0f,
+                depletionPerPlant: 0f,
+                neighborDepletionShare: 0f,
+                multipliers: [fertility]));
+        }
+
+        if (!string.IsNullOrWhiteSpace(environment.ObstacleMode)
+            && !string.Equals(environment.ObstacleMode, "snapshot", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.Equals(environment.ObstacleMode, "clear", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"Unsupported world probe obstacle mode '{environment.ObstacleMode}'.");
+            }
+
+            editedState.SetObstacles(ObstacleMap.CreateEmpty(editedState.Bounds, sourceState.Obstacles.CellSize));
+        }
+    }
+
+    private static bool TryCreateBrainLabWorldProbeBoundaryBiomeMap(
+        WorldState sourceState,
+        CreatureState focus,
+        BrainLabWorldProbeBiomeBoundary? boundary,
+        out BiomeMap biomes)
+    {
+        biomes = sourceState.Biomes;
+        if (boundary is null
+            || string.IsNullOrWhiteSpace(boundary.Direction)
+            || string.Equals(boundary.Direction, "none", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(boundary.FarBiomeKind)
+            || string.Equals(boundary.FarBiomeKind, "snapshot", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var currentBiome = BiomeKinds.Canonicalize(sourceState.Biomes.GetKindAt(focus.Position));
+        var nearBiome = ParseBrainLabWorldProbeBoundaryBiome(boundary.NearBiomeKind, currentBiome);
+        var farBiome = ParseBrainLabWorldProbeBoundaryBiome(boundary.FarBiomeKind, currentBiome);
+        var axis = BrainLabWorldProbeBoundaryAxis(focus.HeadingRadians, boundary.Direction);
+        if (axis.LengthSquared <= 0f)
+        {
+            return false;
+        }
+
+        var offset = ClampFinite(
+            boundary.Offset ?? 0,
+            -MathF.Max(sourceState.Bounds.Width, sourceState.Bounds.Height),
+            MathF.Max(sourceState.Bounds.Width, sourceState.Bounds.Height),
+            0f);
+        var origin = sourceState.Bounds.Clamp(focus.Position + axis * offset);
+        var cellSize = BrainLabWorldProbeBoundaryCellSize(sourceState);
+        var cellCountX = Math.Max(1, (int)MathF.Ceiling(sourceState.Bounds.Width / cellSize));
+        var cellCountY = Math.Max(1, (int)MathF.Ceiling(sourceState.Bounds.Height / cellSize));
+        var cells = new BiomeKind[cellCountX * cellCountY];
+
+        for (var y = 0; y < cellCountY; y++)
+        {
+            for (var x = 0; x < cellCountX; x++)
+            {
+                var cellX = x * cellSize;
+                var cellY = y * cellSize;
+                var width = MathF.Min(cellSize, sourceState.Bounds.Width - cellX);
+                var height = MathF.Min(cellSize, sourceState.Bounds.Height - cellY);
+                var center = new SimVector2(cellX + width * 0.5f, cellY + height * 0.5f);
+                var projection = SimVector2.Dot(center - origin, axis);
+                cells[y * cellCountX + x] = projection >= 0f ? farBiome : nearBiome;
+            }
+        }
+
+        biomes = BiomeMap.CreateFromCells(
+            sourceState.Bounds,
+            cellSize,
+            cellCountX,
+            cellCountY,
+            cells,
+            sourceState.Biomes.ResourceVoidBorderWidth);
+        return true;
+    }
+
+    private static float BrainLabWorldProbeBoundaryCellSize(WorldState sourceState)
+    {
+        var targetCellSize = MathF.Min(sourceState.Biomes.CellSize, BrainLabWorldProbeBoundaryTargetCellSize);
+        var cappedCellSize = MathF.Sqrt(
+            sourceState.Bounds.Width * sourceState.Bounds.Height / BrainLabWorldProbeBoundaryMaxCells);
+        return MathF.Max(1f, MathF.Max(targetCellSize, cappedCellSize));
+    }
+
+    private static BiomeKind ParseBrainLabWorldProbeBoundaryBiome(string? value, BiomeKind fallback)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            || string.Equals(value, "snapshot", StringComparison.OrdinalIgnoreCase)
+                ? fallback
+                : ParseBiomeKindName(value);
+    }
+
+    private static SimVector2 BrainLabWorldProbeBoundaryAxis(float headingRadians, string direction)
+    {
+        var forward = SimVector2.FromAngle(headingRadians).Normalized();
+        var right = new SimVector2(-forward.Y, forward.X);
+        return direction.Trim().ToLowerInvariant() switch
+        {
+            "forward" or "ahead" => forward,
+            "behind" or "back" => forward * -1f,
+            "left" => right * -1f,
+            "right" => right,
+            _ => forward
+        };
     }
 
     private static ResourcePatchState CreateEditedBrainLabResource(
@@ -621,6 +900,96 @@ public sealed partial class LineageRunManager
         return double.IsFinite(value) ? (float)value : fallback;
     }
 
+    private string BrainLabWorldProbeFixtureRoot()
+    {
+        return Path.Combine(_repoRoot, "out", "brain-lab-probes");
+    }
+
+    private string ResolveBrainLabWorldProbeFixturePath(string fixturePath)
+    {
+        if (string.IsNullOrWhiteSpace(fixturePath))
+        {
+            throw new ArgumentException("Probe fixture path is required.");
+        }
+
+        var path = Path.GetFullPath(Path.Combine(_repoRoot, NormalizeRelativePath(fixturePath)));
+        EnsurePathInside(path, BrainLabWorldProbeFixtureRoot());
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Probe fixture file was not found.", fixturePath);
+        }
+
+        return path;
+    }
+
+    private BrainLabWorldProbeFixture? TryReadBrainLabWorldProbeFixture(string path)
+    {
+        try
+        {
+            var file = JsonSerializer.Deserialize<BrainLabWorldProbeFixtureFile>(File.ReadAllText(path), JsonOptions);
+            if (file is null || string.IsNullOrWhiteSpace(file.Name))
+            {
+                return null;
+            }
+
+            file.Tags ??= [];
+            file.WorldProbe = NormalizeBrainLabWorldProbeEditSet(file.WorldProbe);
+            return ToBrainLabWorldProbeFixture(path, file);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private BrainLabWorldProbeFixture ToBrainLabWorldProbeFixture(string path, BrainLabWorldProbeFixtureFile file)
+    {
+        return new BrainLabWorldProbeFixture(
+            file.Name,
+            NormalizeArtifactRelativePath(path),
+            IsBuiltIn: false,
+            CanDelete: true,
+            file.Description ?? string.Empty,
+            file.Tags ?? [],
+            NormalizeBrainLabWorldProbeEditSet(file.WorldProbe),
+            file.CreatedAtUtc,
+            file.UpdatedAtUtc);
+    }
+
+    private static BrainLabWorldProbeEditSet NormalizeBrainLabWorldProbeEditSet(BrainLabWorldProbeEditSet? editSet)
+    {
+        return new BrainLabWorldProbeEditSet(
+            (editSet?.Resources ?? []).Take(MaxBrainLabWorldProbeResources).ToArray(),
+            (editSet?.Eggs ?? []).Take(MaxBrainLabWorldProbeEggs).ToArray(),
+            (editSet?.Creatures ?? []).Take(MaxBrainLabWorldProbeCreatures).ToArray());
+    }
+
+    private static void SaveBrainLabWorldProbeFixtureFile(string path, BrainLabWorldProbeFixtureFile file)
+    {
+        var tempPath = $"{path}.tmp";
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(file, JsonOptions));
+        File.Move(tempPath, path, overwrite: true);
+    }
+
+    private static BrainLabWorldProbeFixture BuiltInBrainLabWorldProbeFixture(
+        string name,
+        string key,
+        string description,
+        IReadOnlyList<string> tags,
+        BrainLabWorldProbeEditSet worldProbe)
+    {
+        return new BrainLabWorldProbeFixture(
+            name,
+            $"builtin:{key}",
+            IsBuiltIn: true,
+            CanDelete: false,
+            description,
+            tags,
+            NormalizeBrainLabWorldProbeEditSet(worldProbe),
+            DateTimeOffset.UnixEpoch,
+            DateTimeOffset.UnixEpoch);
+    }
+
     private RestoredSimulation LoadBrainLabSimulation(string resolvedPath)
     {
         var modifiedUtc = File.GetLastWriteTimeUtc(resolvedPath);
@@ -721,6 +1090,33 @@ public sealed partial class LineageRunManager
             egg.Health);
     }
 
+    private static BrainLabWorldProbeEnvironmentSample CreateBrainLabProbeEnvironmentSample(
+        WorldState state,
+        CreatureState focus,
+        CreatureGenome genome,
+        float senseRadius)
+    {
+        var forward = SimVector2.FromAngle(focus.HeadingRadians);
+        var right = new SimVector2(-forward.Y, forward.X);
+        var bodyRadius = CreatureGrowth.EffectiveBodyRadius(focus, genome);
+        var habitatProbeDistance = Math.Clamp(
+            MathF.Min(senseRadius * 0.25f, bodyRadius * 8f),
+            BrainLabMinimumHabitatProbeDistance,
+            BrainLabMaximumHabitatProbeDistance);
+        var forwardPosition = state.Bounds.Clamp(focus.Position + forward * habitatProbeDistance);
+        var leftPosition = state.Bounds.Clamp(focus.Position - right * habitatProbeDistance);
+        var rightPosition = state.Bounds.Clamp(focus.Position + right * habitatProbeDistance);
+
+        return new BrainLabWorldProbeEnvironmentSample(
+            BiomeKinds.Canonicalize(state.Biomes.GetKindAt(focus.Position)).ToString(),
+            BiomeKinds.Canonicalize(state.Biomes.GetKindAt(forwardPosition)).ToString(),
+            BiomeKinds.Canonicalize(state.Biomes.GetKindAt(leftPosition)).ToString(),
+            BiomeKinds.Canonicalize(state.Biomes.GetKindAt(rightPosition)).ToString(),
+            state.LocalFertility.GetMultiplierAt(focus.Position),
+            state.Obstacles.IsBlockedAt(focus.Position),
+            state.Obstacles.BlockedCellCount);
+    }
+
     private static BrainLabWorldProbeCreature CreateBrainLabProbeCreature(
         WorldState state,
         CreatureState creature,
@@ -752,4 +1148,21 @@ public sealed partial class LineageRunManager
         string Key,
         string Name,
         BrainProbePresetKind PresetKind);
+
+    private sealed class BrainLabWorldProbeFixtureFile
+    {
+        public string SchemaVersion { get; set; } = "lineage.runner.brain-lab-probe.v1";
+
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> Tags { get; set; } = Array.Empty<string>();
+
+        public BrainLabWorldProbeEditSet? WorldProbe { get; set; }
+
+        public DateTimeOffset CreatedAtUtc { get; set; }
+
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+    }
 }
