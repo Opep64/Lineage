@@ -2980,6 +2980,8 @@ public sealed partial class LineageRunManager
             "hybridNeural" => "hybrid neural",
             "hiddenLayerNeural" => "hidden-layer neural",
             "rtNeatGraph" => "rtNEAT graph",
+            "hybridDeep8x8Neural" => "hybrid deep 8x8 neural",
+            "hiddenDeep8x8Neural" => "hidden deep 8x8 neural",
             null or "" => "unknown",
             _ => value
         };

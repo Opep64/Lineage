@@ -23,5 +23,10 @@ public enum BrainArchitectureKind
     /// <summary>
     /// Fixed neural controller with direct input-to-output weights plus two hidden layers of eight nodes each.
     /// </summary>
-    HybridDeep8x8Neural = 3
+    HybridDeep8x8Neural = 3,
+
+    /// <summary>
+    /// Fixed neural controller that routes all inputs through two hidden layers of eight nodes each.
+    /// </summary>
+    HiddenDeep8x8Neural = 4
 }

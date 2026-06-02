@@ -42,6 +42,18 @@ public static class BrainFactory
         SupportsHiddenNodes: true,
         SupportsDirectInputOutputWeights: true);
 
+    private static readonly BrainArchitectureDescriptor HiddenDeep8x8NeuralDescriptor = new(
+        BrainArchitectureKind.HiddenDeep8x8Neural,
+        "Hidden deep 8x8 neural",
+        "Neural controller that routes all inputs through two hidden layers of eight nodes each before outputs.",
+        NeuralBrainSchema.InputCount,
+        NeuralBrainSchema.OutputCount,
+        NeuralBrainSchema.HybridDeep8x8HiddenNodeCount,
+        NeuralBrainSchema.HybridDeep8x8HiddenNodeCount,
+        NeuralBrainSchema.HybridDeep8x8HiddenNodeCount,
+        SupportsHiddenNodes: true,
+        SupportsDirectInputOutputWeights: false);
+
     private static readonly BrainArchitectureDescriptor RtNeatGraphDescriptor = new(
         BrainArchitectureKind.RtNeatGraph,
         "rtNEAT graph",
@@ -62,6 +74,7 @@ public static class BrainFactory
             BrainArchitectureKind.HiddenLayerNeural => HiddenLayerNeuralDescriptor,
             BrainArchitectureKind.RtNeatGraph => RtNeatGraphDescriptor,
             BrainArchitectureKind.HybridDeep8x8Neural => HybridDeep8x8NeuralDescriptor,
+            BrainArchitectureKind.HiddenDeep8x8Neural => HiddenDeep8x8NeuralDescriptor,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
     }
@@ -78,6 +91,9 @@ public static class BrainFactory
                 kind,
                 NeuralBrainGenome.CreateZero(resolvedHiddenNodeCount)),
             BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHybridDeep8x8Zero()),
+            BrainArchitectureKind.HiddenDeep8x8Neural => BrainGenome.FromNeural(
                 kind,
                 NeuralBrainGenome.CreateHybridDeep8x8Zero()),
             BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateZero()),
@@ -107,6 +123,9 @@ public static class BrainFactory
             BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
                 kind,
                 NeuralBrainGenome.CreateHybridDeep8x8Random(random, scale)),
+            BrainArchitectureKind.HiddenDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHiddenDeep8x8Random(random, scale)),
             BrainArchitectureKind.RtNeatGraph => BrainGenome.FromRtNeat(RtNeatBrainGenome.CreateRandom(random, scale)),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported brain architecture kind.")
         };
@@ -150,6 +169,7 @@ public static class BrainFactory
         {
             BrainArchitectureKind.HybridNeural => resolvedHiddenNodeCount,
             BrainArchitectureKind.HybridDeep8x8Neural => NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+            BrainArchitectureKind.HiddenDeep8x8Neural => NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
             _ => 0
         };
         var starter = initialBrainKind switch
@@ -179,6 +199,9 @@ public static class BrainFactory
             BrainArchitectureKind.HybridDeep8x8Neural => BrainGenome.FromNeural(
                 kind,
                 NeuralBrainGenome.CreateHybridDeep8x8FromHybrid(starter)),
+            BrainArchitectureKind.HiddenDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                NeuralBrainGenome.CreateHiddenDeep8x8FromDirect(starter)),
             BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
                 kind,
                 NeuralBrainGenome.CreateHiddenLayerFromDirect(
@@ -208,6 +231,13 @@ public static class BrainFactory
                 kind,
                 brain.Neural?.Mutated(random, mutationStrength, mutationRate)
                     ?? throw new InvalidOperationException("Hybrid deep 8x8 neural mutation requires a dense brain payload.")),
+            BrainArchitectureKind.HiddenDeep8x8Neural => BrainGenome.FromNeural(
+                kind,
+                brain.Neural?.MutatedHiddenLayer(
+                    random,
+                    mutationStrength,
+                    mutationRate)
+                    ?? throw new InvalidOperationException("Hidden deep 8x8 neural mutation requires a dense brain payload.")),
             BrainArchitectureKind.HiddenLayerNeural => BrainGenome.FromNeural(
                 kind,
                 brain.Neural?.MutatedHiddenLayer(

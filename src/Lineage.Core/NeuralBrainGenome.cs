@@ -212,6 +212,28 @@ public sealed class NeuralBrainGenome
             trusted: true);
     }
 
+    public static NeuralBrainGenome CreateHiddenDeep8x8Random(
+        DeterministicRandom random,
+        float scale = 1f)
+    {
+        if (!float.IsFinite(scale) || scale < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), "Random brain scale must be finite and non-negative.");
+        }
+
+        var weights = new float[GetExpectedHybridDeep8x8WeightCount()];
+        for (var i = DirectWeightCount; i < weights.Length; i++)
+        {
+            weights[i] = random.NextSingle(-scale, scale);
+        }
+
+        return new NeuralBrainGenome(
+            weights,
+            NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount,
+            NeuralBrainSchema.HybridDeep8x8SecondLayerNodeCount,
+            trusted: true);
+    }
+
     public static NeuralBrainGenome CreateHiddenLayerRandom(
         DeterministicRandom random,
         float scale = 1f,
@@ -311,6 +333,20 @@ public sealed class NeuralBrainGenome
         }
 
         return new NeuralBrainGenome(weights, firstLayerNodeCount, secondLayerNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome CreateHiddenDeep8x8FromDirect(NeuralBrainGenome directBrain)
+    {
+        ArgumentNullException.ThrowIfNull(directBrain);
+        if (directBrain.HasSecondHiddenLayer)
+        {
+            throw new ArgumentException("Hidden deep 8x8 starters must be converted from a one-layer dense brain.", nameof(directBrain));
+        }
+
+        var hiddenRelay = CreateHiddenLayerFromDirect(
+            directBrain,
+            NeuralBrainSchema.HybridDeep8x8FirstLayerNodeCount);
+        return CreateHybridDeep8x8FromHybrid(hiddenRelay);
     }
 
     /// <summary>

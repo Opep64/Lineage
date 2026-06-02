@@ -5805,6 +5805,7 @@ public partial class Main : Node2D
             BrainArchitectureKind.HybridNeural => "hybrid neural",
             BrainArchitectureKind.HiddenLayerNeural => "hidden-layer neural",
             BrainArchitectureKind.HybridDeep8x8Neural => "hybrid deep 8x8 neural",
+            BrainArchitectureKind.HiddenDeep8x8Neural => "hidden deep 8x8 neural",
             _ => kind.ToString()
         };
     }

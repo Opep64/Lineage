@@ -9299,6 +9299,7 @@ internal static class RunReportWriter
             BrainArchitectureKind.HiddenLayerNeural => "Hidden-layer neural",
             BrainArchitectureKind.RtNeatGraph => "rtNEAT graph",
             BrainArchitectureKind.HybridDeep8x8Neural => "Hybrid deep 8x8 neural",
+            BrainArchitectureKind.HiddenDeep8x8Neural => "Hidden deep 8x8 neural",
             _ => kind.ToString()
         };
     }
