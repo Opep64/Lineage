@@ -2046,6 +2046,19 @@ Readout:
 - Do not raise global/default bite damage yet. If testing a checked-in scenario tweak, `0.25` is the safest candidate for `Predator Prey Pressure`; `0.30` should remain an experiment variant until predator self-attrition and meat conversion improve.
 - Healing should wait until after TTK is tuned; adding healing now would mask whether predators can secure and exploit kills.
 
+## 2026-06-02 Predator Prey Damage Candidate Promotion
+
+Promoted the safest matrix candidate for the checked-in `predator-prey-pressure` scenario:
+
+- `scenarios/predator-prey-pressure.json`: `biteDamagePerSecond` `0.18 -> 0.25`.
+
+Rationale:
+
+- The 60k matrix showed `0.25` roughly doubled tail injury pressure in mixed predator/prey runs while improving predator descendants and cross-profile kills.
+- Higher variants were kept as experiments because they depressed total population more sharply and increased same-profile predator attrition.
+- The global/default bite damage remains unchanged.
+- Healing remains deferred until predator kill/payoff behavior is stable enough to evaluate recovery mechanics cleanly.
+
 ## 2026-06-01 Roster Payoff Telemetry
 
 Added per-lineage accumulated behavior/diet telemetry and roster-profile rollups so predator payoff can be diagnosed by injected profile, not only whole-population totals.
