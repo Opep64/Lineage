@@ -1,7 +1,7 @@
 # Lineage Project Plan
 
 Created: 2026-05-19
-Last reviewed: 2026-05-30
+Last reviewed: 2026-06-03
 
 This file is the high-level project plan. It is intentionally shorter than the experiment logs; use it to recover the current direction, then jump to the narrower documents listed below.
 
@@ -37,7 +37,7 @@ The project should continue to prioritize:
 - `src/Lineage.Godot`: live viewer, scenario editing, run export, report export, and visual inspection.
 - `src/Lineage.Runner`: local launcher/run library web app.
 - `tests/Lineage.Core.Tests`: deterministic core tests.
-- `species/`, `brains/`, `maps/`, and `scenarios/`: reusable user-facing artifacts.
+- `species/`, `brains/`, `maps/`, `scenarios/`, and `scenarios/recipes/`: reusable user-facing artifacts.
 
 The core is stepped through `Simulation.Step()`. Godot and the launcher should consume the same scenario and artifact formats rather than owning alternate simulation rules.
 
@@ -49,10 +49,13 @@ The recent branch work expanded well beyond biomes and is now part of mainline d
 - biome pressure now includes habitat quality, movement cost, basal cost, seasonal/resource effects, and forest/wetland speed/vision pressure;
 - trees as individual simulated/rendered entities were removed in favor of biome-level forest penalties;
 - species bodies and brain profiles are separated into catalogs, with body/brain transplant experiments supported through rosters;
+- the built-in starter catalog is compact: Forager, Omnivore, Predator, and Rookie Omnivore bodies, each with Hybrid 4, Hidden 16, and rtNEAT graph brain profiles;
 - mutation pressure is controlled by scenario/world policy at reproduction time, not by inherited creature authority;
+- rtNEAT graph brains, passive healing, fat storage, grabbing, sound, and Brain Lab probes are implemented first passes;
+- checked-in scenario work is centered on `balanced-foraging.json`, with pressure variants maintained as recipes;
 - neural and sensing systems have configurable parallel execution, while single-threaded settings remain available for controlled comparisons;
-- the launcher supports scenario recipes, map artifacts, catalogs, run history, reports, checkpoints, and Save Species/Save Brain workflows;
-- HTML reports now include spatial ecology summaries, biome death/exposure tables, starting-roster information, and a panning/zooming survivor ancestry graph.
+- the launcher supports scenario recipes with descriptions/diffs, map artifacts, catalogs, starting rosters, run history, reports, checkpoints, Brain Lab probes, and Save Species/Save Brain workflows;
+- HTML reports now include spatial ecology summaries, biome death/exposure tables, starting-roster information, rtNEAT graph/topology diagnostics, healing telemetry, and a panning/zooming survivor ancestry graph.
 
 ## Near-Term Priorities
 
@@ -81,8 +84,9 @@ The recent branch work expanded well beyond biomes and is now part of mainline d
 
 5. Brain architecture experiments
    - Keep `HybridNeural` as default for now.
-   - Continue comparing `HiddenLayerNeural`.
-   - Explore an rt-NEAT-like architecture and possibly a less dense/modular controller.
+   - Continue comparing Hidden 16 catalog profiles against Hybrid 4 and rtNEAT graph profiles.
+   - Tune rtNEAT topology mutation, graph complexity cost, and predator/prey behavior.
+   - Keep deep 8x8 dense variants as experiments until they clearly outperform simpler catalog choices.
    - Keep all current senses unless a specific experiment proves a sense is harmful rather than merely expensive.
 
 ## Deferred Direction
@@ -91,7 +95,7 @@ The following are still good ideas, but not the next default work:
 
 - temperature and water as survival mechanics;
 - radiation or mutation-pressure zones;
-- grabbing/carrying/latching interactions;
+- richer carrying/latching interactions beyond the first creature grab pass;
 - richer plant ecology with seeds, dispersal, toxins, and nutrients;
 - creature social behavior, kin/familiarity cues, and imperfect identity;
 - recurrent/memory-owning brains;

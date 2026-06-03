@@ -5,7 +5,7 @@ through repeatable viability checks across a seed matrix.
 
 By default it tests every `*.species.json` under `species/` using each profile's
 default or embedded brain. This is the main lightweight tool for checking that
-starter, rookie, prey, predator, and exported user profiles remain viable after
+the consolidated starter roles and exported user profiles remain viable after
 brain/schema/body changes:
 
 ```powershell
@@ -17,7 +17,7 @@ Useful focused runs:
 ```powershell
 dotnet run --project tools/catalog-assay -- `
   --scenario scenarios/balanced-foraging.json `
-  --species species/rookie-explorer-forager.species.json `
+  --species species/rookie-omnivore.species.json `
   --seeds 20260519,20260520,20260521 `
   --ticks 100000 `
   --founders 40
@@ -27,9 +27,10 @@ To run body/brain transplant checks, pass one or more brain profiles:
 
 ```powershell
 dotnet run --project tools/catalog-assay -- `
-  --species species/rookie-explorer-forager.species.json `
-  --brain brains/starter/starter-seed-forager-hybrid.brain.json `
-  --brain brains/starter/starter-explorer-forager-hybrid.brain.json
+  --species species/rookie-omnivore.species.json `
+  --brain brains/starter/rookie-omnivore-hybrid.brain.json `
+  --brain brains/starter/rookie-omnivore-hidden-16.brain.json `
+  --brain brains/starter/rookie-omnivore-rtneat.brain.json
 ```
 
 Or test every catalog brain against each selected species:

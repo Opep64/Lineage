@@ -12,7 +12,7 @@ Use these files as evidence trails, not as the primary source of current truth:
 ## Logs
 
 - `2026-05-main-baseline-stability.md`: post-merge mainline performance baseline, 60k stability pass, and 90k weak-scenario check.
-- `2026-05-brain-rework-balance.md`: sector vision, BrainFactory, hidden-layer brain, sparse ecology rebalance, habitat-constrained plant relocation, and Godot export sanity work.
+- `2026-05-brain-rework-balance.md`: sector vision, BrainFactory, HiddenLayer/rtNEAT/deep brain experiments, starter catalog consolidation, recipe-based scenario consolidation, passive healing, sparse ecology rebalance, habitat-constrained plant relocation, and Godot export sanity work.
 - `2026-05-fat-storage-validation.md`: fat-storage probe telemetry, Lean Season Foraging preset, and early/150k fat-pressure validation.
 
 Generated Markdown under `out/` can also be useful evidence, especially catalog assay summaries and performance discussion notes, but those files are run artifacts rather than maintained docs.

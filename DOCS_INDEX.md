@@ -1,6 +1,6 @@
 # Lineage Documentation Index
 
-Last reviewed: 2026-05-30
+Last reviewed: 2026-06-03
 
 This is the starting point for future Codex threads. Read this file first, then choose the narrow document that matches the task.
 
@@ -45,9 +45,10 @@ This is the starting point for future Codex threads. Read this file first, then 
 
 - Branch: `main`
 - Current world direction: natural/manual biome maps, reusable map artifacts, eight canonical biomes, biome-level forest/wetland pressure, and no individual tree layer.
-- Current creature direction: sector vision, rich local senses, body/brain catalog split, starter and rookie profiles, species roster injection, and world-bound mutation pressure.
+- Current creature direction: sector vision, rich local senses, body/brain catalog split, consolidated starter roles, Hybrid 4/Hidden 16/rtNEAT brain profiles, species roster injection, passive healing, fat reserves, grabbing, and world-bound mutation pressure.
+- Current scenario direction: `balanced-foraging.json` as the checked-in base, with ecology, season, meat-pressure, migration, mutation, and performance variants layered as recipes under `scenarios/recipes/`.
 - Current performance direction: configurable parallel neural and sensing systems, optional stale-sense action reuse, optional extinct payload pruning, and Long Run Performance recipe for large CLI runs.
-- Current analysis direction: spatial/biome reporting, starting-roster reporting, and a panning/zooming survivor ancestry graph.
+- Current analysis direction: spatial/biome reporting, starting-roster reporting, rtNEAT graph/topology diagnostics, healing telemetry, Brain Lab probes, and a panning/zooming survivor ancestry graph.
 
 ## Maintenance Rules
 

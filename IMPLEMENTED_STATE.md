@@ -1,6 +1,6 @@
 # Lineage Implemented State
 
-Last reviewed: 2026-05-30
+Last reviewed: 2026-06-03
 
 This file describes what is implemented now. Planned or speculative work belongs in `ROADMAP.md`.
 
@@ -23,8 +23,8 @@ The core simulation is stepped through an explicit `Simulation.Step()` loop. God
 - Default spatial cell size is `64`.
 - Default `worldSenseIntervalTicks` is `10`.
 - Default `statsSnapshotIntervalTicks` is `300`.
-- Default brain architecture is `HybridNeural` with 4 hidden nodes.
-- Default hidden-layer architecture count is 8 when `HiddenLayerNeural` is selected.
+- Default scenario brain architecture is `HybridNeural` with 4 hidden nodes.
+- Generic `HiddenLayerNeural` generation defaults to 10 hidden nodes when no explicit count is supplied, but the visible starter catalog uses authored Hidden 16 brain profiles for the main roles.
 - Default neural controller thread count is `8`.
 - Default sensing thread count is `4`.
 - Optional neural-action reuse on skipped world senses is available but off by default.
@@ -89,6 +89,7 @@ Initial creatures and roster entries can spawn uniformly, in left/middle/right t
 - Creature attacks can damage contact targets, create injury deaths, and produce meat resources.
 - Attack intent remains threshold-gated, so near-threshold attack exploration is still a design concern.
 - Creature grabs can hold a contacted creature, slow the grabbed target's movement, and expose grab pressure/direction as contact-fresh senses. First-pass grab only targets creatures; resource/egg carrying and richer latch/escape rules remain future work.
+- Creature healing is an automatic late-pipeline recovery mechanic. After a configurable no-damage delay, damaged creatures heal slowly while spending energy, and healing stops at a configurable minimum-energy floor.
 
 ## Current Senses
 
@@ -143,9 +144,9 @@ Not implemented yet:
 
 The current flat neural schema has:
 
-- Inputs: `228`.
-- Dense adapter outputs: `8`.
-- Universal physical action outputs: move forward, turn, eat, reproduce, attack, and grab.
+- Inputs: `235`.
+- Dense adapter outputs: `10`.
+- Universal physical action outputs: move forward, turn, eat, reproduce, attack, grab, sound amplitude, and sound tone.
 - Dense-adapter internal outputs: memory forward and memory right.
 - `BrainIoRegistry` records stable keys, flat indices, groups, ranges, neutral values, freshness policy, and physical-vs-internal scope for the active dense adapter schema.
 
@@ -161,7 +162,20 @@ The current flat neural schema has:
 - Optional architecture.
 - Direct input-to-output weights are stored for layout compatibility but forced to zero and not behaviorally active.
 - Inputs must pass through hidden nodes before reaching outputs.
-- Current default hidden-layer node count is 8.
+- Generic hidden-layer generation defaults to 10 hidden nodes when no explicit count is supplied.
+
+`RtNeatGraph`:
+
+- Sparse, topology-evolving graph controller inspired by rtNEAT/Bibites-style brains.
+- Uses the same semantic input/output contract as the dense adapter, but stores explicit nodes and enabled/disabled weighted connections.
+- Mutations can perturb weights and node biases, add/remove valid connections, insert hidden nodes by splitting connections, mutate hidden activation/bias parameters, and prune inactive hidden nodes.
+- Runtime evaluation is sparse and only traverses enabled connections. Hidden nodes and enabled connections have configurable metabolism costs to discourage graph bloat.
+- Stats, reports, probes, and species clustering include rtNEAT topology telemetry.
+
+`HybridDeep8x8Neural` and `HiddenDeep8x8Neural`:
+
+- Experimental two-hidden-layer architectures with 8 nodes in each layer.
+- Available for comparison and Brain Lab/testing work, but not part of the main visible starter catalog.
 
 Brain profiles:
 
@@ -170,13 +184,14 @@ Brain profiles:
 - Built-in starter brain profiles live under `brains/starter/`.
 - User-exported profiles live under `brains/user/`.
 - Older recognizable dense neural layouts can be normalized into the current schema with new inputs/outputs left neutral.
+- The visible starter brain catalog has three controller choices for each main role: Hybrid 4, Hidden 16, and rtNEAT graph.
 
 Species profiles:
 
 - Live under `species/` and use `.species.json`.
 - Store a representative body genome, embedded fallback brain, metadata, and optionally `defaultBrainPath`.
-- Built-in starter, rookie, efficient-prey, and predator profiles are available.
-- Roster entries can use the profile/default brain, a scenario starter brain, or a catalog brain profile path.
+- Built-in starter species are Starter Forager, Starter Omnivore, Starter Predator, and Rookie Omnivore.
+- Roster entries default to the species/default brain and may override with any compatible catalog brain profile path.
 - Species roster rows now keep labels, counts, spawn regions, brain selections, and optional starting energy overrides.
 
 Memory status:
@@ -190,7 +205,7 @@ CLI supports scenario runs, probes, snapshots, checkpointing/resume, CSV sidecar
 
 Godot supports live visualization, scenario editing, CLI run launching, live-run export to CLI-aligned report artifacts, snapshot/checkpoint loading, selected entity inspection, map rendering toggles, pan/zoom/follow controls, scale bars, biome overlays, aggregate drawing for large entity counts, and species/brain roster tools.
 
-The launcher supports run history, active run status, scenario editing, saved scenarios, recipes, map preview/painting/artifacts, species and brain catalogs, starting roster editing, Save Species/Save Brain from completed runs, report opening, checkpoints, rerun/continue, and artifact management.
+The launcher supports run history, active run status, scenario editing, saved scenarios, recipe descriptions and launch diffs, map preview/painting/artifacts, species and brain catalogs, starting roster editing, Brain Lab probes/overrides, Save Species/Save Brain from completed runs, report opening, checkpoints, rerun/continue, and artifact management.
 
 Reports include:
 
@@ -205,18 +220,27 @@ Reports include:
 - trait summaries;
 - lineage, founder, generation, and species cluster summaries;
 - panning/zooming survivor ancestry graph;
+- representative rtNEAT brain graphs and topology telemetry;
 - behavior assays;
 - brain input diagnostics;
-- freshness/rot, memory, terrain, obstacle, and combat metrics.
+- freshness/rot, memory, terrain, obstacle, combat, fat, and healing metrics.
+
+## Scenario Surface And Recipes
+
+- The checked-in scenario surface is centered on `scenarios/balanced-foraging.json`.
+- Balanced Foraging enables the generic, tender, rich, and tough plant mix by default.
+- Pressure variants are represented as recipes under `scenarios/recipes/` rather than many separate checked-in scenario files.
+- Current recipe set includes gentle ecology, harsh ecology, lean season, scavenger pressure, carrion pressure, omnivore pressure, predator pressure, migration pressure, double mutation, and long-run performance.
 
 ## Current Validation Snapshot
 
 Recent validation and evidence is spread across `PERFORMANCE_BASELINES.md`, `docs/experiments/`, and generated `out/` folders. The most durable current facts are:
 
-- Mainline post-merge sparse scenarios completed the 2026-05-25 stability matrix without extinctions.
-- Harsh and Predation are viable but still thin in worst seeds.
-- Predator/Prey has explicit efficient-prey and meat-biased predator profiles, but sustained predator/prey ecology remains experimental.
+- The starter catalog was consolidated to four body roles with Hybrid 4, Hidden 16, and rtNEAT graph brain profiles.
+- rtNEAT is viable enough to keep as a main catalog architecture, but still needs tuning around performance, topology cost, and predator/prey behavior.
+- Healing works and is worth keeping, but the first predator/prey matrix showed it mostly helps the surviving predator lineage rather than consistently preserving prey.
+- Harsh/predator pressure recipes remain useful low-margin checks; sustained predator/prey ecology remains experimental.
 - The 16k x 16k Balanced profiling pass found sensing and neural evaluation dominate carrying-capacity runtime.
 - Parallel neural and sensing execution are now implemented and configurable.
 - Long Run Performance settings improve 16k tail throughput substantially but still do not make 960 ticks/s realistic at the profiled carrying capacity.
-- Recent local core test runs during the brain I/O and grab work passed 218 tests; rerun tests before relying on that number for a release note.
+- Recent local core test runs after healing and catalog/brain work passed 237 tests.

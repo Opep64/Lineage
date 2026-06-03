@@ -287,7 +287,7 @@
         <li>View completed run reports from the run table</li>
         <li>Search, sort, and filter runs by status or scenario</li>
         <li>See a concise failure reason on failed, lost, or unknown runs when stderr or runner diagnostics are available</li>
-        <li>See the seed, brain/starter kind, world size, and resource density used on each run row</li>
+        <li>See the seed, selected starter brain profile, world size, and resource density used on each run row</li>
         <li>Clone settings from a running or finished run back into the launch form for quick experiment variants</li>
         <li>Rerun a completed, failed, or lost row after confirming that the previous run artifacts will be replaced</li>
         <li>Continue a completed, failed, or stopped run in the same row and output folder from its latest checkpoint, final snapshot, or a selected checkpoint in run details</li>
@@ -355,7 +355,7 @@
         population, resource density per 1M world area, biome mode, biome cell size, resource void border,
         food abundance, regrowth, depleted-resource relocation, resource clustering, biome movement/basal cost multipliers, nonlinear movement-speed cost, initial brain mode, metabolism, movement cost, eating rate,
         gut capacity, digestion rate, diet adaptation, bite strength, damage resistance, death-meat output, meat decay, meat scent, vision range and angle, trait upkeep costs, optional egg upkeep, egg production rate, egg incubation, maturity age, mutation strength, trait/brain mutation rates, reproduction threshold, and
-        bite damage, bite energy cost, combat-trait upkeep, bite reach, and snapshot interval. The checked-in starter scenario is:
+        bite damage, bite energy cost, combat-trait upkeep, bite reach, rtNEAT topology upkeep, passive healing, starting roster species/brain profiles, and snapshot interval. The checked-in starter scenario is:
       </p>
       <pre><code>.\scenarios\balanced-foraging.json</code></pre>
       <p>Current pressure presets are runner recipes under <code>.\scenarios\recipes</code> and are intended to layer on top of <code>balanced-foraging</code>:</p>
@@ -363,10 +363,13 @@
         <li><code>gentle_ecology</code>: abundant food, smaller void border, lower basal/movement pressure, and lower mutation pressure</li>
         <li><code>harsh_ecology</code>: sparse food, wider void border, slower regrowth, and higher basal/movement pressure</li>
         <li><code>lean_season</code>: stronger seasonal scarcity with fat-storage pressure</li>
-        <li><code>scavenger_pressure</code>: lower plant reliability, wider void, richer slower-decaying carcasses, and scavenger starter behavior</li>
+        <li><code>scavenger_pressure</code>: lower plant reliability, wider void, and richer slower-decaying carcasses for omnivore/scavenger pressure</li>
         <li><code>carrion_pressure</code>: stronger carrion economy, stronger meat scent, slower decay, and more rot risk</li>
-        <li><code>omnivore_pressure</code>: middle pressure between foraging and meat use, with an opportunistic starter brain</li>
+        <li><code>omnivore_pressure</code>: middle pressure between foraging and meat use</li>
+        <li><code>predator_pressure</code>: mixed forager/predator starter roster with stronger combat and meat payoff pressure</li>
         <li><code>migration_pressure</code>: larger edge-ladder world with top-vs-bottom opposed seasons</li>
+        <li><code>double_mutation</code>: stronger mutation pressure for faster exploratory runs</li>
+        <li><code>long_run_performance</code>: lower-overhead settings for large or long runs</li>
       </ul>
 
       <p>
@@ -541,10 +544,11 @@ dotnet run --project .\tests\Lineage.Core.Tests\Lineage.Core.Tests.csproj</code>
         <li>Juveniles grow toward adult body size, speed, eating capacity, gut capacity, and digestion rate, and cannot reproduce before maturity.</li>
         <li>Food search is local and imperfect: creatures target only visible food inside their vision cone, receive visible food density rather than map fertility, and smell nearby meat as a fuzzy gradient rather than an exact target.</li>
         <li>Dead creatures leave meat resources. Living creatures can now see other living creatures through neutral creature cues and bite one another at close range when their brain outputs attack intent. Bite strength and damage resistance are heritable and costly. Diet adaptation, gut capacity, and digestion rate are heritable, so lineages can evolve from mostly herbivory toward omnivory or meat specialization when the scenario makes that viable.</li>
-        <li>Evolutionary pressure is configurable through biome-shaped food density, resource clustering, no-plant void borders, regrowth, death-meat output, meat decay, meat scent, initial brain mode, bite strength, damage resistance, bite damage/cost/reach, combat-trait upkeep, metabolism, movement cost, shared trait upkeep, vision range/angle upkeep, gut-capacity and digestion-rate upkeep, optional egg upkeep, egg exposure damage, egg production rate, offspring investment, egg incubation, maturity age, reproduction threshold, and body-size upkeep.</li>
-        <li>Offspring investment sets egg sturdiness and hatchling birth quality; explicit fat, strength, and clutches can build on this later.</li>
+        <li>Evolutionary pressure is configurable through biome-shaped food density, resource clustering, no-plant void borders, regrowth, death-meat output, meat decay, meat scent, catalog brain selection, bite strength, damage resistance, bite damage/cost/reach, combat-trait upkeep, metabolism, movement cost, shared trait upkeep, vision range/angle upkeep, gut-capacity and digestion-rate upkeep, rtNEAT graph upkeep, passive healing, optional egg upkeep, egg exposure damage, egg production rate, offspring investment, egg incubation, maturity age, reproduction threshold, and body-size upkeep.</li>
+        <li>Offspring investment sets egg sturdiness and hatchling birth quality. Fat reserves are implemented as automatic surplus storage/release; clutch-like reproduction remains future work.</li>
+        <li>The built-in starter catalog is role-based: Starter Forager, Starter Omnivore, Starter Predator, and Rookie Omnivore bodies, each with Hybrid 4, Hidden 16, and rtNEAT graph brain profiles.</li>
         <li>Pressure presets now live as runner recipes layered onto <code>balanced-foraging</code>, so the base scenario keeps the full generic/tender/rich/tough plant mix while recipes adjust ecology, seasons, meat pressure, migration pressure, or mutation pressure.</li>
-        <li>Local carcass/meat scent and neutral creature perception are now in place. The next simulation work should improve evolved behavior around risk, avoidance, and attack decisions rather than only tuning food and damage numbers.</li>
+        <li>Local carcass/meat scent, neutral creature perception, grabbing, passive healing, fat reserves, and rtNEAT graph brains are now in place. The next simulation work should improve evolved behavior around risk, avoidance, and attack decisions rather than only tuning food and damage numbers.</li>
       </ul>
     </section>
   </main>

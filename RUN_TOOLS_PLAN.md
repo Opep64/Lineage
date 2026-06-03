@@ -1,7 +1,7 @@
 # Lineage Run Tools State And Plan
 
 Created: 2026-05-23
-Last reviewed: 2026-05-30
+Last reviewed: 2026-06-03
 
 This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Start with `DOCS_INDEX.md` for the full documentation map.
 
@@ -20,10 +20,11 @@ The first version is now implemented as a local web launcher/run library in `src
 - Opens reports, artifacts, checkpoints, logs, snapshots, and resolved scenarios.
 - Supports rerun, continue, checkpoint, checkpoint-and-stop, stop, rename, delete, and bulk export/delete workflows.
 - Provides a scenario editor with grouped settings and Basic/All views.
-- Supports scenario recipes such as Long Run Performance and Double Mutation.
+- Supports scenario recipes with descriptions, launch diff review, and save/archive/delete workflows.
 - Supports saved scenarios under `scenarios/user/`.
 - Supports reusable map artifacts under `maps/` with preview, painting, save, duplicate, rename, and delete.
 - Supports species and brain catalogs with starting roster editing, body/brain selection, spawn regions, labels, counts, and starting-energy overrides.
+- Supports Brain Lab probes and starter/world override tools for focused behavior inspection.
 - Supports Save Species and Save Brain from completed runs.
 
 ## Scope Boundaries
@@ -94,16 +95,15 @@ Remaining:
 Implemented:
 
 - Recipes live under `scenarios/recipes/`.
+- Gentle Ecology, Harsh Ecology, Lean Season, Scavenger Pressure, Carrion Pressure, Omnivore Pressure, Predator Pressure, and Migration Pressure layer ecology/season/meat pressure onto Balanced Foraging.
+- Double Mutation applies controlled higher-mutation world pressure.
 - Long Run Performance applies the current long-run performance bundle.
-- Double Mutation applies a controlled higher-mutation world pressure.
-- rtNEAT Graph Growth applies the current experimental sparse-graph architecture, sector vision, and stronger graph-growth mutation pressure.
-- rtNEAT Sparse Scavenger and rtNEAT Sparse Predator apply the new diet-specific sparse starter graphs while keeping base rtNEAT mutation pressure.
+- rtNEAT is selected through catalog brain profiles rather than rtNEAT-specific scenario recipes.
 - Recipes are available from the launcher and Godot scenario tools.
 
 Remaining:
 
-- Recipe diff preview and undo.
-- User-created recipe management from the UI.
+- Recipe undo/history beyond removing applied recipes from the active stack.
 - Better warnings when a recipe changes behavior-sensitive settings.
 
 ### Reusable Maps
@@ -130,14 +130,14 @@ Implemented:
 
 - Species profiles live under `species/` with `.species.json`.
 - Brain profiles live under `brains/` with `.brain.json`.
-- Built-in starter, rookie, prey, predator, hybrid, and hidden profiles exist.
-- Launcher roster entries can select profile/default brain, scenario starter brain, or catalog brain.
+- Built-in starter species are Starter Forager, Starter Omnivore, Starter Predator, and Rookie Omnivore.
+- Each starter role has Hybrid 4, Hidden 16, and rtNEAT graph catalog brain profiles.
+- Launcher roster entries default to the species/default brain and can override with any compatible catalog brain profile.
 - Roster entries can choose count, spawn region, optional label, and optional starting energy.
 - Spawn regions include thirds and quadrants.
 
 Remaining:
 
-- More curated starter profiles.
 - Catalog assay integration in the launcher.
 - Better body/brain transplant summaries.
 - Brain editor or weight inspection tooling.
@@ -148,7 +148,7 @@ Remaining:
 Implemented:
 
 - CLI and Godot can generate the same report style.
-- Reports include run settings, pressure settings, starting roster, charts, ecology summaries, biome outcomes, lineage summaries, behavior assays, brain diagnostics, and survivor ancestry.
+- Reports include run settings, pressure settings, starting roster, charts, ecology summaries, biome outcomes, lineage summaries, behavior assays, brain diagnostics, rtNEAT graph/topology diagnostics, healing telemetry, and survivor ancestry.
 - Spatial reporting captures plant payoff traces and biome exposure; heatmap-style reports are planned but not fully built.
 
 Remaining:

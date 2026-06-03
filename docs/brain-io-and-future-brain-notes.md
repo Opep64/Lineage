@@ -1,9 +1,9 @@
 # Brain I/O And Future Brain Architecture Notes
 
 Created: 2026-05-30
-Status: temporary discussion notes
+Status: branch-aligned design and evidence notes
 
-These notes capture the current discussion about creature actions, senses, input/output schema cleanup, and future brain architecture experiments. Promote durable decisions into `DECISIONS.md`, implemented work into `IMPLEMENTED_STATE.md`, and future work into `ROADMAP.md` when this settles.
+These notes capture the discussion and evidence trail around creature actions, senses, input/output schema cleanup, and brain architecture experiments. Durable decisions now live in `DECISIONS.md`, implemented work in `IMPLEMENTED_STATE.md`, and future work in `ROADMAP.md`.
 
 ## Current Dense Adapter Outputs
 
@@ -315,9 +315,9 @@ inputs -> hidden layer 1 -> hidden layer 2 -> outputs
 
 No direct skip connections initially.
 
-### rtNEAT-Like Sparse Graph Brain
+### rtNEAT Sparse Graph Brain
 
-Plan to explore in the near future.
+First pass implemented on this branch. The original design sketch and tuning evidence remain below because they explain why the current `RtNeatGraph` architecture, catalog serialization, mutation policy, and topology telemetry look the way they do.
 
 Core idea:
 
@@ -667,9 +667,10 @@ When adding a new input or output:
 
 ## Working Recommendation
 
-Do the I/O contract cleanup before expanding inputs/outputs heavily, then update the current two dense brains through adapters. After that, add new architectures in this likely order:
+Keep the current dense adapter contract stable while the catalog settles: Hybrid 4 remains the conservative default, Hidden 16 and rtNEAT graph are first-class catalog alternatives, and the 8x8 deep dense variants stay experimental until they beat the simpler catalog choices in repeated runs. Near-term brain work should tune rtNEAT topology mutation/cost and improve behavior diagnostics before adding another major architecture.
 
-1. two-layer neural as a clean feed-forward comparison;
-2. rtNEAT-like sparse graph brain;
-3. Hebbian/plastic brain once runtime brain state is in place;
-4. HyperNEAT later if senses become more spatial/field-like.
+Likely later architecture order:
+
+1. recurrent or memory-owning variants after the legacy memory bridge is separated from universal I/O;
+2. Hebbian/plastic brain once runtime brain state is in place;
+3. HyperNEAT later if senses become more spatial/field-like.

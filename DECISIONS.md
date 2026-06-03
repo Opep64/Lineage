@@ -1,6 +1,6 @@
 # Lineage Decision Log
 
-Last reviewed: 2026-05-30
+Last reviewed: 2026-06-03
 
 This file records active design decisions. It is not a changelog; it exists so future work understands why the current shape exists.
 
@@ -232,34 +232,85 @@ Status: active.
 Decision:
 
 - `HybridNeural` remains the default architecture.
-- `HiddenLayerNeural` is available for scenario comparisons but not default.
+- `HiddenLayerNeural` and `RtNeatGraph` are available as first-class catalog brain choices but are not the default species brain architecture.
 
 Rationale:
 
-- Hidden-layer brains are viable, but not yet clearly superior across all pressures.
-- A 150k weak-scenario comparison with 8 hidden nodes completed without extinction, but Predation Pressure had thinner worst-seed populations than Hybrid.
-- Keeping hybrid default avoids destabilizing all scenarios while perception/balance work continues.
+- Hidden-layer and rtNEAT graph brains are viable enough to keep in the catalog, but neither has enough long-run evidence to replace Hybrid as the conservative default.
+- Hybrid 4 is smaller and generally faster than Hidden 16 and deep dense variants.
+- Keeping hybrid as each starter species' default avoids destabilizing scenarios while brain architecture tuning continues.
 
 Status: active.
 
-## 2026-05-25: HiddenLayerNeural Default Hidden Count Is 8
+## 2026-06-03: HiddenLayerNeural Generation Defaults To 10; Starter Catalog Uses Hidden 16
 
 Decision:
 
-- Hidden-layer brain default hidden node count is 8.
+- Generic `HiddenLayerNeural` generation defaults to 10 hidden nodes when no explicit count is supplied.
+- The visible starter brain catalog uses authored Hidden 16 profiles for the main starter roles.
+- Hidden 8, Hidden 8x8, Hidden 24, and deep hybrid experiments remain comparison data unless explicitly promoted.
 
 Rationale:
 
-- 16 hidden nodes were slower and not better in the focused checks.
-- 8 preserved viability and largely removed the Harsh weakness seen with 16.
-- Converted starters use seven relay nodes, one per output, leaving one spare node for evolution.
+- Hidden 16 looked more capable than Hidden 8 across the current catalog comparisons without becoming as large as Hidden 24.
+- Hidden 24 adds cost and complexity before there is enough evidence that it improves behavior.
+- Catalog profiles should be fixed authored controllers, not launcher-edited architecture mutations of a selected brain.
 
 Consequence:
 
-- The spare node is initially unused in converted starters and is still evaluated each tick.
-- Random hidden-layer brains may use all nodes from the start.
+- Selecting a Hidden 16 catalog brain means selecting that exact profile.
+- Creating other hidden-node counts should be done as separate brain profiles, for example `XYZ Hidden 8` and `XYZ Hidden 16`, rather than changing the architecture of the selected profile in the launcher.
 
 Status: active, revisit after more hidden-layer comparison.
+
+## 2026-06-03: rtNEAT Is A First-Class Brain Profile Architecture
+
+Decision:
+
+- `RtNeatGraph` brains are selected through the brain catalog, not by swapping a chosen dense brain to an rtNEAT mode in the launcher.
+- rtNEAT graph brains use the same semantic input/output contract as dense brains but store explicit graph nodes and enabled/disabled weighted connections.
+- The current implementation uses mutation-driven topology growth/pruning and reporting/species telemetry, but not full NEAT crossover or innovation-based speciation.
+- rtNEAT graph complexity has metabolism costs for hidden nodes and enabled connections.
+
+Rationale:
+
+- A brain profile's name plus architecture plus weights/topology is the reusable controller unit.
+- The previous launcher affordance that allowed changing the architecture of a selected brain made it easy to think an rtNEAT brain was being launched when a dense fallback was actually used.
+- Topology costs are needed so graph growth is selected for usefulness instead of accumulating indefinitely.
+
+Status: active, with tuning expected.
+
+## 2026-06-03: Consolidate Starter Catalog Around Roles And Recipes
+
+Decision:
+
+- Keep the built-in body catalog small: Starter Forager, Starter Omnivore, Starter Predator, and Rookie Omnivore.
+- Expose three main brain profiles per role: Hybrid 4, Hidden 16, and rtNEAT graph.
+- Keep `scenarios/balanced-foraging.json` as the checked-in base scenario, and express pressure variants through `scenarios/recipes/`.
+
+Rationale:
+
+- The previous collection of seed/explorer/sector/scavenger/predator variants created too many overlapping starter names.
+- A compact role x brain matrix makes comparisons cleaner and keeps body/brain transplants explicit.
+- Recipes make ecological or mutation pressure easier to layer on the same base without maintaining many near-duplicate scenario files.
+
+Status: active.
+
+## 2026-06-03: Keep Passive Healing As A Slow Energy-Paid Recovery Mechanic
+
+Decision:
+
+- Damaged creatures can heal slowly after a no-damage cooldown.
+- Healing spends energy per health restored and stops at a minimum energy floor.
+- Healing is a general creature mechanic, not a prey-only stabilizer.
+
+Rationale:
+
+- Slow recovery lets predators and prey recover from non-lethal fights without erasing the danger of sustained damage.
+- Energy cost prevents healing from becoming free durability.
+- The first predator/prey checks did not prove that healing saves prey consistently, but the mechanic behaved sensibly enough to keep and tune.
+
+Status: active.
 
 ## 2026-05-25: Constrain Plant Relocation To Habitat Biome
 
@@ -348,7 +399,7 @@ Decision:
 Rationale:
 
 - Enables body/brain transplant experiments.
-- Lets starter bodies be paired with Hybrid, HiddenLayer, and future rt-NEAT-like brains.
+- Lets starter bodies be paired with Hybrid, HiddenLayer, rtNEAT graph, and future brain architectures.
 - Gives successful run creatures a path into reusable catalogs without freezing every experiment to one embedded controller.
 
 Status: active.

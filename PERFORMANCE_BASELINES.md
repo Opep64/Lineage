@@ -1,15 +1,17 @@
 # Lineage Performance Baselines
 
 Created: 2026-05-22
-Updated: 2026-05-30
+Updated: 2026-06-03
 
 This file records performance baselines for repeatable CLI runs. Use these numbers as reference points when judging whether future performance work changes behavior or speed.
 
 ## Baseline Cadence Note
 
-As of 2026-05-30, checked-in scenarios default to `worldSenseIntervalTicks: 10` and `statsSnapshotIntervalTicks: 300`. Baselines recorded before 2026-05-27 used the scenario values checked in at the time, usually `worldSenseIntervalTicks: 4` and snapshot intervals of `10` or `30` ticks, with a few diagnostic scenarios using `1`. When comparing against those older baselines, use the recorded scenario files or pass explicit overrides for the older cadence.
+As of 2026-06-03, the checked-in base scenario is `scenarios/balanced-foraging.json`, with pressure variants maintained as recipes under `scenarios/recipes/`. The base still defaults to `worldSenseIntervalTicks: 10` and `statsSnapshotIntervalTicks: 300`. Baselines recorded before 2026-05-27 used the scenario values checked in at the time, usually `worldSenseIntervalTicks: 4` and snapshot intervals of `10` or `30` ticks, with a few diagnostic scenarios using `1`. When comparing against those older baselines, use the recorded scenario files or pass explicit overrides for the older cadence.
 
 For large performance runs, use an explicit high snapshot interval such as `54000` so stats/report accumulation does not dominate the profile. The Long Run Performance recipe uses that setting.
+
+Historical tables below may refer to scenario files that were later consolidated into recipes. Treat those names as evidence from the branch state at measurement time, not as the current checked-in scenario inventory. The current visible starter brain catalog exposes Hybrid 4, Hidden 16, and rtNEAT graph profiles for each main starter role.
 
 ## 2026-05-29 Large-World Performance Pass
 
@@ -86,8 +88,8 @@ Context:
 - Default world sensing cadence at measurement time: expensive world queries refreshed every `4` ticks, with close-range refresh at proximity `0.85`
 - Spatial index mode: array-backed grid cells; persistent dirty resource/egg cells; stamp-array resource/egg candidate dedupe; squared-distance sensing scan filters; specialized visible-creature scan with lazy trait caching; dormant depleted plants stay out of the resource index until respawn; creature cells still rebuild every tick.
 - Vision mode: sector vision enabled; legacy nearest-food and nearest-creature vision inputs disabled in authored scenarios.
-- Neural mode: `HybridNeural` default; `HiddenLayerNeural` available per scenario.
-- World size for checked-in primary presets: current sparse `4000 x 4000` style scenarios.
+- Neural mode at measurement time: `HybridNeural` default; `HiddenLayerNeural` available per scenario.
+- World size for checked-in primary presets at measurement time: sparse `4000 x 4000` style scenarios.
 - Date measured: 2026-05-25
 
 Output file:

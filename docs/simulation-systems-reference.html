@@ -431,7 +431,7 @@
   <div class="shell">
     <aside class="side">
       <h1>Systems Reference</h1>
-      <p>Current simulation systems, formulas, and examples. Last reviewed 2026-05-31.</p>
+      <p>Current simulation systems, formulas, and examples. Last reviewed 2026-06-03.</p>
       <nav aria-label="Reference index">
         <a href="#overview">Overview</a>
         <a href="#tick-pipeline">Tick Pipeline</a>
@@ -440,6 +440,7 @@
         <a href="#creatures">Creature Body</a>
         <a href="#metabolism">Metabolism</a>
         <a href="#fat-storage">Fat Storage</a>
+        <a href="#healing">Healing</a>
         <a href="#sensing">Sensing</a>
         <a href="#brains">Brains And Actions</a>
         <a href="#movement">Movement</a>
@@ -464,7 +465,7 @@
           <p>The simulation is a continuous 2D world advanced by fixed ticks. Godot, the CLI, and the launcher configure or visualize the world, but the rules below live in <code>src/Lineage.Core</code>.</p>
           <div class="meta">
             <span class="pill">Default dt: 1/30 sec</span>
-            <span class="pill">Brain inputs: 228</span>
+            <span class="pill">Brain inputs: 235</span>
             <span class="pill">Brain outputs: 10</span>
             <span class="pill">Canonical biomes: 8</span>
           </div>
@@ -541,9 +542,11 @@
                 <div class="step-row"><span class="num">13</span><div class="step"><strong>EggSystem</strong>: age eggs, hatch, or remove dead eggs.</div></div>
                 <div class="step-row"><span class="num">14</span><div class="step"><strong>CreatureAttackSystem</strong>: gated bite damage.</div></div>
                 <div class="step-row"><span class="num">15</span><div class="step"><strong>FatStorageSystem</strong>: deposit surplus energy and release stored reserves.</div></div>
-                <div class="step-row"><span class="num">16</span><div class="step"><strong>DeathSystem</strong>: starvation, injury, rotten meat deaths and meat creation.</div></div>
-                <div class="step-row"><span class="num">17</span><div class="step"><strong>ExtinctPayloadPruningSystem</strong>: optional compact history payloads.</div></div>
-                <div class="step-row"><span class="num">18</span><div class="step"><strong>StatsRecordingSystem</strong>: sampled snapshots and exposure heatmaps.</div></div>
+                <div class="step-row"><span class="num">16</span><div class="step"><strong>CreatureHealingSystem</strong>: cooldown healing paid from energy.</div></div>
+                <div class="step-row"><span class="num">17</span><div class="step"><strong>LineageTelemetrySystem</strong>: per-lineage behavior and diet counters.</div></div>
+                <div class="step-row"><span class="num">18</span><div class="step"><strong>DeathSystem</strong>: starvation, injury, rotten meat deaths and meat creation.</div></div>
+                <div class="step-row"><span class="num">19</span><div class="step"><strong>ExtinctPayloadPruningSystem</strong>: optional compact history payloads.</div></div>
+                <div class="step-row"><span class="num">20</span><div class="step"><strong>StatsRecordingSystem</strong>: sampled snapshots and exposure heatmaps.</div></div>
               </div>
             </div>
             <div class="mini">
@@ -555,7 +558,7 @@ proximity = 1 - clamp(edgeDistance / senseRadius, 0, 1)
               </div>
               <p>If food is visible in the cone, the creature turns directly toward the best target and moves at effective max speed. Otherwise it wanders at <code>0.25x</code> speed with deterministic heading jitter.</p>
               <div class="callout">
-                <strong>Why the order matters:</strong> eating happens after movement, digestion happens after eating, reproduction happens after digestion, fat storage happens late, and death happens near the end. A creature can eat, digest, lay an egg, attack, release fat, and die in the same simulated tick if the conditions line up.
+                <strong>Why the order matters:</strong> eating happens after movement, digestion happens after eating, reproduction happens after digestion, and fat storage plus healing happen before death. In the full neural pipeline, a creature can eat, digest, lay an egg, attack, release fat, heal, and die in the same simulated tick if the conditions line up.
               </div>
             </div>
           </div>
@@ -765,6 +768,7 @@ juvenileGrowthScale = clamp(sqrt(investmentRatio), 0.5, 2)
 traitUpkeep = sum(effectiveTrait * matchingTraitCost)<br>
 traitUpkeep += plantSpecializationFactor * plantSpecializationCost<br>
 traitUpkeep += clamp(memoryVector.length, 0, 1) * memoryCost<br>
+traitUpkeep += rtNeatHiddenNodes * 0.001 + rtNeatEnabledConnections * 0.00025<br>
 energy -= (basalEnergyPerSecond * biomeBasalMultiplier + traitUpkeep) * dt
           </div>
           <p>Plant specialization upkeep uses squared typed plant adaptations:</p>
@@ -774,6 +778,7 @@ plantSpecializationFactor = tenderAdaptation^2 + richAdaptation^2 + toughAdaptat
           <div class="callout">
             Example: if basal is <code>0.25/s</code>, current biome basal multiplier is <code>1.2</code>, trait upkeep is <code>0.05/s</code>, and <code>dt = 1/30</code>, the tick drains <code>(0.25 * 1.2 + 0.05) / 30 = 0.0117</code> energy.
           </div>
+          <p>rtNEAT graph brains add topology upkeep by default: <code>0.001/s</code> for each hidden node and <code>0.00025/s</code> for each enabled connection. Dense Hybrid and HiddenLayer brains do not use that topology-cost path yet.</p>
         </section>
 
         <section id="fat-storage">
@@ -807,6 +812,27 @@ if energy &gt; depositTarget:<br>
           </div>
           <div class="callout">
             Example: with threshold <code>84</code>, withdraw target is <code>21</code> energy and deposit target is <code>105</code>. A creature at <code>15</code> energy with <code>20</code> fat and <code>0.85</code> efficiency needs <code>6</code> usable energy, so it burns about <code>7.06</code> fat if the transfer limit allows it.
+          </div>
+        </section>
+
+        <section id="healing">
+          <h2>Healing</h2>
+          <p>Healing is an automatic late-pipeline recovery mechanic. It starts only after a creature has avoided attack and rotten-meat damage for a configurable cooldown, then restores health slowly while spending energy.</p>
+
+          <h3>Defaults And Formula</h3>
+          <p>Defaults are delay <code>25s</code>, healing rate <code>0.006</code> of max health per second, energy cost <code>3</code> per health restored, and minimum energy floor <code>30</code>.</p>
+          <div class="formula">
+if attackDamageTaken &gt; 0 or rottenMeatDamage &gt; 0: secondsSinceDamage = 0<br>
+secondsSinceDamage += dt<br>
+if secondsSinceDamage &gt;= healingDelay and energy &gt; healingMinimumEnergy:<br>
+&nbsp;&nbsp;healByRate = healingHealthFractionPerSecond * maxHealth * dt<br>
+&nbsp;&nbsp;healByEnergy = (energy - healingMinimumEnergy) / healingEnergyCostPerHealth<br>
+&nbsp;&nbsp;healing = min(missingHealth, healByRate, healByEnergy)<br>
+&nbsp;&nbsp;health += healing<br>
+&nbsp;&nbsp;energy -= healing * healingEnergyCostPerHealth
+          </div>
+          <div class="callout">
+            Example: an adult with max health <code>1</code> heals at <code>0.006/s</code> after the cooldown. Restoring <code>0.1</code> health takes about <code>16.7s</code> of uninterrupted healing and costs <code>0.3</code> energy.
           </div>
         </section>
 
@@ -901,7 +927,7 @@ directionalConfidence = clamp(vectorLength / totalStrength, 0, 1) * density
 
         <section id="brains">
           <h2>Brains And Actions</h2>
-          <p>The current neural adapter exposes <code>228</code> inputs and <code>10</code> outputs. The brain stores direct input-to-output weights plus optional hidden nodes. Every evaluated output is passed through <code>tanh</code>.</p>
+          <p>The current neural adapter exposes <code>235</code> inputs and <code>10</code> outputs. Dense brains store direct input-to-output weights plus optional hidden nodes. Every evaluated dense output is passed through <code>tanh</code>.</p>
 
           <h3>Brain Schema</h3>
           <table>
@@ -940,10 +966,17 @@ directOutput[o] = sum(input[i] * directWeight[o, i])<br>
 hidden[h] = tanh(sum(input[i] * hiddenInputWeight[h, i]))<br>
 output[o] = tanh(directOutput[o] + sum(hidden[h] * hiddenOutputWeight[o, h]))
           </div>
-          <p>Hybrid neural brains support direct weights plus hidden nodes. Hidden-layer neural brains keep the same payload layout for compatibility but force direct weights to zero so all behavior routes through hidden nodes.</p>
+          <p>Hybrid neural brains support direct weights plus hidden nodes. Hidden-layer neural brains keep the same payload layout for compatibility but force direct weights to zero so all behavior routes through hidden nodes. The visible starter catalog uses Hybrid 4 and Hidden 16 dense profiles for the main roles.</p>
           <div class="callout">
-            With 228 inputs and 10 outputs, direct weights alone use <code>2280</code> floats. A default 4-hidden-node hybrid uses <code>2280 + 4*228 + 4*10 = 3232</code> weights. A default 10-hidden-node hidden-layer brain uses <code>2280 + 10*228 + 10*10 = 4660</code> stored weights, though the direct block is inactive for hidden-layer behavior.
+            With 235 inputs and 10 outputs, direct weights alone use <code>2350</code> floats. A 4-hidden-node hybrid starter stores <code>2350 + 4*235 + 4*10 = 3330</code> weights. A generic 10-hidden-node hidden-layer brain stores <code>2350 + 10*235 + 10*10 = 4700</code> weights, though the direct block is inactive for hidden-layer behavior. A Hidden 16 catalog starter stores <code>6270</code> weights, with <code>3920</code> active hidden-path weights.
           </div>
+
+          <h3>rtNEAT Graphs</h3>
+          <p><code>RtNeatGraph</code> brains use the same semantic inputs and outputs as dense brains, but store explicit input, hidden, and output nodes plus enabled/disabled weighted connections. Mutations can perturb weights and hidden-node biases, add or remove valid connections, insert hidden nodes by splitting connections, mutate hidden activation/bias parameters, and prune inactive hidden nodes.</p>
+          <div class="formula">
+topologyUpkeepPerSecond = hiddenNodeCount * 0.001 + enabledConnectionCount * 0.00025
+          </div>
+          <p>Reports and stats include rtNEAT topology telemetry, and the HTML report can show representative living graph brains. Current rtNEAT is a one-parent sparse graph mutation architecture; it is not full NEAT crossover with innovation-number speciation.</p>
 
           <h3>Action Reuse And Memory</h3>
           <p>Optional neural action reuse skips brain evaluation when world senses are stale. It still updates movement and memory from cached actions. Reuse is broken by fresh world sense, first decision, contact, blocked movement, attack damage, grab state, rotten meat damage, internal energy/hunger/reproduction deltas of <code>0.2</code>, health drop of <code>0.05</code>, or max reuse age.</p>
@@ -1147,7 +1180,7 @@ meatRadius = clamp(effectiveBodyRadius * 0.85, 1.5, 12)
           </table>
 
           <h3>Snapshot Categories</h3>
-          <p>Snapshots include clock/season, population, eggs, plant and meat resources, local fertility, brain counts and hidden-node magnitudes, generation, energy, biome occupancy and deaths, eastward progress, sensing densities, food intake, digestion, gut composition, attack/grab/sound, travel efficiency, reproduction, diet traits, rotten meat, lifespan, memory, and left/middle/right region summaries.</p>
+          <p>Snapshots include clock/season, population, eggs, plant and meat resources, local fertility, brain counts, hidden-node magnitudes, rtNEAT topology metrics, generation, energy, biome occupancy and deaths, eastward progress, sensing densities, food intake, digestion, gut composition, attack/grab/sound, healing, travel efficiency, reproduction, diet traits, rotten meat, lifespan, memory, and left/middle/right region summaries.</p>
 
           <h3>Spatial Heatmaps</h3>
           <p>Heatmaps use a maximum axis of <code>48</code> cells while preserving aspect ratio.</p>

@@ -7,8 +7,8 @@ These files store one representative creature genome and brain that can be injec
 The launcher species catalog lists every `.species.json` under this folder. Profiles exported from runs are saved under
 `species/user/` so they can be reused in scenario rosters without modifying built-in starter profiles.
 Roster entries use the profile/default brain by default, but the launcher and Godot species tools can override that with
-one of the normal scenario starter brains or a catalog brain profile when you want to reuse a body/genome with a weaker or
-different controller. Newer profiles may set `defaultBrainPath` to point at a `.brain.json` artifact under `brains/`, and
+any compatible catalog brain profile when you want to reuse a body/genome with a weaker or different controller.
+Newer profiles may set `defaultBrainPath` to point at a `.brain.json` artifact under `brains/`, and
 individual scenario roster entries may set `brainProfilePath` to transplant a catalog brain onto the species body.
 The built-in starter profiles point at matching hybrid brain catalog artifacts so the body and controller can be selected
 or swapped independently while preserving the old embedded brain as a compatibility fallback.

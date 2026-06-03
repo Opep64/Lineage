@@ -1,16 +1,16 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-05-31
+Last reviewed: 2026-06-03
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
 ## Highest-Value Next Work
 
 - Report layout and interactivity pass.
-- Catalog assay and starter/rookie tuning.
+- Catalog assay and starter/rookie tuning against the consolidated role x brain catalog.
 - Map-artifact polish and reusable map workflows.
 - Next measured performance experiment.
-- Brain architecture experiments once catalog/body-brain separation settles.
+- Brain architecture experiments around Hidden 16, rtNEAT tuning, and deep dense variants.
 
 The user has postponed quadrant-map scenario work for now.
 
@@ -35,15 +35,15 @@ Status: active
 
 Status: active design direction
 
-- Keep `HybridNeural` default until hidden-layer and catalog starter behavior has more long-run evidence.
-- Continue comparing `HiddenLayerNeural`; the 8-node architecture remains viable but not clearly superior.
-- Explore an rt-NEAT-like graph topology as a real architecture experiment, not only a performance optimization.
+- Keep `HybridNeural` default until Hidden 16, rtNEAT, and catalog starter behavior have more long-run evidence.
+- Continue comparing `HiddenLayerNeural`; the main visible starter catalog currently uses Hidden 16, while Hidden 8, Hidden 8x8, and Hidden 24 remain experiment references.
+- Continue tuning `RtNeatGraph` topology mutation, graph metabolism cost, species clustering thresholds, and predator/prey payoff.
 - Explore a less dense or modular controller architecture that avoids evaluating every possible connection every tick.
 - Keep all current senses unless a specific experiment shows a sense is actively harmful. Rich behavior is more important than saving time by making creatures poorer.
 - Do not do sparse-weight pruning on the current dense controller unless it is introduced as a separate architecture or thoroughly proven safe.
 - Record and test lower brain decision frequency as an optional performance mode; the first accepted version reuses all neural outputs when world senses are stale and remains configurable.
 - Consider evolvable hidden node count later, with explicit costs and serialization/clustering rules.
-- Add brain complexity costs based on active hidden nodes, active connections, expensive function nodes, sensory channels, memory/recurrent state, and possibly connection activity.
+- Extend brain complexity costs beyond the first rtNEAT hidden-node/connection upkeep model if larger brains need stronger selection pressure.
 
 ## Memory
 
@@ -101,7 +101,6 @@ Status: ongoing tuning
 - Add stronger search pressure without causing frequent long-run extinction.
 - Watch for scarcity boom-crash cycles.
 - Potential future stabilizers:
-  - fat reserves;
   - idle/low-speed conservation payoffs;
   - reproduction suppression in poor local food conditions;
   - better local depletion memory;
@@ -116,7 +115,7 @@ Status: first pass implemented, not final ecology
 - Improve predation-specific diagnostics and long-run stability.
 - Tune predator/prey starter behavior through scenario rosters and catalog profiles rather than globally increasing bite damage.
 - Revisit combat lethality tuning: baseline bite damage currently requires long sustained contact for a kill, so future work should evaluate bite damage, bite-strength scaling, attack-output intensity, target body/health scaling, and how easily predators can maintain contact.
-- Revisit creature health regeneration: decide whether health should recover over time, whether recovery requires energy surplus/rest/safe conditions, and how regeneration would interact with predation so chip damage does not become either irrelevant or overpowered.
+- Tune passive healing: validate the current cooldown, heal rate, energy cost, energy floor, telemetry, and predator/prey effects so chip damage does not become either irrelevant or overpowered.
 - Add imperfect similarity/species cues or social-tolerance gates before expecting stable predator-only populations.
 - Investigate hard action gates, especially attack intent, because partial progress toward rare actions may not be rewarded.
 - Add generic intent/progress/frustration feedback so brains can learn when intended effort is not producing results.
@@ -185,4 +184,4 @@ Status: first pass implemented, future refinement needed
 - Should future plant ecology use discrete plant entities, patch-level populations, continuous fields, or a hybrid?
 - How should memory-heavy or large-brain lineages pay costs without making useful cognition impossible?
 - When should hidden-layer brains become default, if ever?
-- How should a future rt-NEAT architecture represent old catalog brains and reports?
+- Should rtNEAT eventually add crossover/innovation lineage and richer recurrent/internal-memory nodes, or stay as one-parent sparse graph mutation?

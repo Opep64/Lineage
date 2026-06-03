@@ -402,7 +402,7 @@
     <main>
       <header class="hero" id="overview">
         <div class="hero-copy">
-          <p class="eyebrow">Project snapshot - reviewed 2026-05-30</p>
+          <p class="eyebrow">Project snapshot - reviewed 2026-06-03</p>
           <h2>Lineage is an evolving ecology sandbox with local perception, heritable bodies, neural behavior, and repeatable experiments.</h2>
           <p>
             The project combines a deterministic C# simulation core, a headless CLI runner, a Godot viewer, and a local web launcher. Creatures live in continuous 2D worlds, sense food and neighbors through limited local cues, make decisions through evolvable neural brains, reproduce through eggs, and leave behind lineage, species, geography, and behavior reports.
@@ -411,10 +411,10 @@
             This page is a human-facing overview. It summarizes the current implementation, highlights the important option surfaces, and links back to the markdown files and source modules that should remain the source of truth.
           </p>
           <div class="status-grid" aria-label="Current project status">
-            <div class="metric"><strong>228</strong><span>current neural inputs</span></div>
-            <div class="metric"><strong>6</strong><span>physical action outputs</span></div>
+            <div class="metric"><strong>235</strong><span>current neural inputs</span></div>
+            <div class="metric"><strong>8</strong><span>physical action outputs</span></div>
             <div class="metric"><strong>9 x 18</strong><span>vision sector channels</span></div>
-            <div class="metric"><strong>8</strong><span>default hidden-layer nodes</span></div>
+            <div class="metric"><strong>3</strong><span>main catalog brain families</span></div>
           </div>
         </div>
         <div class="hero-art" aria-label="Schematic ecosystem illustration">
@@ -689,14 +689,14 @@
       <section id="senses">
         <h2>Senses And Inputs</h2>
         <p>
-          The current neural schema has 228 inputs. The old nearest-food and nearest-creature aggregate direction shortcuts were removed from the active brain contract; older 239-input brains are migrated by dropping those slots and preserving sector, contact, scent, terrain, quality, similarity, and habitat weights. Schema v3 adds grab pressure/direction and holding/contact cues.
+          The current neural schema has 235 inputs and 10 dense adapter outputs. The old nearest-food and nearest-creature aggregate direction shortcuts were removed from the active brain contract; older 239-input brains are migrated by dropping those slots and preserving sector, contact, scent, terrain, quality, similarity, and habitat weights. The current contract includes grab/contact cues, sound inputs/outputs, fat reserve cues, eight physical action outputs, and two architecture-internal dense memory outputs.
         </p>
         <div class="grid-2">
           <div class="diagram">
             <svg viewBox="0 0 560 350" role="img" aria-labelledby="input-title">
               <title id="input-title">Neural input composition bar chart.</title>
               <text x="28" y="32" font-size="18" font-weight="700" fill="#17211b">Input Composition</text>
-              <text x="28" y="58" fill="#526050">228 total neural inputs</text>
+              <text x="28" y="58" fill="#526050">235 total neural inputs</text>
               <rect x="28" y="88" width="75" height="52" rx="6" fill="#427aa1"/>
               <rect x="103" y="88" width="407" height="52" rx="6" fill="#4b9b5f"/>
               <rect x="510" y="88" width="15" height="52" rx="6" fill="#bf8f2f"/>
@@ -763,12 +763,12 @@
       <section id="brains">
         <h2>Brain Structures</h2>
         <p>
-          Brain construction now goes through <code>BrainFactory</code>. The world still stores the current neural genome type, but scenarios can choose between two neural architectures and several starter brain policies.
+          Brain construction now goes through <code>BrainFactory</code>. Species bodies and brain profiles are separate catalog artifacts, so a scenario roster chooses a species profile and then uses either that species' default brain or any compatible catalog brain profile.
         </p>
         <div class="diagram">
           <svg viewBox="0 0 1500 900" role="img" aria-labelledby="brain-current-title brain-current-desc">
             <title id="brain-current-title">Current Lineage creature brain schema.</title>
-            <desc id="brain-current-desc">Detailed diagram of 228 neural inputs grouped into base, sector vision, contact, quality, similarity, habitat, grab, and health signals; direct and hidden weight paths; six physical outputs; and two dense-adapter memory outputs.</desc>
+            <desc id="brain-current-desc">Detailed diagram of 235 neural inputs grouped into base, sector vision, contact, quality, similarity, habitat, grab, sound, fat, and health signals; direct and hidden weight paths; eight physical outputs; and two dense-adapter memory outputs.</desc>
             <defs>
               <radialGradient id="brain-bg" cx="50%" cy="46%" r="70%">
                 <stop offset="0%" stop-color="#0b2b22"/>
@@ -803,11 +803,11 @@
             </defs>
             <rect x="0" y="0" width="1500" height="900" fill="url(#brain-bg)"/>
             <text x="750" y="66" text-anchor="middle" font-size="42" font-weight="700" fill="#d7f3cd">Lineage Creature Brain Schema</text>
-            <text x="750" y="100" text-anchor="middle" font-size="19" fill="#9fc994">Current neural adapter: 228 inputs, 6 physical outputs plus 2 dense memory outputs.</text>
+            <text x="750" y="100" text-anchor="middle" font-size="19" fill="#9fc994">Current neural adapter: 235 inputs, 8 physical outputs plus 2 dense memory outputs.</text>
 
-            <text x="80" y="128" font-size="30" font-weight="700" fill="#9cdc84">228 Inputs</text>
-            <text x="80" y="154" font-size="17" fill="#b8d8b1">30 base + 9 sectors x 18 + 36 extended cues</text>
-            <text x="1246" y="128" font-size="30" font-weight="700" fill="#9cdc84">6 + 2 Outputs</text>
+            <text x="80" y="128" font-size="30" font-weight="700" fill="#9cdc84">235 Inputs</text>
+            <text x="80" y="154" font-size="17" fill="#b8d8b1">base + 9 sectors x 18 + contact/scent/sound/fat cues</text>
+            <text x="1246" y="128" font-size="30" font-weight="700" fill="#9cdc84">8 + 2 Outputs</text>
 
             <g id="input-groups" font-size="18">
               <g>
@@ -871,7 +871,7 @@
             <g id="direct-path">
               <rect x="612" y="164" width="284" height="88" rx="10" fill="url(#layer-fill)" stroke="#71bd69" stroke-width="2"/>
               <text x="754" y="198" text-anchor="middle" font-size="22" font-weight="700" fill="#d7f3cd">Hybrid direct layer</text>
-              <text x="754" y="226" text-anchor="middle" font-size="20" fill="#bde5b4">228 x 8 = 1,824 weights</text>
+              <text x="754" y="226" text-anchor="middle" font-size="20" fill="#bde5b4">235 x 10 = 2,350 weights</text>
               <text x="754" y="248" text-anchor="middle" font-size="14" fill="#8fcf83">active in HybridNeural, zeroed in HiddenLayerNeural</text>
             </g>
 
@@ -899,9 +899,9 @@
               <text x="754" y="689" text-anchor="middle" font-size="17" font-weight="700" fill="#d7f3cd">H5</text>
               <text x="754" y="727" text-anchor="middle" font-size="17" font-weight="700" fill="#d7f3cd">H6</text>
               <text x="754" y="765" text-anchor="middle" font-size="17" font-weight="700" fill="#d7f3cd">H7</text>
-              <text x="520" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">228 x hidden</text>
+              <text x="520" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">235 x hidden</text>
               <text x="520" y="696" text-anchor="middle" font-size="18" fill="#9cdc84">input weights</text>
-              <text x="988" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">hidden x 8</text>
+              <text x="988" y="674" text-anchor="middle" font-size="18" fill="#9cdc84">hidden x 10</text>
               <text x="988" y="696" text-anchor="middle" font-size="18" fill="#9cdc84">output weights</text>
             </g>
 
@@ -939,16 +939,22 @@
               <g>
                 <rect x="1168" y="578" width="292" height="72" rx="10" fill="url(#output-fill)" stroke="#71bd69" stroke-width="2"/>
                 <rect x="1184" y="591" width="50" height="46" rx="7" fill="#0b2a22" stroke="#4e944b"/>
-                <path d="M1198 603 H1218 V595 L1231 614 L1218 633 V624 H1198 Z" fill="#55aee0"/>
-                <text x="1252" y="610" font-size="18" font-weight="700" fill="#f1f6ed">Memory forward</text>
-                <text x="1252" y="633" font-size="18" font-weight="700" fill="#f1f6ed">write</text>
+                <path d="M1199 616 C1199 604 1222 604 1222 616 V629 C1222 638 1199 638 1199 629 Z" fill="#9cdc84"/>
+                <text x="1252" y="621" font-size="21" font-weight="700" fill="#f1f6ed">Grab gate</text>
               </g>
               <g>
                 <rect x="1168" y="660" width="292" height="72" rx="10" fill="url(#output-fill)" stroke="#71bd69" stroke-width="2"/>
                 <rect x="1184" y="673" width="50" height="46" rx="7" fill="#0b2a22" stroke="#4e944b"/>
-                <path d="M1198 685 H1218 V677 L1231 696 L1218 715 V706 H1198 Z" fill="#55aee0"/>
-                <text x="1252" y="692" font-size="18" font-weight="700" fill="#f1f6ed">Memory right</text>
-                <text x="1252" y="715" font-size="18" font-weight="700" fill="#f1f6ed">write</text>
+                <path d="M1196 696 C1206 682 1224 688 1224 706 C1224 724 1206 730 1196 716" fill="none" stroke="#9cdc84" stroke-width="5" stroke-linecap="round"/>
+                <text x="1252" y="692" font-size="18" font-weight="700" fill="#f1f6ed">Sound amp</text>
+                <text x="1252" y="715" font-size="18" font-weight="700" fill="#f1f6ed">and tone</text>
+              </g>
+              <g>
+                <rect x="1168" y="742" width="292" height="72" rx="10" fill="url(#output-fill)" stroke="#71bd69" stroke-width="2"/>
+                <rect x="1184" y="755" width="50" height="46" rx="7" fill="#0b2a22" stroke="#4e944b"/>
+                <path d="M1198 767 H1218 V759 L1231 778 L1218 797 V788 H1198 Z" fill="#55aee0"/>
+                <text x="1252" y="774" font-size="18" font-weight="700" fill="#f1f6ed">Memory forward</text>
+                <text x="1252" y="797" font-size="18" font-weight="700" fill="#f1f6ed">and right writes</text>
               </g>
             </g>
 
@@ -982,24 +988,27 @@
                 <path d="M848 644 C954 662 1058 674 1166 696"/>
                 <path d="M848 720 C954 730 1058 692 1166 696"/>
               </g>
-              <path d="M1460 614 C1490 614 1490 856 190 856 C164 856 166 812 188 812" stroke="#55aee0" stroke-width="3" fill="none" marker-end="url(#memory-arrow)"/>
-              <path d="M1460 696 C1484 696 1484 836 232 836 C208 836 214 812 196 812" stroke="#55aee0" stroke-width="3" fill="none" opacity="0.8"/>
+              <path d="M1460 778 C1490 778 1490 856 190 856 C164 856 166 812 188 812" stroke="#55aee0" stroke-width="3" fill="none" marker-end="url(#memory-arrow)"/>
+              <path d="M1460 796 C1484 796 1484 836 232 836 C208 836 214 812 196 812" stroke="#55aee0" stroke-width="3" fill="none" opacity="0.8"/>
             </g>
 
             <g font-size="17">
               <rect x="520" y="792" width="458" height="62" rx="10" fill="#071a17" stroke="#386b57"/>
               <text x="749" y="818" text-anchor="middle" fill="#d7f3cd" font-weight="700">HiddenLayerNeural mode</text>
-              <text x="749" y="842" text-anchor="middle" fill="#bde5b4">8 hidden default: active 228 x 8 + 8 x 8 = 1,888 weights; direct weights stored but forced to zero.</text>
+              <text x="749" y="842" text-anchor="middle" fill="#bde5b4">Hidden 16 catalog: 3,920 active weights, 6,270 stored; direct block is forced to zero.</text>
               <text x="750" y="878" text-anchor="middle" fill="#55aee0" font-style="italic">memory writes are dense-adapter internal state, not universal actions</text>
             </g>
           </svg>
         </div>
         <div class="grid-2">
           <div class="note">
-            <strong>HybridNeural:</strong> the default architecture. Direct input-to-output weights are active, optional hidden nodes can also contribute, and current starter profiles use 4 hidden nodes. With 228 inputs and 8 dense adapter outputs, the direct layer has 1,824 weights; a 4-node hybrid starter stores 2,768 total weights.
+            <strong>HybridNeural:</strong> the default architecture. Direct input-to-output weights are active, optional hidden nodes can also contribute, and current starter profiles use 4 hidden nodes. With 235 inputs and 10 dense adapter outputs, the direct layer has 2,350 weights; a 4-node hybrid starter stores 3,330 total weights.
           </div>
           <div class="note">
-            <strong>HiddenLayerNeural:</strong> optional architecture. Direct weights remain in the genome layout for compatibility, but behavior is routed through hidden nodes. The default is 8 hidden nodes, with relay nodes created from starter outputs.
+            <strong>HiddenLayerNeural:</strong> optional catalog architecture. Direct weights remain in the genome layout for compatibility, but behavior is routed through hidden nodes. Generic generation defaults to 10 hidden nodes when no count is supplied; the main visible starter catalog uses authored Hidden 16 profiles.
+          </div>
+          <div class="note">
+            <strong>RtNeatGraph:</strong> sparse graph architecture. It uses the same semantic brain I/O contract as dense brains, but mutates explicit nodes and enabled/disabled connections, pays topology upkeep for hidden nodes and enabled connections, and appears as fixed catalog brain profiles rather than a launcher mode toggle.
           </div>
         </div>
         <h3>Output Contract</h3>
@@ -1010,14 +1019,16 @@
           <li>Reproduce intent</li>
           <li>Attack intent</li>
           <li>Grab intent</li>
+          <li>Sound amplitude</li>
+          <li>Sound tone</li>
           <li>Dense memory write forward</li>
           <li>Dense memory write right</li>
         </ul>
         <p>
-          The first six outputs are universal physical action intents. The two memory-write slots are architecture-owned internal outputs used by the current dense neural adapter; future recurrent, sparse, or plastic brains can own memory in their own runtime state.
+          The first eight outputs are universal physical action intents. The two memory-write slots are architecture-owned internal outputs used by the current dense neural adapter; future recurrent, sparse, or plastic brains can own memory in their own runtime state.
         </p>
         <p>
-          Starter brain kinds include <code>SeedForager</code>, <code>SectorForager</code>, <code>ExplorerForager</code>, <code>OpportunisticForager</code>, <code>ScavengerForager</code>, <code>FreshnessAwareScavenger</code>, <code>ForagerPredator</code>, and <code>RandomPerFounder</code>.
+          The visible starter brain catalog is role-based: Starter Forager, Starter Omnivore, Starter Predator, and Rookie Omnivore, each with Hybrid 4, Hidden 16, and rtNEAT graph profiles.
         </p>
       </section>
 
@@ -1032,7 +1043,7 @@
             <table>
               <thead><tr><th>Scenario</th><th>World</th><th>Biome/map</th><th>Starter</th><th>Resources / M area</th><th>Role</th></tr></thead>
               <tbody>
-                <tr><td>Balanced Foraging</td><td>4000 x 4000</td><td>Natural climate</td><td>Sector forager</td><td>26</td><td>Default Godot start.</td></tr>
+                <tr><td>Balanced Foraging</td><td>4000 x 4000</td><td>Natural climate</td><td>Starter Forager default brain</td><td>26</td><td>Default Godot and launcher base.</td></tr>
               </tbody>
             </table>
             <h3>Recipe Surface</h3>
@@ -1053,9 +1064,9 @@
           </div>
           <div class="diagram">
             <svg viewBox="0 0 560 430" role="img" aria-labelledby="scenario-chart-title">
-              <title id="scenario-chart-title">Merge readiness final population averages at 20k ticks.</title>
-              <text x="24" y="30" font-size="18" font-weight="700" fill="#17211b">20k Smoke Final Population</text>
-              <text x="24" y="54" fill="#526050">Average final creatures, seeds 42-44.</text>
+              <title id="scenario-chart-title">Historical merge-readiness final population averages at 20k ticks.</title>
+              <text x="24" y="30" font-size="18" font-weight="700" fill="#17211b">Historical Pressure Probe</text>
+              <text x="24" y="54" fill="#526050">Pre-consolidation 20k smoke populations, seeds 42-44.</text>
               <g font-size="12" fill="#526050">
                 <text x="24" y="88">Gentle</text><rect x="138" y="76" width="360" height="14" fill="#4b9b5f"/><text x="506" y="88">103.7</text>
                 <text x="24" y="116">Obstacle</text><rect x="138" y="104" width="290" height="14" fill="#427aa1"/><text x="436" y="116">83.7</text>
@@ -1069,7 +1080,7 @@
                 <text x="24" y="340">Predation</text><rect x="138" y="328" width="95" height="14" fill="#a35e45"/><text x="241" y="340">27.3</text>
                 <text x="24" y="368">Harsh</text><rect x="138" y="356" width="93" height="14" fill="#8d5578"/><text x="239" y="368">26.7</text>
               </g>
-              <text x="24" y="405" fill="#526050" font-size="12">Source: merge-readiness broad probe in the brain rework experiment log.</text>
+              <text x="24" y="405" fill="#526050" font-size="12">Source: brain rework log; pressure variants are now recipes on Balanced.</text>
             </svg>
           </div>
         </div>
@@ -1085,14 +1096,14 @@
       <section id="reports">
         <h2>Reports And Tools</h2>
         <p>
-          CLI and Godot exports produce CSV sidecars, HTML reports, snapshots, checkpoint folders, scenario JSON, species summaries, lineage/founder/generation summaries, roster summaries, biome/spatial summaries, and optional profiling output. The local launcher manages run history, recipes, reusable maps, species catalogs, and brain catalogs.
+          CLI and Godot exports produce CSV sidecars, HTML reports, snapshots, checkpoint folders, scenario JSON, species summaries, lineage/founder/generation summaries, roster summaries, biome/spatial summaries, and optional profiling output. The local launcher manages run history, recipes with descriptions and launch diffs, reusable maps, species catalogs, brain catalogs, starting rosters, and Brain Lab probes.
         </p>
         <div class="grid-3">
-          <div class="mini-panel"><strong>HTML reports</strong><br>Population, resources, deaths, traits, species clusters, behavior assays, brain diagnostics, biome exposure, survivor ancestry, terrain, memory, combat, and freshness metrics.</div>
+          <div class="mini-panel"><strong>HTML reports</strong><br>Population, resources, deaths, traits, species clusters, behavior assays, brain diagnostics, rtNEAT graphs, biome exposure, survivor ancestry, terrain, memory, combat, healing, and freshness metrics.</div>
           <div class="mini-panel"><strong>Snapshots</strong><br>Reloadable world state with creatures, eggs, resources, genomes, brains, lineage records, biome maps, obstacles, fertility, and sampled stats.</div>
           <div class="mini-panel"><strong>Species profiles</strong><br>Portable representative body profiles stored as <code>.species.json</code> for injection, cataloging, and scenario rosters.</div>
           <div class="mini-panel"><strong>Brain profiles</strong><br>Reusable controllers stored as <code>.brain.json</code> for body/brain transplant experiments.</div>
-          <div class="mini-panel"><strong>Launcher</strong><br>Local run library for launching, monitoring, cataloging, recipes, reusable maps, reports, checkpoints, species, and brains.</div>
+          <div class="mini-panel"><strong>Launcher</strong><br>Local run library for launching, monitoring, cataloging, recipes, reusable maps, reports, checkpoints, species, brains, and Brain Lab probes.</div>
           <div class="mini-panel"><strong>Ablation tool</strong><br>Reusable snapshot analysis for memory-enabled versus memory-zeroed single-tick behavior.</div>
           <div class="mini-panel"><strong>Profiling</strong><br>System timing and sensing profiles help track performance changes across branches.</div>
         </div>
@@ -1101,7 +1112,7 @@
       <section id="performance">
         <h2>Performance And Scaling</h2>
         <p>
-          Recent performance work moved the simulator from dense resource scans toward time-sliced sensing, array-backed spatial cells, persistent dirty resource/egg indexing, dormant plant exclusion, compact report sampling, configurable neural and sensing parallelism, optional stale-sense neural action reuse, optional extinct payload pruning, and hidden-layer short-circuiting where possible.
+          Recent performance work moved the simulator from dense resource scans toward time-sliced sensing, array-backed spatial cells, persistent dirty resource/egg indexing, dormant plant exclusion, compact report sampling, configurable neural and sensing parallelism, optional stale-sense neural action reuse, optional extinct payload pruning, hidden-layer short-circuiting where possible, and sparse rtNEAT graph evaluation.
         </p>
         <div class="grid-2">
           <div class="diagram">
@@ -1143,7 +1154,7 @@
           The next major design frontier is not only "more features"; it is adding ecological handles that create real reasons for different strategies to exist.
         </p>
         <div class="grid-3">
-          <div class="mini-panel"><strong>Brain evolution</strong><br>Generic brain interface, recurrent/memory-owning brains, topology evolution, brain complexity costs, and better behavior fingerprints.</div>
+          <div class="mini-panel"><strong>Brain evolution</strong><br>Hidden 16 and rtNEAT tuning, recurrent/memory-owning brains, topology evolution, brain complexity costs, and better behavior fingerprints.</div>
           <div class="mini-panel"><strong>Ecology</strong><br>Multiple plant types, seed dispersal, water as survival pressure, insects, hives, plant toughness/toxicity, nutrient categories, and eventually self-sustaining plant communities.</div>
           <div class="mini-panel"><strong>Interaction</strong><br>Kin scent, egg identity, guarding, carrying, grabbing, parasites, social tolerance, aggression, and imperfect recognition.</div>
           <div class="mini-panel"><strong>World generation</strong><br>Reusable map polish, elevation, moisture, richer water, temperature, hazards, authored maps, and editable terrain layers.</div>
