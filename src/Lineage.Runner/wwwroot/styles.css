@@ -451,6 +451,13 @@ button.biome-preview-legend-item.is-active {
   flex: 1 1 360px;
 }
 
+.recipe-description {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .recipe-stack {
   display: grid;
   gap: 8px;
@@ -484,6 +491,13 @@ button.biome-preview-legend-item.is-active {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.recipe-stack-description {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .recipe-stack-actions {

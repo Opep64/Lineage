@@ -38,6 +38,7 @@ const deleteRecipeButton = document.querySelector("#deleteRecipeButton");
 const reviewLaunchDiffButton = document.querySelector("#reviewLaunchDiffButton");
 const saveRecipeButton = document.querySelector("#saveRecipeButton");
 const saveNewRecipeButton = document.querySelector("#saveNewRecipeButton");
+const recipeDescription = document.querySelector("#recipeDescription");
 const recipeStack = document.querySelector("#recipeStack");
 const scenarioDiffPanel = document.querySelector("#scenarioDiffPanel");
 const scenarioDiffTitle = document.querySelector("#scenarioDiffTitle");
@@ -4253,9 +4254,11 @@ function renderRecipePicker() {
     const option = document.createElement("option");
     option.value = recipeOptionLabel(recipe);
     option.label = recipePickerDetail(recipe);
+    option.title = recipe.description || recipe.path;
     recipeOptions.append(option);
   }
 
+  updateSelectedRecipeDescription();
   updateScenarioManagementButtons();
 }
 
@@ -4285,6 +4288,16 @@ function recipeMatchesSearch(recipe, query) {
   ].some((value) => String(value ?? "").toLowerCase().includes(query));
 }
 
+function updateSelectedRecipeDescription() {
+  if (!recipeDescription) {
+    return;
+  }
+
+  const description = String(selectedRecipe()?.description ?? "").trim();
+  recipeDescription.textContent = description;
+  recipeDescription.hidden = description.length === 0;
+}
+
 function renderRecipeStack() {
   if (!recipeStack) {
     return;
@@ -4304,11 +4317,13 @@ function renderRecipeStack() {
     const fields = recipeFieldNames(recipe);
     const overrideCount = countPriorRecipeOverrides(index);
     const title = fields.map((field) => scenarioFieldLabel(field)).join(", ");
+    const description = String(recipe.description ?? "").trim();
     return `
       <div class="recipe-stack-item">
         <div>
           <strong>${escapeHtml(recipe.name)}</strong>
           <span>${fields.length} field${fields.length === 1 ? "" : "s"}${overrideCount > 0 ? `, overrides ${overrideCount}` : ""}</span>
+          ${description ? `<p class="recipe-stack-description">${escapeHtml(description)}</p>` : ""}
           ${title ? `<div class="run-sub">${escapeHtml(title)}</div>` : ""}
         </div>
         <div class="recipe-stack-actions">
