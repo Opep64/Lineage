@@ -279,6 +279,21 @@ public static class SimulationSnapshotJson
             creature.MaxXReached = creature.Position.X;
         }
 
+        if (!float.IsFinite(creature.SecondsSinceLastDamage) || creature.SecondsSinceLastDamage < 0f)
+        {
+            creature.SecondsSinceLastDamage = 0f;
+        }
+
+        if (!float.IsFinite(creature.LastHealingReceived) || creature.LastHealingReceived < 0f)
+        {
+            creature.LastHealingReceived = 0f;
+        }
+
+        if (!float.IsFinite(creature.LastHealingEnergySpent) || creature.LastHealingEnergySpent < 0f)
+        {
+            creature.LastHealingEnergySpent = 0f;
+        }
+
         if (creature.GutMeatCalories <= 0f)
         {
             creature.GutMeatQualityCalories = 0f;

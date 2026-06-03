@@ -367,6 +367,15 @@ public sealed record SimulationScenario
 
     public float BiteRangePadding { get; init; } = 1f;
 
+    public float HealingDelaySeconds { get; init; } = CreatureHealingSystem.DefaultHealingDelaySeconds;
+
+    public float HealingHealthFractionPerSecond { get; init; } =
+        CreatureHealingSystem.DefaultHealingHealthFractionPerSecond;
+
+    public float HealingEnergyCostPerHealth { get; init; } = CreatureHealingSystem.DefaultHealingEnergyCostPerHealth;
+
+    public float HealingMinimumEnergy { get; init; } = CreatureHealingSystem.DefaultHealingMinimumEnergy;
+
     public float MutationStrength { get; init; } = 0.06f;
 
     public float TraitMutationRate { get; init; } = 0.2f;
@@ -539,6 +548,10 @@ public sealed record SimulationScenario
         EnsureNonNegative(BiteDamagePerSecond, nameof(BiteDamagePerSecond));
         EnsureNonNegative(BiteEnergyCostPerSecond, nameof(BiteEnergyCostPerSecond));
         EnsureNonNegative(BiteRangePadding, nameof(BiteRangePadding));
+        EnsureNonNegative(HealingDelaySeconds, nameof(HealingDelaySeconds));
+        EnsureNonNegative(HealingHealthFractionPerSecond, nameof(HealingHealthFractionPerSecond));
+        EnsureNonNegative(HealingEnergyCostPerHealth, nameof(HealingEnergyCostPerHealth));
+        EnsureNonNegative(HealingMinimumEnergy, nameof(HealingMinimumEnergy));
         EnsureNonNegative(MutationStrength, nameof(MutationStrength));
         EnsureProbability(TraitMutationRate, nameof(TraitMutationRate));
         EnsureProbability(BrainMutationRate, nameof(BrainMutationRate));

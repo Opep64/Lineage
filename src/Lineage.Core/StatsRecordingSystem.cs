@@ -84,6 +84,8 @@ public sealed class StatsRecordingSystem(
         var totalGutPlantShare = 0f;
         var totalGutMeatShare = 0f;
         var totalAttackDamage = 0f;
+        var totalHealthHealed = 0f;
+        var totalHealingEnergySpent = 0f;
         var totalSecondsSinceLastMeal = 0f;
         var totalDistanceTraveled = 0f;
         var totalDistanceSinceLastMeal = 0f;
@@ -159,6 +161,7 @@ public sealed class StatsRecordingSystem(
         var attackIntentWhileTouchingCreatureCount = 0;
         var attackIntentWhileTouchingSimilarCreatureCount = 0;
         var attackNoIntentContactCreatureCount = 0;
+        var healingCreatureCount = 0;
         var rawAttackPositiveCreatureCount = 0;
         var rawAttackNearGateCreatureCount = 0;
         var rawAttackNearGateWhileTouchingCreatureCount = 0;
@@ -271,6 +274,13 @@ public sealed class StatsRecordingSystem(
                 ? creature.GutMeatCalories / gutTotal
                 : 0f;
             totalAttackDamage += creature.LastAttackDamageDealt;
+            totalHealthHealed += creature.LastHealingReceived;
+            totalHealingEnergySpent += creature.LastHealingEnergySpent;
+            if (creature.LastHealingReceived > 0f)
+            {
+                healingCreatureCount++;
+            }
+
             totalSecondsSinceLastMeal += creature.SecondsSinceLastMeal;
             totalDistanceTraveled += creature.LastDistanceTraveled;
             totalDistanceSinceLastMeal += creature.DistanceSinceLastMeal;
@@ -795,6 +805,12 @@ public sealed class StatsRecordingSystem(
         var attackDamagePerSecond = deltaSeconds > 0f
             ? totalAttackDamage / deltaSeconds
             : 0f;
+        var healthHealedPerSecond = deltaSeconds > 0f
+            ? totalHealthHealed / deltaSeconds
+            : 0f;
+        var healingEnergySpentPerSecond = deltaSeconds > 0f
+            ? totalHealingEnergySpent / deltaSeconds
+            : 0f;
         var rottenMeatDamagePerSecond = deltaSeconds > 0f
             ? totalRottenMeatDamage / deltaSeconds
             : 0f;
@@ -1088,6 +1104,9 @@ public sealed class StatsRecordingSystem(
             totalAttackOutput / divisor,
             creatureContactCreatureCount > 0 ? totalTouchingAttackOutput / creatureContactCreatureCount : 0f,
             attackDamagePerSecond,
+            healthHealedPerSecond,
+            healingCreatureCount,
+            healingEnergySpentPerSecond,
             grabIntentCreatureCount,
             canGrabCreatureCount,
             grabIntentWhileCanGrabCreatureCount,

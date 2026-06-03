@@ -105,7 +105,11 @@ public static class SimulationScenarioFactory
                 scenario.BrainMutationRate,
                 scenario.FatDepositEnergyRatio,
                 scenario.FatWithdrawEnergyRatio,
-                scenario.FatTransferCapacitySharePerSecond),
+                scenario.FatTransferCapacitySharePerSecond,
+                scenario.HealingDelaySeconds,
+                scenario.HealingHealthFractionPerSecond,
+                scenario.HealingEnergyCostPerHealth,
+                scenario.HealingMinimumEnergy),
             SimulationPipelineKind.SimpleForaging => SimulationPipelines.CreateMinimalLifeLoop(
                 scenario.SpatialCellSize,
                 scenario.StatsSnapshotIntervalTicks,
@@ -166,7 +170,11 @@ public static class SimulationScenarioFactory
                 scenario.BrainMutationRate,
                 scenario.FatDepositEnergyRatio,
                 scenario.FatWithdrawEnergyRatio,
-                scenario.FatTransferCapacitySharePerSecond),
+                scenario.FatTransferCapacitySharePerSecond,
+                scenario.HealingDelaySeconds,
+                scenario.HealingHealthFractionPerSecond,
+                scenario.HealingEnergyCostPerHealth,
+                scenario.HealingMinimumEnergy),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
     }

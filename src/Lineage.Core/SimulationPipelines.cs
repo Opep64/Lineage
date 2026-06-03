@@ -65,7 +65,11 @@ public static class SimulationPipelines
         float brainMutationRate = 0.08f,
         float fatDepositEnergyRatio = FatStorageSystem.DefaultDepositEnergyRatio,
         float fatWithdrawEnergyRatio = FatStorageSystem.DefaultWithdrawEnergyRatio,
-        float fatTransferCapacitySharePerSecond = FatStorageSystem.DefaultTransferCapacitySharePerSecond)
+        float fatTransferCapacitySharePerSecond = FatStorageSystem.DefaultTransferCapacitySharePerSecond,
+        float healingDelaySeconds = CreatureHealingSystem.DefaultHealingDelaySeconds,
+        float healingHealthFractionPerSecond = CreatureHealingSystem.DefaultHealingHealthFractionPerSecond,
+        float healingEnergyCostPerHealth = CreatureHealingSystem.DefaultHealingEnergyCostPerHealth,
+        float healingMinimumEnergy = CreatureHealingSystem.DefaultHealingMinimumEnergy)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -128,6 +132,11 @@ public static class SimulationPipelines
                 fatDepositEnergyRatio,
                 fatWithdrawEnergyRatio,
                 fatTransferCapacitySharePerSecond),
+            new CreatureHealingSystem(
+                healingDelaySeconds,
+                healingHealthFractionPerSecond,
+                healingEnergyCostPerHealth,
+                healingMinimumEnergy),
             new LineageTelemetrySystem(),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
             .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),
@@ -217,7 +226,11 @@ public static class SimulationPipelines
         float brainMutationRate = 0.08f,
         float fatDepositEnergyRatio = FatStorageSystem.DefaultDepositEnergyRatio,
         float fatWithdrawEnergyRatio = FatStorageSystem.DefaultWithdrawEnergyRatio,
-        float fatTransferCapacitySharePerSecond = FatStorageSystem.DefaultTransferCapacitySharePerSecond)
+        float fatTransferCapacitySharePerSecond = FatStorageSystem.DefaultTransferCapacitySharePerSecond,
+        float healingDelaySeconds = CreatureHealingSystem.DefaultHealingDelaySeconds,
+        float healingHealthFractionPerSecond = CreatureHealingSystem.DefaultHealingHealthFractionPerSecond,
+        float healingEnergyCostPerHealth = CreatureHealingSystem.DefaultHealingEnergyCostPerHealth,
+        float healingMinimumEnergy = CreatureHealingSystem.DefaultHealingMinimumEnergy)
     {
         var spatialIndex = new UniformSpatialIndex(spatialCellSize);
 
@@ -306,6 +319,11 @@ public static class SimulationPipelines
                 fatDepositEnergyRatio,
                 fatWithdrawEnergyRatio,
                 fatTransferCapacitySharePerSecond),
+            new CreatureHealingSystem(
+                healingDelaySeconds,
+                healingHealthFractionPerSecond,
+                healingEnergyCostPerHealth,
+                healingMinimumEnergy),
             new LineageTelemetrySystem(),
             new DeathSystem(deathMeatCaloriesPerBodyRadius, deathMeatEnergyFraction, meatDecayCaloriesPerSecond),
             .. CreateExtinctPayloadPruningSystems(enableExtinctPayloadPruning, extinctPayloadPruneIntervalTicks),

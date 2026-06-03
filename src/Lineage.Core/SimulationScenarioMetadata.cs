@@ -123,6 +123,7 @@ public static class SimulationScenarioMetadata
             || name.Contains("Strength", StringComparison.Ordinal)
             || name.Contains("Resistance", StringComparison.Ordinal)
             || name.Contains("Damage", StringComparison.Ordinal)
+            || name.Contains("Health", StringComparison.Ordinal)
             || name.Contains("Padding", StringComparison.Ordinal)
             || name.EndsWith("PerMillionArea", StringComparison.Ordinal))
         {
@@ -153,6 +154,16 @@ public static class SimulationScenarioMetadata
         if (name.Contains("Radians", StringComparison.Ordinal))
         {
             return "radians";
+        }
+
+        if (name == "HealingHealthFractionPerSecond")
+        {
+            return "max health fraction/s";
+        }
+
+        if (name == "HealingEnergyCostPerHealth")
+        {
+            return "energy per health";
         }
 
         if (name.Contains("Calories", StringComparison.Ordinal)
@@ -204,6 +215,10 @@ public static class SimulationScenarioMetadata
             "ExtinctPayloadPruneIntervalTicks" => "How often survivor-ancestry-aware genome and brain payload compaction runs.",
             "RtNeatHiddenNodeEnergyCostPerSecond" => "Metabolic upkeep charged for each hidden node in an rtNEAT graph brain.",
             "RtNeatEnabledConnectionEnergyCostPerSecond" => "Metabolic upkeep charged for each enabled connection in an rtNEAT graph brain.",
+            "HealingDelaySeconds" => "Time after taking damage before passive healing can begin.",
+            "HealingHealthFractionPerSecond" => "Fraction of maximum health restored per second once passive healing is active.",
+            "HealingEnergyCostPerHealth" => "Energy spent for each point of health restored by passive healing.",
+            "HealingMinimumEnergy" => "Passive healing stops at or below this energy reserve.",
             "WorldMapPath" => "Reusable world map artifact used when biomeMapKind and/or obstacleMapKind are manual.",
             "ManualBiomeMapPath" => "Manual biome map JSON used when biomeMapKind is manual.",
             "ManualObstacleMapPath" => "Manual obstacle map JSON used when obstacleMapKind is manual.",
@@ -347,6 +362,7 @@ public static class SimulationScenarioMetadata
             || name.Contains("Meat", StringComparison.Ordinal)
             || name.Contains("Bite", StringComparison.Ordinal)
             || name.Contains("Damage", StringComparison.Ordinal)
+            || name.Contains("Healing", StringComparison.Ordinal)
             || name.Contains("Eat", StringComparison.Ordinal)
             || name.Contains("Gut", StringComparison.Ordinal)
             || name.Contains("Digestion", StringComparison.Ordinal))

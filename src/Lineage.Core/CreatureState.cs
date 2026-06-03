@@ -214,6 +214,21 @@ public struct CreatureState
     public EntityId LastDamagingCreatureId { get; set; }
 
     /// <summary>
+    /// Seconds since the creature last took health damage.
+    /// </summary>
+    public float SecondsSinceLastDamage { get; set; }
+
+    /// <summary>
+    /// Health restored during the most recent healing pass.
+    /// </summary>
+    public float LastHealingReceived { get; set; }
+
+    /// <summary>
+    /// Energy spent by healing during the most recent healing pass.
+    /// </summary>
+    public float LastHealingEnergySpent { get; set; }
+
+    /// <summary>
     /// Seconds since this creature last transferred calories from food.
     /// </summary>
     public float SecondsSinceLastMeal { get; set; }

@@ -158,6 +158,8 @@ var tests = new (string Name, Action Body)[]
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
+    ("Creature healing waits for cooldown and consumes energy", CreatureHealingWaitsForCooldownAndConsumesEnergy),
+    ("Creature healing resets on damage and honors energy floor", CreatureHealingResetsOnDamageAndHonorsEnergyFloor),
     ("Creature grab slows contact targets", CreatureGrabSlowsContactTargets),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
     ("Sparse mutation rates gate genome and brain changes", SparseMutationRatesGateGenomeAndBrainChanges),
@@ -7432,6 +7434,89 @@ static void CreatureAttackDamagesContactTargets()
     AssertClose(0.75f, target.Health, 0.000001, "Target health after bite");
 }
 
+static void CreatureHealingWaitsForCooldownAndConsumesEnergy()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 332,
+        systems:
+        [
+            new CreatureHealingSystem(
+                healingDelaySeconds: 2f,
+                healingHealthFractionPerSecond: 0.1f,
+                healingEnergyCostPerHealth: 2f,
+                healingMinimumEnergy: 5f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f, health: 0.5f);
+
+    simulation.Step();
+    var creature = simulation.State.Creatures[0];
+    AssertClose(0.5f, creature.Health, 0.000001, "Healing should wait for cooldown");
+    AssertClose(10f, creature.Energy, 0.000001, "Delayed healing should not spend energy");
+    AssertClose(1f, creature.SecondsSinceLastDamage, 0.000001, "Damage timer after first healing tick");
+    AssertClose(0f, creature.LastHealingReceived, 0.000001, "Delayed healing telemetry");
+    AssertClose(0f, creature.LastHealingEnergySpent, 0.000001, "Delayed healing energy telemetry");
+
+    simulation.Step();
+    creature = simulation.State.Creatures[0];
+    AssertClose(0.6f, creature.Health, 0.000001, "Healing amount after cooldown");
+    AssertClose(9.8f, creature.Energy, 0.000001, "Healing energy cost");
+    AssertClose(2f, creature.SecondsSinceLastDamage, 0.000001, "Damage timer after healing");
+    AssertClose(0.1f, creature.LastHealingReceived, 0.000001, "Healing received telemetry");
+    AssertClose(0.2f, creature.LastHealingEnergySpent, 0.000001, "Healing energy telemetry");
+}
+
+static void CreatureHealingResetsOnDamageAndHonorsEnergyFloor()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 333,
+        systems:
+        [
+            new CreatureHealingSystem(
+                healingDelaySeconds: 2f,
+                healingHealthFractionPerSecond: 1f,
+                healingEnergyCostPerHealth: 2f,
+                healingMinimumEnergy: 5f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 5.1f, health: 0.5f);
+    var creature = simulation.State.Creatures[0];
+    creature.SecondsSinceLastDamage = 3f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+    creature = simulation.State.Creatures[0];
+    AssertClose(0.55f, creature.Health, 0.000001, "Healing should be capped by energy above the floor");
+    AssertClose(5f, creature.Energy, 0.000001, "Healing should stop at the energy floor");
+    AssertClose(0.05f, creature.LastHealingReceived, 0.000001, "Energy-capped healing telemetry");
+    AssertClose(0.1f, creature.LastHealingEnergySpent, 0.000001, "Energy-capped healing energy telemetry");
+
+    creature.Health = 0.5f;
+    creature.Energy = 10f;
+    creature.SecondsSinceLastDamage = 3f;
+    creature.LastAttackDamageTaken = 0.2f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+    creature = simulation.State.Creatures[0];
+    AssertClose(0.5f, creature.Health, 0.000001, "Damage tick should not heal");
+    AssertClose(0f, creature.SecondsSinceLastDamage, 0.000001, "Damage should reset healing timer");
+    AssertClose(0f, creature.LastHealingReceived, 0.000001, "Damage reset healing telemetry");
+    AssertClose(0f, creature.LastHealingEnergySpent, 0.000001, "Damage reset healing energy telemetry");
+
+    creature.LastAttackDamageTaken = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+    creature = simulation.State.Creatures[0];
+    AssertClose(0.5f, creature.Health, 0.000001, "Healing should still wait after damage reset");
+    AssertClose(1f, creature.SecondsSinceLastDamage, 0.000001, "Timer should restart after damage stops");
+}
+
 static void CreatureGrabSlowsContactTargets()
 {
     var simulation = new Simulation(
@@ -8217,6 +8302,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.GutPlantCalories = 20f;
     seeingCreature.GutMeatCalories = 5f;
     seeingCreature.LastAttackDamageDealt = 0.2f;
+    seeingCreature.LastHealingReceived = 0.15f;
+    seeingCreature.LastHealingEnergySpent = 0.45f;
     seeingCreature.SecondsSinceLastMeal = 2f;
     seeingCreature.LastDistanceTraveled = 3f;
     seeingCreature.DistanceSinceLastMeal = 8f;
@@ -8412,6 +8499,9 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.45f, snapshot.AverageAttackOutput, 0.000001, "Average attack output");
     AssertClose(0.45f, snapshot.AverageTouchingAttackOutput, 0.000001, "Average touching attack output");
     AssertClose(0.2f, snapshot.TotalAttackDamagePerSecond, 0.000001, "Attack damage per second");
+    AssertClose(0.15f, snapshot.TotalHealthHealedPerSecond, 0.000001, "Healing per second");
+    AssertEqual(1, snapshot.HealingCreatureCount, "Healing creature count");
+    AssertClose(0.45f, snapshot.TotalHealingEnergySpentPerSecond, 0.000001, "Healing energy spent per second");
     AssertEqual(1, snapshot.GrabIntentCreatureCount, "Grab intent count");
     AssertEqual(1, snapshot.CanGrabCreatureCount, "Can grab creature count");
     AssertEqual(1, snapshot.GrabIntentWhileCanGrabCreatureCount, "Grab intent while can grab count");
