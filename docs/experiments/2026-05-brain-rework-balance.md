@@ -56,8 +56,8 @@ Current status: branch outcomes are summarized in `IMPLEMENTED_STATE.md`, `ROADM
 
 - Current scent is narrow: meat scent and rotten-meat scent. Each provides detected/density plus coarse forward/right direction, derived from weighted meat resources within an expanded scent radius.
 - Keep scent lower-resolution than vision. It should help creatures orient toward broad chemical gradients, not identify exact targets or types at a distance.
-- Treat scent as aggregate fields or gradients by category, not per-object nearest cues. Candidate channels: meat/carrion, rot/decay, plant/fruit/flowering if needed later, creature/body odor, egg/young odor, and hazard/toxin/territory markers if those mechanics exist.
-- Do not add generic plant scent for now. Plants should primarily be found through vision/touch, preserving foraging/search pressure.
+- Treat scent as aggregate fields or gradients by category, not per-object nearest cues. Candidate channels: meat/carrion, rot/decay, creature/body odor, egg/young odor, and hazard/toxin/territory markers if those mechanics exist.
+- Do not add generic plant scent for now. Plants should primarily be found through vision/touch, and any imperfect longer-range plant guidance should come from biome fertility, habitat quality, or terrain/ecology cues rather than a direct plant scent field.
 - Keep meat/carrion scent as the main longer-range scent, farther than sight and lower-resolution than sight.
 - Consider close-range creature and egg scent, likely limited to roughly vision/contact range, for identity/kin/species information rather than global tracking.
 - Add an internal "own scent" or scent signature input/source so creatures can compare nearby creature/egg scent against themselves. This could support evolved decisions to attack, avoid, cluster, tolerate, or protect related individuals.

@@ -134,7 +134,7 @@ Implemented internal inputs include:
 Not implemented yet:
 
 - explicit gut fullness as a neural input;
-- generic plant scent;
+- generic plant scent, intentionally dropped/deferred in favor of biome fertility and habitat-quality cues;
 - kin or egg identity scent;
 - distance-blurred visual identity categories;
 - separate plant species/type labels as perfect visual channels;

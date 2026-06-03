@@ -64,7 +64,8 @@ Status: partially implemented, future redesign likely
 
 Status: active design direction
 
-- Keep plants primarily visual/touch based for now; do not add generic plant scent yet.
+- Keep plants primarily visual/touch based for now; drop generic plant scent as a near-term sense.
+- If foraging needs longer-range guidance, prefer imperfect biome fertility, habitat quality, or terrain/ecology cues over direct plant scent.
 - Add creature and egg scent identity later for kin/species/familiarity experiments.
 - Scent identity should be an evolvable continuous value/domain, not a perfect species ID.
 - Add "own scent" or scent signature as an internal body signal so creatures can compare nearby signatures.

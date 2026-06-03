@@ -204,10 +204,13 @@ Status: active.
 Decision:
 
 - Plants are currently found through vision/contact, not generic long-range plant scent.
+- Do not keep generic plant scent as a near-term planned sense.
+- If plants need an imperfect longer-range habitat cue, prefer biome fertility, habitat quality, or terrain/ecology sensing over a direct plant scent field.
 
 Rationale:
 
-- Plant scent would weaken search pressure.
+- Plant scent would weaken search pressure and risks becoming a soft food radar.
+- Biome fertility and habitat-quality cues can lead creatures toward plant-favorable areas without revealing individual plant positions.
 - Meat/carrion scent is more useful as a distinct ecological niche.
 
 Status: active.
