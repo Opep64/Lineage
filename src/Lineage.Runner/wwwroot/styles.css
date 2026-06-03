@@ -1082,6 +1082,57 @@ button.scenario-tab.is-active {
   padding: 5px 9px;
 }
 
+.brain-lab-world-probe-trace {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.brain-lab-world-probe-trace.empty {
+  color: var(--muted);
+}
+
+.brain-lab-world-probe-trace-title {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.brain-lab-world-probe-trace-title code {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.brain-lab-world-probe-trace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+.brain-lab-world-probe-trace-grid strong,
+.brain-lab-world-probe-trace-list strong {
+  color: var(--ink);
+}
+
+.brain-lab-world-probe-trace-list {
+  display: grid;
+  gap: 4px;
+}
+
+.brain-lab-world-probe-trace-list div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .brain-lab-world-probe-editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1216,6 +1267,12 @@ button.scenario-tab.is-active {
 .brain-lab-input-row.is-overridden {
   border-left-color: var(--warn);
   background: #fffaf0;
+}
+
+.brain-lab-input-row.is-selected {
+  border-color: #6d8fe8;
+  border-left-color: #2d6cdf;
+  box-shadow: 0 0 0 2px rgba(45, 108, 223, 0.14);
 }
 
 .brain-lab-input-heading,

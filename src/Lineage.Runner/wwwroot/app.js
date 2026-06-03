@@ -92,6 +92,7 @@ const brainLabWorldProbe = document.querySelector("#brainLabWorldProbe");
 const brainLabWorldProbeCanvas = document.querySelector("#brainLabWorldProbeCanvas");
 const brainLabWorldProbeSummary = document.querySelector("#brainLabWorldProbeSummary");
 const brainLabWorldProbeSelection = document.querySelector("#brainLabWorldProbeSelection");
+const brainLabWorldProbeTrace = document.querySelector("#brainLabWorldProbeTrace");
 const brainLabWorldProbeEditor = document.querySelector("#brainLabWorldProbeEditor");
 const brainLabWorldProbeFixtureSelect = document.querySelector("#brainLabWorldProbeFixtureSelect");
 const applyBrainLabWorldProbeFixtureButton = document.querySelector("#applyBrainLabWorldProbeFixtureButton");
@@ -144,6 +145,7 @@ let brainLabWorldProbeOverrideKeys = new Set();
 let brainLabWorldProbeHiddenKeys = new Set();
 let brainLabWorldProbeMutedSoundKeys = new Set();
 let brainLabWorldProbeSelected = null;
+let brainLabSelectedInputKey = null;
 let brainLabWorldProbeHitTargets = [];
 let brainLabWorldProbeTool = "select";
 let brainLabWorldProbeDrag = null;
@@ -697,6 +699,7 @@ async function loadBrainLabSnapshot() {
   brainLabEvaluation = null;
   brainLabPopulationEvaluation = null;
   brainLabPresetMatrixResult = null;
+  brainLabSelectedInputKey = null;
   brainLabWorldProbeScene = null;
   brainLabWorldProbeBaseScene = null;
   brainLabOverrides = {};
@@ -795,6 +798,10 @@ async function evaluateBrainLab() {
   }
 
   brainLabEvaluation = await response.json();
+  if (brainLabSelectedInputKey
+    && !(brainLabEvaluation.inputs || []).some((input) => input.key === brainLabSelectedInputKey)) {
+    brainLabSelectedInputKey = null;
+  }
   renderBrainLabMeta();
   renderBrainLabInputs();
   renderBrainLabOutputs();
@@ -898,6 +905,7 @@ function renderBrainLabWorldProbe() {
     brainLabWorldProbeSelected = null;
     brainLabWorldProbeSummary.textContent = "No world probe yet.";
     renderBrainLabWorldProbeSelection();
+    renderBrainLabWorldProbeTrace();
     updateBrainLabWorldProbeZoomControls();
     return;
   }
@@ -907,11 +915,12 @@ function renderBrainLabWorldProbe() {
   const transform = brainLabWorldProbeTransform(canvas);
   const { centerX, centerY, radius, scale } = transform;
   const toScreen = (item) => brainLabWorldProbeToScreen(item, transform);
+  const visionTrace = brainLabWorldProbeVisionTrace(scene);
 
   drawBrainLabProbeCircle(context, centerX, centerY, Number(scene.soundRadius || 0) * scale, "#e7a13d", [8, 8]);
   drawBrainLabProbeCircle(context, centerX, centerY, Number(scene.senseRadius || 0) * scale, "#5078bd", [4, 7]);
   drawBrainLabProbeCircle(context, centerX, centerY, radius * scale, "#9aa5b1", []);
-  drawBrainLabProbeVisionCone(context, scene, transform);
+  drawBrainLabProbeVisionCone(context, scene, transform, visionTrace);
   drawBrainLabWorldProbeBiomeCues(context, scene, transform);
 
   if (toggles.sound && toggles.creatures) {
@@ -941,6 +950,7 @@ function renderBrainLabWorldProbe() {
       const point = toScreen(resource);
       const radius = Math.max(3, Number(resource.radius || 0) * scale);
       drawBrainLabProbeDot(context, point, radius, "#3d9462", "#1f6d43");
+      drawBrainLabProbeTraceHighlight(context, point, radius, brainLabWorldProbeTraceContribution(visionTrace, "resource", resource.id));
       addBrainLabWorldProbeHitTarget({
         type: "resource",
         id: resource.id,
@@ -962,6 +972,7 @@ function renderBrainLabWorldProbe() {
       const point = toScreen(resource);
       const radius = Math.max(3, Number(resource.radius || 0) * scale);
       drawBrainLabProbeDot(context, point, radius, "#b95c52", "#873b34");
+      drawBrainLabProbeTraceHighlight(context, point, radius, brainLabWorldProbeTraceContribution(visionTrace, "resource", resource.id));
       addBrainLabWorldProbeHitTarget({
         type: "resource",
         id: resource.id,
@@ -981,6 +992,7 @@ function renderBrainLabWorldProbe() {
       const point = toScreen(egg);
       const radius = Math.max(3, Number(egg.radius || 0) * scale);
       drawBrainLabProbeDot(context, point, radius, "#d7ad34", "#9b7b1e");
+      drawBrainLabProbeTraceHighlight(context, point, radius, brainLabWorldProbeTraceContribution(visionTrace, "egg", egg.id));
       addBrainLabWorldProbeHitTarget({
         type: "egg",
         id: egg.id,
@@ -1001,6 +1013,7 @@ function renderBrainLabWorldProbe() {
 
       const point = toScreen(creature);
       const bodyRadius = drawBrainLabProbeCreature(context, point, creature, scale);
+      drawBrainLabProbeTraceHighlight(context, point, bodyRadius, brainLabWorldProbeTraceContribution(visionTrace, "creature", creature.id));
       addBrainLabWorldProbeHitTarget({
         type: "creature",
         id: creature.id,
@@ -1028,6 +1041,7 @@ function renderBrainLabWorldProbe() {
 
   renderBrainLabWorldProbeSummary(scene, toggles);
   renderBrainLabWorldProbeSelection();
+  renderBrainLabWorldProbeTrace(visionTrace);
   updateBrainLabWorldProbeZoomControls();
 }
 
@@ -1262,7 +1276,7 @@ function drawBrainLabProbeCircle(context, x, y, radius, color, dash) {
   context.restore();
 }
 
-function drawBrainLabProbeVisionCone(context, scene, transform) {
+function drawBrainLabProbeVisionCone(context, scene, transform, trace = null) {
   const focus = scene?.focus;
   if (!focus) {
     return;
@@ -1282,6 +1296,7 @@ function drawBrainLabProbeVisionCone(context, scene, transform) {
   }
 
   const screenHeading = -heading;
+  const halfAngle = angle * 0.5;
   context.save();
   context.fillStyle = "rgba(45, 119, 190, 0.075)";
   context.strokeStyle = "rgba(45, 119, 190, 0.52)";
@@ -1293,11 +1308,11 @@ function drawBrainLabProbeVisionCone(context, scene, transform) {
     context.fill();
     context.setLineDash([4, 6]);
     context.stroke();
+    drawBrainLabProbeVisionSectorGuides(context, point, range, screenHeading, halfAngle, trace);
     context.restore();
     return;
   }
 
-  const halfAngle = angle * 0.5;
   const start = screenHeading - halfAngle;
   const end = screenHeading + halfAngle;
   const startPoint = {
@@ -1318,11 +1333,67 @@ function drawBrainLabProbeVisionCone(context, scene, transform) {
   context.fill();
   context.stroke();
 
+  drawBrainLabProbeVisionSectorGuides(context, point, range, screenHeading, halfAngle, trace);
   context.strokeStyle = "rgba(45, 119, 190, 0.35)";
   context.setLineDash([5, 6]);
   context.beginPath();
   context.moveTo(point.x, point.y);
   context.lineTo(point.x + Math.cos(screenHeading) * range, point.y + Math.sin(screenHeading) * range);
+  context.stroke();
+  context.restore();
+}
+
+function drawBrainLabProbeVisionSectorGuides(context, point, range, screenHeading, halfAngle, trace = null) {
+  const sectorCount = 9;
+  const selectedSector = Number.isInteger(trace?.spec?.sectorIndex) ? trace.spec.sectorIndex : null;
+
+  if (selectedSector !== null) {
+    const start = brainLabWorldProbeSectorScreenAngle(screenHeading, halfAngle, selectedSector + 1, sectorCount);
+    const end = brainLabWorldProbeSectorScreenAngle(screenHeading, halfAngle, selectedSector, sectorCount);
+    context.save();
+    context.fillStyle = "rgba(39, 105, 210, 0.13)";
+    context.strokeStyle = "rgba(39, 105, 210, 0.45)";
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+    context.lineTo(point.x + Math.cos(start) * range, point.y + Math.sin(start) * range);
+    context.arc(point.x, point.y, range, start, end);
+    context.lineTo(point.x, point.y);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.restore();
+  }
+
+  context.save();
+  context.strokeStyle = "rgba(45, 119, 190, 0.22)";
+  context.lineWidth = 1;
+  context.setLineDash([3, 7]);
+  for (let index = 1; index < sectorCount; index += 1) {
+    const angle = brainLabWorldProbeSectorScreenAngle(screenHeading, halfAngle, index, sectorCount);
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+    context.lineTo(point.x + Math.cos(angle) * range, point.y + Math.sin(angle) * range);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function brainLabWorldProbeSectorScreenAngle(screenHeading, halfAngle, sectorBoundaryIndex, sectorCount) {
+  return screenHeading + halfAngle - (halfAngle * 2) * sectorBoundaryIndex / sectorCount;
+}
+
+function drawBrainLabProbeTraceHighlight(context, point, radius, contribution) {
+  if (!contribution) {
+    return;
+  }
+
+  context.save();
+  context.strokeStyle = contribution.primary ? "#1f57d6" : "rgba(31, 87, 214, 0.78)";
+  context.lineWidth = contribution.primary ? 3 : 2;
+  context.setLineDash(contribution.primary ? [] : [4, 4]);
+  context.beginPath();
+  context.arc(point.x, point.y, Math.max(8, radius + 6), 0, Math.PI * 2);
   context.stroke();
   context.restore();
 }
@@ -1335,6 +1406,271 @@ function brainLabWorldProbeVisionConeSummary(scene) {
 
   const degrees = radians * 180 / Math.PI;
   return `${formatBrainLabNumber(degrees)} deg`;
+}
+
+function selectedBrainLabInput() {
+  if (!brainLabSelectedInputKey) {
+    return null;
+  }
+
+  return (brainLabEvaluation?.inputs || []).find((input) => input.key === brainLabSelectedInputKey) ?? null;
+}
+
+function selectBrainLabInput(key) {
+  if (!key) {
+    return;
+  }
+
+  brainLabSelectedInputKey = key;
+  renderBrainLabInputs();
+  renderBrainLabWorldProbe();
+}
+
+function brainLabWorldProbeVisionTrace(scene, input = selectedBrainLabInput()) {
+  const spec = brainLabVisionTraceSpec(input?.key || "");
+  if (!scene || !input || !spec) {
+    return null;
+  }
+
+  const contributors = brainLabWorldProbeVisionContributors(scene, spec)
+    .sort((left, right) => Number(left.distance || 0) - Number(right.distance || 0));
+  const primary = brainLabVisionTraceUsesNearest(spec.signal) ? contributors[0] : null;
+  const contributionByKey = new Map();
+  for (const contribution of contributors) {
+    contribution.primary = primary ? contribution.key === primary.key : false;
+    contributionByKey.set(contribution.key, contribution);
+  }
+
+  return {
+    input,
+    spec,
+    contributors,
+    contributionByKey,
+    nearest: contributors[0] ?? null,
+    densityEstimate: Math.min(1, contributors.length / 8)
+  };
+}
+
+function brainLabVisionTraceSpec(key) {
+  if (!key || !key.startsWith("vision.")) {
+    return null;
+  }
+
+  const sectorMatch = key.match(/^vision\.sector\.(\d+)\.([a-z0-9_]+)$/);
+  const sectorIndex = sectorMatch ? Number(sectorMatch[1]) : null;
+  const signal = sectorMatch ? sectorMatch[2] : key.slice("vision.".length);
+  const categories = brainLabVisionTraceCategories(signal);
+  if (categories.length === 0) {
+    return null;
+  }
+
+  return {
+    key,
+    signal,
+    sectorIndex: Number.isInteger(sectorIndex) && sectorIndex >= 0 && sectorIndex < 9 ? sectorIndex : null,
+    categories
+  };
+}
+
+function brainLabVisionTraceCategories(signal) {
+  if (!signal) {
+    return [];
+  }
+
+  if (signal.includes("plant")) {
+    return ["plant"];
+  }
+  if (signal.includes("meat")) {
+    return ["meat"];
+  }
+  if (signal.includes("egg")) {
+    return ["egg"];
+  }
+  if (signal.includes("creature")) {
+    return ["creature"];
+  }
+  if (signal.includes("food")) {
+    return ["plant", "meat", "egg"];
+  }
+  return [];
+}
+
+function brainLabWorldProbeVisionContributors(scene, spec) {
+  const contributors = [];
+  const toggles = brainLabWorldProbeToggles();
+
+  if (spec.categories.includes("plant") && toggles.plants) {
+    for (const resource of (scene.resources || []).filter((item) => item.kind === "Plant")) {
+      if (isBrainLabWorldProbeResourceVisible(resource)) {
+        brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "resource", "Plant", resource);
+      }
+    }
+  }
+
+  if (spec.categories.includes("meat") && toggles.meatEggs) {
+    for (const resource of (scene.resources || []).filter((item) => item.kind === "Meat")) {
+      if (isBrainLabWorldProbeResourceVisible(resource)) {
+        brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "resource", "Meat", resource);
+      }
+    }
+  }
+
+  if (spec.categories.includes("egg") && toggles.meatEggs) {
+    for (const egg of scene.eggs || []) {
+      if (isBrainLabWorldProbeEggVisible(egg)) {
+        brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "egg", "Egg", egg);
+      }
+    }
+  }
+
+  if (spec.categories.includes("creature") && toggles.creatures) {
+    for (const creature of scene.creatures || []) {
+      if (isBrainLabWorldProbeCreatureVisible(creature) && brainLabWorldProbeCreatureMatchesTraceSize(scene, spec, creature)) {
+        brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "creature", "Creature", creature);
+      }
+    }
+  }
+
+  return contributors;
+}
+
+function brainLabWorldProbeAddVisionContributor(contributors, scene, spec, type, label, item) {
+  const sample = brainLabWorldProbeVisionSample(scene, item);
+  if (!sample.visible || (spec.sectorIndex !== null && sample.sectorIndex !== spec.sectorIndex)) {
+    return;
+  }
+
+  contributors.push({
+    type,
+    id: item.id,
+    key: brainLabWorldProbeTraceKey(type, item.id),
+    label,
+    item,
+    distance: sample.distance,
+    proximity: sample.proximity,
+    sectorIndex: sample.sectorIndex,
+    forward: sample.forward,
+    right: sample.right,
+    primary: false
+  });
+}
+
+function brainLabWorldProbeVisionSample(scene, item) {
+  const focus = scene?.focus || {};
+  const x = Number(item?.x || 0);
+  const y = Number(item?.y || 0);
+  const distance = Math.hypot(x, y);
+  const senseRadius = Math.max(0, Number(scene?.senseRadius || 0));
+  const itemRadius = Math.max(0, Number(item?.radius || 0));
+  const heading = Number(focus.headingRadians || 0);
+  const visionAngle = Math.max(0, Math.min(Math.PI * 2, Number(focus.visionAngleRadians || Math.PI * 2)));
+  const forward = x * Math.cos(heading) + y * Math.sin(heading);
+  const right = x * -Math.sin(heading) + y * Math.cos(heading);
+  const halfAngle = visionAngle >= Math.PI * 2 - 0.001
+    ? Math.PI
+    : Math.max(0.0001, Math.min(Math.PI, visionAngle * 0.5));
+  const angle = Math.atan2(right, forward);
+  const inRange = distance <= senseRadius + itemRadius;
+  const inCone = distance <= 0.000001 || visionAngle >= Math.PI * 2 - 0.001 || (angle >= -halfAngle && angle <= halfAngle);
+  const normalized = (angle + halfAngle) / (halfAngle * 2);
+  const sectorIndex = Math.max(0, Math.min(8, Math.floor(normalized * 9)));
+  return {
+    visible: inRange && inCone,
+    distance,
+    proximity: senseRadius > 0 ? Math.max(0, Math.min(1, 1 - Math.max(0, distance - itemRadius) / senseRadius)) : 0,
+    sectorIndex,
+    forward: senseRadius > 0 ? Math.max(-1, Math.min(1, forward / senseRadius)) : 0,
+    right: senseRadius > 0 ? Math.max(-1, Math.min(1, right / senseRadius)) : 0
+  };
+}
+
+function brainLabWorldProbeCreatureMatchesTraceSize(scene, spec, creature) {
+  if (!spec.signal.includes("smaller_creature")
+    && !spec.signal.includes("similar_creature")
+    && !spec.signal.includes("larger_creature")) {
+    return true;
+  }
+
+  const focusRadius = Math.max(0.001, Number(scene?.focus?.radius || 1));
+  const relative = (Number(creature?.radius || focusRadius) - focusRadius) / focusRadius;
+  if (spec.signal.includes("smaller_creature")) {
+    return relative < -0.2;
+  }
+  if (spec.signal.includes("larger_creature")) {
+    return relative > 0.2;
+  }
+  return relative >= -0.2 && relative <= 0.2;
+}
+
+function brainLabVisionTraceUsesNearest(signal) {
+  return signal.includes("proximity")
+    || signal.includes("approach_rate")
+    || signal.includes("facing_alignment");
+}
+
+function brainLabWorldProbeTraceContribution(trace, type, id) {
+  return trace?.contributionByKey?.get(brainLabWorldProbeTraceKey(type, id)) ?? null;
+}
+
+function brainLabWorldProbeTraceKey(type, id) {
+  return `${type}:${id}`;
+}
+
+function renderBrainLabWorldProbeTrace(trace = brainLabWorldProbeVisionTrace(brainLabWorldProbeScene)) {
+  if (!brainLabWorldProbeTrace) {
+    return;
+  }
+
+  const input = selectedBrainLabInput();
+  if (!brainLabWorldProbeScene) {
+    brainLabWorldProbeTrace.classList.add("empty");
+    brainLabWorldProbeTrace.textContent = "No world probe yet.";
+    return;
+  }
+  if (!input) {
+    brainLabWorldProbeTrace.classList.add("empty");
+    brainLabWorldProbeTrace.textContent = "Select a vision input to trace.";
+    return;
+  }
+  if (!trace) {
+    brainLabWorldProbeTrace.classList.add("empty");
+    brainLabWorldProbeTrace.textContent = "No map trace for this input.";
+    return;
+  }
+
+  const sectorText = trace.spec.sectorIndex === null ? "all sectors" : `sector ${trace.spec.sectorIndex}`;
+  const nearestText = trace.nearest
+    ? `${trace.nearest.label} #${formatNumber(trace.nearest.id)} ${formatBrainLabNumber(trace.nearest.distance)}u`
+    : "none";
+  const valueText = `${formatBrainLabNumber(input.baselineValue)} -> ${formatBrainLabNumber(input.modifiedValue)}`;
+  const topContributors = trace.contributors.slice(0, 4).map((contribution) => `
+    <div>
+      <strong>${escapeHtml(contribution.label)} #${formatNumber(contribution.id)}</strong>
+      ${formatBrainLabNumber(contribution.distance)}u
+      prox ${formatBrainLabNumber(contribution.proximity)}
+      F ${formatBrainLabNumber(contribution.forward)}
+      R ${formatBrainLabNumber(contribution.right)}
+    </div>
+  `).join("");
+
+  brainLabWorldProbeTrace.classList.remove("empty");
+  brainLabWorldProbeTrace.innerHTML = `
+    <div class="brain-lab-world-probe-trace-title">
+      ${escapeHtml(input.name)}
+      <code>${escapeHtml(input.key)}</code>
+    </div>
+    <div class="brain-lab-world-probe-trace-grid">
+      <span><strong>Value</strong> ${escapeHtml(valueText)}</span>
+      <span><strong>Scope</strong> ${escapeHtml(sectorText)}</span>
+      <span><strong>Contributors</strong> ${formatNumber(trace.contributors.length)}</span>
+      <span><strong>Nearest</strong> ${escapeHtml(nearestText)}</span>
+      <span><strong>Density est.</strong> ${formatBrainLabNumber(trace.densityEstimate)}</span>
+      <span><strong>Mode</strong> ${brainLabVisionTraceUsesNearest(trace.spec.signal) ? "nearest" : "aggregate"}</span>
+    </div>
+    <div class="brain-lab-world-probe-trace-list">
+      ${topContributors || "<div>No visible contributors in the current probe view.</div>"}
+    </div>
+  `;
 }
 
 function drawBrainLabWorldProbeBiomeCues(context, scene, transform) {
@@ -2981,8 +3317,9 @@ function renderBrainLabInput(input) {
   const disabled = min === max || brainLabEvaluation?.supportsRawInputOverrides === false ? " disabled" : "";
   const step = max - min <= 2 ? "0.01" : "0.05";
   const overrideClass = input.overridden ? " is-overridden" : "";
+  const selectedClass = input.key === brainLabSelectedInputKey ? " is-selected" : "";
   return `
-    <div class="brain-lab-input-row${overrideClass}" title="${escapeHtml(input.meaning)}">
+    <div class="brain-lab-input-row${overrideClass}${selectedClass}" data-brain-lab-input-row="${escapeHtml(input.key)}" title="${escapeHtml(input.meaning)}">
       <div class="brain-lab-input-heading">
         <span>${escapeHtml(input.name)}</span>
         <code>${escapeHtml(input.key)}</code>
@@ -7059,10 +7396,15 @@ brainLabCreatureSelect.addEventListener("change", () => {
   clearBrainLabPopulation();
   loadBrainLabWorldProbe().then(evaluateBrainLab);
 });
-brainLabGroupFilter.addEventListener("change", renderBrainLabInputs);
+brainLabGroupFilter.addEventListener("change", () => {
+  renderBrainLabInputs();
+  renderBrainLabWorldProbeTrace();
+});
 brainLabInputs.addEventListener("input", (event) => {
   const control = event.target.closest("[data-brain-lab-input-key]");
   if (control) {
+    brainLabSelectedInputKey = control.dataset.brainLabInputKey;
+    renderBrainLabWorldProbe();
     updateBrainLabInputOverride(control);
   }
 });
@@ -7070,6 +7412,11 @@ brainLabInputs.addEventListener("click", (event) => {
   const button = event.target.closest("[data-brain-lab-reset-input]");
   if (button) {
     resetBrainLabInput(button.dataset.brainLabResetInput);
+  }
+
+  const row = event.target.closest("[data-brain-lab-input-row]");
+  if (row) {
+    selectBrainLabInput(row.dataset.brainLabInputRow);
   }
 });
 brainLabWorldProbe.addEventListener("change", (event) => {
