@@ -1,7 +1,7 @@
 {
   "schemaVersion": "lineage.runner.scenario-recipe.v1",
   "name": "Predator Pressure",
-  "description": "Mixed predator/prey pressure with a small predator starter roster, stronger bites, richer carcasses, and a high enough plant floor to keep prey ecology viable.",
+  "description": "Predator-dominant mixed-roster pressure with stronger bites, richer carcasses, and a high enough plant floor to keep the overall ecology viable.",
   "tags": [
     "ecology",
     "meat",
