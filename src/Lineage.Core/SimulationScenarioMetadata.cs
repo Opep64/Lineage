@@ -121,6 +121,7 @@ public static class SimulationScenarioMetadata
             || name.Contains("Cost", StringComparison.Ordinal)
             || name.Contains("Multiplier", StringComparison.Ordinal)
             || name.Contains("Strength", StringComparison.Ordinal)
+            || name.Contains("Weight", StringComparison.Ordinal)
             || name.Contains("Resistance", StringComparison.Ordinal)
             || name.Contains("Damage", StringComparison.Ordinal)
             || name.Contains("Health", StringComparison.Ordinal)
@@ -322,6 +323,11 @@ public static class SimulationScenarioMetadata
             return "Brain & Vision";
         }
 
+        if (name.Contains("Prey", StringComparison.Ordinal))
+        {
+            return "Diet & Combat";
+        }
+
         if (name.Contains("World", StringComparison.Ordinal)
             || name.Contains("Biome", StringComparison.Ordinal)
             || name.Contains("Obstacle", StringComparison.Ordinal)
@@ -360,6 +366,7 @@ public static class SimulationScenarioMetadata
         if (name.Contains("Diet", StringComparison.Ordinal)
             || name.Contains("Carrion", StringComparison.Ordinal)
             || name.Contains("Meat", StringComparison.Ordinal)
+            || name.Contains("Prey", StringComparison.Ordinal)
             || name.Contains("Bite", StringComparison.Ordinal)
             || name.Contains("Damage", StringComparison.Ordinal)
             || name.Contains("Healing", StringComparison.Ordinal)

@@ -53,6 +53,7 @@ public partial class Main : Node2D
     private const float PlantSpriteScalePixels = 6.4f;
     private const float MeatSpriteScalePixels = 6.6f;
     private const float EggSpriteScalePixels = 5.4f;
+    private const float SmallPreySpriteScalePixels = 6.0f;
     private const float PlantSpriteIdleWindRotationRadians = 0.070f;
     private const float PlantSpriteIdleWindStretch = 0.046f;
     private const float PlantSpriteIdleWindSquash = 0.028f;
@@ -81,6 +82,8 @@ public partial class Main : Node2D
     private const float MaxMeatSpriteSizePixels = 54f;
     private const float MinEggSpriteSizePixels = 13f;
     private const float MaxEggSpriteSizePixels = 42f;
+    private const float MinSmallPreySpriteSizePixels = 12f;
+    private const float MaxSmallPreySpriteSizePixels = 38f;
     private const float MinZoom = 0.25f;
     private const float MaxZoom = 80f;
     private const float KeyboardPanPixelsPerSecond = 650f;
@@ -112,6 +115,7 @@ public partial class Main : Node2D
     private readonly Color _toughPlantColor = new(0.30f, 0.52f, 0.22f);
     private readonly Color _meatResourceColor = new(0.72f, 0.22f, 0.20f);
     private readonly Color _eggColor = new(0.86f, 0.88f, 0.72f);
+    private readonly Color _smallPreyColor = new(0.18f, 0.78f, 0.76f);
     private readonly Color _creatureColor = new(0.82f, 0.73f, 0.48f);
     private readonly Color _selectedColor = new(1.0f, 0.94f, 0.42f);
     private readonly Color _senseColor = new(0.35f, 0.62f, 0.92f, 0.18f);
@@ -198,6 +202,7 @@ public partial class Main : Node2D
     private readonly HashSet<EntityId> _drawEatingPlantResourceIds = [];
     private readonly HashSet<EntityId> _drawEatingMeatResourceIds = [];
     private readonly HashSet<EntityId> _drawEatingEggIds = [];
+    private readonly HashSet<EntityId> _drawEatingSmallPreyIds = [];
     private ImageTexture? _biomeOverlayTexture;
     private BiomeMap? _biomeOverlaySource;
     private int _biomeOverlayPixelsPerCell = 1;
@@ -634,6 +639,7 @@ public partial class Main : Node2D
             _drawVisualTimeSeconds = Time.GetTicksMsec() * 0.001f;
             UpdateFoodEatingAnimationSignals();
             DrawResources();
+            DrawSmallPrey();
             DrawEggs();
             DrawCreatures();
             DrawSelectedEggOverlay();
@@ -1302,7 +1308,7 @@ public partial class Main : Node2D
             $"Life avg {snapshot.AverageLifespanSeconds:0}s  med {snapshot.MedianLifespanSeconds:0}s\n" +
             $"Max gen {snapshot.MaxGeneration}\n" +
             $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
-            $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
+            $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}  Prey {snapshot.SmallPreyCount}\n" +
             $"Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
             $"Visual {FormatVisualRenderMode()}\n" +
@@ -1316,7 +1322,7 @@ public partial class Main : Node2D
             $"Tick {state.Tick}  Time {state.ElapsedSeconds:0.0}s\n" +
             $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}\n" +
             $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
-            $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}\n" +
+            $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}  Prey {snapshot.SmallPreyCount}\n" +
             $"Resources/M {resourceDensity:0.00}\n" +
             seasonText +
             $"Births {state.Stats.CreatureBirthCount}  Eggs laid {state.Stats.EggLaidCount}\n" +
@@ -1332,7 +1338,8 @@ public partial class Main : Node2D
             $"Meat scent {FormatPercent(Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount))}  rot {FormatPercent(Share(snapshot.RottenMeatScentDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageMeatScentDensity:0.00}/{snapshot.AverageRottenMeatScentDensity:0.00}\n" +
             $"Meat seen fresh {FormatPercent(Share(snapshot.FreshMeatDetectedCreatureCount, snapshot.CreatureCount))} stale {FormatPercent(Share(snapshot.StaleMeatDetectedCreatureCount, snapshot.CreatureCount))} avoided {FormatPercent(Share(snapshot.StaleMeatAvoidedCreatureCount, snapshot.CreatureCount))}\n" +
             $"Eating {FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount))}  Raw {snapshot.TotalCaloriesEatenPerSecond:0.0}/s  Digest {snapshot.TotalCaloriesDigestedPerSecond:0.0}/s\n" +
-            $"Food src P {snapshot.TotalPlantCaloriesEatenPerSecond:0.0}/s  C {snapshot.TotalCarcassCaloriesEatenPerSecond:0.0}/s  Egg {snapshot.TotalEggCaloriesEatenPerSecond:0.0}/s\n" +
+            $"Food src P {snapshot.TotalPlantCaloriesEatenPerSecond:0.0}/s  C {snapshot.TotalCarcassCaloriesEatenPerSecond:0.0}/s  Egg {snapshot.TotalEggCaloriesEatenPerSecond:0.0}/s  Prey {snapshot.TotalSmallPreyCaloriesEatenPerSecond:0.0}/s\n" +
+            $"Small prey kcal {snapshot.TotalSmallPreyCalories:0}  spawn/kill/eat {snapshot.SmallPreySpawnedCount}/{snapshot.SmallPreyKilledCount}/{snapshot.SmallPreyEatenCount}\n" +
             $"Creatures seen {FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageVisibleCreatureDensity:0.00}\n" +
             $"Kin scent {FormatPercent(Share(snapshot.CreatureSimilarityScentDetectedCreatureCount, snapshot.CreatureCount))}  density {snapshot.AverageCreatureSimilarityScentDensity:0.00}  similar touch {FormatPercent(Share(snapshot.SimilarCreatureContactCreatureCount, snapshot.CreatureCount))}\n" +
             $"Contact {FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount))}  intent {FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount))}  touch+intent {FormatPercent(Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount))}\n" +
@@ -2148,6 +2155,15 @@ public partial class Main : Node2D
                 $"Food kcal {creature.FoodContactCalories:0.00}\n";
         }
 
+        if (creature.FoodContactKind == FoodContactKind.SmallPrey)
+        {
+            return
+                $"Food type small prey\n" +
+                $"Digest eff {CreatureDigestion.FreshMeatEnergyEfficiency(genome):P0}\n" +
+                $"Food edge {creature.FoodContactEdgeDistance:0.0}/{CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}\n" +
+                $"Food kcal {creature.FoodContactCalories:0.00}\n";
+        }
+
         return
             $"Food edge {creature.FoodContactEdgeDistance:0.0}/{CreatureGrowth.EffectiveBodyRadius(creature, genome):0.0}\n" +
             $"Food kcal {creature.FoodContactCalories:0.00}\n";
@@ -2172,6 +2188,12 @@ public partial class Main : Node2D
         {
             source = "egg";
             amount = creature.LastEggCaloriesEaten;
+        }
+
+        if (creature.LastSmallPreyCaloriesEaten > amount)
+        {
+            source = "small prey";
+            amount = creature.LastSmallPreyCaloriesEaten;
         }
 
         if (creature.LastLivePreyCaloriesEaten > amount)
@@ -2498,6 +2520,38 @@ public partial class Main : Node2D
             animatedCenter,
             animatedSize,
             StableAngle(egg.Id.Value) + animation.Rotation,
+            modulate);
+    }
+
+    private bool TryDrawSpriteSmallPrey(SmallPreyState prey, Vector2 screenPosition, float radius, Color color)
+    {
+        if (!TryGetSpriteTheme(out var theme) || radius < MinResourceSpriteRadiusPixels)
+        {
+            return false;
+        }
+
+        var sizePixels = SpriteSizeFromScreenRadius(
+            radius,
+            SmallPreySpriteScalePixels,
+            MinSmallPreySpriteSizePixels,
+            MaxSmallPreySpriteSizePixels);
+        var animation = FoodSpriteEatingAnimation(prey.Id, _drawEatingSmallPreyIds, sizePixels);
+        var animatedCenter = screenPosition + animation.Offset;
+        var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
+        var modulate = prey.HeldByCreatureId == default
+            ? Colors.White.Lerp(color, 0.08f)
+            : Colors.White.Lerp(_selectedColor, 0.18f);
+        DrawSpriteBackplate(
+            animatedCenter,
+            sizePixels * 0.30f * MathF.Max(animation.Scale.X, animation.Scale.Y),
+            color,
+            prey.HeldByCreatureId == default ? animation.IsEating ? 0.34f : 0.24f : 0.42f);
+        return TryDrawSpriteRegion(
+            theme,
+            SpriteAtlasSlot.SmallPrey,
+            animatedCenter,
+            animatedSize,
+            prey.HeadingRadians + animation.Rotation,
             modulate);
     }
 
@@ -2912,6 +2966,49 @@ public partial class Main : Node2D
         }
     }
 
+    private void DrawSmallPrey()
+    {
+        var visibleWorldRect = GetVisibleWorldRect(paddingWorld: 8f / MathF.Max(_worldScale, 0.001f));
+        for (var i = 0; i < _simulation.State.SmallPrey.Count; i++)
+        {
+            var prey = _simulation.State.SmallPrey[i];
+            if (prey.Calories <= 0f
+                || prey.Health <= 0f
+                || !WorldRectIntersectsCircle(visibleWorldRect, prey.Position, prey.Radius))
+            {
+                continue;
+            }
+
+            var screenPosition = ToScreen(prey.Position);
+            var radius = MathF.Max(2f, prey.Radius * _worldScale);
+            if (!IsVisibleInWorldRect(screenPosition, radius + 4f))
+            {
+                continue;
+            }
+
+            var healthRatio = prey.MaxHealth > 0f
+                ? Mathf.Clamp(prey.Health / prey.MaxHealth, 0f, 1f)
+                : 0f;
+            var caloriesRatio = prey.MaxCalories > 0f
+                ? Mathf.Clamp(prey.Calories / prey.MaxCalories, 0f, 1f)
+                : 0f;
+            var color = _smallPreyColor
+                .Lerp(_meatResourceColor, (1f - healthRatio) * 0.38f)
+                .Lerp(Colors.White, (1f - caloriesRatio) * 0.18f);
+            if (prey.HeldByCreatureId != default)
+            {
+                color = color.Lerp(_selectedColor, 0.24f);
+            }
+
+            if (!TryDrawSpriteSmallPrey(prey, screenPosition, radius, color))
+            {
+                DrawCircle(screenPosition, radius, color);
+                var heading = new Vector2(MathF.Cos(prey.HeadingRadians), MathF.Sin(prey.HeadingRadians));
+                DrawLine(screenPosition, screenPosition + heading * MathF.Max(4f, radius * 2.2f), Colors.White.Lerp(color, 0.35f), width: 1f);
+            }
+        }
+    }
+
     private void DrawCreatures()
     {
         UpdateCreatureRenderCache();
@@ -3063,6 +3160,7 @@ public partial class Main : Node2D
         _drawEatingPlantResourceIds.Clear();
         _drawEatingMeatResourceIds.Clear();
         _drawEatingEggIds.Clear();
+        _drawEatingSmallPreyIds.Clear();
 
         foreach (var creature in _simulation.State.Creatures)
         {
@@ -3089,6 +3187,10 @@ public partial class Main : Node2D
             else if (creature.FoodContactKind == FoodContactKind.Egg && creature.LastEggCaloriesEaten > 0f)
             {
                 _drawEatingEggIds.Add(creature.FoodContactResourceId);
+            }
+            else if (creature.FoodContactKind == FoodContactKind.SmallPrey && creature.LastSmallPreyCaloriesEaten > 0f)
+            {
+                _drawEatingSmallPreyIds.Add(creature.FoodContactResourceId);
             }
         }
     }
@@ -3664,6 +3766,24 @@ public partial class Main : Node2D
                 var radius = MathF.Max(4f, EggPredation.ContactRadius(egg) * _worldScale + 3f);
                 DrawLine(creatureScreenPosition, eggScreenPosition, _selectedColor, width: 1.5f);
                 DrawArc(eggScreenPosition, radius, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
+                return;
+            }
+        }
+
+        if (creature.FoodContactKind == FoodContactKind.SmallPrey)
+        {
+            for (var i = 0; i < _simulation.State.SmallPrey.Count; i++)
+            {
+                var prey = _simulation.State.SmallPrey[i];
+                if (prey.Id != creature.FoodContactResourceId)
+                {
+                    continue;
+                }
+
+                var preyScreenPosition = ToScreen(prey.Position);
+                var radius = MathF.Max(4f, prey.Radius * _worldScale + 3f);
+                DrawLine(creatureScreenPosition, preyScreenPosition, _selectedColor, width: 1.5f);
+                DrawArc(preyScreenPosition, radius, 0f, MathF.Tau, 40, _selectedColor, width: 2f);
                 return;
             }
         }
@@ -6300,7 +6420,7 @@ public partial class Main : Node2D
         FoodParticleB = 20,
         FoodParticleC = 21,
         EyeOverlay = 22,
-        MarkingOverlay = 23
+        SmallPrey = 23
     }
 
     private enum ResourceRenderMode

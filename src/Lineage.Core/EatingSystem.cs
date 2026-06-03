@@ -12,6 +12,8 @@ public sealed class EatingSystem(
     private readonly IndexStampSet _seenResourceCandidates = new();
     private readonly List<int> _eggCandidates = [];
     private readonly IndexStampSet _seenEggCandidates = new();
+    private readonly List<int> _smallPreyCandidates = [];
+    private readonly IndexStampSet _seenSmallPreyCandidates = new();
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -36,6 +38,13 @@ public sealed class EatingSystem(
                 minimumEnergy: 0f,
                 _eggCandidates,
                 _seenEggCandidates);
+            spatialIndex.AddSmallPreyCandidatesWithCalories(
+                state,
+                creature.Position,
+                contactRadius,
+                minimumCalories: 0f,
+                _smallPreyCandidates,
+                _seenSmallPreyCandidates);
 
             creature.IsTouchingFood = false;
             creature.FoodContactKind = FoodContactKind.None;
@@ -52,6 +61,7 @@ public sealed class EatingSystem(
             creature.LastCarcassCaloriesEaten = 0f;
             creature.LastEggCaloriesEaten = 0f;
             creature.LastLivePreyCaloriesEaten = 0f;
+            creature.LastSmallPreyCaloriesEaten = 0f;
             creature.LastFreshMeatCaloriesEaten = 0f;
             creature.LastStaleMeatCaloriesEaten = 0f;
 
@@ -84,6 +94,10 @@ public sealed class EatingSystem(
             else if (target.Kind == FoodContactKind.Egg)
             {
                 EatEgg(state, target.Index, ref creature, genome, deltaSeconds);
+            }
+            else if (target.Kind == FoodContactKind.SmallPrey)
+            {
+                EatSmallPrey(state, target.Index, ref creature, genome, deltaSeconds);
             }
 
             state.Creatures[i] = creature;
@@ -164,6 +178,39 @@ public sealed class EatingSystem(
                     egg.Id,
                     edgeDistance,
                     egg.Energy);
+                bestEfficiency = efficiency;
+                bestEdgeDistance = edgeDistance;
+                bestDistanceSquared = distanceSquared;
+            }
+        }
+
+        foreach (var preyIndex in _smallPreyCandidates)
+        {
+            var prey = state.SmallPrey[preyIndex];
+            if (prey.Calories <= 0f || prey.Health <= 0f)
+            {
+                continue;
+            }
+
+            var centerDistance = SimVector2.Distance(creature.Position, prey.Position);
+            var edgeDistance = Math.Max(0f, centerDistance - prey.Radius);
+            if (edgeDistance > contactRadius)
+            {
+                continue;
+            }
+
+            var efficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
+            var distanceSquared = centerDistance * centerDistance;
+            if (IsBetterFoodContact(efficiency, edgeDistance, distanceSquared, bestEfficiency, bestEdgeDistance, bestDistanceSquared))
+            {
+                best = new FoodContact(
+                    FoodContactKind.SmallPrey,
+                    ResourceKind.Meat,
+                    default,
+                    preyIndex,
+                    prey.Id,
+                    edgeDistance,
+                    prey.Calories);
                 bestEfficiency = efficiency;
                 bestEdgeDistance = edgeDistance;
                 bestDistanceSquared = distanceSquared;
@@ -301,6 +348,46 @@ public sealed class EatingSystem(
         creature.DistanceSinceLastMeal = 0f;
 
         state.Eggs[eggIndex] = egg;
+    }
+
+    private static void EatSmallPrey(
+        WorldState state,
+        int preyIndex,
+        ref CreatureState creature,
+        CreatureGenome genome,
+        float deltaSeconds)
+    {
+        var prey = state.SmallPrey[preyIndex];
+        var amount = Math.Min(
+            prey.Calories,
+            Math.Min(
+                CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds,
+                AvailableGutCapacity(creature, genome)));
+
+        if (amount <= 0f)
+        {
+            return;
+        }
+
+        prey.Calories -= amount;
+        if (prey.Calories <= 0f)
+        {
+            prey.Calories = 0f;
+            prey.Health = 0f;
+            state.Stats.RecordSmallPreyEaten();
+        }
+
+        state.Stats.RecordFoodEaten(state.Bounds, prey.Position, ResourceKind.Meat, amount);
+        creature.GutMeatCalories += amount;
+        creature.GutMeatQualityCalories += amount;
+        creature.LastCaloriesEaten = amount;
+        creature.LastLivePreyCaloriesEaten = amount;
+        creature.LastSmallPreyCaloriesEaten = amount;
+        creature.LastFreshMeatCaloriesEaten = amount;
+        creature.SecondsSinceLastMeal = 0f;
+        creature.DistanceSinceLastMeal = 0f;
+
+        state.SmallPrey[preyIndex] = prey;
     }
 
     private static float AvailableGutCapacity(CreatureState creature, CreatureGenome genome)

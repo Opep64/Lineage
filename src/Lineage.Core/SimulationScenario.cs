@@ -357,6 +357,40 @@ public sealed record SimulationScenario
 
     public float MeatScentDensitySaturation { get; init; } = 1f;
 
+    public bool EnableSmallPrey { get; init; }
+
+    public float SmallPreyPerMillionArea { get; init; }
+
+    public float SmallPreyMaxSpawnsPerSecond { get; init; } = 1f;
+
+    public float SmallPreyRadius { get; init; } = 2f;
+
+    public float SmallPreyCalories { get; init; } = 16f;
+
+    public float SmallPreyHealth { get; init; } = 0.18f;
+
+    public float SmallPreyMaxSpeed { get; init; } = 7f;
+
+    public float SmallPreyWanderIntervalSecondsMin { get; init; } = 0.6f;
+
+    public float SmallPreyWanderIntervalSecondsMax { get; init; } = 2.2f;
+
+    public float BarrenBiomeSmallPreySpawnWeight { get; init; } = 0f;
+
+    public float SparseBiomeSmallPreySpawnWeight { get; init; } = 0.25f;
+
+    public float GrasslandBiomeSmallPreySpawnWeight { get; init; } = 0.35f;
+
+    public float RichBiomeSmallPreySpawnWeight { get; init; } = 0.9f;
+
+    public float ForestBiomeSmallPreySpawnWeight { get; init; } = 1.4f;
+
+    public float WetlandBiomeSmallPreySpawnWeight { get; init; } = 1.6f;
+
+    public float TundraBiomeSmallPreySpawnWeight { get; init; } = 0f;
+
+    public float HighlandBiomeSmallPreySpawnWeight { get; init; } = 0.2f;
+
     public float SoundRangeMultiplier { get; init; } = CreatureSensingSystem.DefaultSoundRangeMultiplier;
 
     public float SoundDensitySaturation { get; init; } = CreatureSensingSystem.DefaultSoundDensitySaturation;
@@ -543,6 +577,27 @@ public sealed record SimulationScenario
         EnsureRange(MeatScentRangeMultiplier, 1f, 10f, nameof(MeatScentRangeMultiplier));
         EnsurePositive(MeatScentCaloriesForFullStrength, nameof(MeatScentCaloriesForFullStrength));
         EnsurePositive(MeatScentDensitySaturation, nameof(MeatScentDensitySaturation));
+        EnsureNonNegative(SmallPreyPerMillionArea, nameof(SmallPreyPerMillionArea));
+        EnsureNonNegative(SmallPreyMaxSpawnsPerSecond, nameof(SmallPreyMaxSpawnsPerSecond));
+        EnsurePositive(SmallPreyRadius, nameof(SmallPreyRadius));
+        EnsurePositive(SmallPreyCalories, nameof(SmallPreyCalories));
+        EnsurePositive(SmallPreyHealth, nameof(SmallPreyHealth));
+        EnsureNonNegative(SmallPreyMaxSpeed, nameof(SmallPreyMaxSpeed));
+        EnsurePositive(SmallPreyWanderIntervalSecondsMin, nameof(SmallPreyWanderIntervalSecondsMin));
+        EnsurePositive(SmallPreyWanderIntervalSecondsMax, nameof(SmallPreyWanderIntervalSecondsMax));
+        if (SmallPreyWanderIntervalSecondsMax < SmallPreyWanderIntervalSecondsMin)
+        {
+            throw new InvalidOperationException("Small prey max wander interval must be at least the min interval.");
+        }
+        EnsureNonNegative(BarrenBiomeSmallPreySpawnWeight, nameof(BarrenBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(SparseBiomeSmallPreySpawnWeight, nameof(SparseBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(GrasslandBiomeSmallPreySpawnWeight, nameof(GrasslandBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(RichBiomeSmallPreySpawnWeight, nameof(RichBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(ForestBiomeSmallPreySpawnWeight, nameof(ForestBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(WetlandBiomeSmallPreySpawnWeight, nameof(WetlandBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(TundraBiomeSmallPreySpawnWeight, nameof(TundraBiomeSmallPreySpawnWeight));
+        EnsureNonNegative(HighlandBiomeSmallPreySpawnWeight, nameof(HighlandBiomeSmallPreySpawnWeight));
+        _ = BiomePressureProfile.Validate(CreateSmallPreySpawnWeightProfile(), "SmallPreySpawnWeightProfile");
         EnsureRange(SoundRangeMultiplier, 1f, 10f, nameof(SoundRangeMultiplier));
         EnsurePositive(SoundDensitySaturation, nameof(SoundDensitySaturation));
         EnsureNonNegative(BiteDamagePerSecond, nameof(BiteDamagePerSecond));
@@ -657,6 +712,19 @@ public sealed record SimulationScenario
             WetlandBiomeSeasonalAmplitudeMultiplier,
             TundraBiomeSeasonalAmplitudeMultiplier,
             HighlandBiomeSeasonalAmplitudeMultiplier);
+    }
+
+    public BiomePressureProfile CreateSmallPreySpawnWeightProfile()
+    {
+        return new BiomePressureProfile(
+            BarrenBiomeSmallPreySpawnWeight,
+            SparseBiomeSmallPreySpawnWeight,
+            GrasslandBiomeSmallPreySpawnWeight,
+            RichBiomeSmallPreySpawnWeight,
+            ForestBiomeSmallPreySpawnWeight,
+            WetlandBiomeSmallPreySpawnWeight,
+            TundraBiomeSmallPreySpawnWeight,
+            HighlandBiomeSmallPreySpawnWeight);
     }
 
     public int CalculateInitialResourceCount()

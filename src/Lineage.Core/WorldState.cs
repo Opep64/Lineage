@@ -46,6 +46,8 @@ public sealed class WorldState
 
     public List<EggState> Eggs { get; } = [];
 
+    public List<SmallPreyState> SmallPrey { get; } = [];
+
     public List<ResourcePatchState> Resources { get; } = [];
 
     public List<CreatureGenome> Genomes { get; } = [];
@@ -478,6 +480,7 @@ public sealed class WorldState
         record.TelemetryCarcassCaloriesEaten = AddTelemetry(record.TelemetryCarcassCaloriesEaten, creature.LastCarcassCaloriesEaten);
         record.TelemetryEggCaloriesEaten = AddTelemetry(record.TelemetryEggCaloriesEaten, creature.LastEggCaloriesEaten);
         record.TelemetryFreshKillCaloriesEaten = AddTelemetry(record.TelemetryFreshKillCaloriesEaten, creature.LastLivePreyCaloriesEaten);
+        record.TelemetrySmallPreyCaloriesEaten = AddTelemetry(record.TelemetrySmallPreyCaloriesEaten, creature.LastSmallPreyCaloriesEaten);
         record.TelemetryFreshMeatCaloriesEaten = AddTelemetry(record.TelemetryFreshMeatCaloriesEaten, creature.LastFreshMeatCaloriesEaten);
         record.TelemetryStaleMeatCaloriesEaten = AddTelemetry(record.TelemetryStaleMeatCaloriesEaten, creature.LastStaleMeatCaloriesEaten);
         record.TelemetryRottenMeatDamage = AddTelemetry(record.TelemetryRottenMeatDamage, creature.LastRottenMeatDamage);
@@ -485,6 +488,74 @@ public sealed class WorldState
         record.TelemetryAttackDamageTaken = AddTelemetry(record.TelemetryAttackDamageTaken, creature.LastAttackDamageTaken);
 
         _lineageRecords[index] = record;
+    }
+
+    public EntityId SpawnSmallPrey(SmallPreyState prey)
+    {
+        if (!prey.Position.IsFinite)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey position must be finite.");
+        }
+
+        if (!prey.Velocity.IsFinite)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey velocity must be finite.");
+        }
+
+        if (!float.IsFinite(prey.HeadingRadians))
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey heading must be finite.");
+        }
+
+        if (!float.IsFinite(prey.Radius) || prey.Radius <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey radius must be finite and positive.");
+        }
+
+        if (!float.IsFinite(prey.Calories) || prey.Calories <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey calories must be finite and positive.");
+        }
+
+        if (!float.IsFinite(prey.MaxCalories) || prey.MaxCalories <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey max calories must be finite and positive.");
+        }
+
+        if (!float.IsFinite(prey.Health) || prey.Health <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey health must be finite and positive.");
+        }
+
+        if (!float.IsFinite(prey.MaxHealth) || prey.MaxHealth <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey max health must be finite and positive.");
+        }
+
+        if (!float.IsFinite(prey.AgeSeconds) || prey.AgeSeconds < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey age must be finite and non-negative.");
+        }
+
+        if (!float.IsFinite(prey.WanderSecondsRemaining) || prey.WanderSecondsRemaining < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey wander timer must be finite and non-negative.");
+        }
+
+        if (!float.IsFinite(prey.GrabPressure) || prey.GrabPressure < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(prey), "Small prey grab pressure must be finite and non-negative.");
+        }
+
+        var id = CreateEntityId();
+        prey.Id = id;
+        prey.Position = Bounds.Clamp(prey.Position);
+        prey.Calories = Math.Min(prey.Calories, prey.MaxCalories);
+        prey.Health = Math.Min(prey.Health, prey.MaxHealth);
+        prey.GrabPressure = Math.Clamp(prey.GrabPressure, 0f, 1f);
+        SmallPrey.Add(prey);
+        Stats.RecordSmallPreySpawned();
+        return id;
     }
 
     public EntityId SpawnResourcePatch(ResourcePatchState patch)

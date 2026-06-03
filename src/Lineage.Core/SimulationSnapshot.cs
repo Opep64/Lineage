@@ -28,6 +28,8 @@ public sealed record SimulationSnapshot
 
     public EggState[] Eggs { get; init; } = [];
 
+    public SmallPreyState[] SmallPrey { get; init; } = [];
+
     public ResourcePatchState[] Resources { get; init; } = [];
 
     public CreatureGenome[] Genomes { get; init; } = [];
@@ -100,6 +102,12 @@ public sealed record SimulationSnapshot
 
     public float PlantDormancyCompletedSecondsTotal { get; init; }
 
+    public int SmallPreySpawnedCount { get; init; }
+
+    public int SmallPreyKilledCount { get; init; }
+
+    public int SmallPreyEatenCount { get; init; }
+
     public float MaxCreatureXReached { get; init; }
 
     public BiomeSnapshot Biomes { get; init; } = new();
@@ -123,6 +131,7 @@ public sealed record SimulationSnapshot
             NextEntityId = state.NextEntityId,
             Creatures = state.Creatures.ToArray(),
             Eggs = state.Eggs.ToArray(),
+            SmallPrey = state.SmallPrey.ToArray(),
             Resources = state.Resources.ToArray(),
             Genomes = state.Genomes.ToArray(),
             BrainWeights = state.Brains.Select(brain => brain.Weights.ToArray()).ToArray(),
@@ -161,6 +170,9 @@ public sealed record SimulationSnapshot
             PlantDormancyCompletedCount = state.Stats.PlantDormancyCompletedCount,
             PlantDormancyScheduledSecondsTotal = state.Stats.PlantDormancyScheduledSecondsTotal,
             PlantDormancyCompletedSecondsTotal = state.Stats.PlantDormancyCompletedSecondsTotal,
+            SmallPreySpawnedCount = state.Stats.SmallPreySpawnedCount,
+            SmallPreyKilledCount = state.Stats.SmallPreyKilledCount,
+            SmallPreyEatenCount = state.Stats.SmallPreyEatenCount,
             MaxCreatureXReached = state.Stats.MaxCreatureXReached,
             Biomes = BiomeSnapshot.Capture(state.Biomes),
             Obstacles = ObstacleSnapshot.Capture(state.Obstacles),

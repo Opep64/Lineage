@@ -17,6 +17,7 @@ public sealed class UniformSpatialIndex
     private SpatialCell?[] _cells = [];
     private readonly List<SpatialCell> _resourceCells = [];
     private readonly List<SpatialCell> _eggCells = [];
+    private readonly List<SpatialCell> _smallPreyCells = [];
     private readonly List<SpatialCell> _creatureCells = [];
     private int _cellCountX;
     private int _cellCountY;
@@ -51,6 +52,7 @@ public sealed class UniformSpatialIndex
             _indexedEggVersion = state.EggIndexVersion;
         }
 
+        RebuildSmallPrey(state);
         RebuildCreatures(state);
     }
 
@@ -88,6 +90,27 @@ public sealed class UniformSpatialIndex
         {
             var egg = state.Eggs[i];
             AddEggToCells(i, egg.Position, EggPredation.ContactRadius(egg));
+        }
+    }
+
+    private void RebuildSmallPrey(WorldState state)
+    {
+        foreach (var cell in _smallPreyCells)
+        {
+            cell.ClearSmallPrey();
+        }
+
+        _smallPreyCells.Clear();
+
+        for (var i = 0; i < state.SmallPrey.Count; i++)
+        {
+            var prey = state.SmallPrey[i];
+            if (prey.Calories <= 0f || prey.Health <= 0f)
+            {
+                continue;
+            }
+
+            AddSmallPreyToCells(i, prey.Position, prey.Radius);
         }
     }
 
@@ -732,6 +755,92 @@ public sealed class UniformSpatialIndex
         }
     }
 
+    public void AddSmallPreyCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> results,
+        HashSet<int> seen)
+    {
+        if (radius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius), "Query radius cannot be negative.");
+        }
+
+        results.Clear();
+        seen.Clear();
+
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                AddSmallPreyCandidatesFromList(
+                    state,
+                    position,
+                    radius,
+                    minimumCalories,
+                    cell.SmallPreyIndices,
+                    results,
+                    seen);
+            }
+        }
+    }
+
+    internal void AddSmallPreyCandidatesWithCalories(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        if (radius < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius), "Query radius cannot be negative.");
+        }
+
+        results.Clear();
+        seen.Begin(state.SmallPrey.Count);
+
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetCell(cellX, cellY);
+                if (cell is null)
+                {
+                    continue;
+                }
+
+                AddSmallPreyCandidatesFromList(
+                    state,
+                    position,
+                    radius,
+                    minimumCalories,
+                    cell.SmallPreyIndices,
+                    results,
+                    seen);
+            }
+        }
+    }
+
     public void AddCreatureCandidates(
         WorldState state,
         SimVector2 position,
@@ -1070,6 +1179,28 @@ public sealed class UniformSpatialIndex
         }
     }
 
+    private void AddSmallPreyToCells(int preyIndex, SimVector2 position, float radius)
+    {
+        if (!TryGetCellRange(position, radius, out var minCellX, out var maxCellX, out var minCellY, out var maxCellY))
+        {
+            return;
+        }
+
+        for (var cellY = minCellY; cellY <= maxCellY; cellY++)
+        {
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++)
+            {
+                var cell = GetOrCreateCell(cellX, cellY);
+                if (cell.SmallPreyIndices.Count == 0)
+                {
+                    _smallPreyCells.Add(cell);
+                }
+
+                cell.SmallPreyIndices.Add(preyIndex);
+            }
+        }
+    }
+
     private void AddCreatureToCell(int creatureIndex, SimVector2 position)
     {
         var cellX = ToBoundedCell(position.X, _cellCountX);
@@ -1103,6 +1234,7 @@ public sealed class UniformSpatialIndex
         _cellCountY = cellCountY;
         _resourceCells.Clear();
         _eggCells.Clear();
+        _smallPreyCells.Clear();
         _creatureCells.Clear();
         _indexedResourceVersion = -1;
         _indexedEggVersion = -1;
@@ -1282,6 +1414,68 @@ public sealed class UniformSpatialIndex
         }
     }
 
+    private static void AddSmallPreyCandidatesFromList(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> preyIndices,
+        List<int> results,
+        HashSet<int> seen)
+    {
+        for (var i = 0; i < preyIndices.Count; i++)
+        {
+            var preyIndex = preyIndices[i];
+            if (!seen.Add(preyIndex))
+            {
+                continue;
+            }
+
+            var prey = state.SmallPrey[preyIndex];
+            if (prey.Calories <= minimumCalories || prey.Health <= 0f)
+            {
+                continue;
+            }
+
+            var contactRadius = radius + prey.Radius;
+            if ((prey.Position - position).LengthSquared <= contactRadius * contactRadius)
+            {
+                results.Add(preyIndex);
+            }
+        }
+    }
+
+    private static void AddSmallPreyCandidatesFromList(
+        WorldState state,
+        SimVector2 position,
+        float radius,
+        float minimumCalories,
+        List<int> preyIndices,
+        List<int> results,
+        IndexStampSet seen)
+    {
+        for (var i = 0; i < preyIndices.Count; i++)
+        {
+            var preyIndex = preyIndices[i];
+            if (!seen.Add(preyIndex))
+            {
+                continue;
+            }
+
+            var prey = state.SmallPrey[preyIndex];
+            if (prey.Calories <= minimumCalories || prey.Health <= 0f)
+            {
+                continue;
+            }
+
+            var contactRadius = radius + prey.Radius;
+            if ((prey.Position - position).LengthSquared <= contactRadius * contactRadius)
+            {
+                results.Add(preyIndex);
+            }
+        }
+    }
+
     private static List<int> ResourceIndicesForKind(SpatialCell cell, ResourceKind? kind)
     {
         return kind switch
@@ -1310,6 +1504,8 @@ public sealed class UniformSpatialIndex
 
         public List<int> EggIndices { get; } = [];
 
+        public List<int> SmallPreyIndices { get; } = [];
+
         public void ClearCreatures()
         {
             CreatureIndices.Clear();
@@ -1325,6 +1521,11 @@ public sealed class UniformSpatialIndex
         public void ClearEggs()
         {
             EggIndices.Clear();
+        }
+
+        public void ClearSmallPrey()
+        {
+            SmallPreyIndices.Clear();
         }
     }
 }

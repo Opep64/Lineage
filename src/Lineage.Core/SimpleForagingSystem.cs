@@ -17,6 +17,8 @@ public sealed class SimpleForagingSystem(
     private readonly IndexStampSet _seenResourceCandidates = new();
     private readonly List<int> _eggCandidates = [];
     private readonly IndexStampSet _seenEggCandidates = new();
+    private readonly List<int> _smallPreyCandidates = [];
+    private readonly IndexStampSet _seenSmallPreyCandidates = new();
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -41,6 +43,13 @@ public sealed class SimpleForagingSystem(
                 minimumEnergy: 0f,
                 _eggCandidates,
                 _seenEggCandidates);
+            spatialIndex.AddSmallPreyCandidatesWithCalories(
+                state,
+                creature.Position,
+                effectiveSenseRadius,
+                minimumCalories: 0f,
+                _smallPreyCandidates,
+                _seenSmallPreyCandidates);
             var target = FindBestVisibleFoodTarget(state, creature, genome, effectiveSenseRadius, effectiveVisionAngle);
 
             if (target.Kind != FoodContactKind.None)
@@ -145,6 +154,33 @@ public sealed class SimpleForagingSystem(
                 bestScore = score;
                 bestDistanceSquared = distanceSquared;
                 bestTarget = new FoodTarget(FoodContactKind.Egg, eggIndex, egg.Position);
+            }
+        }
+
+        foreach (var preyIndex in _smallPreyCandidates)
+        {
+            var prey = state.SmallPrey[preyIndex];
+            var toPrey = prey.Position - creature.Position;
+            var centerDistance = toPrey.Length;
+            var direction = centerDistance > 0.0001f
+                ? toPrey / centerDistance
+                : forward;
+
+            if (!IsInsideVisionCone(direction, forward, visionAngleRadians))
+            {
+                continue;
+            }
+
+            var edgeDistance = Math.Max(0f, centerDistance - prey.Radius);
+            var proximity = 1f - Math.Clamp(edgeDistance / effectiveSenseRadius, 0f, 1f);
+            var score = proximity * CreatureDigestion.FreshMeatEnergyEfficiency(genome);
+            var distanceSquared = centerDistance * centerDistance;
+            if (score > bestScore
+                || (Math.Abs(score - bestScore) <= 0.0001f && distanceSquared < bestDistanceSquared))
+            {
+                bestScore = score;
+                bestDistanceSquared = distanceSquared;
+                bestTarget = new FoodTarget(FoodContactKind.SmallPrey, preyIndex, prey.Position);
             }
         }
 

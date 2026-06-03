@@ -69,6 +69,7 @@ public static class SimulationSnapshotJson
     {
         state.Creatures.Clear();
         state.Eggs.Clear();
+        state.SmallPrey.Clear();
         state.Resources.Clear();
         state.Genomes.Clear();
         state.Brains.Clear();
@@ -94,6 +95,7 @@ public static class SimulationSnapshotJson
 
         state.Creatures.AddRange(snapshot.Creatures.Select(NormalizeCreature));
         state.Eggs.AddRange(snapshot.Eggs.Select(NormalizeEgg));
+        state.SmallPrey.AddRange(snapshot.SmallPrey);
         state.Resources.AddRange(snapshot.Resources.Select(resource => NormalizeResource(resource, state.Biomes)));
         state.MarkEggsDirty();
         state.MarkResourcesDirty();
@@ -128,7 +130,10 @@ public static class SimulationSnapshotJson
             snapshot.WetlandDeathCount,
             snapshot.TundraDeathCount,
             snapshot.HighlandDeathCount,
-            snapshot.CreatureDeathCausesByBiome);
+            snapshot.CreatureDeathCausesByBiome,
+            snapshot.SmallPreySpawnedCount,
+            snapshot.SmallPreyKilledCount,
+            snapshot.SmallPreyEatenCount);
         state.Stats.SpatialHeatmaps.Restore(snapshot.SpatialHeatmaps);
         state.Stats.RestoreDeadCreatureLifespans(snapshot.LineageRecords);
     }

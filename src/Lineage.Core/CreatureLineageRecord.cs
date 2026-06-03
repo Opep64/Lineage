@@ -82,6 +82,8 @@ public struct CreatureLineageRecord
 
     public float TelemetryFreshKillCaloriesEaten { get; set; }
 
+    public float TelemetrySmallPreyCaloriesEaten { get; set; }
+
     public float TelemetryFreshMeatCaloriesEaten { get; set; }
 
     public float TelemetryStaleMeatCaloriesEaten { get; set; }

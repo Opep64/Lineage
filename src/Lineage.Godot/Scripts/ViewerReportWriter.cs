@@ -142,10 +142,12 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Resource slots", state.Resources.Count.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plants", snapshot.PlantResourceCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Meat", snapshot.MeatResourceCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Small prey", snapshot.SmallPreyCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Resource calories", totalResourceCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant calories", snapshot.TotalPlantCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant type calories", FormatPlantTypeCalories(snapshot));
         WriteMetric(writer, "Meat calories", snapshot.TotalMeatCalories.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Small prey calories", snapshot.TotalSmallPreyCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Dormant plants", snapshot.DormantPlantResourceCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Avg dormancy remaining", $"{snapshot.AverageDormantPlantSecondsRemaining:0.###} seconds");
         WriteMetric(writer, "Plant patch occupied", FormatPercent(snapshot.PlantPatchOccupiedCellShare));
@@ -156,6 +158,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Depleted fertility cells", FormatPercent(snapshot.DepletedLocalFertilityCellShare));
         WriteMetric(writer, "Plant depletions", state.Stats.PlantDepletionCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant relocations", FormatPlantRelocations(state.Stats));
+        WriteMetric(writer, "Small prey spawn/kill/eat", $"{snapshot.SmallPreySpawnedCount}/{snapshot.SmallPreyKilledCount}/{snapshot.SmallPreyEatenCount}");
         WriteMetric(writer, "Avg dormancy scheduled", $"{state.Stats.AveragePlantDormancyScheduledSeconds:0.###} seconds");
         WriteMetric(writer, "Avg dormancy completed", $"{state.Stats.AveragePlantDormancyCompletedSeconds:0.###} seconds");
         WriteMetric(writer, "Avg meat freshness", FormatPercent(snapshot.AverageMeatFreshness));
@@ -264,6 +267,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Rotten affected", FormatPercent(Share(snapshot.RottenMeatDamagedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Egg eaten", $"{snapshot.TotalEggCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Fresh kill eaten", $"{snapshot.TotalLivePreyCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Small prey eaten", $"{snapshot.TotalSmallPreyCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Calories digested", $"{snapshot.TotalCaloriesDigestedPerSecond:0.###} energy/s");
         WriteMetric(writer, "Plant energy", $"{snapshot.TotalPlantDigestedEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Plant type energy", FormatPlantTypeDigestion(snapshot));

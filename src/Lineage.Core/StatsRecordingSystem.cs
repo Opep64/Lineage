@@ -71,6 +71,7 @@ public sealed class StatsRecordingSystem(
         var totalCarcassCaloriesEaten = 0f;
         var totalEggCaloriesEaten = 0f;
         var totalLivePreyCaloriesEaten = 0f;
+        var totalSmallPreyCaloriesEaten = 0f;
         var totalFreshMeatCaloriesEaten = 0f;
         var totalStaleMeatCaloriesEaten = 0f;
         var totalCaloriesDigested = 0f;
@@ -248,6 +249,7 @@ public sealed class StatsRecordingSystem(
             totalCarcassCaloriesEaten += creature.LastCarcassCaloriesEaten;
             totalEggCaloriesEaten += creature.LastEggCaloriesEaten;
             totalLivePreyCaloriesEaten += creature.LastLivePreyCaloriesEaten;
+            totalSmallPreyCaloriesEaten += creature.LastSmallPreyCaloriesEaten;
             totalFreshMeatCaloriesEaten += creature.LastFreshMeatCaloriesEaten;
             totalStaleMeatCaloriesEaten += creature.LastStaleMeatCaloriesEaten;
             totalCaloriesDigested += creature.LastCaloriesDigested;
@@ -778,6 +780,9 @@ public sealed class StatsRecordingSystem(
         var livePreyCaloriesEatenPerSecond = deltaSeconds > 0f
             ? totalLivePreyCaloriesEaten / deltaSeconds
             : 0f;
+        var smallPreyCaloriesEatenPerSecond = deltaSeconds > 0f
+            ? totalSmallPreyCaloriesEaten / deltaSeconds
+            : 0f;
         var freshMeatCaloriesEatenPerSecond = deltaSeconds > 0f
             ? totalFreshMeatCaloriesEaten / deltaSeconds
             : 0f;
@@ -834,6 +839,19 @@ public sealed class StatsRecordingSystem(
         var averageMeatFreshness = totalMeatCalories > 0f
             ? totalMeatFreshnessWeightedCalories / totalMeatCalories
             : 0f;
+        var totalSmallPreyCalories = 0f;
+        var liveSmallPreyCount = 0;
+        for (var i = 0; i < state.SmallPrey.Count; i++)
+        {
+            var prey = state.SmallPrey[i];
+            if (prey.Calories <= 0f || prey.Health <= 0f)
+            {
+                continue;
+            }
+
+            liveSmallPreyCount++;
+            totalSmallPreyCalories += prey.Calories;
+        }
         var meatDigestedEnergyShare = totalCaloriesDigested > 0f
             ? totalMeatDigestedEnergy / totalCaloriesDigested
             : 0f;
@@ -1237,7 +1255,13 @@ public sealed class StatsRecordingSystem(
             averageRtNeatConnectionCount,
             maxRtNeatConnectionCount,
             averageRtNeatEnabledConnectionCount,
-            maxRtNeatEnabledConnectionCount));
+            maxRtNeatEnabledConnectionCount,
+            liveSmallPreyCount,
+            totalSmallPreyCalories,
+            state.Stats.SmallPreySpawnedCount,
+            state.Stats.SmallPreyKilledCount,
+            state.Stats.SmallPreyEatenCount,
+            smallPreyCaloriesEatenPerSecond));
     }
 
     private SeasonalFertilityState CalculateRegionSeason(WorldState state, float xFraction)

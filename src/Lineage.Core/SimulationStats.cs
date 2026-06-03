@@ -62,6 +62,12 @@ public sealed class SimulationStats
 
     public int PlantDormancyCompletedCount { get; private set; }
 
+    public int SmallPreySpawnedCount { get; private set; }
+
+    public int SmallPreyKilledCount { get; private set; }
+
+    public int SmallPreyEatenCount { get; private set; }
+
     public float PlantDormancyScheduledSecondsTotal { get; private set; }
 
     public float PlantDormancyCompletedSecondsTotal { get; private set; }
@@ -206,6 +212,21 @@ public sealed class SimulationStats
         SpatialHeatmaps.RecordEggEaten(bounds, position, calories);
     }
 
+    internal void RecordSmallPreySpawned()
+    {
+        SmallPreySpawnedCount++;
+    }
+
+    internal void RecordSmallPreyKilled()
+    {
+        SmallPreyKilledCount++;
+    }
+
+    internal void RecordSmallPreyEaten()
+    {
+        SmallPreyEatenCount++;
+    }
+
     internal void RecordAttackDamage(WorldBounds bounds, SimVector2 position, float damage)
     {
         SpatialHeatmaps.RecordAttackDamage(bounds, position, damage);
@@ -300,7 +321,10 @@ public sealed class SimulationStats
         int wetlandDeathCount = 0,
         int tundraDeathCount = 0,
         int highlandDeathCount = 0,
-        BiomeDeathCauseCounts creatureDeathCausesByBiome = default)
+        BiomeDeathCauseCounts creatureDeathCausesByBiome = default,
+        int smallPreySpawnedCount = 0,
+        int smallPreyKilledCount = 0,
+        int smallPreyEatenCount = 0)
     {
         CreatureBirthCount = creatureBirthCount;
         FounderCreatureCount = founderCreatureCount;
@@ -328,6 +352,9 @@ public sealed class SimulationStats
         PlantGlobalRelocationCount = plantGlobalRelocationCount;
         PlantDormancyStartedCount = plantDormancyStartedCount;
         PlantDormancyCompletedCount = plantDormancyCompletedCount;
+        SmallPreySpawnedCount = smallPreySpawnedCount;
+        SmallPreyKilledCount = smallPreyKilledCount;
+        SmallPreyEatenCount = smallPreyEatenCount;
         PlantDormancyScheduledSecondsTotal = NormalizeDuration(plantDormancyScheduledSecondsTotal);
         PlantDormancyCompletedSecondsTotal = NormalizeDuration(plantDormancyCompletedSecondsTotal);
         MaxCreatureXReached = float.IsFinite(maxCreatureXReached) && maxCreatureXReached > 0f

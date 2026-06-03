@@ -8,5 +8,6 @@ public enum FoodContactKind
     None,
     Resource,
     Egg,
-    Creature
+    Creature,
+    SmallPrey
 }

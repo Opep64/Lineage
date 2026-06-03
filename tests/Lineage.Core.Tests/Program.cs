@@ -37,10 +37,12 @@ var tests = new (string Name, Action Body)[]
     ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
     ("Fresh-kill resource credit expires", FreshKillResourceCreditExpires),
+    ("Small prey spawn and wander", SmallPreySpawnAndWander),
     ("Meat freshness reduces digested energy", MeatFreshnessReducesDigestedEnergy),
     ("Rotten meat damage scales with carrion adaptation", RottenMeatDamageScalesWithCarrionAdaptation),
     ("Rotten meat health deaths are counted", RottenMeatHealthDeathsAreCounted),
     ("Eating transfers resource calories into creature energy", EatingTransfersCalories),
+    ("Eating transfers small prey calories as fresh meat", EatingTransfersSmallPreyCaloriesAsFreshMeat),
     ("Eating fills gut before digestion", EatingFillsGutBeforeDigestion),
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
     ("Plant type controls eating transfer rate", PlantTypeControlsEatingTransferRate),
@@ -76,6 +78,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports plant quality cues", CreatureSensingReportsPlantQualityCues),
     ("Creature sensing reports plant preference bridge", CreatureSensingReportsPlantPreferenceBridge),
     ("Creature sensing reports visible creature cues", CreatureSensingReportsVisibleCreatureCues),
+    ("Creature sensing reports small prey as fresh meat", CreatureSensingReportsSmallPreyAsFreshMeat),
     ("Creature sensing smells similar creatures beyond vision", CreatureSensingSmellsSimilarCreaturesBeyondVision),
     ("Creature sensing separates predator prey similarity", CreatureSensingSeparatesPredatorPreySimilarity),
     ("Creature sensing hears intentional sound beyond vision", CreatureSensingHearsIntentionalSoundBeyondVision),
@@ -161,6 +164,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature healing waits for cooldown and consumes energy", CreatureHealingWaitsForCooldownAndConsumesEnergy),
     ("Creature healing resets on damage and honors energy floor", CreatureHealingResetsOnDamageAndHonorsEnergyFloor),
     ("Creature grab slows contact targets", CreatureGrabSlowsContactTargets),
+    ("Small prey grab and bite creates fresh meat", SmallPreyGrabAndBiteCreatesFreshMeat),
     ("Creature attack deaths become injury meat", CreatureAttackDeathsBecomeInjuryMeat),
     ("Sparse mutation rates gate genome and brain changes", SparseMutationRatesGateGenomeAndBrainChanges),
     ("World mutation policy overrides inherited genome mutation settings", WorldMutationPolicyOverridesInheritedGenomeMutationSettings),
@@ -1500,6 +1504,52 @@ static void FreshKillResourceCreditExpires()
     AssertClose(1f, meat.MeatAgeSeconds, 0.000001, "Meat age advances");
 }
 
+static void SmallPreySpawnAndWander()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 1_000f,
+            WorldHeight = 1_000f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 241,
+        systems:
+        [
+            new SmallPreySystem(
+                enabled: true,
+                targetPerMillionArea: 3f,
+                maxSpawnsPerSecond: 3f,
+                radius: 2f,
+                calories: 16f,
+                health: 0.25f,
+                maxSpeed: 5f,
+                wanderIntervalSecondsMin: 1f,
+                wanderIntervalSecondsMax: 1f)
+        ]);
+
+    simulation.Step();
+
+    AssertEqual(3, simulation.State.SmallPrey.Count, "Target prey count after spawning");
+    AssertEqual(3, simulation.State.Stats.SmallPreySpawnedCount, "Spawn counter");
+    foreach (var prey in simulation.State.SmallPrey)
+    {
+        AssertTrue(simulation.State.Bounds.Contains(prey.Position), "Prey position should stay inside bounds");
+        AssertClose(2f, prey.Radius, 0.000001, "Prey radius");
+        AssertClose(16f, prey.Calories, 0.000001, "Prey calories");
+        AssertClose(0.25f, prey.Health, 0.000001, "Prey health");
+        AssertTrue(prey.Velocity.Length > 0f, "Prey should spawn with a movement vector");
+    }
+
+    var firstPosition = simulation.State.SmallPrey[0].Position;
+    simulation.Step();
+
+    var moved = simulation.State.SmallPrey[0];
+    AssertTrue(moved.Position != firstPosition, "Prey should wander after a movement tick");
+    AssertClose(1f, moved.AgeSeconds, 0.000001, "Prey age advances");
+    AssertEqual(3, simulation.State.SmallPrey.Count, "Prey count stays at target");
+}
+
 static void MeatFreshnessReducesDigestedEnergy()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -1694,6 +1744,71 @@ static void EatingTransfersCalories()
     AssertClose(0f, simulation.State.Creatures[0].SecondsSinceLastMeal, 0.000001, "Meal timer resets after eating");
     AssertClose(0f, simulation.State.Creatures[0].DistanceSinceLastMeal, 0.000001, "Meal distance resets after eating");
     AssertClose(18f, simulation.State.Resources[0].Calories, 0.000001, "Resource calories after eating");
+}
+
+static void EatingTransfersSmallPreyCaloriesAsFreshMeat()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 242,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex),
+            new DigestionSystem(),
+            new StatsRecordingSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 12f,
+        DigestionCaloriesPerSecond = 12f,
+        GutCapacityCalories = 20f,
+        DietaryAdaptation = 1f,
+        CarrionAdaptation = 0f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    var preyId = simulation.State.SpawnSmallPrey(new SmallPreyState
+    {
+        Position = new SimVector2(22f, 20f),
+        Velocity = SimVector2.Zero,
+        HeadingRadians = 0f,
+        Radius = 2f,
+        Calories = 8f,
+        MaxCalories = 8f,
+        Health = 0.25f,
+        MaxHealth = 0.25f
+    });
+
+    simulation.Step();
+
+    var creature = simulation.State.Creatures[0];
+    AssertClose(18f, creature.Energy, 0.000001, "Creature energy after eating small prey");
+    AssertTrue(creature.IsTouchingFood, "Creature should touch small prey as food");
+    AssertEqual(FoodContactKind.SmallPrey, creature.FoodContactKind, "Food contact kind");
+    AssertEqual(preyId, creature.FoodContactResourceId, "Touched small prey id");
+    AssertClose(8f, creature.FoodContactCalories, 0.000001, "Touched small prey calories before eating");
+    AssertClose(8f, creature.LastCaloriesEaten, 0.000001, "Raw calories eaten");
+    AssertClose(8f, creature.LastLivePreyCaloriesEaten, 0.000001, "Fresh kill calories eaten");
+    AssertClose(8f, creature.LastSmallPreyCaloriesEaten, 0.000001, "Small prey calories eaten");
+    AssertClose(8f, creature.LastFreshMeatCaloriesEaten, 0.000001, "Fresh meat calories eaten");
+    AssertClose(8f, creature.LastMeatDigestedEnergy, 0.000001, "Fresh meat energy digested");
+    AssertClose(0f, creature.GutMeatCalories, 0.000001, "Meat gut emptied after digestion");
+
+    var prey = simulation.State.SmallPrey[0];
+    AssertClose(0f, prey.Calories, 0.000001, "Small prey calories depleted");
+    AssertClose(0f, prey.Health, 0.000001, "Small prey health zero after full eating");
+    AssertEqual(1, simulation.State.Stats.SmallPreySpawnedCount, "Small prey spawn counter");
+    AssertEqual(1, simulation.State.Stats.SmallPreyEatenCount, "Small prey eaten counter");
+
+    var snapshot = simulation.State.Stats.Snapshots[^1];
+    AssertEqual(0, snapshot.SmallPreyCount, "Live small prey snapshot count");
+    AssertClose(0f, snapshot.TotalSmallPreyCalories, 0.000001, "Live small prey snapshot calories");
+    AssertClose(8f, snapshot.TotalSmallPreyCaloriesEatenPerSecond, 0.000001, "Small prey calories eaten rate");
 }
 
 static void EatingFillsGutBeforeDigestion()
@@ -2919,6 +3034,58 @@ static void CreatureSensingSplitsPlantAndMeatCues()
     AssertTrue(senses.MeatDirectionRight > 0.99f, "Meat should be to the right");
     AssertClose(0f, senses.FoodDirectionForward, 0.0001, "Meat specialist should prefer meat forward");
     AssertTrue(senses.FoodDirectionRight > 0.99f, "Meat specialist should prefer meat right");
+}
+
+static void CreatureSensingReportsSmallPreyAsFreshMeat()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 243,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        DietaryAdaptation = 1f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnSmallPrey(new SmallPreyState
+    {
+        Position = new SimVector2(30f, 20f),
+        Velocity = SimVector2.Zero,
+        HeadingRadians = 0f,
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        Health = 0.25f,
+        MaxHealth = 0.25f
+    });
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(senses.FoodDetected, "Small prey should count as visible food");
+    AssertTrue(!senses.PlantDetected, "Small prey should not count as plant");
+    AssertTrue(senses.MeatDetected, "Small prey should count as meat");
+    AssertClose(0.125f, senses.VisibleFoodDensity, 0.000001, "Visible small prey food density");
+    AssertClose(0f, senses.VisiblePlantDensity, 0.000001, "Visible plant density");
+    AssertClose(0.125f, senses.VisibleMeatDensity, 0.000001, "Visible small prey meat density");
+    AssertClose(1f, senses.VisibleMeatFreshness, 0.000001, "Visible small prey freshness");
+    AssertTrue(MeatQuality.IsFresh(senses.VisibleMeatFreshness), "Small prey should count as fresh meat");
+    AssertTrue(senses.MeatDirectionForward > 0.99f, "Small prey meat direction should be forward");
+    AssertClose(0f, senses.MeatDirectionRight, 0.0001, "Small prey meat right direction");
 }
 
 static void CreatureSensingReportsPlantQualityCues()
@@ -7559,6 +7726,89 @@ static void CreatureGrabSlowsContactTargets()
     AssertClose(27.5f, target.Position.X, 0.000001, "Grabbed target movement should be slowed");
 }
 
+static void SmallPreyGrabAndBiteCreatesFreshMeat()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 244,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new SmallPreyInteractionSystem(
+                spatialIndex,
+                biteDamagePerSecond: 10f,
+                biteEnergyCostPerSecond: 0f,
+                biteRangePadding: 1f,
+                grabRangePadding: 3f,
+                meatDecayCaloriesPerSecond: 0.25f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        BiteStrength = 1f,
+        MaturityAgeSeconds = 0f
+    });
+
+    var creatureId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+    var grabber = simulation.State.Creatures[0];
+    grabber.HeadingRadians = 0f;
+    grabber.Actions = new CreatureActionState
+    {
+        WantsGrab = true,
+        GrabOutput = 0.8f
+    };
+    simulation.State.Creatures[0] = grabber;
+
+    var preyId = simulation.State.SpawnSmallPrey(new SmallPreyState
+    {
+        Position = new SimVector2(24f, 20f),
+        Velocity = new SimVector2(4f, 0f),
+        HeadingRadians = 0f,
+        Radius = 1.5f,
+        Calories = 14f,
+        MaxCalories = 14f,
+        Health = 0.5f,
+        MaxHealth = 0.5f
+    });
+
+    simulation.Step();
+
+    var grabbedPrey = simulation.State.SmallPrey[0];
+    grabber = simulation.State.Creatures[0];
+    AssertEqual(creatureId, grabbedPrey.HeldByCreatureId, "Small prey should record the holding creature");
+    AssertEqual(preyId, grabber.HeldSmallPreyId, "Creature should record held small prey");
+    AssertClose(0.8f, grabbedPrey.GrabPressure, 0.000001, "Small prey grab pressure");
+    AssertClose(0f, grabbedPrey.Velocity.Length, 0.000001, "Grabbed small prey should stop moving");
+    AssertEqual(0, simulation.State.Resources.Count, "Grab alone should not create meat");
+
+    grabber.Actions = new CreatureActionState
+    {
+        WantsGrab = true,
+        GrabOutput = 0.8f,
+        WantsAttack = true
+    };
+    simulation.State.Creatures[0] = grabber;
+
+    simulation.Step();
+
+    var bittenPrey = simulation.State.SmallPrey[0];
+    AssertClose(0f, bittenPrey.Health, 0.000001, "Bite should kill small prey");
+    AssertClose(0f, bittenPrey.Calories, 0.000001, "Killed small prey calories transfer to meat patch");
+    AssertEqual(1, simulation.State.Stats.SmallPreyKilledCount, "Small prey kill counter");
+    AssertEqual(1, simulation.State.Resources.Count, "Bite kill should create meat");
+
+    var meat = simulation.State.Resources[0];
+    AssertEqual(ResourceKind.Meat, meat.Kind, "Small prey kill resource kind");
+    AssertClose(14f, meat.Calories, 0.000001, "Small prey kill meat calories");
+    AssertClose(0f, meat.MeatAgeSeconds, 0.000001, "Small prey kill starts fresh");
+    AssertEqual(creatureId, meat.FreshKillAttackerId, "Small prey kill attacker credit");
+    AssertEqual(preyId, meat.FreshKillPreyId, "Small prey kill prey credit");
+    AssertTrue(meat.FreshKillSecondsRemaining > 0f, "Small prey kill fresh credit timer");
+    AssertTrue(simulation.State.Creatures[0].LastAttackDamageDealt > 0f, "Small prey bite should record attack damage");
+}
+
 static void CreatureAttackDeathsBecomeInjuryMeat()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -11879,6 +12129,23 @@ static void ScenarioJsonRoundTrips()
         MeatScentRangeMultiplier = 2.5f,
         MeatScentCaloriesForFullStrength = 55f,
         MeatScentDensitySaturation = 1.75f,
+        EnableSmallPrey = true,
+        SmallPreyPerMillionArea = 44f,
+        SmallPreyMaxSpawnsPerSecond = 2.5f,
+        SmallPreyRadius = 1.7f,
+        SmallPreyCalories = 13f,
+        SmallPreyHealth = 0.21f,
+        SmallPreyMaxSpeed = 4.5f,
+        SmallPreyWanderIntervalSecondsMin = 0.4f,
+        SmallPreyWanderIntervalSecondsMax = 1.8f,
+        BarrenBiomeSmallPreySpawnWeight = 0.01f,
+        SparseBiomeSmallPreySpawnWeight = 0.2f,
+        GrasslandBiomeSmallPreySpawnWeight = 0.35f,
+        RichBiomeSmallPreySpawnWeight = 0.85f,
+        ForestBiomeSmallPreySpawnWeight = 1.45f,
+        WetlandBiomeSmallPreySpawnWeight = 1.65f,
+        TundraBiomeSmallPreySpawnWeight = 0.02f,
+        HighlandBiomeSmallPreySpawnWeight = 0.18f,
         BiteDamagePerSecond = 0.44f,
         BiteEnergyCostPerSecond = 0.13f,
         BiteRangePadding = 1.75f,
@@ -11894,6 +12161,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"pipelineKind\": \"simpleForaging\""), "JSON should serialize pipeline as a string");
     AssertTrue(json.Contains("\"brainArchitectureKind\": \"hiddenLayerNeural\""), "JSON should serialize brain architecture");
     AssertTrue(json.Contains("\"initialBrainKind\": \"foragerPredator\""), "JSON should serialize initial brain kind as a string");
+    AssertTrue(json.Contains("\"enableSmallPrey\": true"), "JSON should serialize small prey toggle");
     AssertTrue(json.Contains("\"brainHiddenNodeCount\": 16"), "JSON should serialize hidden brain nodes");
     AssertTrue(!json.Contains("randomizeInitialBrainWeights"), "JSON should not serialize legacy random brain flag");
     AssertTrue(json.Contains("\"biomeMapKind\": \"horizontalBands\""), "JSON should serialize biome map kind as a string");
@@ -12072,6 +12340,23 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.MeatScentRangeMultiplier, roundTripped.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
     AssertClose(scenario.MeatScentCaloriesForFullStrength, roundTripped.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");
     AssertClose(scenario.MeatScentDensitySaturation, roundTripped.MeatScentDensitySaturation, 0.000001, "Scenario meat scent saturation");
+    AssertEqual(scenario.EnableSmallPrey, roundTripped.EnableSmallPrey, "Scenario small prey toggle");
+    AssertClose(scenario.SmallPreyPerMillionArea, roundTripped.SmallPreyPerMillionArea, 0.000001, "Scenario small prey density");
+    AssertClose(scenario.SmallPreyMaxSpawnsPerSecond, roundTripped.SmallPreyMaxSpawnsPerSecond, 0.000001, "Scenario small prey spawn rate");
+    AssertClose(scenario.SmallPreyRadius, roundTripped.SmallPreyRadius, 0.000001, "Scenario small prey radius");
+    AssertClose(scenario.SmallPreyCalories, roundTripped.SmallPreyCalories, 0.000001, "Scenario small prey calories");
+    AssertClose(scenario.SmallPreyHealth, roundTripped.SmallPreyHealth, 0.000001, "Scenario small prey health");
+    AssertClose(scenario.SmallPreyMaxSpeed, roundTripped.SmallPreyMaxSpeed, 0.000001, "Scenario small prey speed");
+    AssertClose(scenario.SmallPreyWanderIntervalSecondsMin, roundTripped.SmallPreyWanderIntervalSecondsMin, 0.000001, "Scenario small prey wander min");
+    AssertClose(scenario.SmallPreyWanderIntervalSecondsMax, roundTripped.SmallPreyWanderIntervalSecondsMax, 0.000001, "Scenario small prey wander max");
+    AssertClose(scenario.BarrenBiomeSmallPreySpawnWeight, roundTripped.BarrenBiomeSmallPreySpawnWeight, 0.000001, "Scenario barren small prey spawn weight");
+    AssertClose(scenario.SparseBiomeSmallPreySpawnWeight, roundTripped.SparseBiomeSmallPreySpawnWeight, 0.000001, "Scenario sparse small prey spawn weight");
+    AssertClose(scenario.GrasslandBiomeSmallPreySpawnWeight, roundTripped.GrasslandBiomeSmallPreySpawnWeight, 0.000001, "Scenario grassland small prey spawn weight");
+    AssertClose(scenario.RichBiomeSmallPreySpawnWeight, roundTripped.RichBiomeSmallPreySpawnWeight, 0.000001, "Scenario rich small prey spawn weight");
+    AssertClose(scenario.ForestBiomeSmallPreySpawnWeight, roundTripped.ForestBiomeSmallPreySpawnWeight, 0.000001, "Scenario forest small prey spawn weight");
+    AssertClose(scenario.WetlandBiomeSmallPreySpawnWeight, roundTripped.WetlandBiomeSmallPreySpawnWeight, 0.000001, "Scenario wetland small prey spawn weight");
+    AssertClose(scenario.TundraBiomeSmallPreySpawnWeight, roundTripped.TundraBiomeSmallPreySpawnWeight, 0.000001, "Scenario tundra small prey spawn weight");
+    AssertClose(scenario.HighlandBiomeSmallPreySpawnWeight, roundTripped.HighlandBiomeSmallPreySpawnWeight, 0.000001, "Scenario highland small prey spawn weight");
     AssertClose(scenario.BiteDamagePerSecond, roundTripped.BiteDamagePerSecond, 0.000001, "Scenario bite damage");
     AssertClose(scenario.BiteEnergyCostPerSecond, roundTripped.BiteEnergyCostPerSecond, 0.000001, "Scenario bite energy cost");
     AssertClose(scenario.BiteRangePadding, roundTripped.BiteRangePadding, 0.000001, "Scenario bite reach");

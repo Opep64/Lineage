@@ -282,4 +282,10 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageRtNeatConnectionCount,
     int MaxRtNeatConnectionCount,
     float AverageRtNeatEnabledConnectionCount,
-    int MaxRtNeatEnabledConnectionCount);
+    int MaxRtNeatEnabledConnectionCount,
+    int SmallPreyCount,
+    float TotalSmallPreyCalories,
+    int SmallPreySpawnedCount,
+    int SmallPreyKilledCount,
+    int SmallPreyEatenCount,
+    float TotalSmallPreyCaloriesEatenPerSecond);

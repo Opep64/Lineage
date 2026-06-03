@@ -107,6 +107,8 @@ public struct CreatureState
 
     public EntityId HeldCreatureId { get; set; }
 
+    public EntityId HeldSmallPreyId { get; set; }
+
     public EntityId GrabbedByCreatureId { get; set; }
 
     public float GrabPressure { get; set; }
@@ -133,6 +135,8 @@ public struct CreatureState
     public float LastEggCaloriesEaten { get; set; }
 
     public float LastLivePreyCaloriesEaten { get; set; }
+
+    public float LastSmallPreyCaloriesEaten { get; set; }
 
     public float LastFreshMeatCaloriesEaten { get; set; }
 
