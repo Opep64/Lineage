@@ -50,6 +50,9 @@ public static class ViewerReportWriter
         var snapshots = state.Stats.Snapshots;
         var reportSnapshots = SelectReportSnapshots(snapshots);
         var snapshot = snapshots.Count > 0 ? snapshots[^1] : default;
+        var averageSmallPreyCaloriesEatenPerSecond = AverageSnapshotValue(
+            snapshots,
+            value => value.TotalSmallPreyCaloriesEatenPerSecond);
         var totalResourceCalories = 0f;
         var resourceCapacity = 0f;
         var activeResourceCount = 0;
@@ -268,6 +271,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Egg eaten", $"{snapshot.TotalEggCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Fresh kill eaten", $"{snapshot.TotalLivePreyCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Small prey eaten", $"{snapshot.TotalSmallPreyCaloriesEatenPerSecond:0.###} raw kcal/s");
+        WriteMetric(writer, "Avg small prey eaten", $"{averageSmallPreyCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Calories digested", $"{snapshot.TotalCaloriesDigestedPerSecond:0.###} energy/s");
         WriteMetric(writer, "Plant energy", $"{snapshot.TotalPlantDigestedEnergyPerSecond:0.###} energy/s");
         WriteMetric(writer, "Plant type energy", FormatPlantTypeDigestion(snapshot));
@@ -2622,7 +2626,8 @@ public static class ViewerReportWriter
             new ChartSeries("Fresh meat/s", "#e05a47", snapshots.Select(snapshot => snapshot.TotalFreshMeatCaloriesEatenPerSecond).ToArray()),
             new ChartSeries("Stale meat/s", "#7d5546", snapshots.Select(snapshot => snapshot.TotalStaleMeatCaloriesEatenPerSecond).ToArray()),
             new ChartSeries("Egg eaten/s", "#d69d2f", snapshots.Select(snapshot => snapshot.TotalEggCaloriesEatenPerSecond).ToArray()),
-            new ChartSeries("Fresh kill eaten/s", "#8f4cb8", snapshots.Select(snapshot => snapshot.TotalLivePreyCaloriesEatenPerSecond).ToArray()));
+            new ChartSeries("Fresh kill eaten/s", "#8f4cb8", snapshots.Select(snapshot => snapshot.TotalLivePreyCaloriesEatenPerSecond).ToArray()),
+            new ChartSeries("Small prey/s", "#1aa6a0", snapshots.Select(snapshot => snapshot.TotalSmallPreyCaloriesEatenPerSecond).ToArray()));
         WriteLineChart(
             writer,
             "Plant type intake",
@@ -4569,6 +4574,24 @@ public static class ViewerReportWriter
     private static float Share(int count, int total)
     {
         return total > 0 ? count / (float)total : 0f;
+    }
+
+    private static float AverageSnapshotValue(
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        Func<SimulationStatsSnapshot, float> selector)
+    {
+        if (snapshots.Count == 0)
+        {
+            return 0f;
+        }
+
+        var total = 0f;
+        foreach (var snapshot in snapshots)
+        {
+            total += selector(snapshot);
+        }
+
+        return total / snapshots.Count;
     }
 
     private static float ToDegrees(float radians)
