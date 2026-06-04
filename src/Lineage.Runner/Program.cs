@@ -73,6 +73,18 @@ api.MapPost("/brain-lab/preset-matrix", (BrainLabPresetMatrixRequest request, Li
     }
 });
 
+api.MapPost("/brain-lab/profile-comparison", (BrainLabBehaviorProfileComparisonRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.CompareBrainLabBehaviorProfiles(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/brain-lab/probe-tests", (BrainLabProbeTestRequest request, LineageRunManager manager) =>
 {
     try

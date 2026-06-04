@@ -83,6 +83,7 @@ const brainLabPresetSelect = document.querySelector("#brainLabPresetSelect");
 const applyBrainLabPresetButton = document.querySelector("#applyBrainLabPresetButton");
 const compareBrainLabPopulationButton = document.querySelector("#compareBrainLabPopulationButton");
 const runBrainLabPresetMatrixButton = document.querySelector("#runBrainLabPresetMatrixButton");
+const compareBrainLabProfilesButton = document.querySelector("#compareBrainLabProfilesButton");
 const runBrainLabProbeTestsButton = document.querySelector("#runBrainLabProbeTestsButton");
 const brainLabMeta = document.querySelector("#brainLabMeta");
 const brainLabInputs = document.querySelector("#brainLabInputs");
@@ -90,6 +91,7 @@ const brainLabOutputs = document.querySelector("#brainLabOutputs");
 const brainLabProbeTests = document.querySelector("#brainLabProbeTests");
 const brainLabPopulation = document.querySelector("#brainLabPopulation");
 const brainLabPresetMatrix = document.querySelector("#brainLabPresetMatrix");
+const brainLabProfileComparison = document.querySelector("#brainLabProfileComparison");
 const brainLabWorldProbe = document.querySelector("#brainLabWorldProbe");
 const brainLabWorldProbeCanvas = document.querySelector("#brainLabWorldProbeCanvas");
 const brainLabWorldProbeSummary = document.querySelector("#brainLabWorldProbeSummary");
@@ -140,6 +142,7 @@ let brainLabEvaluation = null;
 let brainLabPopulationEvaluation = null;
 let brainLabPresetMatrixResult = null;
 let brainLabProbeTestResult = null;
+let brainLabProfileComparisonResult = null;
 let brainLabWorldProbeScene = null;
 let brainLabWorldProbeBaseScene = null;
 let brainLabOverrides = {};
@@ -703,6 +706,7 @@ async function loadBrainLabSnapshot() {
   brainLabPopulationEvaluation = null;
   brainLabPresetMatrixResult = null;
   brainLabProbeTestResult = null;
+  brainLabProfileComparisonResult = null;
   brainLabSelectedInputKey = null;
   brainLabWorldProbeScene = null;
   brainLabWorldProbeBaseScene = null;
@@ -735,6 +739,7 @@ function renderBrainLabSnapshot() {
   renderBrainLabProbeTests();
   renderBrainLabPopulation();
   renderBrainLabPresetMatrix();
+  renderBrainLabProfileComparison();
   renderBrainLabWorldProbe();
   updateBrainLabButtons();
 }
@@ -3741,6 +3746,127 @@ function renderBrainLabPresetMatrixRow(row) {
   `;
 }
 
+async function compareBrainLabProfiles() {
+  const path = brainLabSelectedPath();
+  if (!path || !brainLabSnapshot) {
+    updateBrainLabButtons();
+    return;
+  }
+
+  brainLabStatus.textContent = "Comparing behavior profiles";
+  const response = await fetch("/api/brain-lab/profile-comparison", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      inputOverrides: brainLabOverrides,
+      worldProbeEnvironment: buildBrainLabWorldProbeEnvironmentPayload(),
+      maxCreatures: 100,
+      maxFixtures: 100
+    })
+  });
+
+  if (!response.ok) {
+    brainLabStatus.textContent = await responseErrorMessage(response, "Behavior profile comparison failed.");
+    return;
+  }
+
+  brainLabProfileComparisonResult = await response.json();
+  renderBrainLabProfileComparison();
+  updateBrainLabButtons();
+  brainLabStatus.textContent = [
+    `Profile comparison complete`,
+    `${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} creatures`,
+    `${formatNumber(brainLabProfileComparisonResult.evaluatedFixtureCount)} setups`
+  ].join(" | ");
+}
+
+function renderBrainLabProfileComparison() {
+  if (!brainLabProfileComparison) {
+    return;
+  }
+
+  if (!brainLabProfileComparisonResult) {
+    brainLabProfileComparison.textContent = "No behavior profile comparison yet.";
+    return;
+  }
+
+  const rows = brainLabProfileComparisonResult.rows || [];
+  brainLabProfileComparison.innerHTML = `
+    <div class="brain-lab-profile-comparison-summary">
+      <strong>${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} profiled</strong>
+      <span>${formatNumber(brainLabProfileComparisonResult.totalCreatureCount)} total creatures</span>
+      <span>cap ${formatNumber(brainLabProfileComparisonResult.maxCreatures)}</span>
+      <span>${formatNumber(brainLabProfileComparisonResult.evaluatedFixtureCount)} setups</span>
+      ${brainLabProfileComparisonResult.skippedCreatureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedCreatureCount)} creatures skipped by cap</span>` : ""}
+      ${brainLabProfileComparisonResult.skippedFixtureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedFixtureCount)} setups skipped by cap</span>` : ""}
+    </div>
+    <table class="brain-lab-profile-comparison-table">
+      <thead>
+        <tr>
+          <th>Creature</th>
+          <th>Brain</th>
+          <th>Food</th>
+          <th>Scent</th>
+          <th>Sound</th>
+          <th>Creature</th>
+          <th>Conflict</th>
+          <th>Idle</th>
+          <th>Fingerprints</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(renderBrainLabProfileComparisonRow).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderBrainLabProfileComparisonRow(row) {
+  const fingerprints = (row.fingerprints || [])
+    .slice(0, 4)
+    .map(renderBrainLabBehaviorFingerprint)
+    .join("");
+  return `
+    <tr>
+      <td>
+        <strong>#${formatNumber(row.creatureId)}</strong>
+        <code>gen ${formatNumber(row.generation)}</code>
+      </td>
+      <td>
+        <strong>${escapeHtml(row.brainArchitectureKind || "unknown")}</strong>
+        <code>brain ${formatNumber(row.brainId)} genome ${formatNumber(row.genomeId)}</code>
+      </td>
+      ${renderBrainLabProfileComparisonCell(row.profile, "food")}
+      ${renderBrainLabProfileComparisonCell(row.profile, "scent")}
+      ${renderBrainLabProfileComparisonCell(row.profile, "sound")}
+      ${renderBrainLabProfileComparisonCell(row.profile, "creature")}
+      ${renderBrainLabProfileComparisonCell(row.profile, "conflict")}
+      ${renderBrainLabProfileComparisonCell(row.profile, "idle")}
+      <td><div class="brain-lab-behavior-labels">${fingerprints || `<span class="brain-lab-muted">none</span>`}</div></td>
+    </tr>
+  `;
+}
+
+function renderBrainLabProfileComparisonCell(profile, key) {
+  const section = (profile?.sections || []).find((candidate) => candidate.key === key);
+  if (!section) {
+    return `<td><span class="brain-lab-muted">none</span></td>`;
+  }
+
+  const traits = (section.traits || []).slice(0, 3).join(" | ");
+  const evidence = (section.evidence || []).length > 0
+    ? `Evidence: ${section.evidence.join(", ")}`
+    : "No direct evidence rows.";
+  const title = [traits, evidence].filter(Boolean).join(" | ");
+  return `
+    <td title="${escapeHtml(title)}">
+      <strong>${escapeHtml(section.summary || "No clear signal.")}</strong>
+      ${traits ? `<code>${escapeHtml(traits)}</code>` : ""}
+    </td>
+  `;
+}
+
 async function runBrainLabProbeTests() {
   const path = brainLabSelectedPath();
   const creatureId = Number(brainLabCreatureSelect?.value || 0);
@@ -4121,8 +4247,10 @@ function isBrainLabMeatOrEggInput(input) {
 function clearBrainLabPopulation() {
   brainLabPopulationEvaluation = null;
   brainLabProbeTestResult = null;
+  brainLabProfileComparisonResult = null;
   renderBrainLabPopulation();
   renderBrainLabProbeTests();
+  renderBrainLabProfileComparison();
 }
 
 function updateBrainLabButtons() {
@@ -4152,6 +4280,9 @@ function updateBrainLabButtons() {
   }
   if (runBrainLabPresetMatrixButton) {
     runBrainLabPresetMatrixButton.disabled = !hasSnapshot;
+  }
+  if (compareBrainLabProfilesButton) {
+    compareBrainLabProfilesButton.disabled = !hasSnapshot;
   }
   if (runBrainLabProbeTestsButton) {
     runBrainLabProbeTestsButton.disabled = !hasSnapshot || !hasCreature;
@@ -7733,6 +7864,7 @@ resetBrainLabOverridesButton.addEventListener("click", resetBrainLabOverrides);
 applyBrainLabPresetButton.addEventListener("click", applyBrainLabPreset);
 compareBrainLabPopulationButton.addEventListener("click", compareBrainLabPopulation);
 runBrainLabPresetMatrixButton.addEventListener("click", runBrainLabPresetMatrix);
+compareBrainLabProfilesButton.addEventListener("click", compareBrainLabProfiles);
 runBrainLabProbeTestsButton.addEventListener("click", runBrainLabProbeTests);
 brainLabWorldProbeFixtureSelect.addEventListener("change", updateBrainLabButtons);
 applyBrainLabWorldProbeFixtureButton.addEventListener("click", applyBrainLabWorldProbeFixture);

@@ -9,6 +9,7 @@ public sealed partial class LineageRunManager
     private const int MaxBrainLabCreatures = 1000;
     private const int MaxBrainLabPopulationCreatures = 5000;
     private const int MaxBrainLabProbeTestFixtures = 100;
+    private const int MaxBrainLabProfileComparisonCreatures = 100;
     private const int MaxBrainLabWorldProbeResources = 500;
     private const int MaxBrainLabWorldProbeEggs = 250;
     private const int MaxBrainLabWorldProbeSmallPrey = 500;
@@ -501,20 +502,109 @@ public sealed partial class LineageRunManager
             request.MaxFixtures ?? MaxBrainLabProbeTestFixtures,
             1,
             MaxBrainLabProbeTestFixtures);
-        var rows = fixtures
-            .Take(maxFixtures)
+        var selectedFixtures = fixtures.Take(maxFixtures).ToArray();
+        var rows = EvaluateBrainLabProbeTestRows(
+            restored,
+            focus.Id,
+            selectedFixtures,
+            request.WorldProbeEnvironment,
+            request.InputOverrides);
+        var fingerprints = CreateBrainLabProbeTestFingerprints(rows);
+        var profile = CreateBrainLabBehaviorProfile(rows, fingerprints);
+
+        return new BrainLabProbeTestResult(
+            NormalizeArtifactRelativePath(resolvedPath),
+            focus.Id.Value,
+            state.GetBrainArchitectureKind(focus.BrainId).ToString(),
+            totalFixtureCount,
+            rows.Count,
+            Math.Max(0, totalFixtureCount - rows.Count),
+            profile,
+            fingerprints,
+            rows);
+    }
+
+    public BrainLabBehaviorProfileComparisonResult CompareBrainLabBehaviorProfiles(
+        BrainLabBehaviorProfileComparisonRequest request)
+    {
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var state = restored.Simulation.State;
+        var fixtures = ResolveBrainLabProbeTestFixtures(request.FixturePaths);
+        var totalFixtureCount = fixtures.Count;
+        var maxFixtures = Math.Clamp(
+            request.MaxFixtures ?? MaxBrainLabProbeTestFixtures,
+            1,
+            MaxBrainLabProbeTestFixtures);
+        var selectedFixtures = fixtures.Take(maxFixtures).ToArray();
+        var maxCreatures = Math.Clamp(
+            request.MaxCreatures ?? MaxBrainLabProfileComparisonCreatures,
+            1,
+            MaxBrainLabProfileComparisonCreatures);
+        var creatures = state.Creatures
+            .OrderByDescending(creature => creature.Generation)
+            .ThenBy(creature => creature.Id.Value)
+            .Take(maxCreatures)
+            .ToArray();
+        var rows = creatures
+            .Select(creature =>
+            {
+                var probeRows = EvaluateBrainLabProbeTestRows(
+                    restored,
+                    creature.Id,
+                    selectedFixtures,
+                    request.WorldProbeEnvironment,
+                    request.InputOverrides);
+                var fingerprints = CreateBrainLabProbeTestFingerprints(probeRows);
+                var profile = CreateBrainLabBehaviorProfile(probeRows, fingerprints);
+                return new BrainLabBehaviorProfileComparisonRow(
+                    creature.Id.Value,
+                    creature.Generation,
+                    creature.BrainId,
+                    creature.GenomeId,
+                    state.GetBrainArchitectureKind(creature.BrainId).ToString(),
+                    creature.AgeSeconds,
+                    creature.Senses.EnergyRatio,
+                    creature.Senses.HealthRatio,
+                    creature.Senses.Hunger,
+                    profile,
+                    fingerprints.Take(8).ToArray());
+            })
+            .ToArray();
+
+        return new BrainLabBehaviorProfileComparisonResult(
+            NormalizeArtifactRelativePath(resolvedPath),
+            state.Creatures.Count,
+            maxCreatures,
+            rows.Length,
+            Math.Max(0, state.Creatures.Count - rows.Length),
+            totalFixtureCount,
+            selectedFixtures.Length,
+            Math.Max(0, totalFixtureCount - selectedFixtures.Length),
+            rows);
+    }
+
+    private IReadOnlyList<BrainLabProbeTestRow> EvaluateBrainLabProbeTestRows(
+        RestoredSimulation restored,
+        EntityId focusId,
+        IReadOnlyList<BrainLabWorldProbeFixture> fixtures,
+        BrainLabWorldProbeEnvironment? worldProbeEnvironment,
+        IReadOnlyDictionary<string, float>? inputOverrides)
+    {
+        var state = restored.Simulation.State;
+        return fixtures
             .Select(fixture =>
             {
                 var editedSenses = RecomputeBrainLabWorldProbeSenses(
                     restored,
-                    focus.Id,
+                    focusId,
                     NormalizeBrainLabWorldProbeEditSet(fixture.WorldProbe),
-                    request.WorldProbeEnvironment);
+                    worldProbeEnvironment);
                 var evaluation = _brainProbeService.EvaluateWithModifiedSenses(
                     state,
-                    focus.Id,
+                    focusId,
                     editedSenses,
-                    request.InputOverrides);
+                    inputOverrides);
                 var topOutputs = evaluation.Outputs
                     .OrderByDescending(output => Math.Abs(output.Delta))
                     .ThenByDescending(output => output.Changed)
@@ -544,19 +634,6 @@ public sealed partial class LineageRunManager
                     topOutputs);
             })
             .ToArray();
-        var fingerprints = CreateBrainLabProbeTestFingerprints(rows);
-        var profile = CreateBrainLabBehaviorProfile(rows, fingerprints);
-
-        return new BrainLabProbeTestResult(
-            NormalizeArtifactRelativePath(resolvedPath),
-            focus.Id.Value,
-            state.GetBrainArchitectureKind(focus.BrainId).ToString(),
-            totalFixtureCount,
-            rows.Length,
-            Math.Max(0, totalFixtureCount - rows.Length),
-            profile,
-            fingerprints,
-            rows);
     }
 
     private static IReadOnlyList<BrainLabBehaviorLabel> CreateBrainLabProbeTestLabels(

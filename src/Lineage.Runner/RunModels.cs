@@ -275,6 +275,14 @@ public sealed record BrainLabPresetMatrixRequest(
     string SnapshotPath,
     int? MaxCreatures);
 
+public sealed record BrainLabBehaviorProfileComparisonRequest(
+    string SnapshotPath,
+    Dictionary<string, float>? InputOverrides,
+    BrainLabWorldProbeEnvironment? WorldProbeEnvironment = null,
+    IReadOnlyList<string>? FixturePaths = null,
+    int? MaxFixtures = null,
+    int? MaxCreatures = null);
+
 public sealed record BrainLabPresetMatrixResult(
     string SnapshotPath,
     int TotalCreatureCount,
@@ -334,6 +342,30 @@ public sealed record BrainLabProbeTestRow(
     double MaxAbsoluteOutputDelta,
     IReadOnlyList<BrainLabBehaviorLabel> Labels,
     IReadOnlyList<BrainLabProbeTestOutput> TopOutputs);
+
+public sealed record BrainLabBehaviorProfileComparisonResult(
+    string SnapshotPath,
+    int TotalCreatureCount,
+    int MaxCreatures,
+    int EvaluatedCreatureCount,
+    int SkippedCreatureCount,
+    int TotalFixtureCount,
+    int EvaluatedFixtureCount,
+    int SkippedFixtureCount,
+    IReadOnlyList<BrainLabBehaviorProfileComparisonRow> Rows);
+
+public sealed record BrainLabBehaviorProfileComparisonRow(
+    int CreatureId,
+    int Generation,
+    int BrainId,
+    int GenomeId,
+    string BrainArchitectureKind,
+    double AgeSeconds,
+    double EnergyRatio,
+    double HealthRatio,
+    double Hunger,
+    BrainLabBehaviorProfile Profile,
+    IReadOnlyList<BrainLabBehaviorFingerprint> Fingerprints);
 
 public sealed record BrainLabBehaviorLabel(
     string Key,

@@ -1376,7 +1376,8 @@ button.scenario-tab.is-active {
 
 .brain-lab-population,
 .brain-lab-preset-matrix,
-.brain-lab-probe-tests {
+.brain-lab-probe-tests,
+.brain-lab-profile-comparison {
   margin-top: 12px;
   overflow-x: auto;
   padding: 10px;
@@ -1388,7 +1389,8 @@ button.scenario-tab.is-active {
 
 .brain-lab-population-summary,
 .brain-lab-preset-matrix-summary,
-.brain-lab-probe-tests-summary {
+.brain-lab-probe-tests-summary,
+.brain-lab-profile-comparison-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
@@ -1400,7 +1402,8 @@ button.scenario-tab.is-active {
 
 .brain-lab-population-summary strong,
 .brain-lab-preset-matrix-summary strong,
-.brain-lab-probe-tests-summary strong {
+.brain-lab-probe-tests-summary strong,
+.brain-lab-profile-comparison-summary strong {
   color: var(--ink);
 }
 
@@ -1527,7 +1530,8 @@ button.scenario-tab.is-active {
 
 .brain-lab-population-table,
 .brain-lab-preset-matrix-table,
-.brain-lab-probe-tests-table {
+.brain-lab-probe-tests-table,
+.brain-lab-profile-comparison-table {
   min-width: 860px;
   table-layout: auto;
   font-size: 12px;
@@ -1538,7 +1542,9 @@ button.scenario-tab.is-active {
 .brain-lab-preset-matrix-table th,
 .brain-lab-preset-matrix-table td,
 .brain-lab-probe-tests-table th,
-.brain-lab-probe-tests-table td {
+.brain-lab-probe-tests-table td,
+.brain-lab-profile-comparison-table th,
+.brain-lab-profile-comparison-table td {
   padding: 8px;
 }
 
@@ -1549,7 +1555,8 @@ button.scenario-tab.is-active {
 
 .brain-lab-population-table code,
 .brain-lab-preset-matrix-table code,
-.brain-lab-probe-tests-table code {
+.brain-lab-probe-tests-table code,
+.brain-lab-profile-comparison-table code {
   display: block;
   margin-top: 2px;
   color: var(--muted);
@@ -1569,6 +1576,14 @@ button.scenario-tab.is-active {
 .brain-lab-probe-tests-table .is-negative {
   color: var(--danger);
   font-weight: 700;
+}
+
+.brain-lab-profile-comparison-table {
+  min-width: 1280px;
+}
+
+.brain-lab-profile-comparison-table td {
+  vertical-align: top;
 }
 
 .catalog-details {
