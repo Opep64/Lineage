@@ -3789,6 +3789,10 @@ function renderBrainLabProbeTests() {
 
   const rows = [...(brainLabProbeTestResult.rows || [])]
     .sort((left, right) => Number(right.maxAbsoluteOutputDelta || 0) - Number(left.maxAbsoluteOutputDelta || 0));
+  const fingerprints = (brainLabProbeTestResult.fingerprints || [])
+    .map(renderBrainLabBehaviorFingerprint)
+    .join("");
+  const profile = renderBrainLabBehaviorProfile(brainLabProbeTestResult.profile);
   brainLabProbeTests.innerHTML = `
     <div class="brain-lab-probe-tests-summary">
       <strong>${formatNumber(brainLabProbeTestResult.evaluatedFixtureCount)} setups</strong>
@@ -3796,11 +3800,16 @@ function renderBrainLabProbeTests() {
       <span>${escapeHtml(brainLabProbeTestResult.snapshotPath || "")}</span>
       ${brainLabProbeTestResult.skippedFixtureCount ? `<span>${formatNumber(brainLabProbeTestResult.skippedFixtureCount)} skipped</span>` : ""}
     </div>
+    ${profile}
+    <div class="brain-lab-behavior-fingerprints">
+      ${fingerprints || `<span class="brain-lab-muted">No strong fingerprint labels yet.</span>`}
+    </div>
     <table class="brain-lab-probe-tests-table">
       <thead>
         <tr>
           <th>Setup</th>
-          <th>Inputs</th>
+          <th>Labels</th>
+          <th>Input Edits</th>
           <th>Changed</th>
           <th>Gate Flips</th>
           <th>Max Delta</th>
@@ -3814,6 +3823,46 @@ function renderBrainLabProbeTests() {
   `;
 }
 
+function renderBrainLabBehaviorProfile(profile) {
+  if (!profile) {
+    return "";
+  }
+
+  const sections = (profile.sections || [])
+    .map(renderBrainLabBehaviorProfileSection)
+    .join("");
+  return `
+    <div class="brain-lab-behavior-profile">
+      <div class="brain-lab-behavior-profile-heading">
+        <strong>Behavior Profile</strong>
+        <span>${escapeHtml(profile.summary || "No strong behavior profile yet.")}</span>
+      </div>
+      <div class="brain-lab-behavior-profile-grid">
+        ${sections}
+      </div>
+    </div>
+  `;
+}
+
+function renderBrainLabBehaviorProfileSection(section) {
+  const traits = (section.traits || [])
+    .slice(0, 6)
+    .map((trait) => `<span>${escapeHtml(trait)}</span>`)
+    .join("");
+  const evidence = (section.evidence || []).length > 0
+    ? `Evidence: ${section.evidence.join(", ")}`
+    : "No direct evidence rows.";
+  return `
+    <div class="brain-lab-behavior-profile-section" title="${escapeHtml(evidence)}">
+      <strong>${escapeHtml(section.name || section.key || "Profile")}</strong>
+      <p>${escapeHtml(section.summary || "No clear signal.")}</p>
+      <div class="brain-lab-behavior-profile-traits">
+        ${traits || `<span class="brain-lab-muted">no traits</span>`}
+      </div>
+    </div>
+  `;
+}
+
 function renderBrainLabProbeTestRow(row) {
   const topOutputs = (row.topOutputs || [])
     .map((output) => {
@@ -3824,18 +3873,43 @@ function renderBrainLabProbeTestRow(row) {
       return `<div><strong>${escapeHtml(output.name)}</strong> <span class="${deltaClass}">${formatBrainLabDelta(output.delta)}</span>${escapeHtml(gate)}</div>`;
     })
     .join("");
+  const labels = (row.labels || [])
+    .slice(0, 8)
+    .map(renderBrainLabBehaviorLabel)
+    .join("");
   const tags = (row.tags || []).length > 0
     ? `<code>${escapeHtml((row.tags || []).join(", "))}</code>`
     : `<code>${escapeHtml(row.path || "")}</code>`;
   return `
     <tr class="${Number(row.changedOutputCount || 0) > 0 ? "is-changed" : ""}">
       <td><strong>${escapeHtml(row.name)}</strong>${tags}</td>
+      <td><div class="brain-lab-behavior-labels">${labels || `<span class="brain-lab-muted">no strong label</span>`}</div></td>
       <td>${formatNumber(row.overrideCount)}</td>
       <td>${formatNumber(row.changedOutputCount)}</td>
       <td>${formatNumber(row.gateFlipCount)}</td>
       <td>${formatBrainLabNumber(row.maxAbsoluteOutputDelta)}</td>
       <td>${topOutputs}</td>
     </tr>
+  `;
+}
+
+function renderBrainLabBehaviorLabel(label) {
+  return `
+    <span class="brain-lab-behavior-label" title="${escapeHtml(label.category || "")}: ${escapeHtml(formatBrainLabNumber(label.strength || 0))}">
+      ${escapeHtml(label.name || label.key || "label")}
+    </span>
+  `;
+}
+
+function renderBrainLabBehaviorFingerprint(fingerprint) {
+  const evidence = (fingerprint.evidence || []).length > 0
+    ? ` | ${fingerprint.evidence.join(", ")}`
+    : "";
+  return `
+    <span class="brain-lab-behavior-fingerprint" title="${escapeHtml((fingerprint.description || "") + evidence)}">
+      <strong>${escapeHtml(fingerprint.name || fingerprint.key || "fingerprint")}</strong>
+      <span>${formatNumber(fingerprint.score || 0)}</span>
+    </span>
   `;
 }
 

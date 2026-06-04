@@ -1404,10 +1404,131 @@ button.scenario-tab.is-active {
   color: var(--ink);
 }
 
+.brain-lab-muted {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.brain-lab-behavior-profile {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #cfd9e5;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.brain-lab-behavior-profile-heading {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.brain-lab-behavior-profile-heading strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.brain-lab-behavior-profile-heading span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brain-lab-behavior-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.brain-lab-behavior-profile-section {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d7e0ea;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.brain-lab-behavior-profile-section strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.brain-lab-behavior-profile-section p {
+  margin: 0 0 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.brain-lab-behavior-profile-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.brain-lab-behavior-profile-traits span {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid #d4dde8;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #4b6078;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.brain-lab-behavior-fingerprints,
+.brain-lab-behavior-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.brain-lab-behavior-fingerprints {
+  margin-bottom: 10px;
+}
+
+.brain-lab-behavior-label,
+.brain-lab-behavior-fingerprint {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid #bfd1ea;
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #24456d;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.brain-lab-behavior-fingerprint {
+  border-color: #cdd8e2;
+  background: #fff;
+  color: var(--ink);
+}
+
+.brain-lab-behavior-fingerprint span {
+  color: var(--muted);
+}
+
 .brain-lab-population-table,
 .brain-lab-preset-matrix-table,
 .brain-lab-probe-tests-table {
-  min-width: 780px;
+  min-width: 860px;
   table-layout: auto;
   font-size: 12px;
 }
@@ -1846,5 +1967,13 @@ tr.is-expanded td {
   .brain-lab-world-probe-body,
   .brain-lab-world-probe-summary {
     grid-template-columns: 1fr;
+  }
+
+  .brain-lab-behavior-profile-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .brain-lab-behavior-profile-heading span {
+    white-space: normal;
   }
 }

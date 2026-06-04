@@ -319,6 +319,8 @@ public sealed record BrainLabProbeTestResult(
     int TotalFixtureCount,
     int EvaluatedFixtureCount,
     int SkippedFixtureCount,
+    BrainLabBehaviorProfile Profile,
+    IReadOnlyList<BrainLabBehaviorFingerprint> Fingerprints,
     IReadOnlyList<BrainLabProbeTestRow> Rows);
 
 public sealed record BrainLabProbeTestRow(
@@ -330,7 +332,32 @@ public sealed record BrainLabProbeTestRow(
     int ChangedOutputCount,
     int GateFlipCount,
     double MaxAbsoluteOutputDelta,
+    IReadOnlyList<BrainLabBehaviorLabel> Labels,
     IReadOnlyList<BrainLabProbeTestOutput> TopOutputs);
+
+public sealed record BrainLabBehaviorLabel(
+    string Key,
+    string Name,
+    string Category,
+    double Strength);
+
+public sealed record BrainLabBehaviorFingerprint(
+    string Key,
+    string Name,
+    string Description,
+    int Score,
+    IReadOnlyList<string> Evidence);
+
+public sealed record BrainLabBehaviorProfile(
+    string Summary,
+    IReadOnlyList<BrainLabBehaviorProfileSection> Sections);
+
+public sealed record BrainLabBehaviorProfileSection(
+    string Key,
+    string Name,
+    string Summary,
+    IReadOnlyList<string> Traits,
+    IReadOnlyList<string> Evidence);
 
 public sealed record BrainLabProbeTestOutput(
     string Key,

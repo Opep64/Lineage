@@ -16,6 +16,13 @@ public sealed partial class LineageRunManager
     private const string BrainLabWorldProbeFixtureFileExtension = ".lineage-probe.json";
     private const float BrainLabWorldProbePadding = 24f;
     private const float BrainLabSoundEmissionThreshold = 0.05f;
+    private const float BrainLabQuietSoundAmplitudeMax = 0.3f;
+    private const float BrainLabLoudSoundAmplitudeMin = 0.75f;
+    private const float BrainLabLowSoundToneMax = 0.25f;
+    private const float BrainLabHighSoundToneMin = 0.75f;
+    private const float BrainLabBehaviorMoveThreshold = 0.25f;
+    private const float BrainLabBehaviorHoldThreshold = 0.1f;
+    private const float BrainLabBehaviorTurnThreshold = 0.2f;
     private const float BrainLabMinimumHabitatProbeDistance = 16f;
     private const float BrainLabMaximumHabitatProbeDistance = 80f;
     private const float BrainLabWorldProbeBoundaryTargetCellSize = 32f;
@@ -70,6 +77,39 @@ public sealed partial class LineageRunManager
                 [],
                 [])),
         BuiltInBrainLabWorldProbeFixture(
+            "Meat Scent Right",
+            "meat-scent-right",
+            "One fresh meat patch off to the selected creature's right, outside the usual forward vision cone.",
+            ["meat", "scent", "food"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, 160, 6, 24, 24, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Rotten Scent Left",
+            "rotten-scent-left",
+            "One stale meat patch off to the selected creature's left, outside the usual forward vision cone.",
+            ["rotten meat", "scent", "food"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, -160, 6, 24, 24, MeatQuality.MinimumFreshness)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Egg Ahead",
+            "egg-ahead",
+            "One egg in front of the selected creature.",
+            ["egg", "food"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [
+                    new BrainLabWorldProbeEditedEgg(-1, 0, 96, 0, 5, 16, 1)
+                ],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
             "Small Prey Ahead",
             "small-prey-ahead",
             "One live small prey animal in front of the selected creature.",
@@ -102,6 +142,113 @@ public sealed partial class LineageRunManager
                 [],
                 [
                     new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", -160, 0, 0.5, 0, 1, 1, 0, 1, 0.75, true)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Quiet Sound Left",
+            "quiet-sound-left",
+            "A low-amplitude sound source to the selected creature's left.",
+            ["sound", "quiet"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", 0, -180, 0.5, 0, 1, 1, 0, 0.2, 0.45, true)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Loud Sound Left",
+            "loud-sound-left",
+            "A high-amplitude sound source to the selected creature's left.",
+            ["sound", "loud"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", 0, -180, 0.5, 0, 1, 1, 0, 1, 0.45, true)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Low Tone Sound Left",
+            "low-tone-sound-left",
+            "A loud low-tone sound source to the selected creature's left.",
+            ["sound", "loud", "low tone"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", 0, -180, 0.5, 0, 1, 1, 0, 1, 0.1, true)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Mid Tone Sound Left",
+            "mid-tone-sound-left",
+            "A loud mid-tone sound source to the selected creature's left.",
+            ["sound", "loud", "mid tone"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", 0, -180, 0.5, 0, 1, 1, 0, 1, 0.5, true)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "High Tone Sound Left",
+            "high-tone-sound-left",
+            "A loud high-tone sound source to the selected creature's left.",
+            ["sound", "loud", "high tone"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-1, 0, "ProbeSound", 0, -180, 0.5, 0, 1, 1, 0, 1, 0.9, true)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Plant Ahead Meat Scent Right",
+            "plant-ahead-meat-scent-right",
+            "A visible plant ahead while fresh meat scent comes from the right.",
+            ["plant", "meat", "scent", "food", "conflict"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", 110, 0, 8, 25, 25, 1),
+                    new BrainLabWorldProbeEditedResource(-2, "Meat", null, 0, 160, 6, 24, 24, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Plant Ahead Creature Near",
+            "plant-ahead-creature-near",
+            "A visible plant ahead with another creature close to that food cue.",
+            ["plant", "creature", "food", "conflict"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", 110, 0, 8, 25, 25, 1)
+                ],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", 72, 32, 8, Math.PI, 1, 1, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey Ahead Loud Sound Behind",
+            "small-prey-ahead-loud-sound-behind",
+            "Live small prey ahead while a loud sound source calls from behind.",
+            ["small prey", "sound", "food", "conflict"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeSound", -180, 0, 0.5, 0, 1, 1, 0, 1, 0.6, true)
+                ],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, 110, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Egg With Guard",
+            "egg-with-guard",
+            "An egg ahead with another creature near it.",
+            ["egg", "creature", "food", "conflict"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [
+                    new BrainLabWorldProbeEditedEgg(-1, 0, 96, 0, 5, 16, 1)
+                ],
+                [
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", 72, -28, 8, Math.PI, 1, 1, 0, 0, 0)
                 ]))
     ];
 
@@ -382,6 +529,7 @@ public sealed partial class LineageRunManager
                         output.BaselineActive,
                         output.ModifiedActive))
                     .ToArray();
+                var labels = CreateBrainLabProbeTestLabels(fixture, evaluation);
 
                 return new BrainLabProbeTestRow(
                     fixture.Path,
@@ -392,9 +540,12 @@ public sealed partial class LineageRunManager
                     evaluation.ChangedOutputCount,
                     evaluation.GateFlipCount,
                     evaluation.MaxAbsoluteOutputDelta,
+                    labels,
                     topOutputs);
             })
             .ToArray();
+        var fingerprints = CreateBrainLabProbeTestFingerprints(rows);
+        var profile = CreateBrainLabBehaviorProfile(rows, fingerprints);
 
         return new BrainLabProbeTestResult(
             NormalizeArtifactRelativePath(resolvedPath),
@@ -403,7 +554,1036 @@ public sealed partial class LineageRunManager
             totalFixtureCount,
             rows.Length,
             Math.Max(0, totalFixtureCount - rows.Length),
+            profile,
+            fingerprints,
             rows);
+    }
+
+    private static IReadOnlyList<BrainLabBehaviorLabel> CreateBrainLabProbeTestLabels(
+        BrainLabWorldProbeFixture fixture,
+        BrainProbeEvaluation evaluation)
+    {
+        var labels = new Dictionary<string, BrainLabBehaviorLabel>(StringComparer.Ordinal);
+        void AddLabel(string key, string name, string category, double strength = 1)
+        {
+            if (labels.TryGetValue(key, out var existing) && existing.Strength >= strength)
+            {
+                return;
+            }
+
+            labels[key] = new BrainLabBehaviorLabel(key, name, category, strength);
+        }
+
+        var move = BrainLabProbeOutputValue(evaluation, "action.move_forward");
+        var turn = BrainLabProbeOutputValue(evaluation, "action.turn");
+        var eat = BrainLabProbeOutputActive(evaluation, "action.eat");
+        var reproduce = BrainLabProbeOutputActive(evaluation, "action.reproduce");
+        var attack = BrainLabProbeOutputActive(evaluation, "action.attack");
+        var grab = BrainLabProbeOutputActive(evaluation, "action.grab");
+        var signal = BrainLabProbeOutputActive(evaluation, "action.sound_amplitude");
+        var holdsPosition = move <= BrainLabBehaviorHoldThreshold
+            && Math.Abs(turn) <= BrainLabBehaviorTurnThreshold
+            && !eat
+            && !reproduce
+            && !attack
+            && !grab
+            && !signal;
+
+        if (move > 0.65f)
+        {
+            AddLabel("action.moves_fast", "moves fast", "Action", move);
+        }
+        else if (move > BrainLabBehaviorMoveThreshold)
+        {
+            AddLabel("action.moves_forward", "moves forward", "Action", move);
+        }
+
+        if (turn > BrainLabBehaviorTurnThreshold)
+        {
+            AddLabel("action.turns_right", "turns right", "Action", Math.Abs(turn));
+        }
+        else if (turn < -BrainLabBehaviorTurnThreshold)
+        {
+            AddLabel("action.turns_left", "turns left", "Action", Math.Abs(turn));
+        }
+
+        if (holdsPosition)
+        {
+            AddLabel("action.holds_position", "holds position", "Action", 1);
+        }
+
+        if (eat)
+        {
+            AddLabel("action.eats", "eat intent", "Action", Math.Abs(BrainLabProbeOutputValue(evaluation, "action.eat")));
+        }
+
+        if (attack)
+        {
+            AddLabel("action.attacks", "attack intent", "Action", Math.Abs(BrainLabProbeOutputValue(evaluation, "action.attack")));
+        }
+
+        if (grab)
+        {
+            AddLabel("action.grabs", "grab intent", "Action", Math.Abs(BrainLabProbeOutputValue(evaluation, "action.grab")));
+        }
+
+        if (signal)
+        {
+            AddLabel("action.signals", "signals", "Action", BrainLabProbeOutputValue(evaluation, "action.sound_amplitude"));
+        }
+
+        if (reproduce)
+        {
+            AddLabel("action.reproduces", "reproduce intent", "Action", Math.Abs(BrainLabProbeOutputValue(evaluation, "action.reproduce")));
+        }
+
+        var cues = CreateBrainLabProbeFixtureCues(fixture);
+        var isScentFixture = fixture.Tags.Any(tag => tag.Contains("scent", StringComparison.OrdinalIgnoreCase));
+        var isConflictFixture = fixture.Tags.Any(tag => tag.Contains("conflict", StringComparison.OrdinalIgnoreCase));
+        if (cues.Count == 0)
+        {
+            if (holdsPosition)
+            {
+                AddLabel("idle.rests", "rests when empty", "Idle", 1);
+            }
+            else if (move > BrainLabBehaviorMoveThreshold)
+            {
+                AddLabel("idle.searches", "searches when empty", "Idle", move);
+            }
+
+            if (signal)
+            {
+                AddLabel("idle.calls", "calls when empty", "Sound", BrainLabProbeOutputValue(evaluation, "action.sound_amplitude"));
+            }
+        }
+
+        foreach (var cue in cues)
+        {
+            var toward = BrainLabProbeTurnsTowardCue(move, turn, cue.Direction);
+            var away = BrainLabProbeTurnsAwayFromCue(move, turn, cue.Direction);
+            if (cue.Kind is "plant" or "meat" or "rottenMeat" or "egg" or "smallPrey")
+            {
+                if (eat)
+                {
+                    AddLabel($"food.eats.{cue.Kind}", $"tries to eat {cue.Label}", "Food", 1);
+                }
+
+                if (toward)
+                {
+                    AddLabel($"{cue.Kind}.approaches", $"approaches {cue.Label}", "Food", Math.Max(move, Math.Abs(turn)));
+                }
+                else if (away)
+                {
+                    AddLabel($"{cue.Kind}.avoids", $"turns away from {cue.Label}", "Food", Math.Max(move, Math.Abs(turn)));
+                }
+                else if (holdsPosition && !eat)
+                {
+                    AddLabel($"{cue.Kind}.ignores", $"ignores {cue.Label}", "Food", 1);
+                }
+
+                if (isScentFixture && (cue.Kind is "meat" or "rottenMeat"))
+                {
+                    if (toward)
+                    {
+                        AddLabel($"{cue.Kind}.scent_follows", $"follows {cue.Label} scent", "Scent", Math.Max(move, Math.Abs(turn)));
+                    }
+                    else if (away)
+                    {
+                        AddLabel($"{cue.Kind}.scent_avoids", $"avoids {cue.Label} scent", "Scent", Math.Max(move, Math.Abs(turn)));
+                    }
+                    else if (holdsPosition && !eat)
+                    {
+                        AddLabel($"{cue.Kind}.scent_ignores", $"ignores {cue.Label} scent", "Scent", 1);
+                    }
+                }
+
+                continue;
+            }
+
+            if (cue.Kind == "creature")
+            {
+                if (attack)
+                {
+                    AddLabel("creature.attacks", "attacks creature", "Creature", 1);
+                }
+
+                if (grab)
+                {
+                    AddLabel("creature.grabs", "grabs creature", "Creature", 1);
+                }
+
+                if (toward)
+                {
+                    AddLabel("creature.approaches", "approaches creature", "Creature", Math.Max(move, Math.Abs(turn)));
+                }
+                else if (away)
+                {
+                    AddLabel("creature.avoids", "avoids creature", "Creature", Math.Max(move, Math.Abs(turn)));
+                }
+                else if (holdsPosition && !attack && !grab)
+                {
+                    AddLabel("creature.ignores", "ignores creature", "Creature", 1);
+                }
+
+                continue;
+            }
+
+            if (cue.Kind is "sound" or "soundQuiet" or "soundLoud")
+            {
+                if (signal)
+                {
+                    AddLabel("sound.answers", "answers with sound", "Sound", BrainLabProbeOutputValue(evaluation, "action.sound_amplitude"));
+                }
+
+                if (toward)
+                {
+                    AddLabel("sound.approaches", "moves toward sound", "Sound", Math.Max(move, Math.Abs(turn)));
+                }
+                else if (away)
+                {
+                    AddLabel("sound.avoids", "moves away from sound", "Sound", Math.Max(move, Math.Abs(turn)));
+                }
+                else if (holdsPosition && !signal)
+                {
+                    AddLabel("sound.ignores", "ignores sound", "Sound", 1);
+                }
+
+                if (cue.Kind is "soundQuiet" or "soundLoud")
+                {
+                    var amplitudeKey = cue.Kind == "soundQuiet" ? "quiet" : "loud";
+                    var amplitudeLabel = cue.Kind == "soundQuiet" ? "quiet sound" : "loud sound";
+                    if (signal || toward || away)
+                    {
+                        AddLabel(
+                            $"sound.{amplitudeKey}.responds",
+                            $"responds to {amplitudeLabel}",
+                            "Sound",
+                            Math.Max(Math.Max(move, Math.Abs(turn)), BrainLabProbeOutputValue(evaluation, "action.sound_amplitude")));
+                    }
+                    else if (holdsPosition)
+                    {
+                        AddLabel($"sound.{amplitudeKey}.ignores", $"ignores {amplitudeLabel}", "Sound", 1);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(cue.SoundToneClass))
+                {
+                    var toneLabel = cue.SoundToneClass switch
+                    {
+                        "low" => "low tone",
+                        "high" => "high tone",
+                        _ => "mid tone"
+                    };
+                    if (toward)
+                    {
+                        AddLabel(
+                            $"sound.tone.{cue.SoundToneClass}.approaches",
+                            $"moves toward {toneLabel}",
+                            "Sound",
+                            Math.Max(move, Math.Abs(turn)));
+                    }
+                    else if (away)
+                    {
+                        AddLabel(
+                            $"sound.tone.{cue.SoundToneClass}.avoids",
+                            $"moves away from {toneLabel}",
+                            "Sound",
+                            Math.Max(move, Math.Abs(turn)));
+                    }
+
+                    if (signal || toward || away)
+                    {
+                        AddLabel(
+                            $"sound.tone.{cue.SoundToneClass}.responds",
+                            $"responds to {toneLabel}",
+                            "Sound",
+                            Math.Max(Math.Max(move, Math.Abs(turn)), BrainLabProbeOutputValue(evaluation, "action.sound_amplitude")));
+                    }
+                    else if (holdsPosition)
+                    {
+                        AddLabel($"sound.tone.{cue.SoundToneClass}.ignores", $"ignores {toneLabel}", "Sound", 1);
+                    }
+                }
+            }
+        }
+
+        if (isConflictFixture || cues.Select(cue => BrainLabProbeCueFamily(cue.Kind)).Distinct(StringComparer.Ordinal).Count() > 1)
+        {
+            var keys = labels.Keys.ToArray();
+            var choosesFood = keys.Any(key =>
+                key.StartsWith("food.eats.", StringComparison.Ordinal)
+                || key.StartsWith("plant.approaches", StringComparison.Ordinal)
+                || key.StartsWith("meat.approaches", StringComparison.Ordinal)
+                || key.StartsWith("rottenMeat.approaches", StringComparison.Ordinal)
+                || key.StartsWith("egg.approaches", StringComparison.Ordinal)
+                || key.StartsWith("smallPrey.approaches", StringComparison.Ordinal));
+            var choosesAggression = labels.ContainsKey("creature.attacks") || labels.ContainsKey("creature.grabs");
+            var avoidsCreature = labels.ContainsKey("creature.avoids");
+            var followsSound = keys.Any(key =>
+                key.StartsWith("sound.approaches", StringComparison.Ordinal)
+                || key.StartsWith("sound.avoids", StringComparison.Ordinal)
+                || key.StartsWith("sound.answers", StringComparison.Ordinal)
+                || key.StartsWith("sound.quiet.responds", StringComparison.Ordinal)
+                || key.StartsWith("sound.loud.responds", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.low.responds", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.low.approaches", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.low.avoids", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.mid.responds", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.mid.approaches", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.mid.avoids", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.high.responds", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.high.approaches", StringComparison.Ordinal)
+                || key.StartsWith("sound.tone.high.avoids", StringComparison.Ordinal));
+
+            if (choosesFood)
+            {
+                AddLabel("conflict.food", "chooses food cue in conflict", "Conflict", 1);
+            }
+
+            if (choosesAggression)
+            {
+                AddLabel("conflict.aggression", "chooses aggression in conflict", "Conflict", 1);
+            }
+
+            if (avoidsCreature)
+            {
+                AddLabel("conflict.avoids_creature", "avoids creature in conflict", "Conflict", 1);
+            }
+
+            if (followsSound)
+            {
+                AddLabel("conflict.sound", "responds to sound in conflict", "Conflict", 1);
+            }
+
+            if (holdsPosition && !choosesFood && !choosesAggression && !avoidsCreature && !followsSound)
+            {
+                AddLabel("conflict.hesitates", "hesitates in conflict", "Conflict", 1);
+            }
+        }
+
+        return labels.Values
+            .OrderBy(label => label.Category, StringComparer.Ordinal)
+            .ThenByDescending(label => label.Strength)
+            .ThenBy(label => label.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<BrainLabBehaviorFingerprint> CreateBrainLabProbeTestFingerprints(
+        IReadOnlyList<BrainLabProbeTestRow> rows)
+    {
+        var fingerprints = new List<BrainLabBehaviorFingerprint>();
+        void AddFingerprint(string key, string name, string description, params string[] labelPrefixes)
+        {
+            var matches = rows
+                .Select(row => new
+                {
+                    Row = row,
+                    Count = row.Labels.Count(label => labelPrefixes.Any(prefix =>
+                        label.Key.StartsWith(prefix, StringComparison.Ordinal)))
+                })
+                .Where(match => match.Count > 0)
+                .ToArray();
+            if (matches.Length == 0)
+            {
+                return;
+            }
+
+            fingerprints.Add(new BrainLabBehaviorFingerprint(
+                key,
+                name,
+                description,
+                matches.Sum(match => match.Count),
+                matches
+                    .Select(match => match.Row.Name)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(5)
+                    .ToArray()));
+        }
+
+        string[] EvidenceForPrefixes(params string[] labelPrefixes)
+        {
+            return rows
+                .Where(row => row.Labels.Any(label => labelPrefixes.Any(prefix =>
+                    label.Key.StartsWith(prefix, StringComparison.Ordinal))))
+                .Select(row => row.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(5)
+                .ToArray();
+        }
+
+        AddFingerprint(
+            "plant_oriented",
+            "plant-oriented",
+            "Turns toward, approaches, or tries to eat plant setups.",
+            "plant.approaches",
+            "food.eats.plant");
+        AddFingerprint(
+            "meat_oriented",
+            "meat-oriented",
+            "Turns toward, approaches, or tries to eat meat setups.",
+            "meat.approaches",
+            "food.eats.meat");
+        AddFingerprint(
+            "meat_scent_follower",
+            "meat scent follower",
+            "Moves toward fresh meat scent setups.",
+            "meat.scent_follows");
+        AddFingerprint(
+            "meat_scent_avoidant",
+            "meat scent avoidant",
+            "Moves away from fresh meat scent setups.",
+            "meat.scent_avoids");
+        AddFingerprint(
+            "rotten_meat_oriented",
+            "rotten-meat oriented",
+            "Turns toward, approaches, or tries to eat stale meat setups.",
+            "rottenMeat.approaches",
+            "food.eats.rottenMeat");
+        AddFingerprint(
+            "rotten_scent_follower",
+            "rotten scent follower",
+            "Moves toward rotten meat scent setups.",
+            "rottenMeat.scent_follows");
+        AddFingerprint(
+            "rotten_scent_avoidant",
+            "rotten scent avoidant",
+            "Moves away from rotten meat scent setups.",
+            "rottenMeat.scent_avoids");
+        AddFingerprint(
+            "small_prey_hunter",
+            "small-prey responsive",
+            "Turns toward, approaches, or tries to eat live small prey setups.",
+            "smallPrey.approaches",
+            "food.eats.smallPrey");
+        AddFingerprint(
+            "egg_predator",
+            "egg responsive",
+            "Turns toward, approaches, or tries to eat egg setups.",
+            "egg.approaches",
+            "food.eats.egg");
+        AddFingerprint(
+            "sound_responsive",
+            "sound responsive",
+            "Moves, avoids, or answers sound-source setups.",
+            "sound.approaches",
+            "sound.avoids",
+            "sound.answers",
+            "sound.quiet.responds",
+            "sound.loud.responds",
+            "sound.tone.low.responds",
+            "sound.tone.mid.responds",
+            "sound.tone.high.responds");
+        AddFingerprint(
+            "sound_seeking",
+            "sound seeking",
+            "Moves toward sound-source setups.",
+            "sound.approaches");
+        AddFingerprint(
+            "sound_avoidant",
+            "sound avoidant",
+            "Moves away from sound-source setups.",
+            "sound.avoids");
+        AddFingerprint(
+            "quiet_sound_responsive",
+            "quiet-sound responsive",
+            "Moves, avoids, or answers low-amplitude sound setups.",
+            "sound.quiet.responds");
+        AddFingerprint(
+            "loud_sound_responsive",
+            "loud-sound responsive",
+            "Moves, avoids, or answers high-amplitude sound setups.",
+            "sound.loud.responds");
+        AddFingerprint(
+            "low_tone_responsive",
+            "low-tone responsive",
+            "Moves, avoids, or answers low-tone sound setups.",
+            "sound.tone.low.responds");
+        AddFingerprint(
+            "mid_tone_responsive",
+            "mid-tone responsive",
+            "Moves, avoids, or answers mid-tone sound setups.",
+            "sound.tone.mid.responds");
+        AddFingerprint(
+            "high_tone_responsive",
+            "high-tone responsive",
+            "Moves, avoids, or answers high-tone sound setups.",
+            "sound.tone.high.responds");
+        AddFingerprint(
+            "low_tone_seeking",
+            "low-tone seeking",
+            "Moves toward low-tone sound setups.",
+            "sound.tone.low.approaches");
+        AddFingerprint(
+            "mid_tone_seeking",
+            "mid-tone seeking",
+            "Moves toward mid-tone sound setups.",
+            "sound.tone.mid.approaches");
+        AddFingerprint(
+            "high_tone_seeking",
+            "high-tone seeking",
+            "Moves toward high-tone sound setups.",
+            "sound.tone.high.approaches");
+        AddFingerprint(
+            "low_tone_avoidant",
+            "low-tone avoidant",
+            "Moves away from low-tone sound setups.",
+            "sound.tone.low.avoids");
+        AddFingerprint(
+            "mid_tone_avoidant",
+            "mid-tone avoidant",
+            "Moves away from mid-tone sound setups.",
+            "sound.tone.mid.avoids");
+        AddFingerprint(
+            "high_tone_avoidant",
+            "high-tone avoidant",
+            "Moves away from high-tone sound setups.",
+            "sound.tone.high.avoids");
+        AddFingerprint(
+            "creature_aggressive",
+            "creature aggressive",
+            "Attacks or grabs creature-contact setups.",
+            "creature.attacks",
+            "creature.grabs");
+        AddFingerprint(
+            "creature_social",
+            "creature approaching",
+            "Moves toward creature setups.",
+            "creature.approaches");
+        AddFingerprint(
+            "creature_avoidant",
+            "creature avoidant",
+            "Moves away from creature setups.",
+            "creature.avoids");
+        AddFingerprint(
+            "idle_resting",
+            "rests when empty",
+            "Holds position in empty setups.",
+            "idle.rests");
+        AddFingerprint(
+            "idle_searching",
+            "searches when empty",
+            "Moves forward in empty setups.",
+            "idle.searches");
+        AddFingerprint(
+            "signaler",
+            "signaler",
+            "Emits sound in one or more setups.",
+            "action.signals",
+            "sound.answers",
+            "idle.calls");
+        AddFingerprint(
+            "reproductive",
+            "reproductive intent",
+            "Produces reproduce intent in one or more setups.",
+            "action.reproduces");
+        AddFingerprint(
+            "conflict_food",
+            "chooses food in conflicts",
+            "In compound setups, favors the food cue over competing cues.",
+            "conflict.food");
+        AddFingerprint(
+            "conflict_aggression",
+            "chooses aggression in conflicts",
+            "In compound setups, attacks or grabs instead of simply feeding or avoiding.",
+            "conflict.aggression");
+        AddFingerprint(
+            "conflict_creature_avoidant",
+            "avoids creatures in conflicts",
+            "In compound setups, moves away from a creature cue.",
+            "conflict.avoids_creature");
+        AddFingerprint(
+            "conflict_sound",
+            "sound-led in conflicts",
+            "In compound setups, responds to the sound cue.",
+            "conflict.sound");
+        AddFingerprint(
+            "conflict_hesitant",
+            "hesitates in conflicts",
+            "In compound setups, holds position instead of choosing a cue.",
+            "conflict.hesitates");
+
+        var quietIgnoredEvidence = EvidenceForPrefixes("sound.quiet.ignores");
+        var loudResponseEvidence = EvidenceForPrefixes("sound.loud.responds");
+        if (quietIgnoredEvidence.Length > 0 && loudResponseEvidence.Length > 0)
+        {
+            fingerprints.Add(new BrainLabBehaviorFingerprint(
+                "sound_amplitude_thresholded",
+                "sound amplitude thresholded",
+                "Ignores quiet sound but responds to loud sound in the suite.",
+                quietIgnoredEvidence.Length + loudResponseEvidence.Length,
+                quietIgnoredEvidence
+                    .Concat(loudResponseEvidence)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(5)
+                    .ToArray()));
+        }
+
+        var toneResponseEvidence = EvidenceForPrefixes(
+            "sound.tone.low.responds",
+            "sound.tone.mid.responds",
+            "sound.tone.high.responds");
+        var toneIgnoredEvidence = EvidenceForPrefixes(
+            "sound.tone.low.ignores",
+            "sound.tone.mid.ignores",
+            "sound.tone.high.ignores");
+        if (toneResponseEvidence.Length > 0 && toneIgnoredEvidence.Length > 0)
+        {
+            fingerprints.Add(new BrainLabBehaviorFingerprint(
+                "sound_tone_selective",
+                "sound tone selective",
+                "Responds to at least one tone while ignoring another tone in the suite.",
+                toneResponseEvidence.Length + toneIgnoredEvidence.Length,
+                toneResponseEvidence
+                    .Concat(toneIgnoredEvidence)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(5)
+                    .ToArray()));
+        }
+
+        return fingerprints
+            .OrderByDescending(fingerprint => fingerprint.Score)
+            .ThenBy(fingerprint => fingerprint.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static BrainLabBehaviorProfile CreateBrainLabBehaviorProfile(
+        IReadOnlyList<BrainLabProbeTestRow> rows,
+        IReadOnlyList<BrainLabBehaviorFingerprint> fingerprints)
+    {
+        var sections = new List<BrainLabBehaviorProfileSection>();
+
+        int CountLabels(params string[] labelPrefixes)
+        {
+            return rows.Sum(row => row.Labels.Count(label => labelPrefixes.Any(prefix =>
+                label.Key.StartsWith(prefix, StringComparison.Ordinal))));
+        }
+
+        string[] EvidenceForLabels(params string[] labelPrefixes)
+        {
+            return rows
+                .Where(row => row.Labels.Any(label => labelPrefixes.Any(prefix =>
+                    label.Key.StartsWith(prefix, StringComparison.Ordinal))))
+                .Select(row => row.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(5)
+                .ToArray();
+        }
+
+        void AddTrait(List<string> traits, string name, int score)
+        {
+            if (score > 0)
+            {
+                traits.Add($"{name} ({score})");
+            }
+        }
+
+        static string BestSummary(
+            IReadOnlyList<(string Name, int Score)> scores,
+            string emptySummary,
+            string summaryPrefix)
+        {
+            var ranked = scores
+                .Where(score => score.Score > 0)
+                .OrderByDescending(score => score.Score)
+                .ThenBy(score => score.Name, StringComparer.Ordinal)
+                .ToArray();
+            if (ranked.Length == 0)
+            {
+                return emptySummary;
+            }
+
+            var topScore = ranked[0].Score;
+            var leaders = ranked
+                .Where(score => score.Score == topScore)
+                .Select(score => score.Name)
+                .Take(3)
+                .ToArray();
+            return leaders.Length > 1
+                ? $"{summaryPrefix}: {string.Join(" / ", leaders)}"
+                : $"{summaryPrefix}: {leaders[0]}";
+        }
+
+        void AddSection(
+            string key,
+            string name,
+            string summary,
+            IReadOnlyList<string> traits,
+            IReadOnlyList<string> evidence)
+        {
+            sections.Add(new BrainLabBehaviorProfileSection(
+                key,
+                name,
+                summary,
+                traits,
+                evidence));
+        }
+
+        var plantPull = CountLabels("plant.approaches", "food.eats.plant");
+        var meatPull = CountLabels("meat.approaches", "meat.scent_follows", "food.eats.meat");
+        var rottenMeatPull = CountLabels("rottenMeat.approaches", "rottenMeat.scent_follows", "food.eats.rottenMeat");
+        var eggPull = CountLabels("egg.approaches", "food.eats.egg");
+        var smallPreyPull = CountLabels("smallPrey.approaches", "food.eats.smallPrey");
+        var foodTraits = new List<string>();
+        AddTrait(foodTraits, "plant pull", plantPull);
+        AddTrait(foodTraits, "fresh meat pull", meatPull);
+        AddTrait(foodTraits, "rotten meat pull", rottenMeatPull);
+        AddTrait(foodTraits, "egg pull", eggPull);
+        AddTrait(foodTraits, "small prey pull", smallPreyPull);
+        AddTrait(foodTraits, "plant avoidance", CountLabels("plant.avoids"));
+        AddTrait(foodTraits, "fresh meat avoidance", CountLabels("meat.avoids", "meat.scent_avoids"));
+        AddTrait(foodTraits, "rotten meat avoidance", CountLabels("rottenMeat.avoids", "rottenMeat.scent_avoids"));
+        AddSection(
+            "food",
+            "Food",
+            BestSummary(
+                [
+                    ("plant", plantPull),
+                    ("fresh meat", meatPull),
+                    ("rotten meat", rottenMeatPull),
+                    ("egg", eggPull),
+                    ("small prey", smallPreyPull)
+                ],
+                "No clear food preference.",
+                "strongest pull"),
+            foodTraits,
+            EvidenceForLabels(
+                "plant.",
+                "meat.",
+                "rottenMeat.",
+                "egg.",
+                "smallPrey.",
+                "food.eats."));
+
+        var freshScentFollow = CountLabels("meat.scent_follows");
+        var freshScentAvoid = CountLabels("meat.scent_avoids");
+        var freshScentIgnore = CountLabels("meat.scent_ignores");
+        var rottenScentFollow = CountLabels("rottenMeat.scent_follows");
+        var rottenScentAvoid = CountLabels("rottenMeat.scent_avoids");
+        var rottenScentIgnore = CountLabels("rottenMeat.scent_ignores");
+        var scentTraits = new List<string>();
+        AddTrait(scentTraits, "follows fresh meat scent", freshScentFollow);
+        AddTrait(scentTraits, "avoids fresh meat scent", freshScentAvoid);
+        AddTrait(scentTraits, "ignores fresh meat scent", freshScentIgnore);
+        AddTrait(scentTraits, "follows rotten scent", rottenScentFollow);
+        AddTrait(scentTraits, "avoids rotten scent", rottenScentAvoid);
+        AddTrait(scentTraits, "ignores rotten scent", rottenScentIgnore);
+        AddSection(
+            "scent",
+            "Scent",
+            BestSummary(
+                [
+                    ("follows fresh meat scent", freshScentFollow),
+                    ("avoids fresh meat scent", freshScentAvoid),
+                    ("follows rotten scent", rottenScentFollow),
+                    ("avoids rotten scent", rottenScentAvoid),
+                    ("ignores scent", freshScentIgnore + rottenScentIgnore)
+                ],
+                "No clear scent response.",
+                "strongest scent pattern"),
+            scentTraits,
+            EvidenceForLabels("meat.scent_", "rottenMeat.scent_"));
+
+        var soundApproach = CountLabels("sound.approaches");
+        var soundAvoid = CountLabels("sound.avoids");
+        var soundAnswer = CountLabels("sound.answers", "idle.calls");
+        var quietSoundRespond = CountLabels("sound.quiet.responds");
+        var quietSoundIgnore = CountLabels("sound.quiet.ignores");
+        var loudSoundRespond = CountLabels("sound.loud.responds");
+        var loudSoundIgnore = CountLabels("sound.loud.ignores");
+        var lowToneRespond = CountLabels("sound.tone.low.responds");
+        var lowToneIgnore = CountLabels("sound.tone.low.ignores");
+        var midToneRespond = CountLabels("sound.tone.mid.responds");
+        var midToneIgnore = CountLabels("sound.tone.mid.ignores");
+        var highToneRespond = CountLabels("sound.tone.high.responds");
+        var highToneIgnore = CountLabels("sound.tone.high.ignores");
+        var soundTraits = new List<string>();
+        AddTrait(soundTraits, "moves toward sound", soundApproach);
+        AddTrait(soundTraits, "moves away from sound", soundAvoid);
+        AddTrait(soundTraits, "answers with sound", soundAnswer);
+        AddTrait(soundTraits, "responds to quiet sound", quietSoundRespond);
+        AddTrait(soundTraits, "ignores quiet sound", quietSoundIgnore);
+        AddTrait(soundTraits, "responds to loud sound", loudSoundRespond);
+        AddTrait(soundTraits, "ignores loud sound", loudSoundIgnore);
+        AddTrait(soundTraits, "responds to low tone", lowToneRespond);
+        AddTrait(soundTraits, "ignores low tone", lowToneIgnore);
+        AddTrait(soundTraits, "responds to mid tone", midToneRespond);
+        AddTrait(soundTraits, "ignores mid tone", midToneIgnore);
+        AddTrait(soundTraits, "responds to high tone", highToneRespond);
+        AddTrait(soundTraits, "ignores high tone", highToneIgnore);
+        var amplitudeSummary = quietSoundIgnore > 0 && loudSoundRespond > 0
+            ? "amplitude: loud threshold"
+            : quietSoundRespond > 0 && loudSoundRespond > 0
+                ? "amplitude: broad response"
+                : loudSoundRespond > 0
+                    ? "amplitude: loud-biased"
+                    : quietSoundRespond > 0
+                        ? "amplitude: quiet-sensitive"
+                        : string.Empty;
+        var toneResponders = new List<string>();
+        if (lowToneRespond > 0)
+        {
+            toneResponders.Add("low");
+        }
+
+        if (midToneRespond > 0)
+        {
+            toneResponders.Add("mid");
+        }
+
+        if (highToneRespond > 0)
+        {
+            toneResponders.Add("high");
+        }
+
+        var toneSummary = toneResponders.Count switch
+        {
+            0 => string.Empty,
+            1 => $"tone: {toneResponders[0]}",
+            3 => "tone: broad response",
+            _ => $"tone: {string.Join(" / ", toneResponders)}"
+        };
+        var soundSummaryParts = new[]
+            {
+                BestSummary(
+                    [
+                        ("seeking", soundApproach),
+                        ("avoidant", soundAvoid),
+                        ("answering", soundAnswer)
+                    ],
+                    "No clear sound response.",
+                    "strongest sound pattern"),
+                amplitudeSummary,
+                toneSummary
+            }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
+        AddSection(
+            "sound",
+            "Sound",
+            string.Join("; ", soundSummaryParts),
+            soundTraits,
+            EvidenceForLabels("sound.", "idle.calls"));
+
+        var creatureAggression = CountLabels("creature.attacks", "creature.grabs");
+        var creatureApproach = CountLabels("creature.approaches");
+        var creatureAvoid = CountLabels("creature.avoids");
+        var creatureIgnore = CountLabels("creature.ignores");
+        var creatureTraits = new List<string>();
+        AddTrait(creatureTraits, "attacks or grabs", creatureAggression);
+        AddTrait(creatureTraits, "approaches creatures", creatureApproach);
+        AddTrait(creatureTraits, "avoids creatures", creatureAvoid);
+        AddTrait(creatureTraits, "ignores creatures", creatureIgnore);
+        AddSection(
+            "creature",
+            "Creature",
+            BestSummary(
+                [
+                    ("aggressive", creatureAggression),
+                    ("approaching", creatureApproach),
+                    ("avoidant", creatureAvoid),
+                    ("ignoring", creatureIgnore)
+                ],
+                "No clear creature response.",
+                "strongest creature pattern"),
+            creatureTraits,
+            EvidenceForLabels("creature."));
+
+        var conflictFood = CountLabels("conflict.food");
+        var conflictAggression = CountLabels("conflict.aggression");
+        var conflictAvoidCreature = CountLabels("conflict.avoids_creature");
+        var conflictSound = CountLabels("conflict.sound");
+        var conflictHesitate = CountLabels("conflict.hesitates");
+        var conflictTraits = new List<string>();
+        AddTrait(conflictTraits, "chooses food", conflictFood);
+        AddTrait(conflictTraits, "chooses aggression", conflictAggression);
+        AddTrait(conflictTraits, "avoids creature", conflictAvoidCreature);
+        AddTrait(conflictTraits, "responds to sound", conflictSound);
+        AddTrait(conflictTraits, "hesitates", conflictHesitate);
+        AddSection(
+            "conflict",
+            "Conflict",
+            BestSummary(
+                [
+                    ("food", conflictFood),
+                    ("aggression", conflictAggression),
+                    ("creature avoidance", conflictAvoidCreature),
+                    ("sound", conflictSound),
+                    ("hesitation", conflictHesitate)
+                ],
+                "No clear compound-cue priority.",
+                "priority"),
+            conflictTraits,
+            EvidenceForLabels("conflict."));
+
+        var idleRest = CountLabels("idle.rests");
+        var idleSearch = CountLabels("idle.searches");
+        var idleCall = CountLabels("idle.calls");
+        var reproduce = CountLabels("action.reproduces");
+        var idleTraits = new List<string>();
+        AddTrait(idleTraits, "rests when empty", idleRest);
+        AddTrait(idleTraits, "searches when empty", idleSearch);
+        AddTrait(idleTraits, "calls when empty", idleCall);
+        AddTrait(idleTraits, "reproduce intent", reproduce);
+        AddSection(
+            "idle",
+            "Idle",
+            BestSummary(
+                [
+                    ("resting", idleRest),
+                    ("searching", idleSearch),
+                    ("calling", idleCall),
+                    ("reproductive", reproduce)
+                ],
+                "No clear idle tendency.",
+                "tendency"),
+            idleTraits,
+            EvidenceForLabels("idle.", "action.reproduces"));
+
+        var summaryParts = sections
+            .Where(section => !section.Summary.StartsWith("No clear", StringComparison.Ordinal))
+            .Select(section => $"{section.Name}: {section.Summary}")
+            .Take(4)
+            .ToArray();
+        var summary = summaryParts.Length > 0
+            ? string.Join(" | ", summaryParts)
+            : fingerprints.Count > 0
+                ? $"Weak profile; strongest signal: {fingerprints[0].Name}."
+                : "No strong behavior profile yet.";
+
+        return new BrainLabBehaviorProfile(summary, sections);
+    }
+
+    private static float BrainLabProbeOutputValue(BrainProbeEvaluation evaluation, string key)
+    {
+        return evaluation.Outputs.FirstOrDefault(output => string.Equals(output.Key, key, StringComparison.Ordinal))?.ModifiedValue ?? 0f;
+    }
+
+    private static bool BrainLabProbeOutputActive(BrainProbeEvaluation evaluation, string key)
+    {
+        var output = evaluation.Outputs.FirstOrDefault(output => string.Equals(output.Key, key, StringComparison.Ordinal));
+        return output?.ModifiedActive ?? false;
+    }
+
+    private static IReadOnlyList<BrainLabProbeFixtureCue> CreateBrainLabProbeFixtureCues(BrainLabWorldProbeFixture fixture)
+    {
+        var cues = new List<BrainLabProbeFixtureCue>();
+        foreach (var resource in fixture.WorldProbe.Resources ?? [])
+        {
+            if (string.Equals(resource.Kind, nameof(ResourceKind.Meat), StringComparison.OrdinalIgnoreCase))
+            {
+                var freshness = Math.Clamp(resource.Freshness, MeatQuality.MinimumFreshness, 1);
+                var kind = MeatQuality.IsFresh((float)freshness) ? "meat" : "rottenMeat";
+                var label = kind == "meat" ? "meat" : "rotten meat";
+                cues.Add(new BrainLabProbeFixtureCue(kind, label, BrainLabProbeCueDirection(resource.X, resource.Y)));
+            }
+            else
+            {
+                cues.Add(new BrainLabProbeFixtureCue("plant", "plant", BrainLabProbeCueDirection(resource.X, resource.Y)));
+            }
+        }
+
+        foreach (var egg in fixture.WorldProbe.Eggs ?? [])
+        {
+            cues.Add(new BrainLabProbeFixtureCue("egg", "egg", BrainLabProbeCueDirection(egg.X, egg.Y)));
+        }
+
+        foreach (var prey in fixture.WorldProbe.SmallPrey ?? [])
+        {
+            cues.Add(new BrainLabProbeFixtureCue("smallPrey", "small prey", BrainLabProbeCueDirection(prey.X, prey.Y)));
+        }
+
+        foreach (var creature in fixture.WorldProbe.Creatures ?? [])
+        {
+            if (creature.IsProbeSoundOnly || creature.SoundAmplitude > BrainLabSoundEmissionThreshold)
+            {
+                var soundKind = creature.SoundAmplitude <= BrainLabQuietSoundAmplitudeMax
+                    ? "soundQuiet"
+                    : creature.SoundAmplitude >= BrainLabLoudSoundAmplitudeMin
+                        ? "soundLoud"
+                        : "sound";
+                var soundAmplitudeClass = soundKind switch
+                {
+                    "soundQuiet" => "quiet",
+                    "soundLoud" => "loud",
+                    _ => "medium"
+                };
+                var soundToneClass = creature.SoundTone <= BrainLabLowSoundToneMax
+                    ? "low"
+                    : creature.SoundTone >= BrainLabHighSoundToneMin
+                        ? "high"
+                        : "mid";
+                var soundLabel = soundKind switch
+                {
+                    "soundQuiet" => "quiet sound",
+                    "soundLoud" => "loud sound",
+                    _ => "sound"
+                };
+                cues.Add(new BrainLabProbeFixtureCue(
+                    soundKind,
+                    soundLabel,
+                    BrainLabProbeCueDirection(creature.X, creature.Y),
+                    soundAmplitudeClass,
+                    soundToneClass));
+            }
+
+            if (!creature.IsProbeSoundOnly)
+            {
+                cues.Add(new BrainLabProbeFixtureCue("creature", "creature", BrainLabProbeCueDirection(creature.X, creature.Y)));
+            }
+        }
+
+        return cues;
+    }
+
+    private static string BrainLabProbeCueFamily(string kind)
+    {
+        return kind switch
+        {
+            "rottenMeat" => "meat",
+            "soundQuiet" or "soundLoud" => "sound",
+            _ => kind
+        };
+    }
+
+    private static string BrainLabProbeCueDirection(double x, double y)
+    {
+        var absX = Math.Abs(x);
+        var absY = Math.Abs(y);
+        if (absX < 0.001 && absY < 0.001)
+        {
+            return "contact";
+        }
+
+        if (absY > absX * 0.75)
+        {
+            return y >= 0 ? "right" : "left";
+        }
+
+        return x < 0 ? "behind" : "ahead";
+    }
+
+    private static bool BrainLabProbeTurnsTowardCue(float move, float turn, string direction)
+    {
+        return direction switch
+        {
+            "ahead" => move > BrainLabBehaviorMoveThreshold && Math.Abs(turn) <= 0.5f,
+            "right" => turn > BrainLabBehaviorTurnThreshold,
+            "left" => turn < -BrainLabBehaviorTurnThreshold,
+            "behind" => Math.Abs(turn) > BrainLabBehaviorTurnThreshold,
+            _ => false
+        };
+    }
+
+    private static bool BrainLabProbeTurnsAwayFromCue(float move, float turn, string direction)
+    {
+        return direction switch
+        {
+            "ahead" => Math.Abs(turn) > BrainLabBehaviorTurnThreshold,
+            "right" => turn < -BrainLabBehaviorTurnThreshold,
+            "left" => turn > BrainLabBehaviorTurnThreshold,
+            "behind" => move > BrainLabBehaviorMoveThreshold && Math.Abs(turn) <= BrainLabBehaviorTurnThreshold,
+            _ => false
+        };
     }
 
     public BrainLabWorldProbeScene GetBrainLabWorldProbe(BrainLabWorldProbeRequest request)
@@ -1354,6 +2534,13 @@ public sealed partial class LineageRunManager
             creature.Senses.SoundDensity,
             isFocus);
     }
+
+    private readonly record struct BrainLabProbeFixtureCue(
+        string Kind,
+        string Label,
+        string Direction,
+        string? SoundAmplitudeClass = null,
+        string? SoundToneClass = null);
 
     private sealed record BrainLabPresetDefinition(
         string Key,
