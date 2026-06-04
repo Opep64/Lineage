@@ -325,6 +325,8 @@ public sealed record SimulationScenario
 
     public float ReproductionCooldownSeconds { get; init; } = 7f;
 
+    public float MaxLifeExpectancySeconds { get; init; } = CreatureGenome.Baseline.MaxLifeExpectancySeconds;
+
     public bool RequireReproductionIntent { get; init; } = true;
 
     public float ReproductivePrimeAgeSeconds { get; init; } = 240f;
@@ -571,6 +573,7 @@ public sealed record SimulationScenario
         EnsureNonNegative(EggIncubationSeconds, nameof(EggIncubationSeconds));
         EnsureNonNegative(MaturityAgeSeconds, nameof(MaturityAgeSeconds));
         EnsureNonNegative(ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
+        EnsurePositive(MaxLifeExpectancySeconds, nameof(MaxLifeExpectancySeconds));
         EnsureNonNegative(ReproductivePrimeAgeSeconds, nameof(ReproductivePrimeAgeSeconds));
         EnsureNonNegative(ReproductiveSenescenceAgeSeconds, nameof(ReproductiveSenescenceAgeSeconds));
         EnsureRange(SenescentFertilityMultiplier, 0f, 1f, nameof(SenescentFertilityMultiplier));

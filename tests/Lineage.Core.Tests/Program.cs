@@ -67,6 +67,7 @@ var tests = new (string Name, Action Body)[]
     ("Metabolic pace scales basal drain and cooldown", MetabolicPaceScalesBasalDrainAndCooldown),
     ("Metabolic pace speeds life-history systems", MetabolicPaceSpeedsLifeHistorySystems),
     ("Metabolic pace scales locomotion", MetabolicPaceScalesLocomotion),
+    ("Metabolic pace and body size shape life expectancy", MetabolicPaceAndBodySizeShapeLifeExpectancy),
     ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
     ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
@@ -185,6 +186,7 @@ var tests = new (string Name, Action Body)[]
     ("Lineage telemetry records thermal niche exposure", LineageTelemetryRecordsThermalNicheExposure),
     ("Thermal ecotype analyzer groups living founder niches", ThermalEcotypeAnalyzerGroupsLivingFounderNiches),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
+    ("Death system marks old age death reason", DeathSystemMarksOldAgeDeathReason),
     ("Spatial heatmaps record lifecycle and interaction events", SpatialHeatmapsRecordLifecycleAndInteractionEvents),
     ("World state prunes extinct payloads", WorldStatePrunesExtinctPayloads),
     ("World state keeps survivor ancestor payloads", WorldStateKeepsSurvivorAncestorPayloads),
@@ -2515,7 +2517,7 @@ static void MetabolicPaceScalesHelperRates()
 
     AssertEqual(MetabolicPaceBand.High, CreatureMetabolism.PaceBand(fast), "Fast pace band");
     AssertEqual(MetabolicPaceBand.Low, CreatureMetabolism.PaceBand(slow), "Slow pace band");
-    AssertClose(MathF.Pow(2f, 1.25f), CreatureMetabolism.BasalCostMultiplier(fast), 0.000001, "Fast basal multiplier");
+    AssertClose(MathF.Pow(2f, 1.1f), CreatureMetabolism.BasalCostMultiplier(fast), 0.000001, "Fast basal multiplier");
     AssertClose(MathF.Pow(2f, 0.85f), CreatureMetabolism.EggProductionRateMultiplier(fast), 0.000001, "Fast egg production multiplier");
     AssertClose(MathF.Pow(2f, 0.3f), CreatureMetabolism.LocomotionRateMultiplier(fast), 0.000001, "Fast locomotion multiplier");
     AssertTrue(
@@ -2669,6 +2671,43 @@ static void MetabolicPaceScalesLocomotion()
     AssertTrue(
         CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(adult, fastGenome) > CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(adult, slowGenome),
         "Fast pace should turn faster than slow pace");
+}
+
+static void MetabolicPaceAndBodySizeShapeLifeExpectancy()
+{
+    var fastSmall = CreatureGenome.Baseline with
+    {
+        BodyRadius = CreatureGenome.Baseline.BodyRadius * 0.5f,
+        MetabolicPace = 1.4f,
+        MaxLifeExpectancySeconds = 1000f
+    };
+    var slowLarge = CreatureGenome.Baseline with
+    {
+        BodyRadius = CreatureGenome.Baseline.BodyRadius * 2f,
+        MetabolicPace = 0.7f,
+        MaxLifeExpectancySeconds = 1000f
+    };
+
+    AssertTrue(
+        CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(fastSmall) < fastSmall.MaxLifeExpectancySeconds,
+        "Small high-pace creature should have shorter effective life expectancy");
+    AssertTrue(
+        CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(slowLarge) > slowLarge.MaxLifeExpectancySeconds,
+        "Large low-pace creature should have longer effective life expectancy");
+    AssertTrue(
+        CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(slowLarge)
+            > CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(fastSmall),
+        "Slow large life expectancy should exceed fast small life expectancy");
+
+    var oldCreature = new CreatureState
+    {
+        AgeSeconds = CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(fastSmall) * 1.26f
+    };
+    AssertClose(
+        1f,
+        CreatureMetabolism.OldAgeDeathProbability(oldCreature, fastSmall, 1f),
+        0.000001,
+        "Old age death should become guaranteed after the ramp");
 }
 
 static void FatStoragePreservesEggReservePriority()
@@ -8706,6 +8745,36 @@ static void DeathSystemMarksLineageDeathReason()
     AssertClose(1f, simulation.State.Stats.SpatialHeatmaps.StarvationDeaths.Sum(), 0.000001, "Starvation heatmap count");
 }
 
+static void DeathSystemMarksOldAgeDeathReason()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 118,
+        systems: [new DeathSystem()]);
+
+    var genome = CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 0f,
+        MaxLifeExpectancySeconds = 4f
+    };
+    var genomeId = simulation.State.AddGenome(genome);
+    var creatureId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 100f);
+    var creature = simulation.State.Creatures[0];
+    creature.AgeSeconds = CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(genome) * 1.26f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertEqual(0, simulation.State.Creatures.Count, "Old creature should die");
+    AssertEqual(1, simulation.State.Stats.CreatureDeathCount, "Old age death count total");
+    AssertEqual(1, simulation.State.Stats.OldAgeDeathCount, "Old age death count");
+    AssertEqual(0, simulation.State.Stats.StarvationDeathCount, "Old age should not count as starvation");
+    AssertTrue(simulation.State.TryGetLineageRecord(creatureId, out var record), "Old age lineage lookup should succeed");
+    AssertEqual(CreatureDeathReason.OldAge, record.DeathReason, "Old age lineage death reason");
+    AssertClose(1f, simulation.State.Stats.SpatialHeatmaps.Deaths.Sum(), 0.000001, "Death heatmap count");
+    AssertClose(1f, simulation.State.Stats.SpatialHeatmaps.OldAgeDeaths.Sum(), 0.000001, "Old age heatmap count");
+}
+
 static void SpatialHeatmapsRecordLifecycleAndInteractionEvents()
 {
     var foodIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -12191,6 +12260,29 @@ static void RosterLineageSummariesGroupInjectedProfileDescendants()
     AssertEqual(0, scavengerSummary.InjuryDeathsFromUnknownProfile, "Scavenger unattributed injury death");
     AssertEqual((long?)0, scavengerSummary.ExtinctionTick, "Scavenger extinction tick");
     AssertClose(0f, scavengerSummary.TailAverageLivingCreatures, 0.000001, "Scavenger tail living");
+
+    var oldAgeGenome = CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 0f,
+        MaxLifeExpectancySeconds = 4f
+    };
+    var oldAgeGenomeId = simulation.State.AddGenome(oldAgeGenome);
+    var oldForagerIndex = simulation.State.Creatures.FindIndex(creature => creature.Id == foragerInjection.CreatureIds[1]);
+    var oldForager = simulation.State.Creatures[oldForagerIndex];
+    oldForager.GenomeId = oldAgeGenomeId;
+    oldForager.Energy = 100f;
+    oldForager.Health = 100f;
+    oldForager.AgeSeconds = CreatureMetabolism.EffectiveMaxLifeExpectancySeconds(oldAgeGenome) * 1.26f;
+    simulation.State.Creatures[oldForagerIndex] = oldForager;
+    new DeathSystem().Update(simulation.State, 1f);
+    summaries = RosterLineageAnalyzer.Analyze(
+            simulation.State.LineageRecords,
+            [foragerInjection, scavengerInjection],
+            finalTick: 10)
+        .ToDictionary(summary => summary.ProfileName);
+    foragerSummary = summaries["Roster forager"];
+    AssertEqual(1, foragerSummary.OldAgeDeaths, "Forager old age deaths");
+    AssertEqual(0, foragerSummary.UnknownDeaths, "Forager old age should not count as unknown");
 }
 
 static void SimulationSnapshotsRestoreExactContinuation()

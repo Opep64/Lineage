@@ -30,6 +30,8 @@ public sealed class SimulationStats
 
     public int RottenMeatDeathCount { get; private set; }
 
+    public int OldAgeDeathCount { get; private set; }
+
     public int BarrenDeathCount { get; private set; }
 
     public int SparseDeathCount { get; private set; }
@@ -138,6 +140,9 @@ public sealed class SimulationStats
                 break;
             case CreatureDeathReason.RottenMeat:
                 RottenMeatDeathCount++;
+                break;
+            case CreatureDeathReason.OldAge:
+                OldAgeDeathCount++;
                 break;
         }
 
@@ -302,6 +307,7 @@ public sealed class SimulationStats
         int starvationDeathCount,
         int injuryDeathCount,
         int rottenMeatDeathCount,
+        int oldAgeDeathCount,
         IEnumerable<SimulationStatsSnapshot> snapshots,
         int reproductionAttemptCount = 0,
         int barrenDeathCount = 0,
@@ -337,6 +343,7 @@ public sealed class SimulationStats
         StarvationDeathCount = starvationDeathCount;
         InjuryDeathCount = injuryDeathCount;
         RottenMeatDeathCount = rottenMeatDeathCount;
+        OldAgeDeathCount = oldAgeDeathCount;
         BarrenDeathCount = barrenDeathCount;
         SparseDeathCount = sparseDeathCount;
         GrasslandDeathCount = grasslandDeathCount;

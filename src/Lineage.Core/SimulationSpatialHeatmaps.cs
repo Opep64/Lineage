@@ -20,6 +20,8 @@ public sealed record SimulationSpatialHeatmapSnapshot
 
     public float[] RottenMeatDeaths { get; init; } = [];
 
+    public float[] OldAgeDeaths { get; init; } = [];
+
     public float[] UnknownDeaths { get; init; } = [];
 
     public float[] PlantCaloriesEaten { get; init; } = [];
@@ -44,6 +46,7 @@ public sealed class SimulationSpatialHeatmaps
     private float[] _starvationDeaths = [];
     private float[] _injuryDeaths = [];
     private float[] _rottenMeatDeaths = [];
+    private float[] _oldAgeDeaths = [];
     private float[] _unknownDeaths = [];
     private float[] _plantCaloriesEaten = [];
     private float[] _meatCaloriesEaten = [];
@@ -69,6 +72,8 @@ public sealed class SimulationSpatialHeatmaps
     public IReadOnlyList<float> InjuryDeaths => _injuryDeaths;
 
     public IReadOnlyList<float> RottenMeatDeaths => _rottenMeatDeaths;
+
+    public IReadOnlyList<float> OldAgeDeaths => _oldAgeDeaths;
 
     public IReadOnlyList<float> UnknownDeaths => _unknownDeaths;
 
@@ -115,6 +120,7 @@ public sealed class SimulationSpatialHeatmaps
                 CreatureDeathReason.Starvation => _starvationDeaths,
                 CreatureDeathReason.Injury => _injuryDeaths,
                 CreatureDeathReason.RottenMeat => _rottenMeatDeaths,
+                CreatureDeathReason.OldAge => _oldAgeDeaths,
                 _ => _unknownDeaths
             },
             1f);
@@ -158,6 +164,7 @@ public sealed class SimulationSpatialHeatmaps
             StarvationDeaths = _starvationDeaths.ToArray(),
             InjuryDeaths = _injuryDeaths.ToArray(),
             RottenMeatDeaths = _rottenMeatDeaths.ToArray(),
+            OldAgeDeaths = _oldAgeDeaths.ToArray(),
             UnknownDeaths = _unknownDeaths.ToArray(),
             PlantCaloriesEaten = _plantCaloriesEaten.ToArray(),
             MeatCaloriesEaten = _meatCaloriesEaten.ToArray(),
@@ -207,6 +214,7 @@ public sealed class SimulationSpatialHeatmaps
         _starvationDeaths = NormalizeValues(snapshot.StarvationDeaths);
         _injuryDeaths = NormalizeValues(snapshot.InjuryDeaths);
         _rottenMeatDeaths = NormalizeValues(snapshot.RottenMeatDeaths);
+        _oldAgeDeaths = NormalizeValues(snapshot.OldAgeDeaths, expectedLength);
         _unknownDeaths = NormalizeValues(snapshot.UnknownDeaths);
         _plantCaloriesEaten = NormalizeValues(snapshot.PlantCaloriesEaten);
         _meatCaloriesEaten = NormalizeValues(snapshot.MeatCaloriesEaten);
@@ -268,6 +276,7 @@ public sealed class SimulationSpatialHeatmaps
         _starvationDeaths = new float[length];
         _injuryDeaths = new float[length];
         _rottenMeatDeaths = new float[length];
+        _oldAgeDeaths = new float[length];
         _unknownDeaths = new float[length];
         _plantCaloriesEaten = new float[length];
         _meatCaloriesEaten = new float[length];
@@ -301,6 +310,7 @@ public sealed class SimulationSpatialHeatmaps
         _starvationDeaths = [];
         _injuryDeaths = [];
         _rottenMeatDeaths = [];
+        _oldAgeDeaths = [];
         _unknownDeaths = [];
         _plantCaloriesEaten = [];
         _meatCaloriesEaten = [];

@@ -27,6 +27,7 @@ public readonly record struct CreatureGenome
         EggIncubationSeconds = 18f,
         MaturityAgeSeconds = 45f,
         ReproductionCooldownSeconds = 8f,
+        MaxLifeExpectancySeconds = 1200f,
         DietaryAdaptation = 0.1f,
         CarrionAdaptation = 0f,
         TenderPlantAdaptation = 0f,
@@ -45,7 +46,7 @@ public readonly record struct CreatureGenome
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 28;
+    private const int MutatingTraitCount = 29;
 
     public float BodyRadius { get; init; }
 
@@ -76,6 +77,8 @@ public readonly record struct CreatureGenome
     public float MaturityAgeSeconds { get; init; }
 
     public float ReproductionCooldownSeconds { get; init; }
+
+    public float MaxLifeExpectancySeconds { get; init; }
 
     public float DietaryAdaptation { get; init; }
 
@@ -177,6 +180,13 @@ public readonly record struct CreatureGenome
                 strength,
                 CreatureMetabolism.MinimumPace,
                 CreatureMetabolism.MaximumPace),
+            MaxLifeExpectancySeconds = MutateTraitIfSelected(
+                random,
+                mutations[28],
+                MaxLifeExpectancySeconds,
+                strength,
+                120f,
+                5000f),
             MutationStrength = mutationProfile.MutationStrength,
             TraitMutationRate = mutationProfile.TraitMutationRate,
             BrainMutationRate = mutationProfile.BrainMutationRate
@@ -225,6 +235,11 @@ public readonly record struct CreatureGenome
             normalized = normalized with { MetabolicPace = Baseline.MetabolicPace };
         }
 
+        if (normalized.MaxLifeExpectancySeconds <= 0f || !float.IsFinite(normalized.MaxLifeExpectancySeconds))
+        {
+            normalized = normalized with { MaxLifeExpectancySeconds = Baseline.MaxLifeExpectancySeconds };
+        }
+
         EnsurePositive(normalized.BodyRadius, nameof(BodyRadius));
         EnsurePositive(normalized.MaxSpeed, nameof(MaxSpeed));
         EnsurePositive(normalized.MaxTurnRadiansPerSecond, nameof(MaxTurnRadiansPerSecond));
@@ -240,6 +255,7 @@ public readonly record struct CreatureGenome
         EnsurePositive(normalized.ReproductionEnergyThreshold, nameof(ReproductionEnergyThreshold));
         EnsureNonNegative(normalized.MaturityAgeSeconds, nameof(MaturityAgeSeconds));
         EnsureNonNegative(normalized.ReproductionCooldownSeconds, nameof(ReproductionCooldownSeconds));
+        EnsurePositive(normalized.MaxLifeExpectancySeconds, nameof(MaxLifeExpectancySeconds));
         EnsureProbability(normalized.DietaryAdaptation, nameof(DietaryAdaptation));
         EnsureProbability(normalized.CarrionAdaptation, nameof(CarrionAdaptation));
         EnsureProbability(normalized.TenderPlantAdaptation, nameof(TenderPlantAdaptation));

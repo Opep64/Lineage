@@ -7,9 +7,10 @@ public readonly record struct CreatureDeathCauseCounts(
     int Starvation,
     int Injury,
     int RottenMeat,
+    int OldAge,
     int Unknown)
 {
-    public int Total => Starvation + Injury + RottenMeat + Unknown;
+    public int Total => Starvation + Injury + RottenMeat + OldAge + Unknown;
 
     public int For(CreatureDeathReason reason)
     {
@@ -18,6 +19,7 @@ public readonly record struct CreatureDeathCauseCounts(
             CreatureDeathReason.Starvation => Starvation,
             CreatureDeathReason.Injury => Injury,
             CreatureDeathReason.RottenMeat => RottenMeat,
+            CreatureDeathReason.OldAge => OldAge,
             _ => Unknown
         };
     }
@@ -29,6 +31,7 @@ public readonly record struct CreatureDeathCauseCounts(
             CreatureDeathReason.Starvation => this with { Starvation = Starvation + 1 },
             CreatureDeathReason.Injury => this with { Injury = Injury + 1 },
             CreatureDeathReason.RottenMeat => this with { RottenMeat = RottenMeat + 1 },
+            CreatureDeathReason.OldAge => this with { OldAge = OldAge + 1 },
             _ => this with { Unknown = Unknown + 1 }
         };
     }

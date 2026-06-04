@@ -112,6 +112,7 @@ public static class SimulationSnapshotJson
             snapshot.StarvationDeathCount,
             snapshot.InjuryDeathCount,
             snapshot.RottenMeatDeathCount,
+            snapshot.OldAgeDeathCount,
             snapshot.StatsSnapshots,
             snapshot.ReproductionAttemptCount,
             snapshot.BarrenDeathCount,

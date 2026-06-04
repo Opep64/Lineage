@@ -187,6 +187,7 @@ public readonly record struct SimulationStatsSnapshot(
     int StarvationDeathCount,
     int InjuryDeathCount,
     int RottenMeatDeathCount,
+    int OldAgeDeathCount,
     int PlantDepletionCount,
     int PlantLocalDispersalCount,
     int PlantClusterRelocationCount,

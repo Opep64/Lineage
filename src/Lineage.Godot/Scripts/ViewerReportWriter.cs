@@ -212,6 +212,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starvation deaths", state.Stats.StarvationDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rotten meat deaths", state.Stats.RottenMeatDeathCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Old age deaths", state.Stats.OldAgeDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Average lifespan", $"{snapshot.AverageLifespanSeconds:0.###} seconds");
         WriteMetric(writer, "Median lifespan", $"{snapshot.MedianLifespanSeconds:0.###} seconds");
         WriteMetric(writer, "Max generation", snapshot.MaxGeneration.ToString(CultureInfo.InvariantCulture));
@@ -365,6 +366,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Avg sound clarity", snapshot.AverageSoundToneClarity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Injury deaths", state.Stats.InjuryDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rotten meat deaths", state.Stats.RottenMeatDeathCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Old age deaths", state.Stats.OldAgeDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Fresh kill share", FormatPercent(snapshot.FreshKillCaloriesEatenShare));
         WriteMetric(writer, "Meat raw share", FormatPercent(snapshot.MeatCaloriesEatenShare));
         WriteMetric(writer, "Fresh meat share", FormatPercent(snapshot.FreshMeatCaloriesEatenShare));
@@ -614,7 +616,7 @@ public static class ViewerReportWriter
             writer.WriteLine("<section>");
             writer.WriteLine("<h2>Injected Profile Lineages</h2>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
-            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Old Age</th><th>Other</th></tr></thead>");
             writer.WriteLine("<tbody>");
             foreach (var summary in rosterSummaries)
             {
@@ -630,6 +632,7 @@ public static class ViewerReportWriter
                     $"<td>{Html(summary.StarvationDeaths)}</td>" +
                     $"<td>{Html(summary.InjuryDeaths)}</td>" +
                     $"<td>{Html(summary.RottenMeatDeaths)}</td>" +
+                    $"<td>{Html(summary.OldAgeDeaths)}</td>" +
                     $"<td>{Html(summary.UnknownDeaths)}</td>" +
                     "</tr>");
             }
@@ -1472,6 +1475,12 @@ public static class ViewerReportWriter
                 heatmaps.RottenMeatDeaths,
                 "#5f4b8b",
                 "Creature death locations attributed to rotten meat damage."),
+            new SpatialHeatmapLayer(
+                "Old Age Deaths",
+                "deaths",
+                heatmaps.OldAgeDeaths,
+                "#d1a23a",
+                "Creature death locations where old age was the recorded cause."),
             new SpatialHeatmapLayer(
                 "Plant Eating",
                 "raw kcal",
@@ -4500,7 +4509,7 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Deaths by Biome and Cause</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Biome</th><th>Total</th><th>Share</th><th>Starvation</th><th>Injury</th><th>Rotten Meat</th><th>Unknown</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Biome</th><th>Total</th><th>Share</th><th>Starvation</th><th>Injury</th><th>Rotten Meat</th><th>Old Age</th><th>Unknown</th></tr></thead>");
         writer.WriteLine("<tbody>");
 
         foreach (var biome in BiomeKinds.All)
@@ -4514,6 +4523,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(row.Starvation)}</td>" +
                 $"<td>{Html(row.Injury)}</td>" +
                 $"<td>{Html(row.RottenMeat)}</td>" +
+                $"<td>{Html(row.OldAge)}</td>" +
                 $"<td>{Html(row.Unknown)}</td>" +
                 "</tr>");
         }
@@ -4526,6 +4536,7 @@ public static class ViewerReportWriter
             $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.Starvation))}</td>" +
             $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.Injury))}</td>" +
             $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.RottenMeat))}</td>" +
+            $"<td>{Html(SumDeathCause(counts, CreatureDeathReason.OldAge))}</td>" +
             $"<td>{Html(SumUnknownDeaths(counts))}</td>" +
             "</tr>");
 

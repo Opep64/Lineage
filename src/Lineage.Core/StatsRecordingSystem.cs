@@ -1247,6 +1247,7 @@ public sealed class StatsRecordingSystem(
             state.Stats.StarvationDeathCount,
             state.Stats.InjuryDeathCount,
             state.Stats.RottenMeatDeathCount,
+            state.Stats.OldAgeDeathCount,
             state.Stats.PlantDepletionCount,
             state.Stats.PlantLocalDispersalCount,
             state.Stats.PlantClusterRelocationCount,

@@ -28,9 +28,13 @@ public sealed class DeathSystem : ISimulationSystem
         for (var readIndex = 0; readIndex < state.Creatures.Count; readIndex++)
         {
             var creature = state.Creatures[readIndex];
-            if (creature.Energy <= 0f || creature.Health <= 0f)
+            var genome = state.GetGenome(creature.GenomeId);
+            var oldAgeDeathProbability = CreatureMetabolism.OldAgeDeathProbability(creature, genome, deltaSeconds);
+            var diedOfOldAge = oldAgeDeathProbability >= 1f
+                || (oldAgeDeathProbability > 0f && state.Random.NextSingle() < oldAgeDeathProbability);
+            if (creature.Energy <= 0f || creature.Health <= 0f || diedOfOldAge)
             {
-                var reason = GetDeathReason(creature);
+                var reason = GetDeathReason(creature, diedOfOldAge);
                 SpawnMeatResource(state, creature, reason);
                 state.MarkCreatureDead(
                     creature.Id,
@@ -91,7 +95,7 @@ public sealed class DeathSystem : ISimulationSystem
         });
     }
 
-    private static CreatureDeathReason GetDeathReason(CreatureState creature)
+    private static CreatureDeathReason GetDeathReason(CreatureState creature, bool diedOfOldAge)
     {
         if (creature.Energy <= 0f)
         {
@@ -105,6 +109,11 @@ public sealed class DeathSystem : ISimulationSystem
                 : creature.LastRottenMeatDamage > 0f
                     ? CreatureDeathReason.RottenMeat
                     : CreatureDeathReason.Injury;
+        }
+
+        if (diedOfOldAge)
+        {
+            return CreatureDeathReason.OldAge;
         }
 
         return CreatureDeathReason.Unknown;

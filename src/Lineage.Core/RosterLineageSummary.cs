@@ -101,6 +101,9 @@ public static class RosterLineageAnalyzer
                     case CreatureDeathReason.RottenMeat:
                         profile.RottenMeatDeaths++;
                         break;
+                    case CreatureDeathReason.OldAge:
+                        profile.OldAgeDeaths++;
+                        break;
                     default:
                         profile.UnknownDeaths++;
                         break;
@@ -199,6 +202,7 @@ public static class RosterLineageAnalyzer
         public int StarvationDeaths;
         public int InjuryDeaths;
         public int RottenMeatDeaths;
+        public int OldAgeDeaths;
         public int UnknownDeaths;
         public long TailLivingTickTotal;
         public long? LastDeathTick;
@@ -252,6 +256,7 @@ public static class RosterLineageAnalyzer
                 StarvationDeaths,
                 InjuryDeaths,
                 RottenMeatDeaths,
+                OldAgeDeaths,
                 UnknownDeaths,
                 TailLivingTickTotal / (float)Math.Max(1, tailWindowTicks),
                 extinct ? LastDeathTick : null,
@@ -320,6 +325,7 @@ public readonly record struct RosterLineageSummary(
     int StarvationDeaths,
     int InjuryDeaths,
     int RottenMeatDeaths,
+    int OldAgeDeaths,
     int UnknownDeaths,
     float TailAverageLivingCreatures,
     long? ExtinctionTick,

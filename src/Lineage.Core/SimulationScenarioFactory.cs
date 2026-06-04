@@ -267,6 +267,7 @@ public static class SimulationScenarioFactory
             EggIncubationSeconds = scenario.EggIncubationSeconds,
             MaturityAgeSeconds = scenario.MaturityAgeSeconds,
             ReproductionCooldownSeconds = scenario.ReproductionCooldownSeconds,
+            MaxLifeExpectancySeconds = scenario.MaxLifeExpectancySeconds,
             DietaryAdaptation = scenario.DietaryAdaptation,
             CarrionAdaptation = scenario.CarrionAdaptation,
             TenderPlantAdaptation = scenario.TenderPlantAdaptation,
