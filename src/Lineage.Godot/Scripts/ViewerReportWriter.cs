@@ -550,6 +550,7 @@ public static class ViewerReportWriter
         WriteSpatialHeatmapSection(writer, state.Biomes, state.Stats.SpatialHeatmaps);
 
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
+        WriteThermalNicheSection(writer, allFounderSummaries, speciesSummaries, snapshot);
         WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
         WriteSpeciesBrainInputDiagnosticsSection(writer, speciesBrainInputDiagnostics);
@@ -2768,7 +2769,7 @@ public static class ViewerReportWriter
             new ChartSeries("Meat energy share", "#b84a4a", snapshots.Select(snapshot => snapshot.MeatDigestedEnergyShare * 100f).ToArray()));
         WriteLineChart(
             writer,
-            "Grab And Sound",
+            "Grab State",
             "%",
             snapshots,
             new ChartSeries("Can grab", "#f5c26b", snapshots.Select(snapshot => Share(snapshot.CanGrabCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
@@ -2776,9 +2777,17 @@ public static class ViewerReportWriter
             new ChartSeries("Grab+touch", "#ffcc66", snapshots.Select(snapshot => Share(snapshot.GrabIntentWhileCanGrabCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Off-touch grab", "#b96cff", snapshots.Select(snapshot => Share(snapshot.GrabIntentWithoutCanGrabCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Holding", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.HoldingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Grabbed", "#9d3434", snapshots.Select(snapshot => Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Sound emit", "#29b6f6", snapshots.Select(snapshot => Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Sound heard", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+            new ChartSeries("Grabbed", "#9d3434", snapshots.Select(snapshot => Share(snapshot.GrabbedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Sound",
+            "%",
+            snapshots,
+            new ChartSeries("Emitting", "#29b6f6", snapshots.Select(snapshot => Share(snapshot.SoundEmittingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Heard", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.SoundHeardCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Avg amp", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageSoundAmplitude * 100f).ToArray()),
+            new ChartSeries("Avg density", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageSoundDensity * 100f).ToArray()),
+            new ChartSeries("Avg clarity", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageSoundToneClarity * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Meat Freshness",
@@ -2908,6 +2917,94 @@ public static class ViewerReportWriter
 
         writer.WriteLine("</div>");
         writer.WriteLine("</div>");
+    }
+
+    private static void WriteThermalNicheSection(
+        StreamWriter writer,
+        IReadOnlyList<FounderSummary> founderSummaries,
+        IReadOnlyList<SpeciesClusterSummary> speciesSummaries,
+        SimulationStatsSnapshot snapshot)
+    {
+        var livingFounders = founderSummaries
+            .Where(summary => summary.LivingCreatures > 0)
+            .OrderByDescending(summary => summary.LivingCreatures)
+            .ThenByDescending(summary => summary.ThermalNiche.AverageThermalMismatch)
+            .ThenBy(summary => summary.FounderId.Value)
+            .ToArray();
+        var livingSpecies = speciesSummaries
+            .Where(summary => summary.LivingCreatures > 0)
+            .OrderByDescending(summary => summary.LivingCreatures)
+            .ThenBy(summary => summary.Rank)
+            .ToArray();
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Thermal Niches</h2>");
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Current living C/T/H", FormatThermalBandCounts(snapshot.ColdTemperatureCreatureCount, snapshot.TemperateTemperatureCreatureCount, snapshot.HotTemperatureCreatureCount));
+        WriteMetric(writer, "Current stress", FormatThermalStressCounts(snapshot));
+        WriteMetric(writer, "Founder niches", FormatFounderNicheLabelCounts(livingFounders));
+        WriteMetric(writer, "Species niches", FormatSpeciesNicheLabelCounts(livingSpecies));
+        WriteMetric(writer, "Avg creature temp index", FormatTemperatureIndex(snapshot.AverageCreatureTemperature));
+        WriteMetric(writer, "Avg mismatch", FormatPercent(snapshot.AverageCreatureThermalMismatch));
+        WriteMetric(writer, "Births C/T/H", FormatThermalBandValues(snapshot.ColdTemperatureBirths, snapshot.TemperateTemperatureBirths, snapshot.HotTemperatureBirths));
+        WriteMetric(writer, "Deaths C/T/H", FormatThermalBandValues(snapshot.ColdTemperatureDeaths, snapshot.TemperateTemperatureDeaths, snapshot.HotTemperatureDeaths));
+        writer.WriteLine("</div>");
+
+        writer.WriteLine("<h3>Founder Niches</h3>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Lifetime C/T/H</th><th>Stress C/H</th><th>Births C/T/H</th><th>Deaths C/T/H</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in livingFounders.Take(12))
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>#{Html(summary.FounderId.Value)}</td>" +
+                $"<td>{Html(summary.LivingCreatures)}</td>" +
+                $"<td>{Html(summary.ThermalNiche.NicheLabel)}</td>" +
+                $"<td>{Html(summary.ThermalNiche.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.ThermalNiche.AverageThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatThermalShares(summary.ThermalNiche))}</td>" +
+                $"<td>{Html(FormatStressShares(summary.ThermalNiche))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(summary.ThermalNiche.ColdTemperatureBirths, summary.ThermalNiche.TemperateTemperatureBirths, summary.ThermalNiche.HotTemperatureBirths))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(summary.ThermalNiche.ColdTemperatureDeaths, summary.ThermalNiche.TemperateTemperatureDeaths, summary.ThermalNiche.HotTemperatureDeaths))}</td>" +
+                "</tr>");
+        }
+
+        if (livingFounders.Length == 0)
+        {
+            writer.WriteLine("<tr><td class=\"empty\" colspan=\"9\">No living founder lineages were present.</td></tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+
+        writer.WriteLine("<h3>Species Niches</h3>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Niche</th><th>Current Temp</th><th>Lifetime Temp</th><th>Mismatch</th><th>Living C/T/H</th><th>Lifetime C/T/H</th><th>Stress C/H</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var summary in livingSpecies.Take(10))
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(summary.Rank)}</td>" +
+                $"<td>{Html(summary.Name)}</td>" +
+                $"<td>{Html(summary.LivingCreatures)}</td>" +
+                $"<td>{Html(summary.ThermalNicheLabel)}</td>" +
+                $"<td>{Html(summary.AverageCurrentTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.AverageOccupiedThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(summary.ColdTemperatureLivingCreatures, summary.TemperateTemperatureLivingCreatures, summary.HotTemperatureLivingCreatures))}</td>" +
+                $"<td>{Html(FormatSpeciesThermalShares(summary))}</td>" +
+                $"<td>{Html(FormatSpeciesStressShares(summary))}</td>" +
+                "</tr>");
+        }
+
+        if (livingSpecies.Length == 0)
+        {
+            writer.WriteLine("<tr><td class=\"empty\" colspan=\"10\">No living species clusters were available.</td></tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
     }
 
     private static void WriteBehaviorAssaySection(StreamWriter writer, BehaviorAssaySummary summary)
@@ -4512,6 +4609,63 @@ public static class ViewerReportWriter
     private static string FormatStressShares(ThermalLineageNicheSummary summary)
     {
         return $"{FormatPercent(summary.ColdThermalStressShare)} / {FormatPercent(summary.HotThermalStressShare)}";
+    }
+
+    private static string FormatSpeciesThermalShares(SpeciesClusterSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdTemperatureLifetimeShare)} / {FormatPercent(summary.TemperateTemperatureLifetimeShare)} / {FormatPercent(summary.HotTemperatureLifetimeShare)}";
+    }
+
+    private static string FormatSpeciesStressShares(SpeciesClusterSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdThermalStressLifetimeShare)} / {FormatPercent(summary.HotThermalStressLifetimeShare)}";
+    }
+
+    private static string FormatThermalBandCounts(int cold, int temperate, int hot)
+    {
+        return $"{cold} cold / {temperate} temp / {hot} hot";
+    }
+
+    private static string FormatThermalBandValues(float cold, float temperate, float hot)
+    {
+        return $"{cold:0.#} cold / {temperate:0.#} temp / {hot:0.#} hot";
+    }
+
+    private static string FormatThermalStressCounts(SimulationStatsSnapshot snapshot)
+    {
+        return $"{snapshot.ComfortableThermalCreatureCount} comfortable / {snapshot.ColdThermalStressCreatureCount} cold / {snapshot.HotThermalStressCreatureCount} hot";
+    }
+
+    private static string FormatFounderNicheLabelCounts(IReadOnlyList<FounderSummary> summaries)
+    {
+        if (summaries.Count == 0)
+        {
+            return "No living founders";
+        }
+
+        return string.Join(
+            ", ",
+            summaries
+                .GroupBy(summary => summary.ThermalNiche.NicheLabel)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key} {group.Count()}"));
+    }
+
+    private static string FormatSpeciesNicheLabelCounts(IReadOnlyList<SpeciesClusterSummary> summaries)
+    {
+        if (summaries.Count == 0)
+        {
+            return "No living species";
+        }
+
+        return string.Join(
+            ", ",
+            summaries
+                .GroupBy(summary => summary.ThermalNicheLabel)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key} {group.Count()}"));
     }
 
     private static string FormatPlantAdaptation(SpeciesClusterSummary summary)
