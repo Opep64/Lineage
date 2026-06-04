@@ -206,6 +206,8 @@ public static class RtNeatBrainIoRegistry
             "internal.egg_reserve_ratio" => frame.Internal.EggReserveRatio,
             "internal.reproduction_readiness" => frame.Internal.ReproductionReadiness,
             "internal.energy_surplus" => frame.Internal.EnergySurplusRatio,
+            "internal.energy_fullness" => frame.Internal.EnergyFullnessRatio,
+            "internal.gut_fullness" => frame.Internal.GutFullnessRatio,
             "internal.recent_food_success" => frame.Internal.RecentFoodSuccess,
             "internal.recent_plant_raw_yield" => frame.Internal.RecentPlantRawYield,
             "internal.recent_plant_energy_yield" => frame.Internal.RecentPlantEnergyYield,

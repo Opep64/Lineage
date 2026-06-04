@@ -317,6 +317,11 @@ public static class SimulationSnapshotJson
             creature.LastHealingEnergySpent = 0f;
         }
 
+        if (!float.IsFinite(creature.LastEnergyOverflowCalories) || creature.LastEnergyOverflowCalories < 0f)
+        {
+            creature.LastEnergyOverflowCalories = 0f;
+        }
+
         if (creature.GutMeatCalories <= 0f)
         {
             creature.GutMeatQualityCalories = 0f;

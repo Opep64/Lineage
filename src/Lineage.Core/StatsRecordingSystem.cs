@@ -97,6 +97,9 @@ public sealed class StatsRecordingSystem(
         var totalBirthInvestmentRatio = 0f;
         var totalEggReserveRatio = 0f;
         var totalEnergySurplusRatio = 0f;
+        var totalEnergyFullnessRatio = 0f;
+        var totalEnergyCapacityCalories = 0f;
+        var totalEnergyOverflowCalories = 0f;
         var totalRecentFoodSuccess = 0f;
         var totalRecentFoodEnergyYield = 0f;
         var totalTenderPlantPayoffTrace = 0f;
@@ -310,6 +313,9 @@ public sealed class StatsRecordingSystem(
             totalBirthInvestmentRatio += OffspringDevelopment.NormalizeInvestmentRatio(creature.BirthInvestmentRatio);
             totalEggReserveRatio += creature.Senses.EggReserveRatio;
             totalEnergySurplusRatio += creature.Senses.EnergySurplusRatio;
+            totalEnergyFullnessRatio += CreatureGrowth.EnergyFullnessRatio(creature, genome);
+            totalEnergyCapacityCalories += CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+            totalEnergyOverflowCalories += creature.LastEnergyOverflowCalories;
             totalRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
             totalRecentFoodEnergyYield += creature.Senses.RecentFoodEnergyYield;
             totalTenderPlantPayoffTrace += creature.Senses.TenderPlantPayoffTrace;
@@ -1286,6 +1292,9 @@ public sealed class StatsRecordingSystem(
             reproductionIntentCreatureCount,
             totalEggReserveRatio / divisor,
             totalEnergySurplusRatio / divisor,
+            totalEnergyFullnessRatio / divisor,
+            totalEnergyCapacityCalories / divisor,
+            Rate(totalEnergyOverflowCalories, deltaSeconds),
             totalFatRatio / divisor,
             totalMassBurdenRatio / divisor,
             totalFatSpeedMultiplier / divisor,

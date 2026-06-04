@@ -61,6 +61,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutSound = NeuralBrainSchema.IsHoldingCreatureInput + 1;
     private const int LegacyInputCountWithoutFat = NeuralBrainSchema.SoundToneClarityInput + 1;
     private const int LegacyInputCountWithoutThermalSensing = NeuralBrainSchema.MassBurdenInput + 1;
+    private const int LegacyInputCountWithoutFullness = NeuralBrainSchema.RightThermalMismatchInput + 1;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
     private const int LegacyOutputCountWithoutGrab = 7;
@@ -1281,6 +1282,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutFullness,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutFullness,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: LegacyNearestEggReserveInput,
+                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutThermalSensing,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -1879,7 +1895,8 @@ public sealed class NeuralBrainGenome
             return NeuralBrainSchema.ReproductionReadinessInput;
         }
 
-        if (legacyInputCount == LegacyInputCountWithoutFat
+        if (legacyInputCount == LegacyInputCountWithoutFullness
+            || legacyInputCount == LegacyInputCountWithoutFat
             || (legacyInputCount == LegacyInputCountWithoutThermalSensing
                 && legacyOutputCount == NeuralBrainSchema.OutputCount)
             || legacyInputCount == LegacyInputCountWithoutSound

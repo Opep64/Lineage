@@ -4738,12 +4738,16 @@ function applyBrainLabPreset() {
     setBrainLabOverride("internal.hunger", 1, inputs);
     setBrainLabOverride("internal.energy_ratio", 0.2, inputs);
     setBrainLabOverride("internal.energy_surplus", 0, inputs);
+    setBrainLabOverride("internal.energy_fullness", 0, inputs);
+    setBrainLabOverride("internal.gut_fullness", 0, inputs);
     setBrainLabOverride("internal.fat_ratio", 0, inputs);
     setBrainLabOverride("internal.mass_burden", 0, inputs);
   } else if (preset === "full") {
     setBrainLabOverride("internal.hunger", 0, inputs);
     setBrainLabOverride("internal.energy_ratio", 1, inputs);
     setBrainLabOverride("internal.energy_surplus", 1, inputs);
+    setBrainLabOverride("internal.energy_fullness", 1, inputs);
+    setBrainLabOverride("internal.gut_fullness", 1, inputs);
     setBrainLabOverride("internal.fat_ratio", 1, inputs);
     setBrainLabOverride("internal.mass_burden", 1, inputs);
   } else if (preset === "readyToReproduce") {

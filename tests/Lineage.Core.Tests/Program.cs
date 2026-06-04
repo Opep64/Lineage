@@ -70,6 +70,7 @@ var tests = new (string Name, Action Body)[]
     ("Metabolic pace and body size shape life expectancy", MetabolicPaceAndBodySizeShapeLifeExpectancy),
     ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
     ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
+    ("Working energy cap stores fat before overflow", WorkingEnergyCapStoresFatBeforeOverflow),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
     ("Reproduction fertility declines with age", ReproductionFertilityDeclinesWithAge),
     ("Reproduction fertility declines with crowding", ReproductionFertilityDeclinesWithCrowding),
@@ -99,6 +100,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
     ("Creature sensing reports reproductive context", CreatureSensingReportsReproductiveContext),
+    ("Creature sensing reports fullness", CreatureSensingReportsFullness),
     ("Creature vision cone hides food behind it", CreatureVisionConeHidesFoodBehindIt),
     ("Creature sector vision buckets visible categories", CreatureSectorVisionBucketsVisibleCategories),
     ("Brain IO registry describes the dense adapter contract", BrainIoRegistryDescribesDenseAdapterContract),
@@ -156,6 +158,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates sound output and inputs", NeuralBrainMigratesSoundOutputAndInputs),
     ("Neural brain migrates fat inputs", NeuralBrainMigratesFatInputs),
     ("Neural brain migrates thermal sensing inputs", NeuralBrainMigratesThermalSensingInputs),
+    ("Neural brain migrates fullness inputs", NeuralBrainMigratesFullnessInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -2779,6 +2782,39 @@ static void FatStorageReleasesBeforeStarvationDeath()
     AssertClose(22.5f, creature.LastFatReleasedCalories, 0.000001, "Fat release telemetry records usable energy");
 }
 
+static void WorkingEnergyCapStoresFatBeforeOverflow()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 1006,
+        systems:
+        [
+            new FatStorageSystem(transferCapacitySharePerSecond: 10f)
+        ]);
+
+    var genome = CreatureGenome.Baseline with
+    {
+        BodyRadius = CreatureGenome.Baseline.BodyRadius,
+        ReproductionEnergyThreshold = 100f,
+        OffspringEnergyInvestment = 30f,
+        MaturityAgeSeconds = 0f,
+        FatStorageCapacityCalories = 10f,
+        FatStorageEfficiency = 1f
+    };
+    var genomeId = simulation.State.AddGenome(genome);
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 250f);
+
+    simulation.Step();
+
+    var creature = simulation.State.Creatures[0];
+    var energyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+    AssertClose(10f, creature.FatCalories, 0.000001, "Fat reserve fills before energy overflow is discarded");
+    AssertClose(10f, creature.LastFatStoredCalories, 0.000001, "Fat storage telemetry records the pre-overflow deposit");
+    AssertClose(energyCapacity, creature.Energy, 0.000001, "Working energy is clamped to capacity");
+    AssertClose(80f, creature.LastEnergyOverflowCalories, 0.000001, "Overflow telemetry records discarded working energy");
+}
+
 static void ReproductionBuildsEggReserveBeforeLaying()
 {
     var simulation = new Simulation(
@@ -4197,6 +4233,42 @@ static void CreatureSensingReportsReproductiveContext()
     AssertTrue(decayedSenses.RichPlantPayoffTrace > 0f, "Plant payoff trace should persist briefly after payoff");
 }
 
+static void CreatureSensingReportsFullness()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 509,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex)
+        ]);
+
+    var genome = CreatureGenome.Baseline with
+    {
+        BodyRadius = CreatureGenome.Baseline.BodyRadius,
+        ReproductionEnergyThreshold = 100f,
+        OffspringEnergyInvestment = 20f,
+        GutCapacityCalories = 80f,
+        MaturityAgeSeconds = 0f
+    };
+    var genomeId = simulation.State.AddGenome(genome);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 80f);
+    var creature = simulation.State.Creatures[0];
+    creature.GutPlantCalories = 30f;
+    creature.GutMeatCalories = 10f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    var senses = creature.Senses;
+    AssertClose(0.8f, senses.EnergyRatio, 0.000001, "Legacy energy ratio still tracks reproduction threshold");
+    AssertClose(0.5f, senses.EnergyFullnessRatio, 0.000001, "Energy fullness tracks working energy capacity");
+    AssertClose(0.5f, senses.GutFullnessRatio, 0.000001, "Gut fullness tracks gut capacity");
+}
+
 static void CreatureVisionConeHidesFoodBehindIt()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 32f);
@@ -4395,6 +4467,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var soundInput = BrainIoRegistry.GetInput(NeuralBrainSchema.SoundToneInput);
     var fatInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FatRatioInput);
     var climateInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CurrentTemperatureInput);
+    var fullnessInput = BrainIoRegistry.GetInput(NeuralBrainSchema.EnergyFullnessInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -4406,6 +4479,9 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(5, fatInput.IntroducedVersion, "Fat input introduced version");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, climateInput.Freshness, "Climate input freshness");
     AssertEqual(6, climateInput.IntroducedVersion, "Climate input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, fullnessInput.Freshness, "Fullness input freshness");
+    AssertEqual(7, fullnessInput.IntroducedVersion, "Fullness input introduced version");
+    AssertEqual("internal.energy_fullness", fullnessInput.Key, "Fullness input key");
     AssertEqual("climate.current_temperature", climateInput.Key, "Climate input key");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
@@ -4437,6 +4513,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         EggReserveRatio = 0.12f,
         ReproductionReadiness = 0.22f,
         EnergySurplusRatio = 0.32f,
+        EnergyFullnessRatio = 0.91f,
+        GutFullnessRatio = 0.81f,
         RecentFoodSuccess = 0.42f,
         RecentPlantRawYield = 0.36f,
         RecentPlantEnergyYield = 0.46f,
@@ -4558,6 +4636,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.69f, inputs[NeuralBrainSchema.ForwardThermalMismatchInput], 0.000001, "Forward thermal mismatch input");
     AssertClose(0.79f, inputs[NeuralBrainSchema.LeftThermalMismatchInput], 0.000001, "Left thermal mismatch input");
     AssertClose(0.89f, inputs[NeuralBrainSchema.RightThermalMismatchInput], 0.000001, "Right thermal mismatch input");
+    AssertClose(0.91f, inputs[NeuralBrainSchema.EnergyFullnessInput], 0.000001, "Energy fullness input");
+    AssertClose(0.81f, inputs[NeuralBrainSchema.GutFullnessInput], 0.000001, "Gut fullness input");
     AssertClose(0.54f, inputs[NeuralBrainSchema.ForwardTerrainDragInput], 0.000001, "Terrain input");
     AssertClose(0.15f, inputs[NeuralBrainSchema.CurrentHabitatQualityInput], 0.000001, "Current habitat input");
     AssertClose(0.25f, inputs[NeuralBrainSchema.ForwardHabitatQualityInput], 0.000001, "Forward habitat input");
@@ -6753,6 +6833,45 @@ static void NeuralBrainMigratesThermalSensingInputs()
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RightThermalMismatchInput), 0.000001, "New thermal mismatch input starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.ForwardTemperatureInput), 0.000001, "New hidden temperature input starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.LeftThermalMismatchInput), 0.000001, "New hidden mismatch input starts neutral");
+}
+
+static void NeuralBrainMigratesFullnessInputs()
+{
+    const int legacyInputCount = NeuralBrainSchema.RightThermalMismatchInput + 1;
+    const int legacyOutputCount = NeuralBrainSchema.OutputCount;
+    const int hiddenNodeCount = 2;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.RightThermalMismatchInput] = 0.7f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.RightThermalMismatchInput] = 0.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 0.9f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Fullness migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Fullness migrated weight count");
+    AssertClose(
+        0.7f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RightThermalMismatchInput),
+        0.000001,
+        "Existing thermal input remains in place");
+    AssertClose(
+        0.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.RightThermalMismatchInput),
+        0.000001,
+        "Existing hidden thermal input remains in place");
+    AssertClose(
+        0.9f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.EnergyFullnessInput), 0.000001, "New energy fullness input starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.GutFullnessInput), 0.000001, "New gut fullness input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EnergyFullnessInput), 0.000001, "New hidden energy fullness input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.GutFullnessInput), 0.000001, "New hidden gut fullness input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -9101,6 +9220,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.LastRottenMeatDamage = 0.03f;
     seeingCreature.FatCalories = 6f;
     seeingCreature.LastFatStoredCalories = 1f;
+    seeingCreature.LastEnergyOverflowCalories = 0.8f;
     seeingCreature.GutPlantCalories = 20f;
     seeingCreature.GutMeatCalories = 5f;
     seeingCreature.LastAttackDamageDealt = 0.2f;
@@ -9353,6 +9473,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(1f, snapshot.AverageBirthInvestmentRatio, 0.000001, "Average birth investment");
     AssertClose(0.375f, snapshot.AverageEggReserveRatio, 0.000001, "Average egg reserve ratio");
     AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
+    var expectedEnergyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(default, CreatureGenome.Baseline);
+    AssertClose(6f / expectedEnergyCapacity, snapshot.AverageEnergyFullnessRatio, 0.000001, "Average energy fullness ratio");
+    AssertClose(expectedEnergyCapacity, snapshot.AverageEnergyCapacityCalories, 0.000001, "Average energy capacity");
+    AssertClose(0.8f, snapshot.TotalEnergyOverflowCaloriesPerSecond, 0.000001, "Energy overflow calories per second");
     AssertClose(0.375f, snapshot.AverageFatRatio, 0.000001, "Average fat ratio");
     AssertClose(0.075f, snapshot.AverageMassBurdenRatio, 0.000001, "Average fat mass burden");
     AssertClose(0.993142843f, snapshot.AverageFatSpeedMultiplier, 0.000001, "Average fat speed multiplier");

@@ -111,7 +111,7 @@ public static class BrainIoRegistry
         var inputs = new List<BrainInputDefinition>(NeuralBrainSchema.InputCount)
         {
             Input("bias", "Bias", NeuralBrainSchema.BiasInput, BrainIoSignalGroup.Bias, 1f, 1f, 1f, BrainInputFreshnessPolicy.AlwaysFresh, "Constant baseline input."),
-            Input("internal.energy_ratio", "Energy ratio", NeuralBrainSchema.EnergyRatioInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current energy divided by energy capacity."),
+            Input("internal.energy_ratio", "Energy ratio", NeuralBrainSchema.EnergyRatioInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current working energy divided by reproduction threshold."),
             Input("internal.hunger", "Hunger", NeuralBrainSchema.HungerInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current hunger pressure."),
             Input("vision.food_density", "Visible food density", NeuralBrainSchema.VisibleFoodDensityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Blended visible food-like mass."),
             Input("vision.plant_density", "Visible plant density", NeuralBrainSchema.VisiblePlantDensityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Visible plant mass."),
@@ -199,7 +199,9 @@ public static class BrainIoRegistry
             Input("climate.current_thermal_mismatch", "Current thermal mismatch", NeuralBrainSchema.CurrentThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Mismatch between local temperature and the creature's thermal optimum.", introducedVersion: 6),
             Input("climate.forward_thermal_mismatch", "Forward thermal mismatch", NeuralBrainSchema.ForwardThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled ahead.", introducedVersion: 6),
             Input("climate.left_thermal_mismatch", "Left thermal mismatch", NeuralBrainSchema.LeftThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the left.", introducedVersion: 6),
-            Input("climate.right_thermal_mismatch", "Right thermal mismatch", NeuralBrainSchema.RightThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the right.", introducedVersion: 6)
+            Input("climate.right_thermal_mismatch", "Right thermal mismatch", NeuralBrainSchema.RightThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the right.", introducedVersion: 6),
+            Input("internal.energy_fullness", "Energy fullness", NeuralBrainSchema.EnergyFullnessInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current working energy divided by working energy capacity.", introducedVersion: 7),
+            Input("internal.gut_fullness", "Gut fullness", NeuralBrainSchema.GutFullnessInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current gut contents divided by gut capacity.", introducedVersion: 7)
         });
 
         return ValidateInputs(inputs);

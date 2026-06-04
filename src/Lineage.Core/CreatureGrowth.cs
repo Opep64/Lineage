@@ -12,6 +12,8 @@ namespace Lineage.Core;
 public static class CreatureGrowth
 {
     private const float MinimumJuvenileScale = 0.35f;
+    private const float WorkingEnergyCapacityThresholdMultiplier = 1.6f;
+    private const float WorkingEnergyCapacityOffspringMultiplier = 1.35f;
 
     public static float MaturityProgress(CreatureState creature, CreatureGenome genome)
     {
@@ -75,6 +77,35 @@ public static class CreatureGrowth
     public static float EffectiveGutCapacityCalories(CreatureState creature, CreatureGenome genome)
     {
         return genome.GutCapacityCalories * GrowthFactor(creature, genome);
+    }
+
+    public static float EffectiveEnergyCapacityCalories(CreatureState creature, CreatureGenome genome)
+    {
+        var baselineRadius = Math.Max(0.001f, CreatureGenome.Baseline.BodyRadius);
+        var bodyScale = Math.Clamp(EffectiveBodyRadius(creature, genome) / baselineRadius, 0.25f, 4f);
+        var thresholdCapacity = Math.Max(1f, genome.ReproductionEnergyThreshold)
+            * WorkingEnergyCapacityThresholdMultiplier
+            * bodyScale;
+        var hatchlingFloor = Math.Max(1f, genome.OffspringEnergyInvestment)
+            * WorkingEnergyCapacityOffspringMultiplier;
+        return Math.Max(thresholdCapacity, hatchlingFloor);
+    }
+
+    public static float EnergyFullnessRatio(CreatureState creature, CreatureGenome genome)
+    {
+        var capacity = EffectiveEnergyCapacityCalories(creature, genome);
+        return capacity > 0f
+            ? Math.Clamp(creature.Energy / capacity, 0f, 1f)
+            : 0f;
+    }
+
+    public static float GutFullnessRatio(CreatureState creature, CreatureGenome genome)
+    {
+        var capacity = EffectiveGutCapacityCalories(creature, genome);
+        var gutCalories = creature.GutPlantCalories + creature.GutMeatCalories;
+        return capacity > 0f
+            ? Math.Clamp(gutCalories / capacity, 0f, 1f)
+            : 0f;
     }
 
     public static float EffectiveFatStorageCapacityCalories(CreatureState creature, CreatureGenome genome)

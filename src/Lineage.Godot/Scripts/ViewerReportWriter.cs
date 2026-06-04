@@ -197,6 +197,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Ready to lay", FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
         WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
+        WriteMetric(writer, "Energy fullness", $"{FormatPercent(snapshot.AverageEnergyFullnessRatio)} of {snapshot.AverageEnergyCapacityCalories:0.###} kcal cap; {snapshot.TotalEnergyOverflowCaloriesPerSecond:0.###}/s overflow");
         WriteMetric(writer, "Metabolic pace", $"{snapshot.AverageMetabolicPace:0.###} avg; {snapshot.LowMetabolicPaceCreatureCount} low / {snapshot.NormalMetabolicPaceCreatureCount} normal / {snapshot.HighMetabolicPaceCreatureCount} high");
         WriteMetric(writer, "Fat reserve", FormatPercent(snapshot.AverageFatRatio));
         WriteMetric(writer, "Fat calories", snapshot.TotalFatCalories.ToString("0.###", CultureInfo.InvariantCulture));
@@ -2550,7 +2551,8 @@ public static class ViewerReportWriter
             new ChartSeries("Intent", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Ready", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Reserve", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageEggReserveRatio * 100f).ToArray()),
-            new ChartSeries("Surplus", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageEnergySurplusRatio * 100f).ToArray()));
+            new ChartSeries("Surplus", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageEnergySurplusRatio * 100f).ToArray()),
+            new ChartSeries("Energy full", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageEnergyFullnessRatio * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Fat storage",

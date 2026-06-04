@@ -28,50 +28,68 @@ public sealed class FatStorageSystem(
             var genome = state.GetGenome(creature.GenomeId);
             creature.LastFatStoredCalories = 0f;
             creature.LastFatReleasedCalories = 0f;
+            creature.LastEnergyOverflowCalories = 0f;
 
-            var capacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
-            if (capacity <= 0f || safeDeltaSeconds <= 0f)
+            var fatCapacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
+            if (fatCapacity <= 0f)
             {
                 creature.FatCalories = 0f;
+                ClampWorkingEnergy(ref creature, genome);
                 state.Creatures[i] = creature;
                 continue;
             }
 
-            creature.FatCalories = Math.Clamp(creature.FatCalories, 0f, capacity);
-            var efficiency = Math.Clamp(genome.FatStorageEfficiency, 0.05f, 1f);
-            var transferLimit = capacity * _transferCapacitySharePerSecond * safeDeltaSeconds;
-            var withdrawTarget = genome.ReproductionEnergyThreshold * _withdrawEnergyRatio;
-
-            if (creature.Energy < withdrawTarget && creature.FatCalories > 0f)
+            creature.FatCalories = Math.Clamp(creature.FatCalories, 0f, fatCapacity);
+            if (safeDeltaSeconds > 0f)
             {
-                var neededUsableEnergy = withdrawTarget - creature.Energy;
-                var fatToBurn = Math.Min(
-                    creature.FatCalories,
-                    Math.Min(neededUsableEnergy / efficiency, transferLimit));
-                var usableEnergy = fatToBurn * efficiency;
-                creature.FatCalories -= fatToBurn;
-                creature.Energy += usableEnergy;
-                creature.LastFatReleasedCalories = usableEnergy;
-                state.Creatures[i] = creature;
-                continue;
+                var efficiency = Math.Clamp(genome.FatStorageEfficiency, 0.05f, 1f);
+                var transferLimit = fatCapacity * _transferCapacitySharePerSecond * safeDeltaSeconds;
+                var withdrawTarget = genome.ReproductionEnergyThreshold * _withdrawEnergyRatio;
+
+                if (creature.Energy < withdrawTarget && creature.FatCalories > 0f)
+                {
+                    var neededUsableEnergy = withdrawTarget - creature.Energy;
+                    var fatToBurn = Math.Min(
+                        creature.FatCalories,
+                        Math.Min(neededUsableEnergy / efficiency, transferLimit));
+                    var usableEnergy = fatToBurn * efficiency;
+                    creature.FatCalories -= fatToBurn;
+                    creature.Energy += usableEnergy;
+                    creature.LastFatReleasedCalories = usableEnergy;
+                }
+                else
+                {
+                    var depositTarget = genome.ReproductionEnergyThreshold * _depositEnergyRatio;
+                    if (creature.Energy > depositTarget && creature.FatCalories < fatCapacity)
+                    {
+                        var energyAvailable = creature.Energy - depositTarget;
+                        var capacityRoomAsInputEnergy = (fatCapacity - creature.FatCalories) / efficiency;
+                        var energyToStore = Math.Min(
+                            energyAvailable,
+                            Math.Min(capacityRoomAsInputEnergy, transferLimit));
+                        var storedFat = energyToStore * efficiency;
+                        creature.Energy -= energyToStore;
+                        creature.FatCalories += storedFat;
+                        creature.LastFatStoredCalories = storedFat;
+                    }
+                }
             }
 
-            var depositTarget = genome.ReproductionEnergyThreshold * _depositEnergyRatio;
-            if (creature.Energy > depositTarget && creature.FatCalories < capacity)
-            {
-                var energyAvailable = creature.Energy - depositTarget;
-                var capacityRoomAsInputEnergy = (capacity - creature.FatCalories) / efficiency;
-                var energyToStore = Math.Min(
-                    energyAvailable,
-                    Math.Min(capacityRoomAsInputEnergy, transferLimit));
-                var storedFat = energyToStore * efficiency;
-                creature.Energy -= energyToStore;
-                creature.FatCalories += storedFat;
-                creature.LastFatStoredCalories = storedFat;
-            }
-
+            ClampWorkingEnergy(ref creature, genome);
             state.Creatures[i] = creature;
         }
+    }
+
+    private static void ClampWorkingEnergy(ref CreatureState creature, CreatureGenome genome)
+    {
+        var energyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+        if (creature.Energy <= energyCapacity)
+        {
+            return;
+        }
+
+        creature.LastEnergyOverflowCalories = creature.Energy - energyCapacity;
+        creature.Energy = energyCapacity;
     }
 
     private static float ValidateNonNegative(float value, string name)

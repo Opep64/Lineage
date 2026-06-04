@@ -267,7 +267,9 @@ public sealed class NeuralControllerSystem(
         return Math.Abs(senses.EnergyRatio - creature.LastNeuralEnergyRatio) >= InternalDecisionDeltaThreshold
             || creature.LastNeuralHealthRatio - senses.HealthRatio >= HealthDecisionDropThreshold
             || Math.Abs(senses.Hunger - creature.LastNeuralHunger) >= InternalDecisionDeltaThreshold
-            || Math.Abs(senses.ReproductionReadiness - creature.LastNeuralReproductionReadiness) >= InternalDecisionDeltaThreshold;
+            || Math.Abs(senses.ReproductionReadiness - creature.LastNeuralReproductionReadiness) >= InternalDecisionDeltaThreshold
+            || Math.Abs(senses.EnergyFullnessRatio - creature.LastNeuralEnergyFullnessRatio) >= InternalDecisionDeltaThreshold
+            || Math.Abs(senses.GutFullnessRatio - creature.LastNeuralGutFullnessRatio) >= InternalDecisionDeltaThreshold;
     }
 
     private void ApplyControllerOutputs(
@@ -335,6 +337,8 @@ public sealed class NeuralControllerSystem(
         creature.LastNeuralHealthRatio = senses.HealthRatio;
         creature.LastNeuralHunger = senses.Hunger;
         creature.LastNeuralReproductionReadiness = senses.ReproductionReadiness;
+        creature.LastNeuralEnergyFullnessRatio = senses.EnergyFullnessRatio;
+        creature.LastNeuralGutFullnessRatio = senses.GutFullnessRatio;
     }
 
     private static SimVector2 UpdateMemoryVector(

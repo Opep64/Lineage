@@ -378,6 +378,8 @@ public sealed class BrainProbeService
                 ["internal.hunger"] = 1f,
                 ["internal.energy_ratio"] = 0.2f,
                 ["internal.energy_surplus"] = 0f,
+                ["internal.energy_fullness"] = 0f,
+                ["internal.gut_fullness"] = 0f,
                 ["internal.fat_ratio"] = 0f,
                 ["internal.mass_burden"] = 0f
             }),
@@ -386,6 +388,8 @@ public sealed class BrainProbeService
                 ["internal.hunger"] = 0f,
                 ["internal.energy_ratio"] = 1f,
                 ["internal.energy_surplus"] = 1f,
+                ["internal.energy_fullness"] = 1f,
+                ["internal.gut_fullness"] = 1f,
                 ["internal.fat_ratio"] = 1f,
                 ["internal.mass_burden"] = 1f
             }),

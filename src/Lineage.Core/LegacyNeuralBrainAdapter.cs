@@ -103,6 +103,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.ForwardThermalMismatchInput] = frame.Body.ForwardThermalMismatch;
         inputs[NeuralBrainSchema.LeftThermalMismatchInput] = frame.Body.LeftThermalMismatch;
         inputs[NeuralBrainSchema.RightThermalMismatchInput] = frame.Body.RightThermalMismatch;
+        inputs[NeuralBrainSchema.EnergyFullnessInput] = frame.Internal.EnergyFullnessRatio;
+        inputs[NeuralBrainSchema.GutFullnessInput] = frame.Internal.GutFullnessRatio;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

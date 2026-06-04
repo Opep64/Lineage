@@ -45,6 +45,10 @@ public struct CreatureState
 
     public float LastNeuralReproductionReadiness { get; set; }
 
+    public float LastNeuralEnergyFullnessRatio { get; set; }
+
+    public float LastNeuralGutFullnessRatio { get; set; }
+
     /// <summary>
     /// Persistent world-space direction the neural controller can write and read later.
     /// </summary>
@@ -165,6 +169,8 @@ public struct CreatureState
     public float LastFatStoredCalories { get; set; }
 
     public float LastFatReleasedCalories { get; set; }
+
+    public float LastEnergyOverflowCalories { get; set; }
 
     public float LastPlantDigestedEnergy { get; set; }
 

@@ -1318,7 +1318,7 @@ public partial class Main : Node2D
             $"Max gen {snapshot.MaxGeneration}\n" +
             $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}  Prey {snapshot.SmallPreyCount}\n" +
-            $"Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}\n" +
+            $"Energy full {FormatPercent(snapshot.AverageEnergyFullnessRatio)}  Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
             $"Visual {FormatVisualRenderMode()}\n" +
             (seasonText.Length > 0 ? seasonText.TrimEnd() : "Season off");
@@ -1339,6 +1339,7 @@ public partial class Main : Node2D
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +
             $"Egg health {snapshot.AverageEggHealthRatio * 100f:0}%  Birth inv {snapshot.AverageBirthInvestmentRatio:0.00}x\n" +
             $"Pace {snapshot.AverageMetabolicPace:0.00} avg  low/norm/high {snapshot.LowMetabolicPaceCreatureCount}/{snapshot.NormalMetabolicPaceCreatureCount}/{snapshot.HighMetabolicPaceCreatureCount}\n" +
+            $"Energy full {FormatPercent(snapshot.AverageEnergyFullnessRatio)}  cap {snapshot.AverageEnergyCapacityCalories:0}  overflow {snapshot.TotalEnergyOverflowCaloriesPerSecond:0.0}/s\n" +
             $"Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}  burden {FormatPercent(snapshot.AverageMassBurdenRatio)}  speed {snapshot.AverageFatSpeedMultiplier:0.00}x  cap {snapshot.AverageFatStorageCapacityCalories:0} eff {FormatPercent(snapshot.AverageFatStorageEfficiency)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}  Rotten {state.Stats.RottenMeatDeathCount}\n" +
             $"Repro intent {FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount))}  ready {FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount))}\n" +
@@ -1616,6 +1617,8 @@ public partial class Main : Node2D
         var gutFillRatio = gutCapacity > 0f
             ? Math.Clamp(gutTotal / gutCapacity, 0f, 1f)
             : 0f;
+        var energyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+        var energyFullness = CreatureGrowth.EnergyFullnessRatio(creature, genome);
         var fatCapacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
         var fatRatio = CreatureGrowth.FatStorageRatio(creature, genome);
         var fatBurden = CreatureGrowth.FatMassBurdenRatio(creature, genome);
@@ -1648,7 +1651,7 @@ public partial class Main : Node2D
             $"{parentText}\n" +
             $"Generation {creature.Generation}\n" +
             $"Genome {creature.GenomeId}  Brain {brainText}\n" +
-            $"Energy {creature.Energy:0.0}\n" +
+            $"Energy {creature.Energy:0.0}/{energyCapacity:0.0} ({energyFullness:P0})\n" +
             $"Fat {creature.FatCalories:0.0}/{fatCapacity:0.0} ({fatRatio:P0})  burden {fatBurden:P0}\n" +
             $"Health {creature.Health:0.00} ({senses.HealthRatio:P0})\n" +
             $"Age {creature.AgeSeconds:0.0}s\n" +
@@ -1681,7 +1684,7 @@ public partial class Main : Node2D
             $"Bite str {CreatureGrowth.EffectiveBiteStrength(creature, genome):0.00}/{genome.BiteStrength:0.00}\n" +
             $"Damage resist {CreatureGrowth.EffectiveDamageResistance(creature, genome):0.00}/{genome.DamageResistance:0.00}\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
-            $"Energy surplus {senses.EnergySurplusRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
+            $"Energy surplus {senses.EnergySurplusRatio:0.00}  full {senses.EnergyFullnessRatio:0.00}  gut full {senses.GutFullnessRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
             $"Food energy yield {senses.RecentFoodEnergyYield:0.00}  plant energy {senses.RecentPlantEnergyYield:0.00}\n" +
             $"Plant yield raw {senses.RecentPlantRawYield:0.00}\n" +
             $"Plant payoff trace T {senses.TenderPlantPayoffTrace:0.00}  R {senses.RichPlantPayoffTrace:0.00}  Tough {senses.ToughPlantPayoffTrace:0.00}\n" +
@@ -1698,7 +1701,7 @@ public partial class Main : Node2D
             $"Source P {creature.LastPlantCaloriesEaten:0.00}  C {creature.LastCarcassCaloriesEaten:0.00}  Egg {creature.LastEggCaloriesEaten:0.00}  FK {creature.LastLivePreyCaloriesEaten:0.00}\n" +
             $"Digested this tick {creature.LastCaloriesDigested:0.00} energy ({FormatPerSecond(creature.LastCaloriesDigested)}/s)\n" +
             $"Energy P {creature.LastPlantDigestedEnergy:0.00}  M {creature.LastMeatDigestedEnergy:0.00}\n" +
-            $"Fat stored {creature.LastFatStoredCalories:0.00}  released {creature.LastFatReleasedCalories:0.00}\n" +
+            $"Energy overflow {creature.LastEnergyOverflowCalories:0.00}  fat stored {creature.LastFatStoredCalories:0.00}  released {creature.LastFatReleasedCalories:0.00}\n" +
             $"Rotten dmg {creature.LastRottenMeatDamage:0.000} health ({FormatPerSecond(creature.LastRottenMeatDamage)}/s)\n" +
             $"Creature contact {(creature.IsTouchingCreature ? $"#{creature.CreatureContactId.Value} edge {creature.CreatureContactEdgeDistance:0.0}" : "no")}\n" +
             $"Attack dmg {creature.LastAttackDamageDealt:0.000}\n" +
@@ -1755,6 +1758,8 @@ public partial class Main : Node2D
         var energyRatio = genome.ReproductionEnergyThreshold > 0f
             ? creature.Energy / genome.ReproductionEnergyThreshold
             : 1f;
+        var energyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+        var energyFullness = CreatureGrowth.EnergyFullnessRatio(creature, genome);
         var healthRatio = senses.HealthRatio > 0f
             ? senses.HealthRatio
             : creature.Health;
@@ -1772,6 +1777,7 @@ public partial class Main : Node2D
         return
             $"{ColorText("[b]Vitals[/b]", "#f3f0d0")}\n" +
             $"{SummaryMetric("Energy", $"{creature.Energy:0.0}", energyRatio, "vs repro")}\n" +
+            $"{SummaryMetric("Fullness", $"{creature.Energy:0.0}/{energyCapacity:0.0}", energyFullness, "cap")}\n" +
             $"{SummaryMetric("Health", $"{creature.Health:0.00}", healthRatio, "of max")}\n" +
             $"{SummaryMetric("Fat", $"{creature.FatCalories:0.0}/{fatCapacity:0.0}", fatRatio, "stored")}\n" +
             $"{ColorText("Age", "#b8c7bd")} {creature.AgeSeconds:0.0}s    " +
@@ -1802,6 +1808,7 @@ public partial class Main : Node2D
             $"{ColorText("Digested", "#b8c7bd")} {creature.LastCaloriesDigested:0.00} energy\n" +
             $"{ColorText("Attack dealt", "#b8c7bd")} {creature.LastAttackDamageDealt:0.000}    " +
             $"{ColorText("Damage taken", "#b8c7bd")} {creature.LastAttackDamageTaken:0.000}\n" +
+            $"{ColorText("Energy overflow", "#b8c7bd")} {creature.LastEnergyOverflowCalories:0.00}    " +
             $"{ColorText("Fat stored", "#b8c7bd")} {creature.LastFatStoredCalories:0.00}    " +
             $"{ColorText("Fat released", "#b8c7bd")} {creature.LastFatReleasedCalories:0.00}\n" +
             $"{ColorText("Sound tone", "#b8c7bd")} {creature.Actions.SoundTone:0.00}    " +
@@ -1913,7 +1920,7 @@ public partial class Main : Node2D
             BuildFoodContactText(creature, genome) +
             $"Swallowed {creature.LastCaloriesEaten:0.00} raw ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
             $"Digested {creature.LastCaloriesDigested:0.00} energy ({FormatPerSecond(creature.LastCaloriesDigested)}/s)\n\n" +
-            $"Fat stored {creature.LastFatStoredCalories:0.00}   released {creature.LastFatReleasedCalories:0.00}\n\n" +
+            $"Energy overflow {creature.LastEnergyOverflowCalories:0.00}   fat stored {creature.LastFatStoredCalories:0.00}   released {creature.LastFatReleasedCalories:0.00}\n\n" +
             $"Reproduction\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}   cooldown {creature.ReproductionCooldownSeconds:0.0}s\n";
@@ -1927,6 +1934,8 @@ public partial class Main : Node2D
         var gutFillRatio = gutCapacity > 0f
             ? Math.Clamp(gutTotal / gutCapacity, 0f, 1f)
             : 0f;
+        var energyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+        var energyFullness = CreatureGrowth.EnergyFullnessRatio(creature, genome);
         var fatCapacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
         var fatRatio = CreatureGrowth.FatStorageRatio(creature, genome);
         var fatBurden = CreatureGrowth.FatMassBurdenRatio(creature, genome);
@@ -1948,6 +1957,7 @@ public partial class Main : Node2D
             $"Optimum {FormatTemperatureIndex(thermalOptimum)}   tolerance {FormatTemperatureIndex(thermalTolerance)}\n" +
             $"Current {FormatTemperatureIndex(currentTemperature)}   mismatch {FormatPercent(thermalMismatch)}   basal {thermalBasalCostMultiplier:0.00}x\n\n" +
             $"Diet & Digestion\n" +
+            $"Working energy {creature.Energy:0.0}/{energyCapacity:0.0} ({energyFullness:P0})   overflow last {creature.LastEnergyOverflowCalories:0.00}\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}   carrion {genome.CarrionAdaptation:0.00}\n" +
             $"Plant efficiency {CreatureDigestion.PlantEfficiency(genome):P0}   meat {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
             $"Fresh meat {CreatureDigestion.FreshMeatEnergyEfficiency(genome):P0}   stale {CreatureDigestion.StaleMeatEnergyEfficiency(genome):P0}\n" +
@@ -2026,7 +2036,8 @@ public partial class Main : Node2D
             $"Thermal mismatch now {FormatPercent(senses.CurrentThermalMismatch)}   ahead {FormatPercent(senses.ForwardThermalMismatch)}   L {FormatPercent(senses.LeftThermalMismatch)}   R {FormatPercent(senses.RightThermalMismatch)}\n" +
             $"Obstacle fwd {senses.ForwardObstacle:0.00}   L {senses.LeftObstacle:0.00}   R {senses.RightObstacle:0.00}   blocked {senses.MovementBlocked:0.00}\n\n" +
             $"Internal Feedback\n" +
-            $"Energy surplus {senses.EnergySurplusRatio:0.00}   fat {senses.FatRatio:0.00}   mass {senses.MassBurdenRatio:0.00}\n" +
+            $"Energy surplus {senses.EnergySurplusRatio:0.00}   full {senses.EnergyFullnessRatio:0.00}   gut full {senses.GutFullnessRatio:0.00}\n" +
+            $"Fat {senses.FatRatio:0.00}   mass {senses.MassBurdenRatio:0.00}\n" +
             $"Food success {senses.RecentFoodSuccess:0.00}\n" +
             $"Food yield {senses.RecentFoodEnergyYield:0.00}   plant energy {senses.RecentPlantEnergyYield:0.00}   raw {senses.RecentPlantRawYield:0.00}\n" +
             $"Payoff trace T {senses.TenderPlantPayoffTrace:0.00}   R {senses.RichPlantPayoffTrace:0.00}   Tough {senses.ToughPlantPayoffTrace:0.00}\n" +
@@ -2055,6 +2066,7 @@ public partial class Main : Node2D
             $"Action Context\n" +
             $"Touching food {(creature.IsTouchingFood ? "yes" : "no")}   touching creature {(creature.IsTouchingCreature ? "yes" : "no")}\n" +
             $"Repro ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}   egg reserve {senses.EggReserveRatio:P0}\n" +
+            $"Energy full {senses.EnergyFullnessRatio:P0}   gut full {senses.GutFullnessRatio:P0}\n" +
             $"Fat {senses.FatRatio:P0}   mass burden {senses.MassBurdenRatio:P0}\n" +
             $"Holding {FormatCreatureReference(creature.HeldCreatureId)}   grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n" +
             $"Attack near gate {creature.Actions.AttackOutput:0.00}   last damage {creature.LastAttackDamageDealt:0.000}\n\n" +
