@@ -97,6 +97,30 @@ api.MapPost("/brain-lab/probe-tests", (BrainLabProbeTestRequest request, Lineage
     }
 });
 
+api.MapPost("/brain-lab/species-exports", (BrainLabSpeciesCatalogExportRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.ExportBrainLabSpeciesProfile(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+api.MapPost("/brain-lab/brain-exports", (BrainLabBrainCatalogExportRequest request, LineageRunManager manager) =>
+{
+    try
+    {
+        return Results.Ok(manager.ExportBrainLabBrainProfile(request));
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
 api.MapPost("/brain-lab/world-probe", (BrainLabWorldProbeRequest request, LineageRunManager manager) =>
 {
     try

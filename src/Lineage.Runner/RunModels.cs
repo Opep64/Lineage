@@ -320,6 +320,19 @@ public sealed record BrainLabProbeTestRequest(
     IReadOnlyList<string>? FixturePaths = null,
     int? MaxFixtures = null);
 
+public sealed record BrainLabSpeciesCatalogExportRequest(
+    string SnapshotPath,
+    string Name,
+    string? Notes,
+    int CreatureId,
+    bool ExportPairedBrain);
+
+public sealed record BrainLabBrainCatalogExportRequest(
+    string SnapshotPath,
+    string Name,
+    string? Notes,
+    int CreatureId);
+
 public sealed record BrainLabProbeTestResult(
     string SnapshotPath,
     int CreatureId,

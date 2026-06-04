@@ -77,6 +77,8 @@ const brainLabGroupFilter = document.querySelector("#brainLabGroupFilter");
 const refreshBrainLabSnapshotsButton = document.querySelector("#refreshBrainLabSnapshotsButton");
 const loadBrainLabSnapshotButton = document.querySelector("#loadBrainLabSnapshotButton");
 const evaluateBrainLabButton = document.querySelector("#evaluateBrainLabButton");
+const exportBrainLabSpeciesButton = document.querySelector("#exportBrainLabSpeciesButton");
+const exportBrainLabBrainButton = document.querySelector("#exportBrainLabBrainButton");
 const muteBrainLabSoundButton = document.querySelector("#muteBrainLabSoundButton");
 const resetBrainLabOverridesButton = document.querySelector("#resetBrainLabOverridesButton");
 const brainLabPresetSelect = document.querySelector("#brainLabPresetSelect");
@@ -775,6 +777,15 @@ function renderBrainLabCreatureOptions() {
   }
 
   brainLabCreatureSelect.disabled = false;
+}
+
+function selectedBrainLabCreature() {
+  const creatureId = Number(brainLabCreatureSelect?.value || 0);
+  if (!creatureId) {
+    return null;
+  }
+
+  return (brainLabSnapshot?.creatures || []).find((creature) => Number(creature.id) === creatureId) ?? null;
 }
 
 async function evaluateBrainLab() {
@@ -3934,6 +3945,114 @@ async function loadBrainLabProfileCreature(creatureId) {
   await evaluateBrainLab();
 }
 
+async function saveBrainLabSpeciesProfile() {
+  const path = brainLabSelectedPath();
+  const creature = selectedBrainLabCreature();
+  if (!path || !creature) {
+    brainLabStatus.textContent = "Load a snapshot and choose a creature before exporting.";
+    return;
+  }
+
+  const defaultName = `${brainLabSnapshot?.scenarioName || "Brain Lab"} #${creature.id} gen ${creature.generation}`;
+  const name = prompt("Species profile name", defaultName);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    brainLabStatus.textContent = "Species profile name is required.";
+    return;
+  }
+
+  const notes = prompt(
+    "Species notes",
+    `Saved from Brain Lab snapshot ${path}, creature #${creature.id} gen ${creature.generation}.`);
+  if (notes === null) {
+    return;
+  }
+
+  const exportPairedBrain = confirm("Also save this creature's brain as a paired catalog brain and make it the species default?");
+  brainLabStatus.textContent = "Saving species profile";
+  const response = await fetch("/api/brain-lab/species-exports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      name: trimmedName,
+      notes: notes.trim(),
+      creatureId: creature.id,
+      exportPairedBrain
+    })
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Brain Lab species export failed." }));
+    brainLabStatus.textContent = problem.error || "Brain Lab species export failed.";
+    return;
+  }
+
+  const result = await response.json();
+  await loadSpeciesCatalog(result.species.path);
+  if (result.brain) {
+    await loadBrainCatalog(result.brain.path);
+  }
+
+  brainLabStatus.textContent = result.brain
+    ? `Saved species profile ${result.species.name} with paired brain ${result.brain.name}.`
+    : `Saved species profile ${result.species.name}.`;
+}
+
+async function saveBrainLabBrainProfile() {
+  const path = brainLabSelectedPath();
+  const creature = selectedBrainLabCreature();
+  if (!path || !creature) {
+    brainLabStatus.textContent = "Load a snapshot and choose a creature before exporting.";
+    return;
+  }
+
+  const defaultName = `${brainLabSnapshot?.scenarioName || "Brain Lab"} #${creature.id} brain`;
+  const name = prompt("Brain profile name", defaultName);
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    brainLabStatus.textContent = "Brain profile name is required.";
+    return;
+  }
+
+  const notes = prompt(
+    "Brain notes",
+    `Saved from Brain Lab snapshot ${path}, creature #${creature.id} gen ${creature.generation}.`);
+  if (notes === null) {
+    return;
+  }
+
+  brainLabStatus.textContent = "Saving brain profile";
+  const response = await fetch("/api/brain-lab/brain-exports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      name: trimmedName,
+      notes: notes.trim(),
+      creatureId: creature.id
+    })
+  });
+
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({ error: "Brain Lab brain export failed." }));
+    brainLabStatus.textContent = problem.error || "Brain Lab brain export failed.";
+    return;
+  }
+
+  const result = await response.json();
+  await loadBrainCatalog(result.brain.path);
+  brainLabStatus.textContent = `Saved brain profile ${result.brain.name}.`;
+}
+
 async function runBrainLabProbeTests() {
   const path = brainLabSelectedPath();
   const creatureId = Number(brainLabCreatureSelect?.value || 0);
@@ -4333,6 +4452,12 @@ function updateBrainLabButtons() {
   const worldProbeControlsDisabled = !hasSnapshot || !hasCreature || !hasEvaluation || !brainLabWorldProbeScene;
   if (evaluateBrainLabButton) {
     evaluateBrainLabButton.disabled = !hasSnapshot || !hasCreature;
+  }
+  if (exportBrainLabSpeciesButton) {
+    exportBrainLabSpeciesButton.disabled = !hasSnapshot || !hasCreature;
+  }
+  if (exportBrainLabBrainButton) {
+    exportBrainLabBrainButton.disabled = !hasSnapshot || !hasCreature;
   }
   if (muteBrainLabSoundButton) {
     muteBrainLabSoundButton.disabled = !hasEvaluation || !supportsOverrides;
@@ -7927,6 +8052,8 @@ deleteBrainCatalogButton.addEventListener("click", deleteSelectedBrainCatalogEnt
 refreshBrainLabSnapshotsButton.addEventListener("click", () => loadBrainLabSnapshots());
 loadBrainLabSnapshotButton.addEventListener("click", loadBrainLabSnapshot);
 evaluateBrainLabButton.addEventListener("click", evaluateBrainLab);
+exportBrainLabSpeciesButton.addEventListener("click", saveBrainLabSpeciesProfile);
+exportBrainLabBrainButton.addEventListener("click", saveBrainLabBrainProfile);
 muteBrainLabSoundButton.addEventListener("click", muteBrainLabSound);
 resetBrainLabOverridesButton.addEventListener("click", resetBrainLabOverrides);
 applyBrainLabPresetButton.addEventListener("click", applyBrainLabPreset);

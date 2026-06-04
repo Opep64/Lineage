@@ -293,6 +293,85 @@ public sealed partial class LineageRunManager
             .ToArray();
     }
 
+    public SpeciesCatalogExportResult ExportBrainLabSpeciesProfile(BrainLabSpeciesCatalogExportRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Species profile name is required.");
+        }
+
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var notes = string.IsNullOrWhiteSpace(request.Notes)
+            ? $"Exported from Brain Lab snapshot {NormalizeArtifactRelativePath(resolvedPath)}."
+            : request.Notes.Trim();
+        var creatureId = new EntityId(request.CreatureId);
+
+        var profile = SpeciesProfileExporter.ExportCreature(
+            restored.Scenario,
+            restored.Simulation.State,
+            creatureId,
+            name,
+            notes);
+
+        var speciesRoot = UserSpeciesCatalogRoot();
+        Directory.CreateDirectory(speciesRoot);
+        BrainCatalogEntry? brainEntry = null;
+        if (request.ExportPairedBrain)
+        {
+            var brainName = $"{profile.Name} Brain";
+            var brainNotes = $"Paired controller exported from Brain Lab with species profile {profile.Name}.";
+            var brainProfile = BrainProfileExporter.ExportCreatureBrain(
+                restored.Scenario,
+                restored.Simulation.State,
+                creatureId,
+                brainName,
+                brainNotes);
+            var brainRoot = UserBrainCatalogRoot();
+            Directory.CreateDirectory(brainRoot);
+            var brainPath = GetUniquePath(Path.Combine(brainRoot, $"{Slugify(brainName)}{BrainProfileJson.FileExtension}"));
+            EnsurePathInside(brainPath, brainRoot);
+            BrainProfileJson.Save(brainPath, brainProfile);
+            brainEntry = ToBrainCatalogEntry(brainPath, brainProfile);
+            profile = profile with { DefaultBrainPath = NormalizeArtifactRelativePath(brainPath) };
+        }
+
+        var path = GetUniquePath(Path.Combine(speciesRoot, $"{Slugify(name)}{SpeciesProfileJson.FileExtension}"));
+        EnsurePathInside(path, speciesRoot);
+        SpeciesProfileJson.Save(path, profile);
+        return new SpeciesCatalogExportResult(ToSpeciesCatalogEntry(path, profile), brainEntry);
+    }
+
+    public BrainCatalogExportResult ExportBrainLabBrainProfile(BrainLabBrainCatalogExportRequest request)
+    {
+        var name = (request.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Brain profile name is required.");
+        }
+
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var notes = string.IsNullOrWhiteSpace(request.Notes)
+            ? $"Exported from Brain Lab snapshot {NormalizeArtifactRelativePath(resolvedPath)}."
+            : request.Notes.Trim();
+
+        var profile = BrainProfileExporter.ExportCreatureBrain(
+            restored.Scenario,
+            restored.Simulation.State,
+            new EntityId(request.CreatureId),
+            name,
+            notes);
+
+        var brainRoot = UserBrainCatalogRoot();
+        Directory.CreateDirectory(brainRoot);
+        var path = GetUniquePath(Path.Combine(brainRoot, $"{Slugify(name)}{BrainProfileJson.FileExtension}"));
+        EnsurePathInside(path, brainRoot);
+        BrainProfileJson.Save(path, profile);
+        return new BrainCatalogExportResult(ToBrainCatalogEntry(path, profile));
+    }
+
     public BrainLabWorldProbeFixtureSaveResult SaveBrainLabWorldProbeFixture(BrainLabWorldProbeFixtureSaveRequest request)
     {
         var name = (request.Name ?? string.Empty).Trim();
