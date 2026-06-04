@@ -12,6 +12,7 @@ public enum BrainIoSignalGroup
     Sound,
     Terrain,
     Habitat,
+    Climate,
     Obstacle,
     Contact,
     Memory,
@@ -190,7 +191,15 @@ public static class BrainIoRegistry
             Input("sound.tone", "Sound tone", NeuralBrainSchema.SoundToneInput, BrainIoSignalGroup.Sound, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Weighted average tone of nearby intentional sound.", introducedVersion: 4),
             Input("sound.tone_clarity", "Sound tone clarity", NeuralBrainSchema.SoundToneClarityInput, BrainIoSignalGroup.Sound, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Confidence that heard sound is a coherent tone rather than a mixed signal.", introducedVersion: 4),
             Input("internal.fat_ratio", "Fat ratio", NeuralBrainSchema.FatRatioInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current stored fat divided by fat capacity.", introducedVersion: 5),
-            Input("internal.mass_burden", "Mass burden", NeuralBrainSchema.MassBurdenInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current fat-derived movement burden.", introducedVersion: 5)
+            Input("internal.mass_burden", "Mass burden", NeuralBrainSchema.MassBurdenInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current fat-derived movement burden.", introducedVersion: 5),
+            Input("climate.current_temperature", "Current temperature", NeuralBrainSchema.CurrentTemperatureInput, BrainIoSignalGroup.Climate, 0f, 1f, 0.5f, BrainInputFreshnessPolicy.WorldSenseStale, "Normalized temperature under the creature.", introducedVersion: 6),
+            Input("climate.forward_temperature", "Forward temperature", NeuralBrainSchema.ForwardTemperatureInput, BrainIoSignalGroup.Climate, 0f, 1f, 0.5f, BrainInputFreshnessPolicy.WorldSenseStale, "Normalized temperature sampled ahead.", introducedVersion: 6),
+            Input("climate.left_temperature", "Left temperature", NeuralBrainSchema.LeftTemperatureInput, BrainIoSignalGroup.Climate, 0f, 1f, 0.5f, BrainInputFreshnessPolicy.WorldSenseStale, "Normalized temperature sampled to the left.", introducedVersion: 6),
+            Input("climate.right_temperature", "Right temperature", NeuralBrainSchema.RightTemperatureInput, BrainIoSignalGroup.Climate, 0f, 1f, 0.5f, BrainInputFreshnessPolicy.WorldSenseStale, "Normalized temperature sampled to the right.", introducedVersion: 6),
+            Input("climate.current_thermal_mismatch", "Current thermal mismatch", NeuralBrainSchema.CurrentThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Mismatch between local temperature and the creature's thermal optimum.", introducedVersion: 6),
+            Input("climate.forward_thermal_mismatch", "Forward thermal mismatch", NeuralBrainSchema.ForwardThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled ahead.", introducedVersion: 6),
+            Input("climate.left_thermal_mismatch", "Left thermal mismatch", NeuralBrainSchema.LeftThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the left.", introducedVersion: 6),
+            Input("climate.right_thermal_mismatch", "Right thermal mismatch", NeuralBrainSchema.RightThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the right.", introducedVersion: 6)
         });
 
         return ValidateInputs(inputs);

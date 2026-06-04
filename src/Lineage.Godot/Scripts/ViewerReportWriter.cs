@@ -159,6 +159,22 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Avg local fertility", $"{snapshot.AverageLocalFertilityMultiplier:0.###}x");
         WriteMetric(writer, "Min local fertility", $"{snapshot.MinimumLocalFertilityMultiplier:0.###}x");
         WriteMetric(writer, "Depleted fertility cells", FormatPercent(snapshot.DepletedLocalFertilityCellShare));
+        WriteMetric(writer, "Temperature cells", snapshot.TemperatureCellCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Avg map temperature", FormatTemperatureIndex(snapshot.AverageMapTemperature));
+        WriteMetric(writer, "Map temperature range", $"{FormatTemperatureIndex(snapshot.MinimumMapTemperature)} - {FormatTemperatureIndex(snapshot.MaximumMapTemperature)}");
+        WriteMetric(writer, "Avg creature temperature", FormatTemperatureIndex(snapshot.AverageCreatureTemperature));
+        WriteMetric(writer, "Avg thermal optimum", FormatTemperatureIndex(snapshot.AverageThermalOptimum));
+        WriteMetric(writer, "Avg thermal tolerance", FormatTemperatureIndex(snapshot.AverageThermalTolerance));
+        WriteMetric(writer, "Avg thermal mismatch", FormatPercent(snapshot.AverageCreatureThermalMismatch));
+        WriteMetric(writer, "Hot/cold mismatch", $"{snapshot.HotThermalMismatchCreatureCount} hot / {snapshot.ColdThermalMismatchCreatureCount} cold");
+        WriteMetric(writer, "Thermal basal cost", $"{snapshot.ThermalBasalEnergyPerSecond:0.###} energy/s");
+        WriteMetric(writer, "Thermal stress mix", $"{snapshot.ComfortableThermalCreatureCount} comfortable / {snapshot.ColdThermalStressCreatureCount} cold / {snapshot.HotThermalStressCreatureCount} hot");
+        WriteMetric(writer, "Temp-band creatures", $"{snapshot.ColdTemperatureCreatureCount} cold / {snapshot.TemperateTemperatureCreatureCount} temperate / {snapshot.HotTemperatureCreatureCount} hot");
+        WriteMetric(writer, "Temp-band plant kcal", $"{snapshot.ColdTemperaturePlantCalories:0.#} cold / {snapshot.TemperateTemperaturePlantCalories:0.#} temperate / {snapshot.HotTemperaturePlantCalories:0.#} hot");
+        WriteMetric(writer, "Temp-band births", $"{snapshot.ColdTemperatureBirths:0.#} cold / {snapshot.TemperateTemperatureBirths:0.#} temperate / {snapshot.HotTemperatureBirths:0.#} hot");
+        WriteMetric(writer, "Temp-band deaths", $"{snapshot.ColdTemperatureDeaths:0.#} cold / {snapshot.TemperateTemperatureDeaths:0.#} temperate / {snapshot.HotTemperatureDeaths:0.#} hot");
+        WriteMetric(writer, "Avg plant temperature", FormatTemperatureIndex(snapshot.AveragePlantTemperature));
+        WriteMetric(writer, "Avg small prey temperature", FormatTemperatureIndex(snapshot.AverageSmallPreyTemperature));
         WriteMetric(writer, "Plant depletions", state.Stats.PlantDepletionCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Plant relocations", FormatPlantRelocations(state.Stats));
         WriteMetric(writer, "Small prey spawn/kill/eat", $"{snapshot.SmallPreySpawnedCount}/{snapshot.SmallPreyKilledCount}/{snapshot.SmallPreyEatenCount}");
@@ -375,7 +391,9 @@ public static class ViewerReportWriter
             CarrionAdaptation = scenario.CarrionAdaptation,
             TenderPlantAdaptation = scenario.TenderPlantAdaptation,
             RichPlantAdaptation = scenario.RichPlantAdaptation,
-            ToughPlantAdaptation = scenario.ToughPlantAdaptation
+            ToughPlantAdaptation = scenario.ToughPlantAdaptation,
+            ThermalOptimum = scenario.ThermalOptimum,
+            ThermalTolerance = scenario.ThermalTolerance
         };
 
         writer.WriteLine("<section>");
@@ -391,6 +409,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Biomes", scenario.EnableBiomes ? "Enabled" : "Disabled");
         WriteMetric(writer, "Biome map", scenario.BiomeMapKind.ToString());
         WriteMetric(writer, "Biome cell size", scenario.BiomeCellSize.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Temperature", scenario.EnableTemperature ? "Enabled" : "Disabled");
         WriteMetric(writer, "Obstacles", scenario.EnableObstacles ? "Enabled" : "Disabled");
         WriteMetric(writer, "Obstacle map", scenario.ObstacleMapKind.ToString());
         WriteMetric(writer, "Obstacle cell size", scenario.ObstacleCellSize.ToString("0.###", CultureInfo.InvariantCulture));
@@ -417,6 +436,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Biome speed", FormatBiomePressureProfile(scenario.CreateBiomeSpeedProfile()));
         WriteMetric(writer, "Biome vision range", FormatBiomePressureProfile(scenario.CreateBiomeVisionRangeProfile()));
         WriteMetric(writer, "Basal upkeep", $"{scenario.BasalEnergyPerSecond:0.###} energy/s");
+        WriteMetric(writer, "Thermal mismatch basal cost", $"{scenario.ThermalMismatchBasalCostMultiplier:0.###}x at full mismatch");
         WriteMetric(writer, "Body radius upkeep", $"{scenario.BodyRadiusEnergyCostPerSecond:0.###} energy/radius/s");
         WriteMetric(writer, "Max speed upkeep", $"{scenario.MaxSpeedEnergyCostPerSecond:0.######} energy/speed/s");
         WriteMetric(writer, "Turn rate upkeep", $"{scenario.TurnRateEnergyCostPerSecond:0.######} energy/rad/s/s");
@@ -449,6 +469,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Starting diet", $"{scenario.DietaryAdaptation:0.###} meat bias");
         WriteMetric(writer, "Starting carrion", $"{scenario.CarrionAdaptation:0.###} stale-meat bias");
         WriteMetric(writer, "Starting plant adaptation", $"T {scenario.TenderPlantAdaptation:0.###}, R {scenario.RichPlantAdaptation:0.###}, Tough {scenario.ToughPlantAdaptation:0.###}");
+        WriteMetric(writer, "Starting thermal genes", $"opt {FormatTemperatureIndex(scenario.ThermalOptimum)}, tol {FormatTemperatureIndex(scenario.ThermalTolerance)}");
         WriteMetric(writer, "Starting fat storage", $"capacity {scenario.FatStorageCapacityCalories:0.###}, efficiency {FormatPercent(scenario.FatStorageEfficiency)}");
         WriteMetric(writer, "Starting bite strength", scenario.BiteStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starting damage resistance", scenario.DamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
@@ -476,6 +497,7 @@ public static class ViewerReportWriter
         writer.WriteLine("</section>");
 
         WriteBiomeMapSection(writer, state.Biomes);
+        WriteTemperatureMapSection(writer, state.Temperature);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
@@ -573,6 +595,8 @@ public static class ViewerReportWriter
             WriteTraitRow(writer, "Digestion rate", traitSummary.DigestionCaloriesPerSecond);
             WriteTraitRow(writer, "Bite strength", traitSummary.BiteStrength);
             WriteTraitRow(writer, "Damage resistance", traitSummary.DamageResistance);
+            WriteTraitRow(writer, "Thermal optimum", traitSummary.ThermalOptimum);
+            WriteTraitRow(writer, "Thermal tolerance", traitSummary.ThermalTolerance);
             WriteTraitRow(writer, "Mutation strength", traitSummary.MutationStrength);
             WriteTraitRow(writer, "Trait mutation rate", traitSummary.TraitMutationRate);
             WriteTraitRow(writer, "Brain mutation rate", traitSummary.BrainMutationRate);
@@ -613,11 +637,11 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Top Founder Lineages</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Total Creatures</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Living Share</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Total Creatures</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Living Share</th><th>Thermal Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Cold/Temp/Hot</th><th>Cold/Hot Stress</th></tr></thead>");
         writer.WriteLine("<tbody>");
         if (founderSummaries.Length == 0)
         {
-            writer.WriteLine("<tr><td class=\"empty\" colspan=\"6\">No lineage records are present.</td></tr>");
+            writer.WriteLine("<tr><td class=\"empty\" colspan=\"11\">No lineage records are present.</td></tr>");
         }
         else
         {
@@ -634,6 +658,11 @@ public static class ViewerReportWriter
                     $"<td>{Html(summary.DeadCreatures)}</td>" +
                     $"<td>{Html(summary.MaxGeneration)}</td>" +
                     $"<td>{Html($"{livingShare * 100f:0.0}%")}</td>" +
+                    $"<td>{Html(summary.ThermalNiche.NicheLabel)}</td>" +
+                    $"<td>{Html(summary.ThermalNiche.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(summary.ThermalNiche.AverageThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                    $"<td>{Html(FormatThermalShares(summary.ThermalNiche))}</td>" +
+                    $"<td>{Html(FormatStressShares(summary.ThermalNiche))}</td>" +
                     "</tr>");
             }
         }
@@ -675,6 +704,8 @@ public static class ViewerReportWriter
             summary.DigestionCaloriesPerSecond.Add(genome.DigestionCaloriesPerSecond);
             summary.BiteStrength.Add(genome.BiteStrength);
             summary.DamageResistance.Add(genome.DamageResistance);
+            summary.ThermalOptimum.Add(CreatureThermal.NormalizeOptimum(genome.ThermalOptimum));
+            summary.ThermalTolerance.Add(CreatureThermal.NormalizeTolerance(genome.ThermalTolerance));
             summary.MutationStrength.Add(genome.MutationStrength);
             summary.TraitMutationRate.Add(genome.TraitMutationRate);
             summary.BrainMutationRate.Add(genome.BrainMutationRate);
@@ -687,30 +718,34 @@ public static class ViewerReportWriter
     private static IReadOnlyList<FounderSummary> SummarizeFounders(IReadOnlyList<CreatureLineageRecord> records)
     {
         var byId = records.ToDictionary(record => record.Id);
-        var summaries = new Dictionary<EntityId, MutableFounderSummary>();
+        var summaries = new Dictionary<EntityId, List<CreatureLineageRecord>>();
 
         foreach (var record in records)
         {
             var founderId = FindFounderId(record, byId);
-            if (!summaries.TryGetValue(founderId, out var summary))
+            if (!summaries.TryGetValue(founderId, out var founderRecords))
             {
-                summary = new MutableFounderSummary { FounderId = founderId };
-                summaries.Add(founderId, summary);
+                founderRecords = [];
+                summaries.Add(founderId, founderRecords);
             }
 
-            summary.TotalCreatures++;
-            summary.LivingCreatures += record.IsAlive ? 1 : 0;
-            summary.DeadCreatures += record.IsAlive ? 0 : 1;
-            summary.MaxGeneration = Math.Max(summary.MaxGeneration, record.Generation);
+            founderRecords.Add(record);
         }
 
-        return summaries.Values
-            .Select(summary => new FounderSummary(
-                summary.FounderId,
-                summary.TotalCreatures,
-                summary.LivingCreatures,
-                summary.DeadCreatures,
-                summary.MaxGeneration))
+        return summaries
+            .Select(pair =>
+            {
+                var founderRecords = pair.Value;
+                var totalCreatures = founderRecords.Count;
+                var livingCreatures = founderRecords.Count(record => record.IsAlive);
+                return new FounderSummary(
+                    pair.Key,
+                    totalCreatures,
+                    livingCreatures,
+                    Math.Max(0, totalCreatures - livingCreatures),
+                    founderRecords.Count == 0 ? 0 : founderRecords.Max(record => record.Generation),
+                    ThermalNicheTelemetry.SummarizeRecords(founderRecords));
+            })
             .ToArray();
     }
 
@@ -1336,6 +1371,42 @@ public static class ViewerReportWriter
                 $"<span><span class=\"legend-swatch\" style=\"background:{Html(BiomeColor(biome))}\"></span>{Html(FormatBiomeKind(biome))}</span>");
         }
 
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteTemperatureMapSection(TextWriter writer, TemperatureMap map)
+    {
+        var width = MathF.Max(1f, map.Bounds.Width);
+        var height = MathF.Max(1f, map.Bounds.Height);
+        var summary = map.Summarize();
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Temperature Layout</h2>");
+        writer.WriteLine(
+            $"<p class=\"biome-map-note\">{Html(map.CellCountX)} x {Html(map.CellCountY)} cells at {Html(map.CellSize.ToString("0.###", CultureInfo.InvariantCulture))} world units per cell. Temperature index runs 0 cold, 50 temperate, 100 hot. Average {Html(FormatTemperatureIndex(summary.AverageTemperature))}, range {Html(FormatTemperatureIndex(summary.MinimumTemperature))} - {Html(FormatTemperatureIndex(summary.MaximumTemperature))}.</p>");
+        writer.WriteLine("<div class=\"biome-map-frame\">");
+        writer.WriteLine($"<svg class=\"biome-map\" viewBox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" role=\"img\" aria-label=\"Temperature map layout\" preserveAspectRatio=\"xMidYMid meet\" shape-rendering=\"crispEdges\">");
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                var cell = map.GetCellBounds(x, y);
+                if (cell.Width <= 0f || cell.Height <= 0f)
+                {
+                    continue;
+                }
+
+                writer.WriteLine(
+                    $"<rect x=\"{SvgNumber(cell.X)}\" y=\"{SvgNumber(cell.Y)}\" width=\"{SvgNumber(cell.Width)}\" height=\"{SvgNumber(cell.Height)}\" fill=\"{Html(TemperatureColor(map.GetTemperature(x, y)))}\" />");
+            }
+        }
+
+        writer.WriteLine("</svg>");
+        writer.WriteLine("</div>");
+        writer.WriteLine("<div class=\"biome-legend\">");
+        writer.WriteLine($"<span><span class=\"legend-swatch\" style=\"background:{Html(TemperatureColor(0f))}\"></span>cold</span>");
+        writer.WriteLine($"<span><span class=\"legend-swatch\" style=\"background:{Html(TemperatureColor(0.5f))}\"></span>temperate</span>");
+        writer.WriteLine($"<span><span class=\"legend-swatch\" style=\"background:{Html(TemperatureColor(1f))}\"></span>hot</span>");
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
     }
@@ -2515,6 +2586,25 @@ public static class ViewerReportWriter
             new ChartSeries("Depleted cells", "#8f4cb8", snapshots.Select(snapshot => snapshot.DepletedLocalFertilityCellShare * 100f).ToArray()));
         WriteLineChart(
             writer,
+            "Temperature exposure",
+            "",
+            snapshots,
+            new ChartSeries("Map avg", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageMapTemperature * 100f).ToArray()),
+            new ChartSeries("Creatures", "#c9492e", snapshots.Select(snapshot => snapshot.AverageCreatureTemperature * 100f).ToArray()),
+            new ChartSeries("Plants", "#4b9b44", snapshots.Select(snapshot => snapshot.AveragePlantTemperature * 100f).ToArray()),
+            new ChartSeries("Small prey", "#1b91a8", snapshots.Select(snapshot => snapshot.AverageSmallPreyTemperature * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Thermal adaptation",
+            "",
+            snapshots,
+            new ChartSeries("Optimum", "#c9492e", snapshots.Select(snapshot => snapshot.AverageThermalOptimum * 100f).ToArray()),
+            new ChartSeries("Tolerance", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageThermalTolerance * 100f).ToArray()),
+            new ChartSeries("Mismatch", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageCreatureThermalMismatch * 100f).ToArray()),
+            new ChartSeries("Hot mismatch", "#b83a2e", snapshots.Select(snapshot => Share(snapshot.HotThermalMismatchCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Cold mismatch", "#2f74bc", snapshots.Select(snapshot => Share(snapshot.ColdThermalMismatchCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
             "Season fertility",
             "x",
             snapshots,
@@ -2880,7 +2970,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Genome Div</th><th>Brain Div</th><th>Plant Adapt</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Thermal Niche</th><th>Current Temp</th><th>Lifetime Temp</th><th>Mismatch</th><th>Living C/T/H</th><th>Genome Div</th><th>Brain Div</th><th>Plant Adapt</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -2897,6 +2987,11 @@ public static class ViewerReportWriter
                 $"<td>{Html(summary.DietLabel)}</td>" +
                 $"<td>{Html(summary.TacticLabel)}</td>" +
                 $"<td>{Html(summary.RegionLabel)}</td>" +
+                $"<td>{Html(summary.ThermalNicheLabel)}</td>" +
+                $"<td>{Html(summary.AverageCurrentTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(summary.AverageOccupiedThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html($"{summary.ColdTemperatureLivingCreatures}/{summary.TemperateTemperatureLivingCreatures}/{summary.HotTemperatureLivingCreatures}")}</td>" +
                 $"<td>{Html(summary.AverageGenomeDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.AverageBrainDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPlantAdaptation(summary))}</td>" +
@@ -3884,6 +3979,47 @@ public static class ViewerReportWriter
         };
     }
 
+    private static string TemperatureColor(float temperature)
+    {
+        var value = Math.Clamp(temperature, 0f, 1f);
+        if (value < 0.30f)
+        {
+            return InterpolateHexColor(0x2e, 0x57, 0xd3, 0x1b, 0x91, 0xa8, value / 0.30f);
+        }
+
+        if (value < 0.55f)
+        {
+            return InterpolateHexColor(0x1b, 0x91, 0xa8, 0x4b, 0x9b, 0x44, (value - 0.30f) / 0.25f);
+        }
+
+        if (value < 0.75f)
+        {
+            return InterpolateHexColor(0x4b, 0x9b, 0x44, 0xd6, 0x9b, 0x2f, (value - 0.55f) / 0.20f);
+        }
+
+        return InterpolateHexColor(0xd6, 0x9b, 0x2f, 0xc9, 0x49, 0x2e, (value - 0.75f) / 0.25f);
+    }
+
+    private static string InterpolateHexColor(
+        int fromR,
+        int fromG,
+        int fromB,
+        int toR,
+        int toG,
+        int toB,
+        float amount)
+    {
+        var t = Math.Clamp(amount, 0f, 1f);
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"#{LerpByte(fromR, toR, t):x2}{LerpByte(fromG, toG, t):x2}{LerpByte(fromB, toB, t):x2}");
+    }
+
+    private static int LerpByte(int from, int to, float amount)
+    {
+        return Math.Clamp((int)MathF.Round(from + (to - from) * amount), 0, 255);
+    }
+
     private static string SvgNumber(float value)
     {
         return value.ToString("0.###", CultureInfo.InvariantCulture);
@@ -4287,6 +4423,11 @@ public static class ViewerReportWriter
         return $"{value * 100f:0.0}%";
     }
 
+    private static string FormatTemperatureIndex(float temperature)
+    {
+        return $"{Math.Clamp(temperature, 0f, 1f) * 100f:0.#}";
+    }
+
     private static string FormatIndex(float value)
     {
         return float.IsFinite(value)
@@ -4361,6 +4502,16 @@ public static class ViewerReportWriter
         return min == max
             ? $"{min} avg {average:0.##}"
             : $"{min}-{max} avg {average:0.##}";
+    }
+
+    private static string FormatThermalShares(ThermalLineageNicheSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdTemperatureShare)} / {FormatPercent(summary.TemperateTemperatureShare)} / {FormatPercent(summary.HotTemperatureShare)}";
+    }
+
+    private static string FormatStressShares(ThermalLineageNicheSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdThermalStressShare)} / {FormatPercent(summary.HotThermalStressShare)}";
     }
 
     private static string FormatPlantAdaptation(SpeciesClusterSummary summary)
@@ -4604,21 +4755,13 @@ public static class ViewerReportWriter
         return WebUtility.HtmlEncode(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
-    private sealed class MutableFounderSummary
-    {
-        public EntityId FounderId;
-        public int TotalCreatures;
-        public int LivingCreatures;
-        public int DeadCreatures;
-        public int MaxGeneration;
-    }
-
     private readonly record struct FounderSummary(
         EntityId FounderId,
         int TotalCreatures,
         int LivingCreatures,
         int DeadCreatures,
-        int MaxGeneration);
+        int MaxGeneration,
+        ThermalLineageNicheSummary ThermalNiche);
 
     private readonly record struct ChartSeries(string Label, string Color, float[] Values);
 
@@ -4647,6 +4790,8 @@ public static class ViewerReportWriter
         public FloatAccumulator DigestionCaloriesPerSecond;
         public FloatAccumulator BiteStrength;
         public FloatAccumulator DamageResistance;
+        public FloatAccumulator ThermalOptimum;
+        public FloatAccumulator ThermalTolerance;
         public FloatAccumulator MutationStrength;
         public FloatAccumulator TraitMutationRate;
         public FloatAccumulator BrainMutationRate;

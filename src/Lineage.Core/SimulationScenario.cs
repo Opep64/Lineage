@@ -39,6 +39,8 @@ public sealed record SimulationScenario
 
     public BiomeMapKind BiomeMapKind { get; init; } = BiomeMapKind.NaturalClimate;
 
+    public bool EnableTemperature { get; init; } = true;
+
     public string? WorldMapPath { get; init; }
 
     public string? ManualBiomeMapPath { get; init; }
@@ -247,6 +249,8 @@ public sealed record SimulationScenario
 
     public float BasalEnergyPerSecond { get; init; } = 0.18f;
 
+    public float ThermalMismatchBasalCostMultiplier { get; init; }
+
     public float BodyRadiusEnergyCostPerSecond { get; init; } = 0.04f;
 
     public float MaxSpeedEnergyCostPerSecond { get; init; } = 0.006f;
@@ -338,6 +342,10 @@ public sealed record SimulationScenario
     public float RichPlantAdaptation { get; init; } = 0f;
 
     public float ToughPlantAdaptation { get; init; } = 0f;
+
+    public float ThermalOptimum { get; init; } = CreatureGenome.Baseline.ThermalOptimum;
+
+    public float ThermalTolerance { get; init; } = CreatureGenome.Baseline.ThermalTolerance;
 
     public float BiteStrength { get; init; } = 0.55f;
 
@@ -524,6 +532,7 @@ public sealed record SimulationScenario
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeSeasonalAmplitudeProfile(), "BiomeSeasonalAmplitudeProfile");
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
+        EnsureNonNegative(ThermalMismatchBasalCostMultiplier, nameof(ThermalMismatchBasalCostMultiplier));
         EnsureNonNegative(BodyRadiusEnergyCostPerSecond, nameof(BodyRadiusEnergyCostPerSecond));
         EnsureNonNegative(MaxSpeedEnergyCostPerSecond, nameof(MaxSpeedEnergyCostPerSecond));
         EnsureNonNegative(TurnRateEnergyCostPerSecond, nameof(TurnRateEnergyCostPerSecond));
@@ -568,6 +577,8 @@ public sealed record SimulationScenario
         EnsureProbability(TenderPlantAdaptation, nameof(TenderPlantAdaptation));
         EnsureProbability(RichPlantAdaptation, nameof(RichPlantAdaptation));
         EnsureProbability(ToughPlantAdaptation, nameof(ToughPlantAdaptation));
+        EnsureRange(ThermalOptimum, CreatureThermal.MinimumOptimum, CreatureThermal.MaximumOptimum, nameof(ThermalOptimum));
+        EnsureRange(ThermalTolerance, CreatureThermal.MinimumTolerance, CreatureThermal.MaximumTolerance, nameof(ThermalTolerance));
         EnsurePositive(BiteStrength, nameof(BiteStrength));
         EnsurePositive(DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(DeathMeatCaloriesPerBodyRadius, nameof(DeathMeatCaloriesPerBodyRadius));

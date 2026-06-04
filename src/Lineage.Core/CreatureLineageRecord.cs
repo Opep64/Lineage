@@ -20,6 +20,8 @@ public struct CreatureLineageRecord
 
     public SimVector2 BirthPosition { get; set; }
 
+    public float BirthTemperature { get; set; }
+
     public int Generation { get; set; }
 
     public int GenomeId { get; set; }
@@ -42,11 +44,29 @@ public struct CreatureLineageRecord
 
     public SimVector2? DeathPosition { get; set; }
 
+    public float DeathTemperature { get; set; }
+
     public CreatureDeathReason? DeathReason { get; set; }
 
     public EntityId DeathAttackerId { get; set; }
 
     public float TelemetryLivingSeconds { get; set; }
+
+    public float TelemetryTemperatureExposure { get; set; }
+
+    public float TelemetryThermalMismatchExposure { get; set; }
+
+    public float TelemetryColdTemperatureSeconds { get; set; }
+
+    public float TelemetryTemperateTemperatureSeconds { get; set; }
+
+    public float TelemetryHotTemperatureSeconds { get; set; }
+
+    public float TelemetryComfortableThermalSeconds { get; set; }
+
+    public float TelemetryColdThermalStressSeconds { get; set; }
+
+    public float TelemetryHotThermalStressSeconds { get; set; }
 
     public float TelemetryEatingSeconds { get; set; }
 

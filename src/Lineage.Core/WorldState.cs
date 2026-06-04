@@ -22,6 +22,7 @@ public sealed class WorldState
         Biomes = BiomeMap.CreateUniform(bounds, MathF.Max(bounds.Width, bounds.Height), BiomeKind.Grassland);
         Obstacles = ObstacleMap.CreateEmpty(bounds, MathF.Max(bounds.Width, bounds.Height));
         LocalFertility = LocalFertilityMap.CreateDisabled(bounds);
+        Temperature = TemperatureMap.CreateNeutral(bounds);
     }
 
     public long Tick { get; private set; }
@@ -37,6 +38,8 @@ public sealed class WorldState
     public ObstacleMap Obstacles { get; internal set; }
 
     public LocalFertilityMap LocalFertility { get; internal set; }
+
+    public TemperatureMap Temperature { get; internal set; }
 
     public SimulationStats Stats { get; } = new();
 
@@ -208,6 +211,16 @@ public sealed class WorldState
         LocalFertility = localFertility;
     }
 
+    public void SetTemperature(TemperatureMap temperature)
+    {
+        if (temperature.Bounds.Width != Bounds.Width || temperature.Bounds.Height != Bounds.Height)
+        {
+            throw new ArgumentException("Temperature map bounds must match the world bounds.", nameof(temperature));
+        }
+
+        Temperature = temperature;
+    }
+
     public EntityId SpawnCreature(
         int genomeId,
         SimVector2 position,
@@ -267,6 +280,7 @@ public sealed class WorldState
             BirthTick = Tick,
             BirthElapsedSeconds = ElapsedSeconds,
             BirthPosition = clampedPosition,
+            BirthTemperature = Temperature.GetTemperatureAt(clampedPosition),
             Generation = generation,
             GenomeId = genomeId,
             BrainId = brainId,
@@ -377,6 +391,7 @@ public sealed class WorldState
         record.DeathTick = Tick;
         record.DeathElapsedSeconds = ElapsedSeconds;
         record.DeathPosition = Bounds.Clamp(deathPosition);
+        record.DeathTemperature = Temperature.GetTemperatureAt(record.DeathPosition.Value);
         record.DeathReason = reason;
         record.DeathAttackerId = attackerId;
         record.MaxXReached = Math.Max(record.MaxXReached, maxXReached);
@@ -425,6 +440,40 @@ public sealed class WorldState
             ? deltaSeconds
             : 0f;
         record.TelemetryLivingSeconds = AddTelemetry(record.TelemetryLivingSeconds, seconds);
+        if (seconds > 0f && TryGetGenome(creature.GenomeId, out var genome))
+        {
+            var temperature = Temperature.GetTemperatureAt(creature.Position);
+            var thermalMismatch = CreatureThermal.ThermalMismatch(temperature, genome);
+            var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
+            record.TelemetryTemperatureExposure = AddTelemetry(record.TelemetryTemperatureExposure, temperature * seconds);
+            record.TelemetryThermalMismatchExposure = AddTelemetry(record.TelemetryThermalMismatchExposure, thermalMismatch * seconds);
+            switch (CreatureThermal.ClassifyTemperatureBand(temperature))
+            {
+                case TemperatureBand.Cold:
+                    record.TelemetryColdTemperatureSeconds = AddTelemetry(record.TelemetryColdTemperatureSeconds, seconds);
+                    break;
+                case TemperatureBand.Hot:
+                    record.TelemetryHotTemperatureSeconds = AddTelemetry(record.TelemetryHotTemperatureSeconds, seconds);
+                    break;
+                default:
+                    record.TelemetryTemperateTemperatureSeconds = AddTelemetry(record.TelemetryTemperateTemperatureSeconds, seconds);
+                    break;
+            }
+
+            if (thermalMismatch < CreatureThermal.ThermalStressMismatchThreshold)
+            {
+                record.TelemetryComfortableThermalSeconds = AddTelemetry(record.TelemetryComfortableThermalSeconds, seconds);
+            }
+            else if (temperature < thermalOptimum)
+            {
+                record.TelemetryColdThermalStressSeconds = AddTelemetry(record.TelemetryColdThermalStressSeconds, seconds);
+            }
+            else
+            {
+                record.TelemetryHotThermalStressSeconds = AddTelemetry(record.TelemetryHotThermalStressSeconds, seconds);
+            }
+        }
+
         record.TelemetryEatingSeconds = AddTelemetrySeconds(
             record.TelemetryEatingSeconds,
             seconds,

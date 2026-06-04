@@ -78,6 +78,7 @@ public static class SimulationSnapshotJson
         state.Biomes = snapshot.Biomes.ToMap(state.Bounds);
         state.SetObstacles(snapshot.Obstacles.ToMap(state.Bounds));
         state.SetLocalFertility(snapshot.LocalFertility.ToMap(state.Bounds));
+        state.SetTemperature(snapshot.Temperature.ToMap(state.Bounds));
         state.Random.State = snapshot.RandomState;
         state.RestoreClock(snapshot.Tick, snapshot.ElapsedSeconds);
         state.RestoreNextEntityId(snapshot.NextEntityId);
@@ -176,6 +177,7 @@ public static class SimulationSnapshotJson
         _ = snapshot.Biomes.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         _ = snapshot.Obstacles.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         _ = snapshot.LocalFertility.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
+        _ = snapshot.Temperature.ToMap(new WorldBounds(snapshot.Scenario.WorldWidth, snapshot.Scenario.WorldHeight));
         return snapshot;
     }
 
@@ -267,6 +269,16 @@ public static class SimulationSnapshotJson
         if (genome.DamageResistance <= 0f)
         {
             genome = genome with { DamageResistance = CreatureGenome.Baseline.DamageResistance };
+        }
+
+        if (genome.ThermalOptimum <= 0f)
+        {
+            genome = genome with { ThermalOptimum = CreatureGenome.Baseline.ThermalOptimum };
+        }
+
+        if (genome.ThermalTolerance <= 0f)
+        {
+            genome = genome with { ThermalTolerance = CreatureGenome.Baseline.ThermalTolerance };
         }
 
         return genome;

@@ -184,7 +184,7 @@ public partial class Main : Node2D
     private string? _pendingBrainExportNotes;
     private bool _isPanning;
     private bool _followSelected;
-    private bool _showBiomeOverlay = true;
+    private MapOverlayMode _mapOverlayMode = MapOverlayMode.Biome;
     private bool _renderMap = true;
     private bool _showVisionSectorDebug = true;
     private VisualRenderMode _visualRenderMode = VisualRenderMode.SpriteTheme;
@@ -206,6 +206,9 @@ public partial class Main : Node2D
     private ImageTexture? _biomeOverlayTexture;
     private BiomeMap? _biomeOverlaySource;
     private int _biomeOverlayPixelsPerCell = 1;
+    private ImageTexture? _temperatureOverlayTexture;
+    private TemperatureMap? _temperatureOverlaySource;
+    private int _temperatureOverlayPixelsPerCell = 1;
     private int _visibleCreatureEstimate;
     private int _drawnResourceCount;
     private int _drawnResourceAggregateCount;
@@ -630,10 +633,7 @@ public partial class Main : Node2D
         if (_renderMap)
         {
             DrawRect(_worldRect, _worldColor, filled: true);
-            if (_showBiomeOverlay)
-            {
-                DrawBiomeOverlay();
-            }
+            DrawMapOverlay();
 
             DrawObstacleOverlay();
             _drawVisualTimeSeconds = Time.GetTicksMsec() * 0.001f;
@@ -693,7 +693,7 @@ public partial class Main : Node2D
                     ToggleFollowSelected();
                     break;
                 case Key.B:
-                    _showBiomeOverlay = !_showBiomeOverlay;
+                    CycleMapOverlayMode();
                     break;
                 case Key.M:
                     SetMapVisible(!_renderMap);
@@ -812,6 +812,14 @@ public partial class Main : Node2D
             ClearMapRenderStats();
         }
 
+        RequestVisualRefresh();
+    }
+
+    private void CycleMapOverlayMode()
+    {
+        var next = (int)_mapOverlayMode + 1;
+        var count = Enum.GetValues<MapOverlayMode>().Length;
+        _mapOverlayMode = (MapOverlayMode)(next % count);
         RequestVisualRefresh();
     }
 
@@ -1269,6 +1277,7 @@ public partial class Main : Node2D
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
+        var centerTemperature = state.Temperature.GetTemperatureAt(_viewCenter);
         var season = SeasonalFertility.CalculateAt(
             _scenario.EnableSeasons,
             state.ElapsedSeconds,
@@ -1353,7 +1362,9 @@ public partial class Main : Node2D
             $"Food {FormatResourceRenderMode(_resourceRenderMode)} v{_visibleResourceEstimate} d{FormatDrawCount(_drawnResourceCount, _drawnResourceAggregateCount)}\n" +
             $"Plant colors generic/tender/rich/tough\n" +
             $"Creatures {FormatCreatureRenderMode(_creatureRenderMode)} v{_visibleCreatureEstimate} d{FormatDrawCount(_drawnCreatureCount, _drawnCreatureAggregateCount)}\n" +
-            $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} {(_showBiomeOverlay ? "shown" : "hidden")}\n" +
+            $"Biome {FormatBiomeKind(centerBiome)}{centerVoidText} {FormatBiomeMapKind(_scenario.BiomeMapKind)} overlay {FormatMapOverlayMode(_mapOverlayMode)}\n" +
+            $"Temperature here {FormatTemperatureIndex(centerTemperature)}  map avg {FormatTemperatureIndex(snapshot.AverageMapTemperature)}  creature avg {FormatTemperatureIndex(snapshot.AverageCreatureTemperature)}\n" +
+            $"Thermal opt {FormatTemperatureIndex(snapshot.AverageThermalOptimum)}  tol {FormatTemperatureIndex(snapshot.AverageThermalTolerance)}  mismatch {FormatPercent(snapshot.AverageCreatureThermalMismatch)}  hot/cold {snapshot.HotThermalMismatchCreatureCount}/{snapshot.ColdThermalMismatchCreatureCount}\n" +
             $"Obstacles {FormatObstacleMapKind(_scenario.ObstacleMapKind)} cells {_simulation.State.Obstacles.BlockedCellCount}\n" +
             $"Obstacle sensed {FormatPercent(Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount))}  blocked {FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))}  fwd {snapshot.AverageForwardObstacle:0.00}\n" +
             $"Biome pop D {FormatPercent(Share(snapshot.BarrenCreatureCount, snapshot.CreatureCount))} Sc {FormatPercent(Share(snapshot.SparseCreatureCount, snapshot.CreatureCount))} G {FormatPercent(Share(snapshot.GrasslandCreatureCount, snapshot.CreatureCount))} F {FormatPercent(Share(snapshot.RichCreatureCount, snapshot.CreatureCount))}\n" +
@@ -1368,7 +1379,7 @@ public partial class Main : Node2D
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Population)}\n" +
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Season)}\n" +
             "Keys: Space/P pause  +/- speed  N seed  S scenario\n" +
-            $"Move: Arrows/Wheel/Drag  Click select  G follow  T visual  B/C/V/M toggles";
+            $"Move: Arrows/Wheel/Drag  Click select  G follow  T visual  B overlay  C/V/M toggles";
 
         _miniGraphLabels[0].Text = $"Population {state.Creatures.Count}";
         _miniGraphLabels[0].AddThemeColorOverride("font_color", _graphPopulationColor);
@@ -1751,6 +1762,11 @@ public partial class Main : Node2D
         var memoryOutput = MathF.Max(
             MathF.Abs(creature.Actions.MemoryForward),
             MathF.Abs(creature.Actions.MemoryRight));
+        var currentTemperature = _simulation.State.Temperature.GetTemperatureAt(creature.Position);
+        var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
+        var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
+        var thermalMismatch = CreatureThermal.ThermalMismatch(currentTemperature, genome);
+        var thermalBasalCostMultiplier = 1f + thermalMismatch * _scenario.ThermalMismatchBasalCostMultiplier;
 
         return
             $"{ColorText("[b]Vitals[/b]", "#f3f0d0")}\n" +
@@ -1761,6 +1777,12 @@ public partial class Main : Node2D
             $"{ColorText("Growth", "#b8c7bd")} {maturityText} ({growthFactor:P0})\n" +
             $"{ColorText("Egg reserve", "#b8c7bd")} {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0} ({senses.EggReserveRatio:P0})    " +
             $"{ColorText("Speed", "#b8c7bd")} {creature.Velocity.Length:0.0} ({speedRatio:P0})\n\n" +
+            $"{ColorText("[b]Thermal[/b]", "#f3f0d0")}\n" +
+            $"{ColorText("Now", "#b8c7bd")} {FormatTemperatureIndex(currentTemperature)}    " +
+            $"{ColorText("Opt", "#b8c7bd")} {FormatTemperatureIndex(thermalOptimum)}    " +
+            $"{ColorText("Tol", "#b8c7bd")} {FormatTemperatureIndex(thermalTolerance)}    " +
+            $"{ColorText("Mismatch", "#b8c7bd")} {FormatPercent(thermalMismatch)}    " +
+            $"{ColorText("Basal", "#b8c7bd")} {thermalBasalCostMultiplier:0.00}x\n\n" +
             $"{ColorText("[b]World Outputs[/b]", "#f3f0d0")}\n" +
             $"{SummaryAction("Move", creature.Actions.MoveForward, MathF.Abs(creature.Actions.MoveForward) >= SummaryActionActiveThreshold, "#72cfff")}  " +
             $"{SummaryAction("Turn", creature.Actions.Turn, MathF.Abs(creature.Actions.Turn) >= SummaryActionActiveThreshold, "#72cfff")}\n" +
@@ -1840,6 +1862,9 @@ public partial class Main : Node2D
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
         var visionMultiplier = _scenario.CreateBiomeVisionRangeProfile().For(biome);
+        var currentTemperature = _simulation.State.Temperature.GetTemperatureAt(creature.Position);
+        var thermalMismatch = CreatureThermal.ThermalMismatch(currentTemperature, genome);
+        var thermalBasalCostMultiplier = 1f + thermalMismatch * _scenario.ThermalMismatchBasalCostMultiplier;
         var fatCapacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
         var fatRatio = CreatureGrowth.FatStorageRatio(creature, genome);
         var fatBurden = CreatureGrowth.FatMassBurdenRatio(creature, genome);
@@ -1867,6 +1892,7 @@ public partial class Main : Node2D
             $"Birth investment {creature.BirthInvestmentRatio:0.00}x\n\n" +
             $"Place\n" +
             $"Biome {FormatBiomeKind(biome)}   season {seasonalFertility:0.00}x\n" +
+            $"Temperature {FormatTemperatureIndex(currentTemperature)}   thermal mismatch {FormatPercent(thermalMismatch)}   thermal basal {thermalBasalCostMultiplier:0.00}x\n" +
             $"Move {movementCostMultiplier:0.00}x   basal {basalCostMultiplier:0.00}x   speed {speedMultiplier:0.00}x   vision {visionMultiplier:0.00}x\n" +
             $"Position {creature.Position.X:0}, {creature.Position.Y:0}\n\n" +
             $"Movement\n" +
@@ -1904,6 +1930,11 @@ public partial class Main : Node2D
         var fatRatio = CreatureGrowth.FatStorageRatio(creature, genome);
         var fatBurden = CreatureGrowth.FatMassBurdenRatio(creature, genome);
         var fatSpeedMultiplier = CreatureGrowth.FatSpeedMultiplier(creature, genome);
+        var currentTemperature = _simulation.State.Temperature.GetTemperatureAt(creature.Position);
+        var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
+        var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
+        var thermalMismatch = CreatureThermal.ThermalMismatch(currentTemperature, genome);
+        var thermalBasalCostMultiplier = 1f + thermalMismatch * _scenario.ThermalMismatchBasalCostMultiplier;
 
         return
             $"Body\n" +
@@ -1912,6 +1943,9 @@ public partial class Main : Node2D
             $"Turn {CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome):0.0}/{genome.MaxTurnRadiansPerSecond:0.0}\n" +
             $"Vision range {CreatureGrowth.EffectiveSenseRadius(creature, genome):0.0}/{genome.SenseRadius:0.0}\n" +
             $"Vision angle {ToDegrees(CreatureGrowth.EffectiveVisionAngleRadians(creature, genome)):0}deg/{ToDegrees(genome.VisionAngleRadians):0}deg\n\n" +
+            $"Thermal\n" +
+            $"Optimum {FormatTemperatureIndex(thermalOptimum)}   tolerance {FormatTemperatureIndex(thermalTolerance)}\n" +
+            $"Current {FormatTemperatureIndex(currentTemperature)}   mismatch {FormatPercent(thermalMismatch)}   basal {thermalBasalCostMultiplier:0.00}x\n\n" +
             $"Diet & Digestion\n" +
             $"Diet meat bias {genome.DietaryAdaptation:0.00}   carrion {genome.CarrionAdaptation:0.00}\n" +
             $"Plant efficiency {CreatureDigestion.PlantEfficiency(genome):P0}   meat {CreatureDigestion.MeatEfficiency(genome):P0}\n" +
@@ -1986,6 +2020,8 @@ public partial class Main : Node2D
             $"Plant taste energy {senses.PlantFoodContactEnergyQuality:0.00}   bite {senses.PlantFoodContactBiteEase:0.00}\n" +
             $"Terrain now {senses.CurrentTerrainDrag:0.00}   ahead {senses.ForwardTerrainDrag:0.00}   L {senses.LeftTerrainDrag:0.00}   R {senses.RightTerrainDrag:0.00}\n" +
             $"Habitat now {senses.CurrentHabitatQuality:0.00}   ahead {senses.ForwardHabitatQuality:0.00}   L {senses.LeftHabitatQuality:0.00}   R {senses.RightHabitatQuality:0.00}\n" +
+            $"Temp now {FormatTemperatureIndex(senses.CurrentTemperature)}   ahead {FormatTemperatureIndex(senses.ForwardTemperature)}   L {FormatTemperatureIndex(senses.LeftTemperature)}   R {FormatTemperatureIndex(senses.RightTemperature)}\n" +
+            $"Thermal mismatch now {FormatPercent(senses.CurrentThermalMismatch)}   ahead {FormatPercent(senses.ForwardThermalMismatch)}   L {FormatPercent(senses.LeftThermalMismatch)}   R {FormatPercent(senses.RightThermalMismatch)}\n" +
             $"Obstacle fwd {senses.ForwardObstacle:0.00}   L {senses.LeftObstacle:0.00}   R {senses.RightObstacle:0.00}   blocked {senses.MovementBlocked:0.00}\n\n" +
             $"Internal Feedback\n" +
             $"Energy surplus {senses.EnergySurplusRatio:0.00}   fat {senses.FatRatio:0.00}   mass {senses.MassBurdenRatio:0.00}\n" +
@@ -2824,6 +2860,8 @@ public partial class Main : Node2D
     {
         _biomeOverlayTexture = null;
         _biomeOverlaySource = null;
+        _temperatureOverlayTexture = null;
+        _temperatureOverlaySource = null;
     }
 
     private void DrawIndividualResources(Rect2 visibleWorldRect)
@@ -4006,6 +4044,19 @@ public partial class Main : Node2D
             : middle.Lerp(old, (ratio - 0.5f) / 0.5f);
     }
 
+    private void DrawMapOverlay()
+    {
+        switch (_mapOverlayMode)
+        {
+            case MapOverlayMode.Biome:
+                DrawBiomeOverlay();
+                break;
+            case MapOverlayMode.Temperature:
+                DrawTemperatureOverlay();
+                break;
+        }
+    }
+
     private void DrawBiomeOverlay()
     {
         var map = _simulation.State.Biomes;
@@ -4018,6 +4069,20 @@ public partial class Main : Node2D
         }
 
         DrawBiomeCellOutlines(map);
+    }
+
+    private void DrawTemperatureOverlay()
+    {
+        var map = _simulation.State.Temperature;
+        DrawMapTexture(GetTemperatureOverlayTexture(map), map.CellSize / Math.Max(1, _temperatureOverlayPixelsPerCell));
+        DrawResourceVoidOverlay(_simulation.State.Biomes);
+
+        if (map.CellSize * _worldScale <= 54f)
+        {
+            return;
+        }
+
+        DrawTemperatureCellOutlines(map);
     }
 
     private void DrawResourceVoidOverlay(BiomeMap map)
@@ -4084,7 +4149,51 @@ public partial class Main : Node2D
         return _biomeOverlayTexture;
     }
 
+    private ImageTexture GetTemperatureOverlayTexture(TemperatureMap map)
+    {
+        if (_temperatureOverlayTexture is not null && ReferenceEquals(_temperatureOverlaySource, map))
+        {
+            return _temperatureOverlayTexture;
+        }
+
+        var pixelsPerCell = CalculateTemperatureTexturePixelsPerCell(map);
+        var image = Image.CreateEmpty(map.CellCountX * pixelsPerCell, map.CellCountY * pixelsPerCell, false, Image.Format.Rgba8);
+        for (var y = 0; y < map.CellCountY; y++)
+        {
+            for (var x = 0; x < map.CellCountX; x++)
+            {
+                var temperature = map.GetTemperature(x, y);
+                for (var localY = 0; localY < pixelsPerCell; localY++)
+                {
+                    for (var localX = 0; localX < pixelsPerCell; localX++)
+                    {
+                        image.SetPixel(
+                            x * pixelsPerCell + localX,
+                            y * pixelsPerCell + localY,
+                            ColorForTemperatureTexture(temperature, x, y, localX, localY, pixelsPerCell));
+                    }
+                }
+            }
+        }
+
+        _temperatureOverlaySource = map;
+        _temperatureOverlayPixelsPerCell = pixelsPerCell;
+        _temperatureOverlayTexture = ImageTexture.CreateFromImage(image);
+        return _temperatureOverlayTexture;
+    }
+
     private static int CalculateBiomeTexturePixelsPerCell(BiomeMap map)
+    {
+        var maxCells = Math.Max(map.CellCountX, map.CellCountY);
+        if (maxCells <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Clamp(MaxBiomeTextureDimension / maxCells, 1, PreferredBiomeTexturePixelsPerCell);
+    }
+
+    private static int CalculateTemperatureTexturePixelsPerCell(TemperatureMap map)
     {
         var maxCells = Math.Max(map.CellCountX, map.CellCountY);
         if (maxCells <= 0)
@@ -4109,6 +4218,25 @@ public partial class Main : Node2D
                 if (TryClipRect(rect, _worldRect, out var clipped))
                 {
                     DrawRect(clipped, new Color(0f, 0f, 0f, 0.045f), filled: false, width: 1f);
+                }
+            }
+        }
+    }
+
+    private void DrawTemperatureCellOutlines(TemperatureMap map)
+    {
+        var range = GetVisibleCellRange(map.CellSize, map.CellCountX, map.CellCountY);
+        for (var y = range.MinY; y < range.MaxYExclusive; y++)
+        {
+            for (var x = range.MinX; x < range.MaxXExclusive; x++)
+            {
+                var cell = map.GetCellBounds(x, y);
+                var topLeft = ToScreen(new SimVector2(cell.X, cell.Y));
+                var bottomRight = ToScreen(new SimVector2(cell.X + cell.Width, cell.Y + cell.Height));
+                var rect = RectFromPoints(topLeft, bottomRight);
+                if (TryClipRect(rect, _worldRect, out var clipped))
+                {
+                    DrawRect(clipped, new Color(0f, 0f, 0f, 0.05f), filled: false, width: 1f);
                 }
             }
         }
@@ -4261,6 +4389,54 @@ public partial class Main : Node2D
             BiomeKind.Highland => new Color(0.50f, 0.45f, 0.36f, 0.44f),
             _ => new Color(0.24f, 0.50f, 0.18f, 0.50f)
         };
+    }
+
+    private static Color ColorForTemperature(float temperature)
+    {
+        var value = Math.Clamp(temperature, 0f, 1f);
+        var cold = new Color(0.18f, 0.34f, 0.88f, 0.58f);
+        var cool = new Color(0.10f, 0.58f, 0.72f, 0.54f);
+        var mild = new Color(0.26f, 0.63f, 0.28f, 0.48f);
+        var warm = new Color(0.90f, 0.68f, 0.20f, 0.54f);
+        var hot = new Color(0.84f, 0.20f, 0.12f, 0.60f);
+
+        if (value < 0.30f)
+        {
+            return cold.Lerp(cool, value / 0.30f);
+        }
+
+        if (value < 0.55f)
+        {
+            return cool.Lerp(mild, (value - 0.30f) / 0.25f);
+        }
+
+        if (value < 0.75f)
+        {
+            return mild.Lerp(warm, (value - 0.55f) / 0.20f);
+        }
+
+        return warm.Lerp(hot, (value - 0.75f) / 0.25f);
+    }
+
+    private static Color ColorForTemperatureTexture(
+        float temperature,
+        int cellX,
+        int cellY,
+        int localX,
+        int localY,
+        int pixelsPerCell)
+    {
+        var baseColor = ColorForTemperature(temperature);
+        if (pixelsPerCell <= 1)
+        {
+            return baseColor;
+        }
+
+        var fine = Hash01(cellX * pixelsPerCell + localX, cellY * pixelsPerCell + localY, 0x4f1bbcddu);
+        var coarse = Hash01(cellX * 3 + localX / 5, cellY * 3 + localY / 5, 0x8ac5f293u);
+        var variation = (fine - 0.5f) * 0.025f + (coarse - 0.5f) * 0.030f;
+        var color = AdjustColorValue(baseColor, variation);
+        return new Color(color.R, color.G, color.B, baseColor.A);
     }
 
     private static Color ColorForBiomeTexture(
@@ -5896,9 +6072,24 @@ public partial class Main : Node2D
         };
     }
 
+    private static string FormatMapOverlayMode(MapOverlayMode mode)
+    {
+        return mode switch
+        {
+            MapOverlayMode.Biome => "biome",
+            MapOverlayMode.Temperature => "temperature",
+            _ => "off"
+        };
+    }
+
     private static string FormatBiomeKind(BiomeKind biome)
     {
         return BiomeKinds.Canonicalize(biome).ToString().ToLowerInvariant();
+    }
+
+    private static string FormatTemperatureIndex(float temperature)
+    {
+        return $"{Math.Clamp(temperature, 0f, 1f) * 100f:0.#}";
     }
 
     private static string FormatBiomeMapKind(BiomeMapKind mapKind)
@@ -6393,6 +6584,13 @@ public partial class Main : Node2D
     {
         LegacyShapes,
         SpriteTheme
+    }
+
+    private enum MapOverlayMode
+    {
+        Biome,
+        Temperature,
+        Off
     }
 
     private enum SpriteAtlasSlot

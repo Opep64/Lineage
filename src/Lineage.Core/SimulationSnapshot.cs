@@ -116,6 +116,8 @@ public sealed record SimulationSnapshot
 
     public LocalFertilitySnapshot LocalFertility { get; init; } = new();
 
+    public TemperatureSnapshot Temperature { get; init; } = new();
+
     public static SimulationSnapshot Capture(
         SimulationScenario scenario,
         Simulation simulation,
@@ -176,7 +178,8 @@ public sealed record SimulationSnapshot
             MaxCreatureXReached = state.Stats.MaxCreatureXReached,
             Biomes = BiomeSnapshot.Capture(state.Biomes),
             Obstacles = ObstacleSnapshot.Capture(state.Obstacles),
-            LocalFertility = LocalFertilitySnapshot.Capture(state.LocalFertility)
+            LocalFertility = LocalFertilitySnapshot.Capture(state.LocalFertility),
+            Temperature = TemperatureSnapshot.Capture(state.Temperature)
         };
     }
 
@@ -320,6 +323,44 @@ public sealed record LocalFertilitySnapshot
                 NeighborDepletionShare,
                 Multipliers)
             : LocalFertilityMap.CreateDisabled(bounds);
+    }
+}
+
+public sealed record TemperatureSnapshot
+{
+    public bool Enabled { get; init; }
+
+    public float CellSize { get; init; } = 1f;
+
+    public int CellCountX { get; init; } = 1;
+
+    public int CellCountY { get; init; } = 1;
+
+    public float[] Temperatures { get; init; } = [TemperatureMap.NeutralTemperature];
+
+    public static TemperatureSnapshot Capture(TemperatureMap map)
+    {
+        return new TemperatureSnapshot
+        {
+            Enabled = map.Enabled,
+            CellSize = map.CellSize,
+            CellCountX = map.CellCountX,
+            CellCountY = map.CellCountY,
+            Temperatures = map.GetCellsCopy()
+        };
+    }
+
+    public TemperatureMap ToMap(WorldBounds bounds)
+    {
+        return Temperatures.Length == CellCountX * CellCountY
+            ? TemperatureMap.CreateFromCells(
+                bounds,
+                Enabled,
+                CellSize,
+                CellCountX,
+                CellCountY,
+                Temperatures)
+            : TemperatureMap.CreateNeutral(bounds);
     }
 }
 

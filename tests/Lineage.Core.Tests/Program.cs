@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Lineage.Core;
 
@@ -61,6 +62,7 @@ var tests = new (string Name, Action Body)[]
     ("Metabolism charges plant specialization upkeep", MetabolismChargesPlantSpecializationUpkeep),
     ("Metabolism charges rtNEAT topology upkeep", MetabolismChargesRtNeatTopologyUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
+    ("Metabolism basal cost follows thermal mismatch", MetabolismBasalCostFollowsThermalMismatch),
     ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
     ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
@@ -86,6 +88,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports rotten meat cues", CreatureSensingReportsRottenMeatCues),
     ("Creature sensing reports local terrain drag", CreatureSensingReportsLocalTerrainDrag),
     ("Creature sensing reports habitat quality", CreatureSensingReportsHabitatQuality),
+    ("Creature sensing reports local temperature", CreatureSensingReportsLocalTemperature),
     ("Creature sensing applies biome vision range penalty", CreatureSensingAppliesBiomeVisionRangePenalty),
     ("Creature sensing reports local obstacles", CreatureSensingReportsLocalObstacles),
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
@@ -96,6 +99,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain IO registry describes the dense adapter contract", BrainIoRegistryDescribesDenseAdapterContract),
     ("Legacy neural adapter maps grouped brain inputs", LegacyNeuralAdapterMapsGroupedBrainInputs),
     ("Neural controller turns senses into actions", NeuralControllerTurnsSensesIntoActions),
+    ("Neural controller turns thermal mismatch into actions", NeuralControllerTurnsThermalMismatchIntoActions),
     ("Neural controller reuses actions on skipped world senses", NeuralControllerReusesActionsOnSkippedWorldSenses),
     ("Neural controller forces decisions on stale contact", NeuralControllerForcesDecisionsOnStaleContact),
     ("Neural controller parallel path matches single-threaded path", NeuralControllerParallelPathMatchesSingleThreadedPath),
@@ -146,6 +150,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates grab output and inputs", NeuralBrainMigratesGrabOutputAndInputs),
     ("Neural brain migrates sound output and inputs", NeuralBrainMigratesSoundOutputAndInputs),
     ("Neural brain migrates fat inputs", NeuralBrainMigratesFatInputs),
+    ("Neural brain migrates thermal sensing inputs", NeuralBrainMigratesThermalSensingInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -173,6 +178,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural life loop is repeatable", NeuralLifeLoopIsRepeatable),
     ("Spawned creatures create lineage records", SpawnedCreaturesCreateLineageRecords),
     ("Offspring lineage records parent and generation", OffspringLineageRecordsParentAndGeneration),
+    ("Lineage telemetry records thermal niche exposure", LineageTelemetryRecordsThermalNicheExposure),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
     ("Spatial heatmaps record lifecycle and interaction events", SpatialHeatmapsRecordLifecycleAndInteractionEvents),
     ("World state prunes extinct payloads", WorldStatePrunesExtinctPayloads),
@@ -195,6 +201,7 @@ var tests = new (string Name, Action Body)[]
     ("Generated small biome maps contain visible variety", GeneratedSmallBiomeMapsContainVisibleVariety),
     ("Natural climate biome maps create broad five-biome regions", NaturalClimateBiomeMapsCreateBroadFiveBiomeRegions),
     ("Natural climate single-cell maps stay neutral", NaturalClimateSingleCellMapsStayNeutral),
+    ("Temperature maps generate cold and hot regions", TemperatureMapsGenerateColdAndHotRegions),
     ("Banded biome maps create broad regions", BandedBiomeMapsCreateBroadRegions),
     ("Edge band biome maps create productive ends", EdgeBandBiomeMapsCreateProductiveEnds),
     ("Edge ladder biome maps keep poor centers crossable", EdgeLadderBiomeMapsKeepPoorCentersCrossable),
@@ -243,6 +250,7 @@ var tests = new (string Name, Action Body)[]
     ("Simulation snapshot capture can sample stats history", SimulationSnapshotCaptureCanSampleStatsHistory),
     ("Scenario pressure knobs seed starting genome", ScenarioPressureKnobsSeedStartingGenome),
     ("Scenario metadata describes editable JSON fields", ScenarioMetadataDescribesEditableJsonFields),
+    ("Scenario recipes use known fields", ScenarioRecipesUseKnownFields),
     ("Scenario JSON migrates legacy resource count", ScenarioJsonMigratesLegacyResourceCount),
     ("Biome JSON migrates legacy names", BiomeJsonMigratesLegacyNames),
     ("Scenario JSON round trips", ScenarioJsonRoundTrips)
@@ -2452,6 +2460,40 @@ static void MetabolismBasalCostFollowsBiomeMultiplier()
     AssertClose(7f, simulation.State.Creatures[0].Energy, 0.000001, "Biome basal energy");
 }
 
+static void MetabolismBasalCostFollowsThermalMismatch()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            FixedDeltaSeconds = 1f,
+            WorldWidth = 100f,
+            WorldHeight = 100f
+        },
+        seed: 133,
+        systems: [new MetabolismSystem(thermalMismatchBasalCostMultiplier: 0.5f)]);
+    simulation.State.SetTemperature(TemperatureMap.CreateFromCells(
+        simulation.State.Bounds,
+        enabled: true,
+        cellSize: 100f,
+        cellCountX: 1,
+        cellCountY: 1,
+        [1f]));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 2f,
+        MaturityAgeSeconds = 0f,
+        ThermalOptimum = 0.5f,
+        ThermalTolerance = 0.25f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f);
+
+    simulation.Step();
+
+    AssertClose(7f, simulation.State.Creatures[0].Energy, 0.000001, "Thermal mismatch basal energy");
+}
+
 static void FatStoragePreservesEggReservePriority()
 {
     var simulation = new Simulation(
@@ -3641,6 +3683,57 @@ static void CreatureSensingReportsHabitatQuality()
     AssertTrue(senses.ForwardHabitatQuality > senses.CurrentHabitatQuality, "Forward fertile habitat should be better than locally depleted grassland");
 }
 
+static void CreatureSensingReportsLocalTemperature()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 200f,
+            WorldHeight = 200f,
+            FixedDeltaSeconds = 0.1f
+        },
+        seed: 409,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
+        ]);
+    simulation.State.SetTemperature(TemperatureMap.CreateFromCells(
+        simulation.State.Bounds,
+        enabled: true,
+        cellSize: 100f,
+        cellCountX: 2,
+        cellCountY: 2,
+        [0.2f, 0.8f, 0.4f, 0.6f]));
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        SenseRadius = 100f,
+        MaturityAgeSeconds = 0f,
+        ThermalOptimum = 0.4f,
+        ThermalTolerance = 0.2f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(85f, 85f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertClose(0.2f, senses.CurrentTemperature, 0.000001, "Current temperature");
+    AssertClose(0.8f, senses.ForwardTemperature, 0.000001, "Forward temperature");
+    AssertClose(0.2f, senses.LeftTemperature, 0.000001, "Left temperature");
+    AssertClose(0.4f, senses.RightTemperature, 0.000001, "Right temperature");
+    AssertClose(1f, senses.CurrentThermalMismatch, 0.000001, "Current thermal mismatch");
+    AssertClose(1f, senses.ForwardThermalMismatch, 0.000001, "Forward thermal mismatch");
+    AssertClose(1f, senses.LeftThermalMismatch, 0.000001, "Left thermal mismatch");
+    AssertClose(0f, senses.RightThermalMismatch, 0.000001, "Right thermal mismatch");
+}
+
 static void CreatureSensingAppliesBiomeVisionRangePenalty()
 {
     var visionProfile = new BiomePressureProfile(
@@ -4085,6 +4178,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var grabInput = BrainIoRegistry.GetInput(NeuralBrainSchema.GrabPressureInput);
     var soundInput = BrainIoRegistry.GetInput(NeuralBrainSchema.SoundToneInput);
     var fatInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FatRatioInput);
+    var climateInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CurrentTemperatureInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -4094,6 +4188,9 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(4, soundInput.IntroducedVersion, "Sound input introduced version");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, fatInput.Freshness, "Fat input freshness");
     AssertEqual(5, fatInput.IntroducedVersion, "Fat input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, climateInput.Freshness, "Climate input freshness");
+    AssertEqual(6, climateInput.IntroducedVersion, "Climate input introduced version");
+    AssertEqual("climate.current_temperature", climateInput.Key, "Climate input key");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
 }
@@ -4162,6 +4259,14 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         SoundToneClarity = 0.69f,
         FatRatio = 0.79f,
         MassBurdenRatio = 0.89f,
+        CurrentTemperature = 0.19f,
+        ForwardTemperature = 0.29f,
+        LeftTemperature = 0.39f,
+        RightTemperature = 0.49f,
+        CurrentThermalMismatch = 0.59f,
+        ForwardThermalMismatch = 0.69f,
+        LeftThermalMismatch = 0.79f,
+        RightThermalMismatch = 0.89f,
         CurrentTerrainDrag = 0.44f,
         ForwardTerrainDrag = 0.54f,
         LeftTerrainDrag = 0.64f,
@@ -4229,6 +4334,14 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.69f, inputs[NeuralBrainSchema.SoundToneClarityInput], 0.000001, "Sound clarity input");
     AssertClose(0.79f, inputs[NeuralBrainSchema.FatRatioInput], 0.000001, "Fat ratio input");
     AssertClose(0.89f, inputs[NeuralBrainSchema.MassBurdenInput], 0.000001, "Mass burden input");
+    AssertClose(0.19f, inputs[NeuralBrainSchema.CurrentTemperatureInput], 0.000001, "Current temperature input");
+    AssertClose(0.29f, inputs[NeuralBrainSchema.ForwardTemperatureInput], 0.000001, "Forward temperature input");
+    AssertClose(0.39f, inputs[NeuralBrainSchema.LeftTemperatureInput], 0.000001, "Left temperature input");
+    AssertClose(0.49f, inputs[NeuralBrainSchema.RightTemperatureInput], 0.000001, "Right temperature input");
+    AssertClose(0.59f, inputs[NeuralBrainSchema.CurrentThermalMismatchInput], 0.000001, "Current thermal mismatch input");
+    AssertClose(0.69f, inputs[NeuralBrainSchema.ForwardThermalMismatchInput], 0.000001, "Forward thermal mismatch input");
+    AssertClose(0.79f, inputs[NeuralBrainSchema.LeftThermalMismatchInput], 0.000001, "Left thermal mismatch input");
+    AssertClose(0.89f, inputs[NeuralBrainSchema.RightThermalMismatchInput], 0.000001, "Right thermal mismatch input");
     AssertClose(0.54f, inputs[NeuralBrainSchema.ForwardTerrainDragInput], 0.000001, "Terrain input");
     AssertClose(0.15f, inputs[NeuralBrainSchema.CurrentHabitatQualityInput], 0.000001, "Current habitat input");
     AssertClose(0.25f, inputs[NeuralBrainSchema.ForwardHabitatQualityInput], 0.000001, "Forward habitat input");
@@ -4353,6 +4466,41 @@ static void NeuralControllerTurnsSensesIntoActions()
     AssertTrue(Math.Abs(creature.Actions.Turn) < 0.001f, "Food straight ahead should not request turn");
     AssertTrue(!creature.Actions.WantsEat, "Forager should wait for food contact before eating");
     AssertTrue(creature.DesiredVelocity.X > 0f, "Desired velocity should face food");
+}
+
+static void NeuralControllerTurnsThermalMismatchIntoActions()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 611,
+        systems: [new NeuralControllerSystem()]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaxSpeed = 10f,
+        MaxTurnRadiansPerSecond = 4f,
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainSchema.InputCount * NeuralBrainSchema.OutputCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 1f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.LeftThermalMismatchInput] = 4f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RightThermalMismatchInput] = -4f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        LeftThermalMismatch = 1f,
+        RightThermalMismatch = 0f
+    };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    AssertTrue(creature.Actions.MoveForward > 0.7f, "Probe brain should request forward movement");
+    AssertTrue(creature.Actions.Turn > 0.9f, "Probe brain should turn away from high thermal mismatch on the left");
 }
 
 static void NeuralControllerReusesActionsOnSkippedWorldSenses()
@@ -6352,6 +6500,45 @@ static void NeuralBrainMigratesFatInputs()
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.MassBurdenInput), 0.000001, "New hidden mass input starts neutral");
 }
 
+static void NeuralBrainMigratesThermalSensingInputs()
+{
+    const int legacyInputCount = NeuralBrainSchema.MassBurdenInput + 1;
+    const int legacyOutputCount = NeuralBrainSchema.OutputCount;
+    const int hiddenNodeCount = 2;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.MassBurdenInput] = 0.7f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.MassBurdenInput] = 0.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 0.9f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Thermal migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Thermal migrated weight count");
+    AssertClose(
+        0.7f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MassBurdenInput),
+        0.000001,
+        "Existing mass burden input remains in place");
+    AssertClose(
+        0.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.MassBurdenInput),
+        0.000001,
+        "Existing hidden mass burden input remains in place");
+    AssertClose(
+        0.9f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CurrentTemperatureInput), 0.000001, "New current temperature input starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.RightThermalMismatchInput), 0.000001, "New thermal mismatch input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.ForwardTemperatureInput), 0.000001, "New hidden temperature input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.LeftThermalMismatchInput), 0.000001, "New hidden mismatch input starts neutral");
+}
+
 static void NeuralBrainSupportsHiddenNodes()
 {
     const int hiddenNodeCount = 4;
@@ -8191,6 +8378,57 @@ static void OffspringLineageRecordsParentAndGeneration()
     AssertEqual(1, simulation.State.Stats.EggHatchedCount, "Egg hatch count");
 }
 
+static void LineageTelemetryRecordsThermalNicheExposure()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            FixedDeltaSeconds = 1f,
+            WorldWidth = 100f,
+            WorldHeight = 100f
+        },
+        seed: 12,
+        systems: []);
+    simulation.State.SetTemperature(TemperatureMap.CreateFromCells(
+        simulation.State.Bounds,
+        enabled: true,
+        cellSize: 100f,
+        cellCountX: 1,
+        cellCountY: 1,
+        [1f]));
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ThermalOptimum = 0.5f,
+        ThermalTolerance = 0.25f
+    });
+    var creatureId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
+
+    new LineageTelemetrySystem().Update(simulation.State, 2f);
+
+    AssertTrue(simulation.State.TryGetLineageRecord(creatureId, out var record), "Thermal lineage lookup");
+    AssertClose(1f, record.BirthTemperature, 0.000001, "Birth temperature");
+    AssertClose(2f, record.TelemetryLivingSeconds, 0.000001, "Thermal telemetry seconds");
+    AssertClose(2f, record.TelemetryTemperatureExposure, 0.000001, "Temperature exposure");
+    AssertClose(2f, record.TelemetryThermalMismatchExposure, 0.000001, "Thermal mismatch exposure");
+    AssertClose(2f, record.TelemetryHotTemperatureSeconds, 0.000001, "Hot temperature seconds");
+    AssertClose(2f, record.TelemetryHotThermalStressSeconds, 0.000001, "Hot stress seconds");
+
+    var creature = simulation.State.Creatures[0];
+    creature.Energy = 0f;
+    simulation.State.Creatures[0] = creature;
+    new DeathSystem().Update(simulation.State, 1f);
+
+    AssertTrue(simulation.State.TryGetLineageRecord(creatureId, out record), "Dead thermal lineage lookup");
+    AssertClose(1f, record.DeathTemperature, 0.000001, "Death temperature");
+    var summary = ThermalNicheTelemetry.SummarizeRecords([record]);
+    AssertClose(1f, summary.AverageOccupiedTemperature, 0.000001, "Average occupied temperature");
+    AssertClose(1f, summary.AverageThermalMismatch, 0.000001, "Average thermal mismatch");
+    AssertClose(1f, summary.HotTemperatureShare, 0.000001, "Hot lifetime share");
+    AssertClose(1f, summary.HotThermalStressShare, 0.000001, "Hot stress share");
+    AssertEqual(1, summary.HotTemperatureBirths, "Hot birth count");
+    AssertEqual(1, summary.HotTemperatureDeaths, "Hot death count");
+}
+
 static void DeathSystemMarksLineageDeathReason()
 {
     var simulation = new Simulation(
@@ -8641,6 +8879,18 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(1f, snapshot.AverageLocalFertilityMultiplier, 0.000001, "Snapshot average local fertility");
     AssertClose(1f, snapshot.MinimumLocalFertilityMultiplier, 0.000001, "Snapshot minimum local fertility");
     AssertClose(0f, snapshot.DepletedLocalFertilityCellShare, 0.000001, "Snapshot depleted local fertility share");
+    AssertEqual(1, snapshot.TemperatureCellCount, "Snapshot temperature cell count");
+    AssertClose(TemperatureMap.NeutralTemperature, snapshot.AverageMapTemperature, 0.000001, "Snapshot average map temperature");
+    AssertClose(TemperatureMap.NeutralTemperature, snapshot.MinimumMapTemperature, 0.000001, "Snapshot minimum map temperature");
+    AssertClose(TemperatureMap.NeutralTemperature, snapshot.MaximumMapTemperature, 0.000001, "Snapshot maximum map temperature");
+    AssertClose(TemperatureMap.NeutralTemperature, snapshot.AverageCreatureTemperature, 0.000001, "Snapshot average creature temperature");
+    AssertClose(CreatureGenome.Baseline.ThermalOptimum, snapshot.AverageThermalOptimum, 0.000001, "Snapshot average thermal optimum");
+    AssertClose(CreatureGenome.Baseline.ThermalTolerance, snapshot.AverageThermalTolerance, 0.000001, "Snapshot average thermal tolerance");
+    AssertClose(0f, snapshot.AverageCreatureThermalMismatch, 0.000001, "Snapshot average thermal mismatch");
+    AssertEqual(0, snapshot.HotThermalMismatchCreatureCount, "Snapshot hot thermal mismatch count");
+    AssertEqual(0, snapshot.ColdThermalMismatchCreatureCount, "Snapshot cold thermal mismatch count");
+    AssertClose(TemperatureMap.NeutralTemperature, snapshot.AveragePlantTemperature, 0.000001, "Snapshot average plant temperature");
+    AssertClose(0f, snapshot.AverageSmallPreyTemperature, 0.000001, "Snapshot average small prey temperature without small prey");
     AssertEqual(1, snapshot.GenomeCount, "Snapshot genome count");
     AssertEqual(1, snapshot.BrainCount, "Snapshot brain count");
     AssertClose(4f, snapshot.AverageBrainHiddenNodeCount, 0.000001, "Snapshot average hidden nodes");
@@ -9443,6 +9693,57 @@ static void NaturalClimateSingleCellMapsStayNeutral()
     AssertEqual(1, map.CellCountX, "Single-cell natural climate count x");
     AssertEqual(1, map.CellCountY, "Single-cell natural climate count y");
     AssertEqual(BiomeKind.Grassland, map.GetKind(0, 0), "Single-cell natural climate biome");
+}
+
+static void TemperatureMapsGenerateColdAndHotRegions()
+{
+    var scenario = new SimulationScenario
+    {
+        Seed = 73,
+        EnableBiomes = true,
+        EnableTemperature = true,
+        BiomeMapKind = BiomeMapKind.NaturalClimate,
+        WorldWidth = 8_000f,
+        WorldHeight = 8_000f,
+        BiomeCellSize = 500f,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    };
+    var biomeMap = SimulationScenarioFactory.CreateBiomeMap(scenario);
+    var first = SimulationScenarioFactory.CreateTemperatureMap(scenario, biomeMap);
+    var second = SimulationScenarioFactory.CreateTemperatureMap(scenario, biomeMap);
+    var summary = first.Summarize();
+
+    AssertTrue(first.Enabled, "Temperature map should be enabled when scenario temperature is enabled");
+    AssertEqual(biomeMap.CellCountX, first.CellCountX, "Temperature map cell count x");
+    AssertEqual(biomeMap.CellCountY, first.CellCountY, "Temperature map cell count y");
+    AssertEqual(biomeMap.CellSize, first.CellSize, "Temperature map cell size");
+    AssertTrue(summary.MaximumTemperature - summary.MinimumTemperature > 0.35f, "Temperature map should contain visible cold/hot range");
+    AssertTrue(summary.MinimumTemperature < TemperatureMap.NeutralTemperature, "Temperature map should include cold regions");
+    AssertTrue(summary.MaximumTemperature > TemperatureMap.NeutralTemperature, "Temperature map should include hot regions");
+
+    for (var y = 0; y < first.CellCountY; y++)
+    {
+        for (var x = 0; x < first.CellCountX; x++)
+        {
+            AssertClose(first.GetTemperature(x, y), second.GetTemperature(x, y), 0.000001, $"Temperature cell {x},{y}");
+        }
+    }
+
+    var topAverage = AverageTemperatureRow(first, 0);
+    var bottomAverage = AverageTemperatureRow(first, first.CellCountY - 1);
+    AssertTrue(topAverage + 0.25f < bottomAverage, $"Temperature map should be colder at top than bottom, saw {topAverage:0.###} vs {bottomAverage:0.###}");
+}
+
+static float AverageTemperatureRow(TemperatureMap map, int y)
+{
+    var total = 0f;
+    for (var x = 0; x < map.CellCountX; x++)
+    {
+        total += map.GetTemperature(x, y);
+    }
+
+    return total / Math.Max(1, map.CellCountX);
 }
 
 static void BandedBiomeMapsCreateBroadRegions()
@@ -11803,6 +12104,8 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         TenderPlantAdaptation = 0.2f,
         RichPlantAdaptation = 0.3f,
         ToughPlantAdaptation = 0.4f,
+        ThermalOptimum = 0.62f,
+        ThermalTolerance = 0.18f,
         BiteStrength = 0.75f,
         DamageResistance = 1.25f,
         DeathMeatCaloriesPerBodyRadius = 5f,
@@ -11853,6 +12156,8 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(0.2f, genome.TenderPlantAdaptation, 0.000001, "Seeded tender plant adaptation");
     AssertClose(0.3f, genome.RichPlantAdaptation, 0.000001, "Seeded rich plant adaptation");
     AssertClose(0.4f, genome.ToughPlantAdaptation, 0.000001, "Seeded tough plant adaptation");
+    AssertClose(0.62f, genome.ThermalOptimum, 0.000001, "Seeded thermal optimum");
+    AssertClose(0.18f, genome.ThermalTolerance, 0.000001, "Seeded thermal tolerance");
     AssertClose(0.75f, genome.BiteStrength, 0.000001, "Seeded bite strength");
     AssertClose(1.25f, genome.DamageResistance, 0.000001, "Seeded damage resistance");
     AssertClose(5f, scenario.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
@@ -11975,6 +12280,83 @@ static void ScenarioMetadataDescribesEditableJsonFields()
     AssertEqual("Brain & Vision", closeMinimum.Group, "Close sense refresh minimum group");
     AssertEqual("ticks", closeMinimum.Units, "Close sense refresh minimum units");
     AssertTrue(closeMinimum.Advanced, "Close sense refresh minimum should be advanced");
+
+    var fixedDelta = SimulationScenarioMetadata.FindByJsonName("fixedDeltaSeconds")
+        ?? throw new InvalidOperationException("Missing fixed delta metadata.");
+    AssertClose(0.00001, fixedDelta.Step ?? double.NaN, 0.000000001, "Fixed delta editor step");
+
+    var maxSpeedUpkeep = SimulationScenarioMetadata.FindByJsonName("maxSpeedEnergyCostPerSecond")
+        ?? throw new InvalidOperationException("Missing max speed upkeep metadata.");
+    AssertClose(0.001, maxSpeedUpkeep.Step ?? double.NaN, 0.000000001, "Max speed upkeep editor step");
+
+    var senseRadiusUpkeep = SimulationScenarioMetadata.FindByJsonName("senseRadiusEnergyCostPerSecond")
+        ?? throw new InvalidOperationException("Missing sense radius upkeep metadata.");
+    AssertClose(0.0001, senseRadiusUpkeep.Step ?? double.NaN, 0.000000001, "Sense radius upkeep editor step");
+
+    var localFertilityRecovery = SimulationScenarioMetadata.FindByJsonName("localFertilityRecoveryPerSecond")
+        ?? throw new InvalidOperationException("Missing local fertility recovery metadata.");
+    AssertClose(0.00001, localFertilityRecovery.Step ?? double.NaN, 0.000000001, "Local fertility recovery editor step");
+
+    var rtNeatConnectionUpkeep = SimulationScenarioMetadata.FindByJsonName("rtNeatEnabledConnectionEnergyCostPerSecond")
+        ?? throw new InvalidOperationException("Missing rtNEAT connection upkeep metadata.");
+    AssertClose(0.00001, rtNeatConnectionUpkeep.Step ?? double.NaN, 0.000000001, "rtNEAT connection upkeep editor step");
+}
+
+static void ScenarioRecipesUseKnownFields()
+{
+    var recipeDirectory = Path.Combine("scenarios", "recipes");
+    AssertTrue(Directory.Exists(recipeDirectory), "Scenario recipe directory should exist");
+    var recipePaths = Directory
+        .EnumerateFiles(recipeDirectory, "*.json", SearchOption.TopDirectoryOnly)
+        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    AssertTrue(recipePaths.Length > 0, "Scenario recipes should be present");
+
+    var foundThermalRecipe = false;
+    foreach (var recipePath in recipePaths)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(recipePath));
+        var root = document.RootElement;
+        AssertEqual("lineage.runner.scenario-recipe.v1", root.GetProperty("schemaVersion").GetString(), $"Recipe schema {recipePath}");
+        AssertTrue(root.GetProperty("changes").ValueKind == JsonValueKind.Object, $"Recipe changes object {recipePath}");
+
+        var scenarioJson = JsonNode.Parse(SimulationScenarioJson.ToJson(new SimulationScenario()))?.AsObject()
+            ?? throw new InvalidOperationException("Could not create default scenario JSON.");
+        foreach (var change in root.GetProperty("changes").EnumerateObject())
+        {
+            AssertTrue(
+                SimulationScenarioMetadata.FindByJsonName(change.Name) is not null,
+                $"Recipe {Path.GetFileName(recipePath)} uses known field {change.Name}");
+            scenarioJson[change.Name] = JsonNode.Parse(change.Value.GetRawText());
+        }
+
+        var scenario = SimulationScenarioJson.FromJson(scenarioJson.ToJsonString()).Validated();
+        if (string.Equals(Path.GetFileName(recipePath), "thermal_gradient_trial.json", StringComparison.OrdinalIgnoreCase))
+        {
+            foundThermalRecipe = true;
+            AssertEqual("Thermal Gradient Trial", root.GetProperty("name").GetString(), "Thermal recipe name");
+            AssertEqual("Thermal Gradient Trial", scenario.Name, "Thermal recipe scenario name");
+            AssertEqual(BiomeMapKind.NaturalClimate, scenario.BiomeMapKind, "Thermal recipe map kind");
+            AssertTrue(scenario.EnableTemperature, "Thermal recipe enables temperature");
+            AssertClose(16_000f, scenario.WorldWidth, 0.000001, "Thermal recipe world width");
+            AssertClose(16_000f, scenario.WorldHeight, 0.000001, "Thermal recipe world height");
+            AssertClose(500f, scenario.BiomeCellSize, 0.000001, "Thermal recipe climate cell size");
+            AssertClose(30f, scenario.InitialResourcesPerMillionArea, 0.000001, "Thermal recipe initial resource density");
+            AssertClose(0.3f, scenario.ResourceRegrowthMin, 0.000001, "Thermal recipe plant regrowth min");
+            AssertClose(1.4f, scenario.ResourceRegrowthMax, 0.000001, "Thermal recipe plant regrowth max");
+            AssertClose(45f, scenario.PlantRespawnDelaySecondsMin, 0.000001, "Thermal recipe plant respawn min");
+            AssertClose(130f, scenario.PlantRespawnDelaySecondsMax, 0.000001, "Thermal recipe plant respawn max");
+            AssertClose(0.55f, scenario.LocalFertilityMinimumMultiplier, 0.000001, "Thermal recipe local fertility minimum");
+            AssertClose(0.0008f, scenario.LocalFertilityRecoveryPerSecond, 0.000001, "Thermal recipe local fertility recovery");
+            AssertClose(0.08f, scenario.LocalFertilityDepletionPerPlant, 0.000001, "Thermal recipe local fertility depletion");
+            AssertClose(0.45f, scenario.LocalFertilityNeighborDepletionShare, 0.000001, "Thermal recipe neighbor depletion share");
+            AssertClose(0.85f, scenario.ThermalMismatchBasalCostMultiplier, 0.000001, "Thermal recipe mismatch basal cost");
+            AssertClose(CreatureThermal.DefaultOptimum, scenario.ThermalOptimum, 0.000001, "Thermal recipe starting optimum");
+            AssertClose(0.2f, scenario.ThermalTolerance, 0.000001, "Thermal recipe starting tolerance");
+        }
+    }
+
+    AssertTrue(foundThermalRecipe, "Thermal gradient trial recipe should be present");
 }
 
 static void ScenarioJsonRoundTrips()
@@ -12083,6 +12465,7 @@ static void ScenarioJsonRoundTrips()
         ForestBiomeBasalCostMultiplier = 0.88f,
         WetlandBiomeBasalCostMultiplier = 1.08f,
         BasalEnergyPerSecond = 0.31f,
+        ThermalMismatchBasalCostMultiplier = 0.47f,
         BodyRadiusEnergyCostPerSecond = 0.04f,
         MaxSpeedEnergyCostPerSecond = 0.003f,
         TurnRateEnergyCostPerSecond = 0.012f,
@@ -12120,6 +12503,8 @@ static void ScenarioJsonRoundTrips()
         TenderPlantAdaptation = 0.11f,
         RichPlantAdaptation = 0.22f,
         ToughPlantAdaptation = 0.33f,
+        ThermalOptimum = 0.61f,
+        ThermalTolerance = 0.21f,
         BiteStrength = 0.7f,
         DamageResistance = 1.4f,
         DeathMeatCaloriesPerBodyRadius = 3.5f,
@@ -12203,6 +12588,8 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"rtNeatHiddenNodeEnergyCostPerSecond\""), "JSON should serialize rtNEAT hidden-node cost");
     AssertTrue(json.Contains("\"rtNeatEnabledConnectionEnergyCostPerSecond\""), "JSON should serialize rtNEAT connection cost");
     AssertTrue(json.Contains("\"tenderPlantAdaptation\""), "JSON should serialize tender plant adaptation");
+    AssertTrue(json.Contains("\"thermalMismatchBasalCostMultiplier\""), "JSON should serialize thermal mismatch basal cost");
+    AssertTrue(json.Contains("\"thermalOptimum\""), "JSON should serialize thermal optimum");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
@@ -12294,6 +12681,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.ForestBiomeBasalCostMultiplier, roundTripped.ForestBiomeBasalCostMultiplier, 0.000001, "Scenario forest basal biome cost");
     AssertClose(scenario.WetlandBiomeBasalCostMultiplier, roundTripped.WetlandBiomeBasalCostMultiplier, 0.000001, "Scenario wetland basal biome cost");
     AssertClose(scenario.BasalEnergyPerSecond, roundTripped.BasalEnergyPerSecond, 0.000001, "Scenario basal energy");
+    AssertClose(scenario.ThermalMismatchBasalCostMultiplier, roundTripped.ThermalMismatchBasalCostMultiplier, 0.000001, "Scenario thermal mismatch basal cost");
     AssertClose(scenario.BodyRadiusEnergyCostPerSecond, roundTripped.BodyRadiusEnergyCostPerSecond, 0.000001, "Scenario body-size energy");
     AssertClose(scenario.MaxSpeedEnergyCostPerSecond, roundTripped.MaxSpeedEnergyCostPerSecond, 0.000001, "Scenario max-speed energy");
     AssertClose(scenario.TurnRateEnergyCostPerSecond, roundTripped.TurnRateEnergyCostPerSecond, 0.000001, "Scenario turn-rate energy");
@@ -12331,6 +12719,8 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.TenderPlantAdaptation, roundTripped.TenderPlantAdaptation, 0.000001, "Scenario tender plant adaptation");
     AssertClose(scenario.RichPlantAdaptation, roundTripped.RichPlantAdaptation, 0.000001, "Scenario rich plant adaptation");
     AssertClose(scenario.ToughPlantAdaptation, roundTripped.ToughPlantAdaptation, 0.000001, "Scenario tough plant adaptation");
+    AssertClose(scenario.ThermalOptimum, roundTripped.ThermalOptimum, 0.000001, "Scenario thermal optimum");
+    AssertClose(scenario.ThermalTolerance, roundTripped.ThermalTolerance, 0.000001, "Scenario thermal tolerance");
     AssertClose(scenario.BiteStrength, roundTripped.BiteStrength, 0.000001, "Scenario bite strength");
     AssertClose(scenario.DamageResistance, roundTripped.DamageResistance, 0.000001, "Scenario damage resistance");
     AssertClose(scenario.DeathMeatCaloriesPerBodyRadius, roundTripped.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");

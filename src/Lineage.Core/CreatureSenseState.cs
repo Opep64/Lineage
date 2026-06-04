@@ -186,6 +186,46 @@ public struct CreatureSenseState
     public float RightHabitatQuality { get; set; }
 
     /// <summary>
+    /// Normalized temperature under the creature's current body position.
+    /// </summary>
+    public float CurrentTemperature { get; set; }
+
+    /// <summary>
+    /// Normalized temperature sampled a short distance in front of the creature's heading.
+    /// </summary>
+    public float ForwardTemperature { get; set; }
+
+    /// <summary>
+    /// Normalized temperature sampled a short distance to the creature's left.
+    /// </summary>
+    public float LeftTemperature { get; set; }
+
+    /// <summary>
+    /// Normalized temperature sampled a short distance to the creature's right.
+    /// </summary>
+    public float RightTemperature { get; set; }
+
+    /// <summary>
+    /// Local mismatch between current temperature and this creature's thermal optimum.
+    /// </summary>
+    public float CurrentThermalMismatch { get; set; }
+
+    /// <summary>
+    /// Thermal mismatch sampled a short distance in front of the creature's heading.
+    /// </summary>
+    public float ForwardThermalMismatch { get; set; }
+
+    /// <summary>
+    /// Thermal mismatch sampled a short distance to the creature's left.
+    /// </summary>
+    public float LeftThermalMismatch { get; set; }
+
+    /// <summary>
+    /// Thermal mismatch sampled a short distance to the creature's right.
+    /// </summary>
+    public float RightThermalMismatch { get; set; }
+
+    /// <summary>
     /// Hard obstacle proximity sampled a short distance in front of the creature.
     /// </summary>
     public float ForwardObstacle { get; set; }

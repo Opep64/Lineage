@@ -12,11 +12,13 @@ public sealed class StatsRecordingSystem(
     float seasonLengthSeconds = 900f,
     float seasonFertilityAmplitude = 0.3f,
     float seasonPhaseOffsetSeconds = 0f,
-    SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global) : ISimulationSystem
+    SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
+    float thermalMismatchBasalCostMultiplier = 0f) : ISimulationSystem
 {
     private const float ActiveHiddenOutputWeightThreshold = 0.05f;
     private const float RawAttackPositiveThreshold = 0f;
     private const float SoundEmissionThreshold = 0.05f;
+    private const float ThermalMismatchTelemetryThreshold = 0.75f;
     private const int PlantPatchinessGridAxisCells = 10;
     private const int PlantPatchinessGridCellCount = PlantPatchinessGridAxisCells * PlantPatchinessGridAxisCells;
 
@@ -34,6 +36,8 @@ public sealed class StatsRecordingSystem(
     private readonly float _seasonFertilityAmplitude = EnsureRange(seasonFertilityAmplitude, 0f, 0.95f, nameof(seasonFertilityAmplitude));
     private readonly float _seasonPhaseOffsetSeconds = EnsureFinite(seasonPhaseOffsetSeconds, nameof(seasonPhaseOffsetSeconds));
     private readonly SeasonPhaseMode _seasonPhaseMode = seasonPhaseMode;
+    private readonly float _thermalMismatchBasalCostMultiplier =
+        EnsureNonNegative(thermalMismatchBasalCostMultiplier, nameof(thermalMismatchBasalCostMultiplier));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -125,6 +129,19 @@ public sealed class StatsRecordingSystem(
         var totalBiomeMovementCostMultiplier = 0f;
         var totalBiomeBasalCostMultiplier = 0f;
         var totalBiomeSpeedMultiplier = 0f;
+        var totalCreatureTemperature = 0f;
+        var totalThermalOptimum = 0f;
+        var totalThermalTolerance = 0f;
+        var totalCreatureThermalMismatch = 0f;
+        var totalThermalBasalEnergyPerSecond = 0f;
+        var hotThermalMismatchCreatureCount = 0;
+        var coldThermalMismatchCreatureCount = 0;
+        var comfortableThermalCreatureCount = 0;
+        var coldThermalStressCreatureCount = 0;
+        var hotThermalStressCreatureCount = 0;
+        var coldTemperatureCreatureCount = 0;
+        var temperateTemperatureCreatureCount = 0;
+        var hotTemperatureCreatureCount = 0;
         var totalForwardObstacle = 0f;
         var totalLeftObstacle = 0f;
         var totalRightObstacle = 0f;
@@ -352,6 +369,48 @@ public sealed class StatsRecordingSystem(
             totalBiomeMovementCostMultiplier += _biomeMovementCostProfile.For(biome);
             totalBiomeBasalCostMultiplier += _biomeBasalCostProfile.For(biome);
             totalBiomeSpeedMultiplier += _biomeSpeedProfile.For(biome);
+            var creatureTemperature = state.Temperature.GetTemperatureAt(creature.Position);
+            var thermalMismatch = CreatureThermal.ThermalMismatch(creatureTemperature, genome);
+            var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
+            var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
+            totalCreatureTemperature += creatureTemperature;
+            totalThermalOptimum += thermalOptimum;
+            totalThermalTolerance += thermalTolerance;
+            totalCreatureThermalMismatch += thermalMismatch;
+            totalThermalBasalEnergyPerSecond += genome.BasalEnergyPerSecond
+                * _biomeBasalCostProfile.For(biome)
+                * thermalMismatch
+                * _thermalMismatchBasalCostMultiplier;
+            AddTemperatureBandCount(
+                creatureTemperature,
+                ref coldTemperatureCreatureCount,
+                ref temperateTemperatureCreatureCount,
+                ref hotTemperatureCreatureCount);
+            if (thermalMismatch < CreatureThermal.ThermalStressMismatchThreshold)
+            {
+                comfortableThermalCreatureCount++;
+            }
+            else if (creatureTemperature < thermalOptimum)
+            {
+                coldThermalStressCreatureCount++;
+            }
+            else
+            {
+                hotThermalStressCreatureCount++;
+            }
+
+            if (thermalMismatch >= ThermalMismatchTelemetryThreshold)
+            {
+                if (creatureTemperature >= thermalOptimum)
+                {
+                    hotThermalMismatchCreatureCount++;
+                }
+                else
+                {
+                    coldThermalMismatchCreatureCount++;
+                }
+            }
+
             totalForwardObstacle += creature.Senses.ForwardObstacle;
             totalLeftObstacle += creature.Senses.LeftObstacle;
             totalRightObstacle += creature.Senses.RightObstacle;
@@ -614,6 +673,10 @@ public sealed class StatsRecordingSystem(
 
         var totalResourceCalories = 0f;
         var totalPlantCalories = 0f;
+        var totalPlantTemperature = 0f;
+        var coldTemperaturePlantCalories = 0f;
+        var temperateTemperaturePlantCalories = 0f;
+        var hotTemperaturePlantCalories = 0f;
         var totalMeatCalories = 0f;
         var totalMeatFreshnessWeightedCalories = 0f;
         var activeResourceCount = 0;
@@ -690,6 +753,14 @@ public sealed class StatsRecordingSystem(
             {
                 plantResourceCount++;
                 totalPlantCalories += resource.Calories;
+                var plantTemperature = state.Temperature.GetTemperatureAt(resource.Position);
+                totalPlantTemperature += plantTemperature;
+                AddTemperatureBandValue(
+                    plantTemperature,
+                    resource.Calories,
+                    ref coldTemperaturePlantCalories,
+                    ref temperateTemperaturePlantCalories,
+                    ref hotTemperaturePlantCalories);
                 switch (resource.PlantKind)
                 {
                     case PlantResourceKind.Tender:
@@ -840,6 +911,7 @@ public sealed class StatsRecordingSystem(
             ? totalMeatFreshnessWeightedCalories / totalMeatCalories
             : 0f;
         var totalSmallPreyCalories = 0f;
+        var totalSmallPreyTemperature = 0f;
         var liveSmallPreyCount = 0;
         for (var i = 0; i < state.SmallPrey.Count; i++)
         {
@@ -851,6 +923,7 @@ public sealed class StatsRecordingSystem(
 
             liveSmallPreyCount++;
             totalSmallPreyCalories += prey.Calories;
+            totalSmallPreyTemperature += state.Temperature.GetTemperatureAt(prey.Position);
         }
         var meatDigestedEnergyShare = totalCaloriesDigested > 0f
             ? totalMeatDigestedEnergy / totalCaloriesDigested
@@ -972,6 +1045,8 @@ public sealed class StatsRecordingSystem(
             _seasonFertilityAmplitude,
             _seasonPhaseOffsetSeconds);
         var localFertilitySummary = state.LocalFertility.Summarize();
+        var temperatureSummary = state.Temperature.Summarize();
+        var temperatureEventBands = CalculateTemperatureEventBands(state.Stats.SpatialHeatmaps, state.Temperature);
         var leftRegionSeason = CalculateRegionSeason(state, 1f / 6f);
         var middleRegionSeason = CalculateRegionSeason(state, 0.5f);
         var rightRegionSeason = CalculateRegionSeason(state, 5f / 6f);
@@ -1261,7 +1336,35 @@ public sealed class StatsRecordingSystem(
             state.Stats.SmallPreySpawnedCount,
             state.Stats.SmallPreyKilledCount,
             state.Stats.SmallPreyEatenCount,
-            smallPreyCaloriesEatenPerSecond));
+            smallPreyCaloriesEatenPerSecond,
+            temperatureSummary.CellCount,
+            temperatureSummary.AverageTemperature,
+            temperatureSummary.MinimumTemperature,
+            temperatureSummary.MaximumTemperature,
+            totalCreatureTemperature / divisor,
+            totalThermalOptimum / divisor,
+            totalThermalTolerance / divisor,
+            totalCreatureThermalMismatch / divisor,
+            hotThermalMismatchCreatureCount,
+            coldThermalMismatchCreatureCount,
+            plantResourceCount > 0 ? totalPlantTemperature / plantResourceCount : 0f,
+            liveSmallPreyCount > 0 ? totalSmallPreyTemperature / liveSmallPreyCount : 0f,
+            totalThermalBasalEnergyPerSecond,
+            comfortableThermalCreatureCount,
+            coldThermalStressCreatureCount,
+            hotThermalStressCreatureCount,
+            coldTemperatureCreatureCount,
+            temperateTemperatureCreatureCount,
+            hotTemperatureCreatureCount,
+            coldTemperaturePlantCalories,
+            temperateTemperaturePlantCalories,
+            hotTemperaturePlantCalories,
+            temperatureEventBands.ColdBirths,
+            temperatureEventBands.TemperateBirths,
+            temperatureEventBands.HotBirths,
+            temperatureEventBands.ColdDeaths,
+            temperatureEventBands.TemperateDeaths,
+            temperatureEventBands.HotDeaths));
     }
 
     private SeasonalFertilityState CalculateRegionSeason(WorldState state, float xFraction)
@@ -1319,6 +1422,109 @@ public sealed class StatsRecordingSystem(
                 middle += value;
                 break;
         }
+    }
+
+    private static void AddTemperatureBandCount(
+        float temperature,
+        ref int cold,
+        ref int temperate,
+        ref int hot)
+    {
+        switch (CreatureThermal.ClassifyTemperatureBand(temperature))
+        {
+            case TemperatureBand.Cold:
+                cold++;
+                break;
+            case TemperatureBand.Hot:
+                hot++;
+                break;
+            default:
+                temperate++;
+                break;
+        }
+    }
+
+    private static void AddTemperatureBandValue(
+        float temperature,
+        float value,
+        ref float cold,
+        ref float temperate,
+        ref float hot)
+    {
+        if (value <= 0f)
+        {
+            return;
+        }
+
+        switch (CreatureThermal.ClassifyTemperatureBand(temperature))
+        {
+            case TemperatureBand.Cold:
+                cold += value;
+                break;
+            case TemperatureBand.Hot:
+                hot += value;
+                break;
+            default:
+                temperate += value;
+                break;
+        }
+    }
+
+    private static TemperatureEventBands CalculateTemperatureEventBands(
+        SimulationSpatialHeatmaps heatmaps,
+        TemperatureMap temperature)
+    {
+        if (heatmaps.CellCountX <= 0
+            || heatmaps.CellCountY <= 0
+            || heatmaps.WorldWidth <= 0f
+            || heatmaps.WorldHeight <= 0f)
+        {
+            return default;
+        }
+
+        var expectedLength = heatmaps.CellCountX * heatmaps.CellCountY;
+        if (heatmaps.Births.Count < expectedLength || heatmaps.Deaths.Count < expectedLength)
+        {
+            return default;
+        }
+
+        var coldBirths = 0f;
+        var temperateBirths = 0f;
+        var hotBirths = 0f;
+        var coldDeaths = 0f;
+        var temperateDeaths = 0f;
+        var hotDeaths = 0f;
+        for (var y = 0; y < heatmaps.CellCountY; y++)
+        {
+            for (var x = 0; x < heatmaps.CellCountX; x++)
+            {
+                var index = y * heatmaps.CellCountX + x;
+                var position = new SimVector2(
+                    (x + 0.5f) / heatmaps.CellCountX * heatmaps.WorldWidth,
+                    (y + 0.5f) / heatmaps.CellCountY * heatmaps.WorldHeight);
+                var bandTemperature = temperature.GetTemperatureAt(position);
+                AddTemperatureBandValue(
+                    bandTemperature,
+                    heatmaps.Births[index],
+                    ref coldBirths,
+                    ref temperateBirths,
+                    ref hotBirths);
+                AddTemperatureBandValue(
+                    bandTemperature,
+                    heatmaps.Deaths[index],
+                    ref coldDeaths,
+                    ref temperateDeaths,
+                    ref hotDeaths);
+            }
+        }
+
+        return new TemperatureEventBands(
+            coldBirths,
+            temperateBirths,
+            hotBirths,
+            coldDeaths,
+            temperateDeaths,
+            hotDeaths);
     }
 
     private static void AddBiomeValue(
@@ -1466,6 +1672,14 @@ public sealed class StatsRecordingSystem(
         float TopDecileCaloriesShare,
         float Patchiness);
 
+    private readonly record struct TemperatureEventBands(
+        float ColdBirths,
+        float TemperateBirths,
+        float HotBirths,
+        float ColdDeaths,
+        float TemperateDeaths,
+        float HotDeaths);
+
     private static float EnsurePositive(float value, string name)
     {
         if (!float.IsFinite(value) || value <= 0f)
@@ -1481,6 +1695,16 @@ public sealed class StatsRecordingSystem(
         if (!float.IsFinite(value) || value < inclusiveMin || value > inclusiveMax)
         {
             throw new ArgumentOutOfRangeException(name, $"{name} must be finite and between {inclusiveMin} and {inclusiveMax}.");
+        }
+
+        return value;
+    }
+
+    private static float EnsureNonNegative(float value, string name)
+    {
+        if (!float.IsFinite(value) || value < 0f)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and non-negative.");
         }
 
         return value;

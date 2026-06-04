@@ -122,7 +122,7 @@ internal static class GodotStatsCsvWriter
     public static void Write(string path, IReadOnlyList<SimulationStatsSnapshot> snapshots)
     {
         using var writer = CreateWriter(path);
-        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,dormant_plant_resources,total_dormant_plant_seconds_remaining,avg_dormant_plant_seconds_remaining,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,rtneat_brains,rtneat_brain_share,avg_rtneat_hidden_nodes,max_rtneat_hidden_nodes,avg_rtneat_connections,max_rtneat_connections,avg_rtneat_enabled_connections,max_rtneat_enabled_connections,max_generation,total_creature_energy,total_fat_calories,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,tender_plant_type_resources,rich_plant_type_resources,tough_plant_type_resources,tender_plant_type_calories,rich_plant_type_calories,tough_plant_type_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,obstacle_blocked_creatures,obstacle_blocked_share,obstacle_sensed_creatures,obstacle_sensed_share,avg_forward_obstacle,avg_left_obstacle,avg_right_obstacle,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,fresh_meat_detected_creatures,fresh_meat_detected_share,stale_meat_detected_creatures,stale_meat_detected_share,stale_meat_avoided_creatures,stale_meat_avoided_share,avg_visible_meat_freshness,avg_meat_scent_density,rotten_meat_scent_detected_creatures,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,tender_plant_calories_eaten_per_second,rich_plant_calories_eaten_per_second,tough_plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,tender_plant_digested_energy_per_second,rich_plant_digested_energy_per_second,tough_plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,rotten_meat_deaths,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,avg_plant_dormancy_scheduled_seconds,avg_plant_dormancy_completed_seconds,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,rotten_meat_damaged_creatures,rotten_meat_damaged_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_fat_ratio,avg_mass_burden,avg_fat_speed_multiplier,avg_fat_storage_capacity,avg_fat_storage_efficiency,fat_stored_calories_per_second,fat_released_calories_per_second,avg_recent_food_success,avg_recent_food_energy_yield,active_memory_creatures,active_memory_share,avg_memory_strength,memory_food_contact_share,non_memory_food_contact_share,memory_eating_share,non_memory_eating_share,memory_calories_eaten_per_distance,non_memory_calories_eaten_per_distance,memory_avg_seconds_since_last_meal,non_memory_avg_seconds_since_last_meal,memory_avg_distance_since_last_meal,non_memory_avg_distance_since_last_meal,memory_avg_recent_food_success,non_memory_avg_recent_food_success,memory_avg_generation,non_memory_avg_generation,memory_avg_max_x_progress_share,non_memory_avg_max_x_progress_share,memory_right_region_share,non_memory_right_region_share,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility,creature_contact_creatures,creature_contact_share,attack_intent_creatures,attack_intent_share,attack_intent_touching_creatures,attack_intent_touching_share,attack_no_intent_contact_creatures,attack_no_intent_contact_share,raw_attack_positive_creatures,raw_attack_positive_share,raw_attack_near_gate_creatures,raw_attack_near_gate_share,raw_attack_near_gate_touching_creatures,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,avg_tender_plant_payoff_trace,avg_rich_plant_payoff_trace,avg_tough_plant_payoff_trace,grab_intent_creatures,grab_intent_share,can_grab_creatures,can_grab_share,grab_intent_can_grab_creatures,grab_intent_can_grab_share,grab_intent_no_contact_creatures,grab_intent_no_contact_share,holding_creatures,holding_share,grabbed_creatures,grabbed_share,avg_grab_output,avg_can_grab_grab_output,avg_grab_pressure,avg_grab_strength,sound_emitting_creatures,sound_emitting_share,sound_heard_creatures,sound_heard_share,avg_sound_amplitude,avg_sound_density,avg_sound_tone_clarity,small_prey,small_prey_calories,small_prey_spawned,small_prey_killed,small_prey_eaten,small_prey_calories_eaten_per_second");
+        writer.WriteLine("tick,elapsed_seconds,season_phase,season_fertility_multiplier,creatures,eggs,resources,plant_resources,meat_resources,dormant_plant_resources,total_dormant_plant_seconds_remaining,avg_dormant_plant_seconds_remaining,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,genomes,brains,avg_brain_hidden_nodes,max_brain_hidden_nodes,avg_hidden_input_weight_magnitude,avg_hidden_output_weight_magnitude,active_hidden_output_share,rtneat_brains,rtneat_brain_share,avg_rtneat_hidden_nodes,max_rtneat_hidden_nodes,avg_rtneat_connections,max_rtneat_connections,avg_rtneat_enabled_connections,max_rtneat_enabled_connections,max_generation,total_creature_energy,total_fat_calories,total_egg_energy,total_egg_health,total_resource_calories,total_plant_calories,tender_plant_type_resources,rich_plant_type_resources,tough_plant_type_resources,tender_plant_type_calories,rich_plant_type_calories,tough_plant_type_calories,total_meat_calories,barren_creatures,barren_creature_share,sparse_creatures,sparse_creature_share,grassland_creatures,grassland_creature_share,rich_creatures,rich_creature_share,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,obstacle_blocked_creatures,obstacle_blocked_share,obstacle_sensed_creatures,obstacle_sensed_share,avg_forward_obstacle,avg_left_obstacle,avg_right_obstacle,food_detected_creatures,food_detected_share,plant_detected_creatures,plant_detected_share,meat_detected_creatures,meat_detected_share,meat_scent_detected_creatures,meat_scent_detected_share,creature_detected_creatures,creature_detected_share,food_contact_creatures,food_contact_share,eating_creatures,eating_share,attacking_creatures,attacking_share,avg_visible_food_density,avg_visible_plant_density,avg_visible_meat_density,fresh_meat_detected_creatures,fresh_meat_detected_share,stale_meat_detected_creatures,stale_meat_detected_share,stale_meat_avoided_creatures,stale_meat_avoided_share,avg_visible_meat_freshness,avg_meat_scent_density,rotten_meat_scent_detected_creatures,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,avg_visible_creature_density,total_calories_eaten_per_second,plant_calories_eaten_per_second,tender_plant_calories_eaten_per_second,rich_plant_calories_eaten_per_second,tough_plant_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,live_prey_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,total_calories_digested_per_second,plant_digested_energy_per_second,tender_plant_digested_energy_per_second,rich_plant_digested_energy_per_second,tough_plant_digested_energy_per_second,meat_digested_energy_per_second,meat_digested_energy_share,avg_gut_fill_ratio,avg_gut_plant_share,avg_gut_meat_share,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_bite_strength,avg_damage_resistance,attacker_avg_dietary_adaptation,attacker_avg_bite_strength,attacker_avg_damage_resistance,non_attacker_avg_dietary_adaptation,non_attacker_avg_bite_strength,non_attacker_avg_damage_resistance,total_attack_damage_per_second,avg_seconds_since_last_meal,total_distance_traveled_per_second,avg_distance_since_last_meal,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_birth_investment_ratio,avg_egg_health_ratio,avg_vision_range,avg_vision_angle_degrees,births,eggs_laid,reproduction_attempts,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,rotten_meat_deaths,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,avg_plant_dormancy_scheduled_seconds,avg_plant_dormancy_completed_seconds,avg_meat_freshness,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,rotten_meat_damaged_creatures,rotten_meat_damaged_share,avg_lifespan_seconds,median_lifespan_seconds,reproduction_ready_creatures,reproduction_ready_share,reproduction_intent_creatures,reproduction_intent_share,avg_egg_reserve_ratio,avg_energy_surplus_ratio,avg_fat_ratio,avg_mass_burden,avg_fat_speed_multiplier,avg_fat_storage_capacity,avg_fat_storage_efficiency,fat_stored_calories_per_second,fat_released_calories_per_second,avg_recent_food_success,avg_recent_food_energy_yield,active_memory_creatures,active_memory_share,avg_memory_strength,memory_food_contact_share,non_memory_food_contact_share,memory_eating_share,non_memory_eating_share,memory_calories_eaten_per_distance,non_memory_calories_eaten_per_distance,memory_avg_seconds_since_last_meal,non_memory_avg_seconds_since_last_meal,memory_avg_distance_since_last_meal,non_memory_avg_distance_since_last_meal,memory_avg_recent_food_success,non_memory_avg_recent_food_success,memory_avg_generation,non_memory_avg_generation,memory_avg_max_x_progress_share,non_memory_avg_max_x_progress_share,memory_right_region_share,non_memory_right_region_share,left_region_creatures,left_region_creature_share,middle_region_creatures,middle_region_creature_share,right_region_creatures,right_region_creature_share,left_region_eggs,middle_region_eggs,right_region_eggs,left_region_plant_calories,middle_region_plant_calories,right_region_plant_calories,left_region_meat_calories,middle_region_meat_calories,right_region_meat_calories,left_region_avg_generation,middle_region_avg_generation,right_region_avg_generation,left_region_season_fertility,middle_region_season_fertility,right_region_season_fertility,creature_contact_creatures,creature_contact_share,attack_intent_creatures,attack_intent_share,attack_intent_touching_creatures,attack_intent_touching_share,attack_no_intent_contact_creatures,attack_no_intent_contact_share,raw_attack_positive_creatures,raw_attack_positive_share,raw_attack_near_gate_creatures,raw_attack_near_gate_share,raw_attack_near_gate_touching_creatures,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,avg_tender_plant_payoff_trace,avg_rich_plant_payoff_trace,avg_tough_plant_payoff_trace,grab_intent_creatures,grab_intent_share,can_grab_creatures,can_grab_share,grab_intent_can_grab_creatures,grab_intent_can_grab_share,grab_intent_no_contact_creatures,grab_intent_no_contact_share,holding_creatures,holding_share,grabbed_creatures,grabbed_share,avg_grab_output,avg_can_grab_grab_output,avg_grab_pressure,avg_grab_strength,sound_emitting_creatures,sound_emitting_share,sound_heard_creatures,sound_heard_share,avg_sound_amplitude,avg_sound_density,avg_sound_tone_clarity,small_prey,small_prey_calories,small_prey_spawned,small_prey_killed,small_prey_eaten,small_prey_calories_eaten_per_second,temperature_cells,avg_map_temperature,min_map_temperature,max_map_temperature,avg_creature_temperature,avg_thermal_optimum,avg_thermal_tolerance,avg_creature_thermal_mismatch,hot_thermal_mismatch_creatures,cold_thermal_mismatch_creatures,avg_plant_temperature,avg_small_prey_temperature,thermal_basal_energy_per_second,comfortable_thermal_creatures,cold_thermal_stress_creatures,hot_thermal_stress_creatures,cold_temp_creatures,temperate_temp_creatures,hot_temp_creatures,cold_temp_plant_calories,temperate_temp_plant_calories,hot_temp_plant_calories,cold_temp_births,temperate_temp_births,hot_temp_births,cold_temp_deaths,temperate_temp_deaths,hot_temp_deaths");
 
         foreach (var snapshot in snapshots)
         {
@@ -401,7 +401,35 @@ internal static class GodotStatsCsvWriter
                 snapshot.SmallPreySpawnedCount.ToString(CultureInfo.InvariantCulture),
                 snapshot.SmallPreyKilledCount.ToString(CultureInfo.InvariantCulture),
                 snapshot.SmallPreyEatenCount.ToString(CultureInfo.InvariantCulture),
-                snapshot.TotalSmallPreyCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture)));
+                snapshot.TotalSmallPreyCaloriesEatenPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TemperatureCellCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.AverageMapTemperature.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MinimumMapTemperature.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.MaximumMapTemperature.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageCreatureTemperature.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageThermalOptimum.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageThermalTolerance.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageCreatureThermalMismatch.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.HotThermalMismatchCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.ColdThermalMismatchCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.AveragePlantTemperature.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.AverageSmallPreyTemperature.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.ThermalBasalEnergyPerSecond.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.ComfortableThermalCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.ColdThermalStressCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.HotThermalStressCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.ColdTemperatureCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.TemperateTemperatureCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.HotTemperatureCreatureCount.ToString(CultureInfo.InvariantCulture),
+                snapshot.ColdTemperaturePlantCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TemperateTemperaturePlantCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.HotTemperaturePlantCalories.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.ColdTemperatureBirths.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TemperateTemperatureBirths.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.HotTemperatureBirths.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.ColdTemperatureDeaths.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.TemperateTemperatureDeaths.ToString("0.######", CultureInfo.InvariantCulture),
+                snapshot.HotTemperatureDeaths.ToString("0.######", CultureInfo.InvariantCulture)));
         }
     }
 
@@ -432,10 +460,11 @@ internal static class GodotLineageCsvWriter
     public static void Write(string path, IReadOnlyList<CreatureLineageRecord> records)
     {
         using var writer = GodotStatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("id,parent_id,birth_tick,birth_elapsed_seconds,generation,genome_id,brain_id,birth_energy,death_tick,death_elapsed_seconds,death_reason,is_founder,is_alive");
+        writer.WriteLine("id,parent_id,birth_tick,birth_elapsed_seconds,generation,genome_id,brain_id,birth_energy,birth_temperature,death_tick,death_elapsed_seconds,death_temperature,death_reason,is_founder,is_alive,telemetry_living_seconds,avg_occupied_temperature,avg_thermal_mismatch,cold_temperature_share,temperate_temperature_share,hot_temperature_share,comfortable_thermal_share,cold_thermal_stress_share,hot_thermal_stress_share");
 
         foreach (var record in records)
         {
+            var livingSeconds = Math.Max(0f, record.TelemetryLivingSeconds);
             writer.WriteLine(string.Join(
                 ',',
                 record.Id.Value.ToString(CultureInfo.InvariantCulture),
@@ -446,12 +475,30 @@ internal static class GodotLineageCsvWriter
                 record.GenomeId.ToString(CultureInfo.InvariantCulture),
                 record.BrainId.ToString(CultureInfo.InvariantCulture),
                 record.BirthEnergy.ToString("0.######", CultureInfo.InvariantCulture),
+                record.BirthTemperature.ToString("0.######", CultureInfo.InvariantCulture),
                 record.DeathTick?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 record.DeathElapsedSeconds?.ToString("0.######", CultureInfo.InvariantCulture) ?? string.Empty,
+                record.DeathTick is null
+                    ? string.Empty
+                    : record.DeathTemperature.ToString("0.######", CultureInfo.InvariantCulture),
                 record.DeathReason?.ToString() ?? string.Empty,
                 record.IsFounder.ToString(CultureInfo.InvariantCulture),
-                record.IsAlive.ToString(CultureInfo.InvariantCulture)));
+                record.IsAlive.ToString(CultureInfo.InvariantCulture),
+                record.TelemetryLivingSeconds.ToString("0.######", CultureInfo.InvariantCulture),
+                FormatRate(record.TelemetryTemperatureExposure, livingSeconds),
+                FormatRate(record.TelemetryThermalMismatchExposure, livingSeconds),
+                FormatRate(record.TelemetryColdTemperatureSeconds, livingSeconds),
+                FormatRate(record.TelemetryTemperateTemperatureSeconds, livingSeconds),
+                FormatRate(record.TelemetryHotTemperatureSeconds, livingSeconds),
+                FormatRate(record.TelemetryComfortableThermalSeconds, livingSeconds),
+                FormatRate(record.TelemetryColdThermalStressSeconds, livingSeconds),
+                FormatRate(record.TelemetryHotThermalStressSeconds, livingSeconds)));
         }
+    }
+
+    private static string FormatRate(float value, float divisor)
+    {
+        return (divisor > 0f ? value / divisor : 0f).ToString("0.######", CultureInfo.InvariantCulture);
     }
 }
 
@@ -460,11 +507,11 @@ internal static class GodotTraitSummaryCsvWriter
     public static void Write(string path, WorldState state)
     {
         using var writer = GodotStatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scope,count,avg_body_radius,min_body_radius,max_body_radius,avg_max_speed,min_max_speed,max_max_speed,avg_vision_range,min_vision_range,max_vision_range,avg_vision_angle_degrees,min_vision_angle_degrees,max_vision_angle_degrees,avg_reproduction_threshold,min_reproduction_threshold,max_reproduction_threshold,avg_offspring_investment,min_offspring_investment,max_offspring_investment,avg_egg_production_per_second,min_egg_production_per_second,max_egg_production_per_second,avg_egg_incubation_seconds,min_egg_incubation_seconds,max_egg_incubation_seconds,avg_maturity_age_seconds,min_maturity_age_seconds,max_maturity_age_seconds,avg_dietary_adaptation,min_dietary_adaptation,max_dietary_adaptation,avg_carrion_adaptation,min_carrion_adaptation,max_carrion_adaptation,avg_tender_plant_adaptation,min_tender_plant_adaptation,max_tender_plant_adaptation,avg_rich_plant_adaptation,min_rich_plant_adaptation,max_rich_plant_adaptation,avg_tough_plant_adaptation,min_tough_plant_adaptation,max_tough_plant_adaptation,avg_plant_digestion,min_plant_digestion,max_plant_digestion,avg_meat_digestion,min_meat_digestion,max_meat_digestion,avg_fresh_meat_digestion,min_fresh_meat_digestion,max_fresh_meat_digestion,avg_stale_meat_digestion,min_stale_meat_digestion,max_stale_meat_digestion,avg_gut_capacity,min_gut_capacity,max_gut_capacity,avg_digestion_rate,min_digestion_rate,max_digestion_rate,avg_bite_strength,min_bite_strength,max_bite_strength,avg_damage_resistance,min_damage_resistance,max_damage_resistance,avg_mutation_strength,min_mutation_strength,max_mutation_strength,avg_trait_mutation_rate,min_trait_mutation_rate,max_trait_mutation_rate,avg_brain_mutation_rate,min_brain_mutation_rate,max_brain_mutation_rate");
+        writer.WriteLine("scope,count,avg_body_radius,min_body_radius,max_body_radius,avg_max_speed,min_max_speed,max_max_speed,avg_vision_range,min_vision_range,max_vision_range,avg_vision_angle_degrees,min_vision_angle_degrees,max_vision_angle_degrees,avg_reproduction_threshold,min_reproduction_threshold,max_reproduction_threshold,avg_offspring_investment,min_offspring_investment,max_offspring_investment,avg_egg_production_per_second,min_egg_production_per_second,max_egg_production_per_second,avg_egg_incubation_seconds,min_egg_incubation_seconds,max_egg_incubation_seconds,avg_maturity_age_seconds,min_maturity_age_seconds,max_maturity_age_seconds,avg_dietary_adaptation,min_dietary_adaptation,max_dietary_adaptation,avg_carrion_adaptation,min_carrion_adaptation,max_carrion_adaptation,avg_tender_plant_adaptation,min_tender_plant_adaptation,max_tender_plant_adaptation,avg_rich_plant_adaptation,min_rich_plant_adaptation,max_rich_plant_adaptation,avg_tough_plant_adaptation,min_tough_plant_adaptation,max_tough_plant_adaptation,avg_plant_digestion,min_plant_digestion,max_plant_digestion,avg_meat_digestion,min_meat_digestion,max_meat_digestion,avg_fresh_meat_digestion,min_fresh_meat_digestion,max_fresh_meat_digestion,avg_stale_meat_digestion,min_stale_meat_digestion,max_stale_meat_digestion,avg_gut_capacity,min_gut_capacity,max_gut_capacity,avg_digestion_rate,min_digestion_rate,max_digestion_rate,avg_bite_strength,min_bite_strength,max_bite_strength,avg_damage_resistance,min_damage_resistance,max_damage_resistance,avg_thermal_optimum,min_thermal_optimum,max_thermal_optimum,avg_thermal_tolerance,min_thermal_tolerance,max_thermal_tolerance,avg_mutation_strength,min_mutation_strength,max_mutation_strength,avg_trait_mutation_rate,min_trait_mutation_rate,max_trait_mutation_rate,avg_brain_mutation_rate,min_brain_mutation_rate,max_brain_mutation_rate");
 
         if (state.Creatures.Count == 0)
         {
-            writer.WriteLine("living_creatures,0" + new string(',', 75));
+            writer.WriteLine("living_creatures,0" + new string(',', 81));
             return;
         }
 
@@ -539,6 +586,12 @@ internal static class GodotTraitSummaryCsvWriter
             Format(summary.DamageResistance.Average),
             Format(summary.DamageResistance.Min),
             Format(summary.DamageResistance.Max),
+            Format(summary.ThermalOptimum.Average),
+            Format(summary.ThermalOptimum.Min),
+            Format(summary.ThermalOptimum.Max),
+            Format(summary.ThermalTolerance.Average),
+            Format(summary.ThermalTolerance.Min),
+            Format(summary.ThermalTolerance.Max),
             Format(summary.MutationStrength.Average),
             Format(summary.MutationStrength.Min),
             Format(summary.MutationStrength.Max),
@@ -566,7 +619,7 @@ internal static class GodotSpeciesClusterCsvWriter
     public static void Write(string path, WorldState state)
     {
         using var writer = GodotStatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("rank,species_id,name,living_creatures,living_share,founder_count,dominant_founder_id,dominant_founder_living,min_generation,avg_generation,max_generation,avg_energy,avg_age_seconds,avg_genome_distance,avg_brain_distance,avg_body_radius,avg_max_speed,avg_vision_range,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_plant_digestion,avg_meat_digestion,avg_fresh_meat_digestion,avg_stale_meat_digestion,avg_bite_strength,avg_damage_resistance,recent_plant_kcal,recent_meat_kcal,eating_share,attack_share,current_east_progress_share,right_region_share,diet_label,tactic_label,region_label");
+        writer.WriteLine("rank,species_id,name,living_creatures,living_share,founder_count,dominant_founder_id,dominant_founder_living,min_generation,avg_generation,max_generation,avg_energy,avg_age_seconds,avg_genome_distance,avg_brain_distance,avg_body_radius,avg_max_speed,avg_vision_range,avg_dietary_adaptation,avg_carrion_adaptation,avg_tender_plant_adaptation,avg_rich_plant_adaptation,avg_tough_plant_adaptation,avg_plant_digestion,avg_meat_digestion,avg_fresh_meat_digestion,avg_stale_meat_digestion,avg_bite_strength,avg_damage_resistance,avg_thermal_optimum,min_thermal_optimum,max_thermal_optimum,avg_thermal_tolerance,min_thermal_tolerance,max_thermal_tolerance,avg_current_temperature,avg_current_thermal_mismatch,avg_occupied_temperature,avg_occupied_thermal_mismatch,cold_temp_living,temperate_temp_living,hot_temp_living,comfortable_thermal_living,cold_thermal_stress_living,hot_thermal_stress_living,cold_temp_lifetime_share,temperate_temp_lifetime_share,hot_temp_lifetime_share,comfortable_thermal_lifetime_share,cold_thermal_stress_lifetime_share,hot_thermal_stress_lifetime_share,cold_temp_births,temperate_temp_births,hot_temp_births,cold_temp_deaths,temperate_temp_deaths,hot_temp_deaths,thermal_niche_label,recent_plant_kcal,recent_meat_kcal,eating_share,attack_share,current_east_progress_share,right_region_share,diet_label,tactic_label,region_label");
 
         foreach (var summary in SpeciesClusterAnalyzer.Analyze(state))
         {
@@ -601,6 +654,35 @@ internal static class GodotSpeciesClusterCsvWriter
                 Format(summary.AverageStaleMeatDigestion),
                 Format(summary.AverageBiteStrength),
                 Format(summary.AverageDamageResistance),
+                Format(summary.AverageThermalOptimum),
+                Format(summary.MinimumThermalOptimum),
+                Format(summary.MaximumThermalOptimum),
+                Format(summary.AverageThermalTolerance),
+                Format(summary.MinimumThermalTolerance),
+                Format(summary.MaximumThermalTolerance),
+                Format(summary.AverageCurrentTemperature),
+                Format(summary.AverageCurrentThermalMismatch),
+                Format(summary.AverageOccupiedTemperature),
+                Format(summary.AverageOccupiedThermalMismatch),
+                summary.ColdTemperatureLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.ComfortableThermalLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.ColdThermalStressLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.HotThermalStressLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                Format(summary.ColdTemperatureLifetimeShare),
+                Format(summary.TemperateTemperatureLifetimeShare),
+                Format(summary.HotTemperatureLifetimeShare),
+                Format(summary.ComfortableThermalLifetimeShare),
+                Format(summary.ColdThermalStressLifetimeShare),
+                Format(summary.HotThermalStressLifetimeShare),
+                summary.ColdTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.ColdTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                Escape(summary.ThermalNicheLabel),
                 Format(summary.RecentPlantCaloriesEaten),
                 Format(summary.RecentMeatCaloriesEaten),
                 Format(summary.EatingShare),
@@ -667,7 +749,7 @@ internal static class GodotFounderSummaryCsvWriter
     public static void Write(string path, IReadOnlyList<CreatureLineageRecord> records)
     {
         using var writer = GodotStatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("founder_id,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation");
+        writer.WriteLine("founder_id,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,avg_occupied_temperature,avg_thermal_mismatch,cold_temperature_share,temperate_temperature_share,hot_temperature_share,comfortable_thermal_share,cold_thermal_stress_share,hot_thermal_stress_share,cold_temperature_births,temperate_temperature_births,hot_temperature_births,cold_temperature_deaths,temperate_temperature_deaths,hot_temperature_deaths,thermal_niche_label");
 
         foreach (var summary in Summarize(records).OrderBy(summary => summary.FounderId.Value))
         {
@@ -678,34 +760,57 @@ internal static class GodotFounderSummaryCsvWriter
                 summary.DescendantCount.ToString(CultureInfo.InvariantCulture),
                 summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
                 summary.DeadCreatures.ToString(CultureInfo.InvariantCulture),
-                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture)));
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                Format(summary.ThermalNiche.AverageOccupiedTemperature),
+                Format(summary.ThermalNiche.AverageThermalMismatch),
+                Format(summary.ThermalNiche.ColdTemperatureShare),
+                Format(summary.ThermalNiche.TemperateTemperatureShare),
+                Format(summary.ThermalNiche.HotTemperatureShare),
+                Format(summary.ThermalNiche.ComfortableThermalShare),
+                Format(summary.ThermalNiche.ColdThermalStressShare),
+                Format(summary.ThermalNiche.HotThermalStressShare),
+                summary.ThermalNiche.ColdTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.ThermalNiche.TemperateTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.ThermalNiche.HotTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.ThermalNiche.ColdTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.ThermalNiche.TemperateTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.ThermalNiche.HotTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                Escape(summary.ThermalNiche.NicheLabel)));
         }
     }
 
     public static IReadOnlyList<GodotFounderSummary> Summarize(IReadOnlyList<CreatureLineageRecord> records)
     {
         var byId = records.ToDictionary(record => record.Id);
-        var summaries = new Dictionary<EntityId, FounderAccumulator>();
+        var summaries = new Dictionary<EntityId, List<CreatureLineageRecord>>();
 
         foreach (var record in records)
         {
             var founderId = FindFounderId(record, byId);
-            summaries.TryGetValue(founderId, out var summary);
-            summary.TotalCreatures++;
-            summary.LivingCreatures += record.IsAlive ? 1 : 0;
-            summary.DeadCreatures += record.IsAlive ? 0 : 1;
-            summary.MaxGeneration = Math.Max(summary.MaxGeneration, record.Generation);
-            summaries[founderId] = summary;
+            if (!summaries.TryGetValue(founderId, out var founderRecords))
+            {
+                founderRecords = [];
+                summaries[founderId] = founderRecords;
+            }
+
+            founderRecords.Add(record);
         }
 
         return summaries
-            .Select(pair => new GodotFounderSummary(
-                pair.Key,
-                pair.Value.TotalCreatures,
-                Math.Max(0, pair.Value.TotalCreatures - 1),
-                pair.Value.LivingCreatures,
-                pair.Value.DeadCreatures,
-                pair.Value.MaxGeneration))
+            .Select(pair =>
+            {
+                var founderRecords = pair.Value;
+                var totalCreatures = founderRecords.Count;
+                var livingCreatures = founderRecords.Count(record => record.IsAlive);
+                return new GodotFounderSummary(
+                    pair.Key,
+                    totalCreatures,
+                    Math.Max(0, totalCreatures - 1),
+                    livingCreatures,
+                    Math.Max(0, totalCreatures - livingCreatures),
+                    founderRecords.Count == 0 ? 0 : founderRecords.Max(record => record.Generation),
+                    ThermalNicheTelemetry.SummarizeRecords(founderRecords));
+            })
             .ToArray();
     }
 
@@ -722,12 +827,16 @@ internal static class GodotFounderSummaryCsvWriter
         return current.Id;
     }
 
-    private struct FounderAccumulator
+    private static string Format(float value)
     {
-        public int TotalCreatures;
-        public int LivingCreatures;
-        public int DeadCreatures;
-        public int MaxGeneration;
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Escape(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
     }
 }
 
@@ -737,7 +846,8 @@ internal readonly record struct GodotFounderSummary(
     int DescendantCount,
     int LivingCreatures,
     int DeadCreatures,
-    int MaxGeneration);
+    int MaxGeneration,
+    ThermalLineageNicheSummary ThermalNiche);
 
 internal static class GodotRosterLineageSummaryCsvWriter
 {
@@ -1063,6 +1173,8 @@ internal readonly record struct ViewerTraitAccumulator(
     ViewerFloatSummary DigestionCaloriesPerSecond,
     ViewerFloatSummary BiteStrength,
     ViewerFloatSummary DamageResistance,
+    ViewerFloatSummary ThermalOptimum,
+    ViewerFloatSummary ThermalTolerance,
     ViewerFloatSummary MutationStrength,
     ViewerFloatSummary TraitMutationRate,
     ViewerFloatSummary BrainMutationRate)
@@ -1091,6 +1203,8 @@ internal readonly record struct ViewerTraitAccumulator(
         var digestionCaloriesPerSecond = new ViewerFloatAccumulator();
         var biteStrength = new ViewerFloatAccumulator();
         var damageResistance = new ViewerFloatAccumulator();
+        var thermalOptimum = new ViewerFloatAccumulator();
+        var thermalTolerance = new ViewerFloatAccumulator();
         var mutationStrength = new ViewerFloatAccumulator();
         var traitMutationRate = new ViewerFloatAccumulator();
         var brainMutationRate = new ViewerFloatAccumulator();
@@ -1120,6 +1234,8 @@ internal readonly record struct ViewerTraitAccumulator(
             digestionCaloriesPerSecond.Add(genome.DigestionCaloriesPerSecond);
             biteStrength.Add(genome.BiteStrength);
             damageResistance.Add(genome.DamageResistance);
+            thermalOptimum.Add(CreatureThermal.NormalizeOptimum(genome.ThermalOptimum));
+            thermalTolerance.Add(CreatureThermal.NormalizeTolerance(genome.ThermalTolerance));
             mutationStrength.Add(genome.MutationStrength);
             traitMutationRate.Add(genome.TraitMutationRate);
             brainMutationRate.Add(genome.BrainMutationRate);
@@ -1149,6 +1265,8 @@ internal readonly record struct ViewerTraitAccumulator(
             digestionCaloriesPerSecond.ToSummary(),
             biteStrength.ToSummary(),
             damageResistance.ToSummary(),
+            thermalOptimum.ToSummary(),
+            thermalTolerance.ToSummary(),
             mutationStrength.ToSummary(),
             traitMutationRate.ToSummary(),
             brainMutationRate.ToSummary());

@@ -18,7 +18,8 @@ public sealed class MetabolismSystem(
     float memoryEnergyCostPerSecond = 0f,
     float rtNeatHiddenNodeEnergyCostPerSecond = MetabolismSystem.DefaultRtNeatHiddenNodeEnergyCostPerSecond,
     float rtNeatEnabledConnectionEnergyCostPerSecond = MetabolismSystem.DefaultRtNeatEnabledConnectionEnergyCostPerSecond,
-    BiomePressureProfile? biomeBasalCostProfile = null) : ISimulationSystem
+    BiomePressureProfile? biomeBasalCostProfile = null,
+    float thermalMismatchBasalCostMultiplier = 0f) : ISimulationSystem
 {
     public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0.001f;
     public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0.00025f;
@@ -53,6 +54,8 @@ public sealed class MetabolismSystem(
         ValidateCost(rtNeatHiddenNodeEnergyCostPerSecond, nameof(rtNeatHiddenNodeEnergyCostPerSecond));
     private readonly float _rtNeatEnabledConnectionEnergyCostPerSecond =
         ValidateCost(rtNeatEnabledConnectionEnergyCostPerSecond, nameof(rtNeatEnabledConnectionEnergyCostPerSecond));
+    private readonly float _thermalMismatchBasalCostMultiplier =
+        ValidateCost(thermalMismatchBasalCostMultiplier, nameof(thermalMismatchBasalCostMultiplier));
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -81,7 +84,11 @@ public sealed class MetabolismSystem(
                 + Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond
                 + BrainTopologyUpkeep(state, creature.BrainId);
             var biomeBasalCostMultiplier = _biomeBasalCostProfile.For(state.Biomes.GetKindAt(creature.Position));
-            creature.Energy -= (genome.BasalEnergyPerSecond * biomeBasalCostMultiplier + traitUpkeep) * deltaSeconds;
+            var thermalMismatch = _thermalMismatchBasalCostMultiplier > 0f
+                ? CreatureThermal.ThermalMismatch(state.Temperature.GetTemperatureAt(creature.Position), genome)
+                : 0f;
+            var thermalBasalCostMultiplier = 1f + thermalMismatch * _thermalMismatchBasalCostMultiplier;
+            creature.Energy -= (genome.BasalEnergyPerSecond * biomeBasalCostMultiplier * thermalBasalCostMultiplier + traitUpkeep) * deltaSeconds;
 
             state.Creatures[i] = creature;
         }
@@ -104,6 +111,6 @@ public sealed class MetabolismSystem(
     {
         return float.IsFinite(value) && value >= 0f
             ? value
-            : throw new ArgumentOutOfRangeException(name, "Trait energy cost must be finite and non-negative.");
+            : throw new ArgumentOutOfRangeException(name, "Energy cost must be finite and non-negative.");
     }
 }

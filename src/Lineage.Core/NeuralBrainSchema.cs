@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 5;
+    public const int InputSchemaVersion = 6;
 
     public const int OutputSchemaVersion = 3;
 
@@ -112,7 +112,23 @@ public static class NeuralBrainSchema
 
     public const int MassBurdenInput = FatRatioInput + 1;
 
-    public const int InputCount = MassBurdenInput + 1;
+    public const int CurrentTemperatureInput = MassBurdenInput + 1;
+
+    public const int ForwardTemperatureInput = CurrentTemperatureInput + 1;
+
+    public const int LeftTemperatureInput = ForwardTemperatureInput + 1;
+
+    public const int RightTemperatureInput = LeftTemperatureInput + 1;
+
+    public const int CurrentThermalMismatchInput = RightTemperatureInput + 1;
+
+    public const int ForwardThermalMismatchInput = CurrentThermalMismatchInput + 1;
+
+    public const int LeftThermalMismatchInput = ForwardThermalMismatchInput + 1;
+
+    public const int RightThermalMismatchInput = LeftThermalMismatchInput + 1;
+
+    public const int InputCount = RightThermalMismatchInput + 1;
 
     public const int OutputCount = 10;
 

@@ -21,7 +21,9 @@ public static class SimulationScenarioFactory
             scenario.Seed,
             CreatePipeline(scenario));
 
-        simulation.State.Biomes = CreateBiomeMap(scenario, scenarioDirectory);
+        var biomeMap = CreateBiomeMap(scenario, scenarioDirectory);
+        simulation.State.SetBiomes(biomeMap);
+        simulation.State.SetTemperature(CreateTemperatureMap(scenario, biomeMap));
         simulation.State.SetObstacles(CreateObstacleMap(scenario, scenarioDirectory));
         simulation.State.SetLocalFertility(CreateLocalFertilityMap(scenario));
         SeedWorld(simulation, scenario);
@@ -99,6 +101,7 @@ public static class SimulationScenarioFactory
                 scenario.SeasonPhaseMode,
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
+                scenario.ThermalMismatchBasalCostMultiplier,
                 scenario.CreateBiomeSpeedProfile(),
                 scenario.CreateBiomeVisionRangeProfile(),
                 scenario.MovementSpeedCostExponent,
@@ -175,6 +178,7 @@ public static class SimulationScenarioFactory
                 scenario.SeasonPhaseMode,
                 scenario.CreateBiomeMovementCostProfile(),
                 scenario.CreateBiomeBasalCostProfile(),
+                scenario.ThermalMismatchBasalCostMultiplier,
                 scenario.CreateBiomeSpeedProfile(),
                 scenario.MovementSpeedCostExponent,
                 scenario.RequireReproductionIntent,
@@ -267,6 +271,8 @@ public static class SimulationScenarioFactory
             TenderPlantAdaptation = scenario.TenderPlantAdaptation,
             RichPlantAdaptation = scenario.RichPlantAdaptation,
             ToughPlantAdaptation = scenario.ToughPlantAdaptation,
+            ThermalOptimum = scenario.ThermalOptimum,
+            ThermalTolerance = scenario.ThermalTolerance,
             BiteStrength = scenario.BiteStrength,
             DamageResistance = scenario.DamageResistance,
             MutationStrength = scenario.MutationStrength,
@@ -435,6 +441,14 @@ public static class SimulationScenarioFactory
             ObstacleMapKind.Manual => LoadManualObstacleMap(scenario, scenarioDirectory),
             _ => ObstacleMap.Generate(bounds, scenario.ObstacleCellSize, scenario.ObstacleMapKind, scenario.Seed)
         };
+    }
+
+    public static TemperatureMap CreateTemperatureMap(SimulationScenario scenario, BiomeMap biomes)
+    {
+        scenario = scenario.Validated();
+        return scenario.EnableTemperature
+            ? TemperatureMap.GenerateFromBiomes(biomes, scenario.Seed)
+            : TemperatureMap.CreateNeutral(new WorldBounds(scenario.WorldWidth, scenario.WorldHeight));
     }
 
     private static string ResolveManualMapPath(string path, string? scenarioDirectory, string argumentName)

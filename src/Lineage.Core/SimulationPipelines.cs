@@ -60,6 +60,7 @@ public static class SimulationPipelines
         SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
+        float thermalMismatchBasalCostMultiplier = 0f,
         BiomePressureProfile? biomeSpeedProfile = null,
         float movementSpeedCostExponent = 1f,
         bool requireReproductionIntent = true,
@@ -127,7 +128,8 @@ public static class SimulationPipelines
                 memoryEnergyCostPerSecond,
                 rtNeatHiddenNodeEnergyCostPerSecond,
                 rtNeatEnabledConnectionEnergyCostPerSecond,
-                biomeBasalCostProfile),
+                biomeBasalCostProfile,
+                thermalMismatchBasalCostMultiplier),
             new SpatialIndexRebuildSystem(spatialIndex),
             new SimpleForagingSystem(spatialIndex),
             new SmallPreyInteractionSystem(
@@ -177,7 +179,8 @@ public static class SimulationPipelines
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
                 seasonPhaseOffsetSeconds,
-                seasonPhaseMode)
+                seasonPhaseMode,
+                thermalMismatchBasalCostMultiplier)
         ];
     }
 
@@ -248,6 +251,7 @@ public static class SimulationPipelines
         SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
         BiomePressureProfile? biomeMovementCostProfile = null,
         BiomePressureProfile? biomeBasalCostProfile = null,
+        float thermalMismatchBasalCostMultiplier = 0f,
         BiomePressureProfile? biomeSpeedProfile = null,
         BiomePressureProfile? biomeVisionRangeProfile = null,
         float movementSpeedCostExponent = 1f,
@@ -316,7 +320,8 @@ public static class SimulationPipelines
                 memoryEnergyCostPerSecond,
                 rtNeatHiddenNodeEnergyCostPerSecond,
                 rtNeatEnabledConnectionEnergyCostPerSecond,
-                biomeBasalCostProfile),
+                biomeBasalCostProfile,
+                thermalMismatchBasalCostMultiplier),
             new SpatialIndexRebuildSystem(spatialIndex),
             new CreatureSensingSystem(
                 spatialIndex,
@@ -392,7 +397,8 @@ public static class SimulationPipelines
                 seasonLengthSeconds,
                 seasonFertilityAmplitude,
                 seasonPhaseOffsetSeconds,
-                seasonPhaseMode)
+                seasonPhaseMode,
+                thermalMismatchBasalCostMultiplier)
         ];
     }
 

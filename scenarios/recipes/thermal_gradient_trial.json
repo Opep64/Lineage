@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "lineage.runner.scenario-recipe.v1",
+  "name": "Thermal Gradient Trial",
+  "description": "Large natural-climate map with moderate food recovery, narrower starting thermal tolerance, and stronger thermal mismatch basal pressure for observing temperature sensing and early thermal adaptation with reduced starvation confounding.",
+  "tags": [
+    "ecology",
+    "climate",
+    "temperature"
+  ],
+  "changes": {
+    "name": "Thermal Gradient Trial",
+    "enableBiomes": true,
+    "biomeMapKind": "naturalClimate",
+    "enableTemperature": true,
+    "worldWidth": 16000,
+    "worldHeight": 16000,
+    "biomeCellSize": 500,
+    "resourceVoidBorderWidth": 500,
+    "initialCreatureCount": 220,
+    "statsSnapshotIntervalTicks": 675,
+    "initialResourcesPerMillionArea": 30,
+    "resourceRegrowthMin": 0.3,
+    "resourceRegrowthMax": 1.4,
+    "plantRespawnDelaySecondsMin": 45,
+    "plantRespawnDelaySecondsMax": 130,
+    "seasonFertilityAmplitude": 0.2,
+    "enablePlantTypeHabitatAffinity": true,
+    "resourceClusterRadius": 1000,
+    "plantLocalDispersalRadius": 1200,
+    "enableLocalFertility": true,
+    "localFertilityCellSize": 1000,
+    "localFertilityMinimumMultiplier": 0.55,
+    "localFertilityRecoveryPerSecond": 0.0008,
+    "localFertilityDepletionPerPlant": 0.08,
+    "localFertilityNeighborDepletionShare": 0.45,
+    "thermalMismatchBasalCostMultiplier": 0.85,
+    "thermalOptimum": 0.5,
+    "thermalTolerance": 0.2
+  },
+  "createdAtUtc": "2026-06-03T00:00:00Z",
+  "updatedAtUtc": "2026-06-03T00:00:00Z"
+}

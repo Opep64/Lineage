@@ -1068,6 +1068,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.ForwardHabitatQuality = HabitatQualityAt(state, habitatForwardPosition);
         senses.LeftHabitatQuality = HabitatQualityAt(state, habitatLeftPosition);
         senses.RightHabitatQuality = HabitatQualityAt(state, habitatRightPosition);
+        ApplyTemperatureSense(
+            ref senses,
+            state,
+            genome,
+            creature.Position,
+            habitatForwardPosition,
+            habitatLeftPosition,
+            habitatRightPosition);
 
         if (_hasUniformBiomeSpeedProfile)
         {
@@ -1091,6 +1099,25 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private float TerrainSpeedMultiplierAt(WorldState state, SimVector2 position)
     {
         return _biomeSpeedProfile.For(state.Biomes.GetKindAt(position));
+    }
+
+    private static void ApplyTemperatureSense(
+        ref CreatureSenseState senses,
+        WorldState state,
+        CreatureGenome genome,
+        SimVector2 currentPosition,
+        SimVector2 forwardPosition,
+        SimVector2 leftPosition,
+        SimVector2 rightPosition)
+    {
+        senses.CurrentTemperature = state.Temperature.GetTemperatureAt(currentPosition);
+        senses.ForwardTemperature = state.Temperature.GetTemperatureAt(forwardPosition);
+        senses.LeftTemperature = state.Temperature.GetTemperatureAt(leftPosition);
+        senses.RightTemperature = state.Temperature.GetTemperatureAt(rightPosition);
+        senses.CurrentThermalMismatch = CreatureThermal.ThermalMismatch(senses.CurrentTemperature, genome);
+        senses.ForwardThermalMismatch = CreatureThermal.ThermalMismatch(senses.ForwardTemperature, genome);
+        senses.LeftThermalMismatch = CreatureThermal.ThermalMismatch(senses.LeftTemperature, genome);
+        senses.RightThermalMismatch = CreatureThermal.ThermalMismatch(senses.RightTemperature, genome);
     }
 
     private static float HabitatQualityAt(WorldState state, SimVector2 position)

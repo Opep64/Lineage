@@ -35,6 +35,8 @@ public readonly record struct CreatureGenome
         DigestionCaloriesPerSecond = 5f,
         FatStorageCapacityCalories = 42f,
         FatStorageEfficiency = 0.85f,
+        ThermalOptimum = CreatureThermal.DefaultOptimum,
+        ThermalTolerance = CreatureThermal.DefaultTolerance,
         BiteStrength = 0.55f,
         DamageResistance = 1f,
         MutationStrength = 0.05f,
@@ -42,7 +44,7 @@ public readonly record struct CreatureGenome
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 25;
+    private const int MutatingTraitCount = 27;
 
     public float BodyRadius { get; init; }
 
@@ -89,6 +91,10 @@ public readonly record struct CreatureGenome
     public float FatStorageCapacityCalories { get; init; }
 
     public float FatStorageEfficiency { get; init; }
+
+    public float ThermalOptimum { get; init; }
+
+    public float ThermalTolerance { get; init; }
 
     public float BiteStrength { get; init; }
 
@@ -147,6 +153,20 @@ public readonly record struct CreatureGenome
             DamageResistance = MutateTraitIfSelected(random, mutations[21], DamageResistance, strength, 0.25f, 4f),
             FatStorageCapacityCalories = MutateTraitIfSelected(random, mutations[23], FatStorageCapacityCalories, strength, 0f, 250f),
             FatStorageEfficiency = MutateTraitIfSelected(random, mutations[24], FatStorageEfficiency, strength, 0.35f, 0.98f),
+            ThermalOptimum = MutateTraitIfSelected(
+                random,
+                mutations[25],
+                ThermalOptimum,
+                strength * 0.7f,
+                CreatureThermal.MinimumOptimum,
+                CreatureThermal.MaximumOptimum),
+            ThermalTolerance = MutateTraitIfSelected(
+                random,
+                mutations[26],
+                ThermalTolerance,
+                strength * 0.7f,
+                CreatureThermal.MinimumTolerance,
+                CreatureThermal.MaximumTolerance),
             MutationStrength = mutationProfile.MutationStrength,
             TraitMutationRate = mutationProfile.TraitMutationRate,
             BrainMutationRate = mutationProfile.BrainMutationRate
@@ -180,6 +200,16 @@ public readonly record struct CreatureGenome
             normalized = normalized with { FatStorageEfficiency = Baseline.FatStorageEfficiency };
         }
 
+        if (normalized.ThermalOptimum <= 0f || !float.IsFinite(normalized.ThermalOptimum))
+        {
+            normalized = normalized with { ThermalOptimum = Baseline.ThermalOptimum };
+        }
+
+        if (normalized.ThermalTolerance <= 0f || !float.IsFinite(normalized.ThermalTolerance))
+        {
+            normalized = normalized with { ThermalTolerance = Baseline.ThermalTolerance };
+        }
+
         EnsurePositive(normalized.BodyRadius, nameof(BodyRadius));
         EnsurePositive(normalized.MaxSpeed, nameof(MaxSpeed));
         EnsurePositive(normalized.MaxTurnRadiansPerSecond, nameof(MaxTurnRadiansPerSecond));
@@ -203,6 +233,8 @@ public readonly record struct CreatureGenome
         EnsurePositive(normalized.DigestionCaloriesPerSecond, nameof(DigestionCaloriesPerSecond));
         EnsureNonNegative(normalized.FatStorageCapacityCalories, nameof(FatStorageCapacityCalories));
         EnsureRange(normalized.FatStorageEfficiency, 0.05f, 1f, nameof(FatStorageEfficiency));
+        EnsureRange(normalized.ThermalOptimum, CreatureThermal.MinimumOptimum, CreatureThermal.MaximumOptimum, nameof(ThermalOptimum));
+        EnsureRange(normalized.ThermalTolerance, CreatureThermal.MinimumTolerance, CreatureThermal.MaximumTolerance, nameof(ThermalTolerance));
         EnsurePositive(normalized.BiteStrength, nameof(BiteStrength));
         EnsurePositive(normalized.DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(normalized.MutationStrength, nameof(MutationStrength));

@@ -330,10 +330,15 @@ public static class SpeciesClusterAnalyzer
             var lineageClusters = BuildLineageClusters(state, resolvedOptions);
             var livingClusters = lineageClusters.Clusters.ToDictionary(
                 cluster => cluster.SpeciesId,
-                cluster => new SpeciesClusterAccumulator(
-                    cluster.SpeciesId,
-                    cluster.GenomeCentroid,
-                    cluster.BrainCentroid));
+                cluster =>
+                {
+                    var accumulator = new SpeciesClusterAccumulator(
+                        cluster.SpeciesId,
+                        cluster.GenomeCentroid,
+                        cluster.BrainCentroid);
+                    accumulator.Records.AddRange(cluster.Records);
+                    return accumulator;
+                });
 
             foreach (var creature in state.Creatures.OrderBy(creature => creature.Id.Value))
             {
@@ -735,6 +740,12 @@ public static class SpeciesClusterAnalyzer
         var totalToughPlantAdaptation = 0f;
         var totalBiteStrength = 0f;
         var totalDamageResistance = 0f;
+        var totalThermalOptimum = 0f;
+        var minThermalOptimum = float.MaxValue;
+        var maxThermalOptimum = float.MinValue;
+        var totalThermalTolerance = 0f;
+        var minThermalTolerance = float.MaxValue;
+        var maxThermalTolerance = float.MinValue;
         var totalPlantDigestion = 0f;
         var totalMeatDigestion = 0f;
         var totalFreshMeatDigestion = 0f;
@@ -774,6 +785,14 @@ public static class SpeciesClusterAnalyzer
             totalToughPlantAdaptation += genome.ToughPlantAdaptation;
             totalBiteStrength += genome.BiteStrength;
             totalDamageResistance += genome.DamageResistance;
+            var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
+            var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
+            totalThermalOptimum += thermalOptimum;
+            minThermalOptimum = Math.Min(minThermalOptimum, thermalOptimum);
+            maxThermalOptimum = Math.Max(maxThermalOptimum, thermalOptimum);
+            totalThermalTolerance += thermalTolerance;
+            minThermalTolerance = Math.Min(minThermalTolerance, thermalTolerance);
+            maxThermalTolerance = Math.Max(maxThermalTolerance, thermalTolerance);
             totalPlantDigestion += CreatureDigestion.PlantEfficiency(genome);
             totalMeatDigestion += CreatureDigestion.MeatEfficiency(genome);
             totalFreshMeatDigestion += CreatureDigestion.FreshMeatEnergyEfficiency(genome);
@@ -803,6 +822,14 @@ public static class SpeciesClusterAnalyzer
         var attackShare = attackingCount / (float)count;
         var eastProgressShare = totalEastProgress / count;
         var rightRegionShare = rightRegionCount / (float)count;
+        var lineageRecords = cluster.Records.Count > 0
+            ? (IReadOnlyList<CreatureLineageRecord>)cluster.Records
+            : cluster.Members
+                .Select(member => recordsById.TryGetValue(member.Id, out var record) ? record : default)
+                .Where(record => record.Id != default)
+                .ToArray();
+        var lineageNiche = ThermalNicheTelemetry.SummarizeRecords(lineageRecords);
+        var livingNiche = ThermalNicheTelemetry.SummarizeLiving(state, cluster.Members);
 
         return new SpeciesClusterSummary(
             Rank: 0,
@@ -836,6 +863,34 @@ public static class SpeciesClusterAnalyzer
             AverageStaleMeatDigestion: totalStaleMeatDigestion / count,
             AverageBiteStrength: averageBiteStrength,
             AverageDamageResistance: totalDamageResistance / count,
+            AverageThermalOptimum: totalThermalOptimum / count,
+            MinimumThermalOptimum: minThermalOptimum == float.MaxValue ? 0f : minThermalOptimum,
+            MaximumThermalOptimum: maxThermalOptimum == float.MinValue ? 0f : maxThermalOptimum,
+            AverageThermalTolerance: totalThermalTolerance / count,
+            MinimumThermalTolerance: minThermalTolerance == float.MaxValue ? 0f : minThermalTolerance,
+            MaximumThermalTolerance: maxThermalTolerance == float.MinValue ? 0f : maxThermalTolerance,
+            AverageCurrentTemperature: livingNiche.AverageCurrentTemperature,
+            AverageCurrentThermalMismatch: livingNiche.AverageCurrentThermalMismatch,
+            AverageOccupiedTemperature: lineageNiche.AverageOccupiedTemperature,
+            AverageOccupiedThermalMismatch: lineageNiche.AverageThermalMismatch,
+            ColdTemperatureLivingCreatures: livingNiche.ColdTemperatureLivingCreatures,
+            TemperateTemperatureLivingCreatures: livingNiche.TemperateTemperatureLivingCreatures,
+            HotTemperatureLivingCreatures: livingNiche.HotTemperatureLivingCreatures,
+            ComfortableThermalLivingCreatures: livingNiche.ComfortableThermalLivingCreatures,
+            ColdThermalStressLivingCreatures: livingNiche.ColdThermalStressLivingCreatures,
+            HotThermalStressLivingCreatures: livingNiche.HotThermalStressLivingCreatures,
+            ColdTemperatureLifetimeShare: lineageNiche.ColdTemperatureShare,
+            TemperateTemperatureLifetimeShare: lineageNiche.TemperateTemperatureShare,
+            HotTemperatureLifetimeShare: lineageNiche.HotTemperatureShare,
+            ComfortableThermalLifetimeShare: lineageNiche.ComfortableThermalShare,
+            ColdThermalStressLifetimeShare: lineageNiche.ColdThermalStressShare,
+            HotThermalStressLifetimeShare: lineageNiche.HotThermalStressShare,
+            ColdTemperatureBirths: lineageNiche.ColdTemperatureBirths,
+            TemperateTemperatureBirths: lineageNiche.TemperateTemperatureBirths,
+            HotTemperatureBirths: lineageNiche.HotTemperatureBirths,
+            ColdTemperatureDeaths: lineageNiche.ColdTemperatureDeaths,
+            TemperateTemperatureDeaths: lineageNiche.TemperateTemperatureDeaths,
+            HotTemperatureDeaths: lineageNiche.HotTemperatureDeaths,
             RecentPlantCaloriesEaten: totalPlantCaloriesEaten,
             RecentMeatCaloriesEaten: totalMeatCaloriesEaten,
             EatingShare: eatingShare,
@@ -844,12 +899,13 @@ public static class SpeciesClusterAnalyzer
             RightRegionShare: rightRegionShare,
             DietLabel: FormatDietLabel(averageDietaryAdaptation, averageCarrionAdaptation),
             TacticLabel: FormatTacticLabel(eatingShare, attackShare, averageBiteStrength),
-            RegionLabel: FormatRegionLabel(eastProgressShare, rightRegionShare));
+            RegionLabel: FormatRegionLabel(eastProgressShare, rightRegionShare),
+            ThermalNicheLabel: lineageNiche.NicheLabel);
     }
 
     private static string FormatClusterRole(SpeciesClusterSummary summary)
     {
-        return $"{summary.DietLabel}; {summary.TacticLabel}; {summary.RegionLabel}";
+        return $"{summary.DietLabel}; {summary.TacticLabel}; {summary.RegionLabel}; {summary.ThermalNicheLabel}";
     }
 
     private static string FormatClusterAncestry(SpeciesClusterSummary summary)
@@ -1728,6 +1784,8 @@ public static class SpeciesClusterAnalyzer
 
         public List<CreatureState> Members { get; } = [];
 
+        public List<CreatureLineageRecord> Records { get; } = [];
+
         public float[] GenomeCentroid { get; private set; }
 
         public float[] BrainCentroid { get; private set; }
@@ -1880,6 +1938,34 @@ public readonly record struct SpeciesClusterSummary(
     float AverageStaleMeatDigestion,
     float AverageBiteStrength,
     float AverageDamageResistance,
+    float AverageThermalOptimum,
+    float MinimumThermalOptimum,
+    float MaximumThermalOptimum,
+    float AverageThermalTolerance,
+    float MinimumThermalTolerance,
+    float MaximumThermalTolerance,
+    float AverageCurrentTemperature,
+    float AverageCurrentThermalMismatch,
+    float AverageOccupiedTemperature,
+    float AverageOccupiedThermalMismatch,
+    int ColdTemperatureLivingCreatures,
+    int TemperateTemperatureLivingCreatures,
+    int HotTemperatureLivingCreatures,
+    int ComfortableThermalLivingCreatures,
+    int ColdThermalStressLivingCreatures,
+    int HotThermalStressLivingCreatures,
+    float ColdTemperatureLifetimeShare,
+    float TemperateTemperatureLifetimeShare,
+    float HotTemperatureLifetimeShare,
+    float ComfortableThermalLifetimeShare,
+    float ColdThermalStressLifetimeShare,
+    float HotThermalStressLifetimeShare,
+    int ColdTemperatureBirths,
+    int TemperateTemperatureBirths,
+    int HotTemperatureBirths,
+    int ColdTemperatureDeaths,
+    int TemperateTemperatureDeaths,
+    int HotTemperatureDeaths,
     float RecentPlantCaloriesEaten,
     float RecentMeatCaloriesEaten,
     float EatingShare,
@@ -1888,7 +1974,8 @@ public readonly record struct SpeciesClusterSummary(
     float RightRegionShare,
     string DietLabel,
     string TacticLabel,
-    string RegionLabel);
+    string RegionLabel,
+    string ThermalNicheLabel);
 
 public readonly record struct SpeciesClusterInterpretation(
     int Rank,

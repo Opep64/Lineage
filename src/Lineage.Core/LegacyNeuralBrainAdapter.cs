@@ -95,6 +95,14 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.SoundToneClarityInput] = frame.Communication.Sound.ToneClarity;
         inputs[NeuralBrainSchema.FatRatioInput] = frame.Internal.FatRatio;
         inputs[NeuralBrainSchema.MassBurdenInput] = frame.Internal.MassBurdenRatio;
+        inputs[NeuralBrainSchema.CurrentTemperatureInput] = frame.Body.CurrentTemperature;
+        inputs[NeuralBrainSchema.ForwardTemperatureInput] = frame.Body.ForwardTemperature;
+        inputs[NeuralBrainSchema.LeftTemperatureInput] = frame.Body.LeftTemperature;
+        inputs[NeuralBrainSchema.RightTemperatureInput] = frame.Body.RightTemperature;
+        inputs[NeuralBrainSchema.CurrentThermalMismatchInput] = frame.Body.CurrentThermalMismatch;
+        inputs[NeuralBrainSchema.ForwardThermalMismatchInput] = frame.Body.ForwardThermalMismatch;
+        inputs[NeuralBrainSchema.LeftThermalMismatchInput] = frame.Body.LeftThermalMismatch;
+        inputs[NeuralBrainSchema.RightThermalMismatchInput] = frame.Body.RightThermalMismatch;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

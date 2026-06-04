@@ -73,7 +73,7 @@ public static class SimulationScenarioMetadata
         Type propertyType,
         string type)
     {
-        var step = IsIntegerType(propertyType) ? 1d : type == "number" ? 0.01d : (double?)null;
+        var step = ScenarioFieldStep(name, propertyType, type);
         var units = ScenarioFieldUnits(name);
         var description = ScenarioFieldDescription(name);
 
@@ -194,6 +194,31 @@ public static class SimulationScenarioMetadata
         return null;
     }
 
+    private static double? ScenarioFieldStep(string name, Type propertyType, string type)
+    {
+        if (IsIntegerType(propertyType))
+        {
+            return 1d;
+        }
+
+        if (type != "number")
+        {
+            return null;
+        }
+
+        return name switch
+        {
+            "FixedDeltaSeconds" => 0.00001d,
+            "LocalFertilityRecoveryPerSecond" => 0.00001d,
+            "RtNeatEnabledConnectionEnergyCostPerSecond" => 0.00001d,
+            "SenseRadiusEnergyCostPerSecond" => 0.0001d,
+            "GutCapacityEnergyCostPerSecond" => 0.0001d,
+            "RottenMeatDamagePerRawKcal" => 0.001d,
+            _ when name.EndsWith("EnergyCostPerSecond", StringComparison.Ordinal) => 0.001d,
+            _ => 0.01d
+        };
+    }
+
     private static string? ScenarioFieldDescription(string name)
     {
         return name switch
@@ -220,6 +245,10 @@ public static class SimulationScenarioMetadata
             "HealingHealthFractionPerSecond" => "Fraction of maximum health restored per second once passive healing is active.",
             "HealingEnergyCostPerHealth" => "Energy spent for each point of health restored by passive healing.",
             "HealingMinimumEnergy" => "Passive healing stops at or below this energy reserve.",
+            "EnableTemperature" => "Builds a cached temperature map for climate visualization, telemetry, thermal sensing, and optional thermal stress costs.",
+            "ThermalMismatchBasalCostMultiplier" => "Extra basal upkeep applied at full thermal mismatch. Zero keeps temperature sensory and observational only.",
+            "ThermalOptimum" => "Starting creature thermal optimum on the normalized 0 cold, 0.5 temperate, 1 hot scale.",
+            "ThermalTolerance" => "Starting creature thermal tolerance. Larger values make temperature mismatch cues ramp up more slowly.",
             "WorldMapPath" => "Reusable world map artifact used when biomeMapKind and/or obstacleMapKind are manual.",
             "ManualBiomeMapPath" => "Manual biome map JSON used when biomeMapKind is manual.",
             "ManualObstacleMapPath" => "Manual obstacle map JSON used when obstacleMapKind is manual.",
@@ -333,6 +362,7 @@ public static class SimulationScenarioMetadata
             || name.Contains("Obstacle", StringComparison.Ordinal)
             || name.Contains("Tree", StringComparison.Ordinal)
             || name.Contains("Terrain", StringComparison.Ordinal)
+            || name.Contains("Temperature", StringComparison.Ordinal)
             || name.Contains("Spatial", StringComparison.Ordinal)
             || name is "FixedDeltaSeconds")
         {
