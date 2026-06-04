@@ -281,7 +281,8 @@ public sealed record BrainLabBehaviorProfileComparisonRequest(
     BrainLabWorldProbeEnvironment? WorldProbeEnvironment = null,
     IReadOnlyList<string>? FixturePaths = null,
     int? MaxFixtures = null,
-    int? MaxCreatures = null);
+    int? MaxCreatures = null,
+    int? CreatureOffset = null);
 
 public sealed record BrainLabPresetMatrixResult(
     string SnapshotPath,
@@ -359,6 +360,7 @@ public sealed record BrainLabProbeTestRow(
 public sealed record BrainLabBehaviorProfileComparisonResult(
     string SnapshotPath,
     int TotalCreatureCount,
+    int CreatureOffset,
     int MaxCreatures,
     int EvaluatedCreatureCount,
     int SkippedCreatureCount,
@@ -389,7 +391,10 @@ public sealed record BrainLabBehaviorProfileComparisonRow(
     double HealthRatio,
     double Hunger,
     BrainLabBehaviorProfile Profile,
-    IReadOnlyList<BrainLabBehaviorFingerprint> Fingerprints);
+    IReadOnlyList<BrainLabBehaviorFingerprint> Fingerprints,
+    string CohortKey,
+    IReadOnlyList<string> CohortTraits,
+    IReadOnlyList<string> CohortFingerprints);
 
 public sealed record BrainLabBehaviorLabel(
     string Key,

@@ -620,9 +620,14 @@ public sealed partial class LineageRunManager
             request.MaxCreatures ?? MaxBrainLabProfileComparisonCreatures,
             1,
             MaxBrainLabProfileComparisonCreatures);
+        var creatureOffset = Math.Clamp(
+            request.CreatureOffset ?? 0,
+            0,
+            Math.Max(0, state.Creatures.Count));
         var creatures = state.Creatures
             .OrderByDescending(creature => creature.Generation)
             .ThenBy(creature => creature.Id.Value)
+            .Skip(creatureOffset)
             .Take(maxCreatures)
             .ToArray();
         var rows = creatures
@@ -636,6 +641,10 @@ public sealed partial class LineageRunManager
                     request.InputOverrides);
                 var fingerprints = CreateBrainLabProbeTestFingerprints(probeRows);
                 var profile = CreateBrainLabBehaviorProfile(probeRows, fingerprints);
+                var cohortTraits = BrainLabBehaviorProfileCohortTraits(profile);
+                var cohortFingerprintKeys = fingerprints.Take(4).Select(fingerprint => fingerprint.Key).ToArray();
+                var cohortFingerprints = fingerprints.Take(4).Select(fingerprint => fingerprint.Name).ToArray();
+                var cohortKey = BrainLabBehaviorProfileCohortKey(cohortTraits, cohortFingerprintKeys);
                 return new BrainLabBehaviorProfileComparisonRow(
                     creature.Id.Value,
                     creature.Generation,
@@ -647,7 +656,10 @@ public sealed partial class LineageRunManager
                     creature.Senses.HealthRatio,
                     creature.Senses.Hunger,
                     profile,
-                    fingerprints.Take(8).ToArray());
+                    fingerprints.Take(8).ToArray(),
+                    cohortKey,
+                    cohortTraits,
+                    cohortFingerprints);
             })
             .ToArray();
         var cohorts = CreateBrainLabBehaviorProfileCohorts(rows);
@@ -655,9 +667,10 @@ public sealed partial class LineageRunManager
         return new BrainLabBehaviorProfileComparisonResult(
             NormalizeArtifactRelativePath(resolvedPath),
             state.Creatures.Count,
+            creatureOffset,
             maxCreatures,
             rows.Length,
-            Math.Max(0, state.Creatures.Count - rows.Length),
+            Math.Max(0, state.Creatures.Count - creatureOffset - rows.Length),
             totalFixtureCount,
             selectedFixtures.Length,
             Math.Max(0, totalFixtureCount - selectedFixtures.Length),
@@ -669,53 +682,40 @@ public sealed partial class LineageRunManager
         IReadOnlyList<BrainLabBehaviorProfileComparisonRow> rows)
     {
         return rows
-            .Select(row => new
-            {
-                Row = row,
-                Traits = BrainLabBehaviorProfileCohortTraits(row.Profile),
-                FingerprintKeys = row.Fingerprints.Take(4).Select(fingerprint => fingerprint.Key).ToArray(),
-                FingerprintNames = row.Fingerprints.Take(4).Select(fingerprint => fingerprint.Name).ToArray()
-            })
             .GroupBy(
-                item => BrainLabBehaviorProfileCohortKey(item.Traits, item.FingerprintKeys),
+                row => row.CohortKey,
                 StringComparer.Ordinal)
-            .Select((group, index) =>
+            .Select(group =>
             {
-                var items = group.ToArray();
-                var orderedRows = items
-                    .Select(item => item.Row)
+                var orderedRows = group
                     .OrderByDescending(row => row.Generation)
                     .ThenBy(row => row.CreatureId)
                     .ToArray();
                 var representative = orderedRows[0];
-                var traits = items
-                    .SelectMany(item => item.Traits)
+                var traits = orderedRows
+                    .SelectMany(row => row.CohortTraits)
                     .GroupBy(trait => trait, StringComparer.Ordinal)
                     .OrderByDescending(traitGroup => traitGroup.Count())
                     .ThenBy(traitGroup => traitGroup.Key, StringComparer.Ordinal)
                     .Take(6)
                     .Select(traitGroup => $"{traitGroup.Key} ({traitGroup.Count()})")
                     .ToArray();
-                var fingerprints = items
-                    .SelectMany(item => item.FingerprintNames)
+                var fingerprints = orderedRows
+                    .SelectMany(row => row.CohortFingerprints)
                     .GroupBy(fingerprint => fingerprint, StringComparer.Ordinal)
                     .OrderByDescending(fingerprintGroup => fingerprintGroup.Count())
                     .ThenBy(fingerprintGroup => fingerprintGroup.Key, StringComparer.Ordinal)
                     .Take(6)
                     .Select(fingerprintGroup => $"{fingerprintGroup.Key} ({fingerprintGroup.Count()})")
                     .ToArray();
-                var name = traits.Length > 0
-                    ? string.Join(" / ", traits.Take(3).Select(BrainLabBehaviorProfileCohortNamePart))
-                    : $"Cohort {index + 1}";
-                var summary = traits.Length > 0
-                    ? $"{items.Length} creatures matching {string.Join(", ", traits.Take(4))}"
-                    : $"{items.Length} creatures with weak or mixed profile signals";
+                var name = BrainLabBehaviorProfileCohortName(traits, fingerprints);
+                var summary = BrainLabBehaviorProfileCohortSummary(orderedRows.Length, traits, fingerprints);
 
                 return new BrainLabBehaviorProfileCohort(
                     group.Key,
                     name,
                     summary,
-                    items.Length,
+                    orderedRows.Length,
                     representative.CreatureId,
                     orderedRows.Select(row => row.CreatureId).ToArray(),
                     traits,
@@ -763,7 +763,49 @@ public sealed partial class LineageRunManager
         var fingerprintKeyPart = fingerprintKeys
             .Take(4)
             .Select(BrainLabBehaviorProfileCohortToken);
-        return string.Join("|", traitKeys.Concat(fingerprintKeyPart));
+        var tokens = traitKeys
+            .Concat(fingerprintKeyPart)
+            .Where(token => !string.IsNullOrWhiteSpace(token))
+            .ToArray();
+
+        return tokens.Length > 0
+            ? string.Join("|", tokens)
+            : "weak-mixed-no-clear-signal";
+    }
+
+    private static string BrainLabBehaviorProfileCohortName(
+        IReadOnlyList<string> traits,
+        IReadOnlyList<string> fingerprints)
+    {
+        if (traits.Count > 0)
+        {
+            return string.Join(" / ", traits.Take(3).Select(BrainLabBehaviorProfileCohortNamePart));
+        }
+
+        if (fingerprints.Count > 0)
+        {
+            return $"Fingerprint: {string.Join(" / ", fingerprints.Take(3).Select(BrainLabBehaviorProfileCohortNamePart))}";
+        }
+
+        return "Weak/Mixed: no clear signal";
+    }
+
+    private static string BrainLabBehaviorProfileCohortSummary(
+        int creatureCount,
+        IReadOnlyList<string> traits,
+        IReadOnlyList<string> fingerprints)
+    {
+        if (traits.Count > 0)
+        {
+            return $"{creatureCount} creatures matching {string.Join(", ", traits.Take(4))}";
+        }
+
+        if (fingerprints.Count > 0)
+        {
+            return $"{creatureCount} creatures matching {string.Join(", ", fingerprints.Take(4))}";
+        }
+
+        return $"{creatureCount} creatures with no strong profile signals or fingerprints";
     }
 
     private static string BrainLabBehaviorProfileCohortNamePart(string trait)

@@ -86,6 +86,7 @@ const applyBrainLabPresetButton = document.querySelector("#applyBrainLabPresetBu
 const compareBrainLabPopulationButton = document.querySelector("#compareBrainLabPopulationButton");
 const runBrainLabPresetMatrixButton = document.querySelector("#runBrainLabPresetMatrixButton");
 const compareBrainLabProfilesButton = document.querySelector("#compareBrainLabProfilesButton");
+const brainLabProfileScopeSelect = document.querySelector("#brainLabProfileScope");
 const runBrainLabProbeTestsButton = document.querySelector("#runBrainLabProbeTestsButton");
 const brainLabMeta = document.querySelector("#brainLabMeta");
 const brainLabInputs = document.querySelector("#brainLabInputs");
@@ -146,6 +147,7 @@ let brainLabPresetMatrixResult = null;
 let brainLabProbeTestResult = null;
 let brainLabProfileComparisonResult = null;
 let brainLabProfileComparisonCohortKey = null;
+let brainLabProfileComparisonRunning = false;
 let brainLabWorldProbeScene = null;
 let brainLabWorldProbeBaseScene = null;
 let brainLabOverrides = {};
@@ -171,6 +173,8 @@ let recipeBaseScenario = null;
 let recipeDiffCheckpoint = null;
 let pendingRecipeSave = null;
 let selectedRunIds = new Set();
+
+const brainLabProfileComparisonBatchSize = 100;
 
 const brainLabBiomeColors = {
   Desert: "#c7b56f",
@@ -3766,33 +3770,229 @@ async function compareBrainLabProfiles() {
     return;
   }
 
+  if (brainLabProfileComparisonRunning) {
+    return;
+  }
+
+  brainLabProfileComparisonRunning = true;
+  brainLabProfileComparisonCohortKey = null;
+  updateBrainLabButtons();
+  const inputOverrides = { ...brainLabOverrides };
+  const worldProbeEnvironment = buildBrainLabWorldProbeEnvironmentPayload();
+  try {
+    if (brainLabProfileScopeSelect?.value === "all") {
+      await compareAllBrainLabProfiles(path, inputOverrides, worldProbeEnvironment);
+    } else {
+      await compareSampleBrainLabProfiles(path, inputOverrides, worldProbeEnvironment);
+    }
+  } finally {
+    brainLabProfileComparisonRunning = false;
+    if (brainLabProfileComparisonResult) {
+      brainLabProfileComparisonResult.isRunning = false;
+      renderBrainLabProfileComparison();
+    }
+
+    updateBrainLabButtons();
+  }
+}
+
+async function compareSampleBrainLabProfiles(path, inputOverrides, worldProbeEnvironment) {
   brainLabStatus.textContent = "Comparing behavior profiles";
+  const result = await fetchBrainLabProfileComparisonBatch(
+    path,
+    inputOverrides,
+    worldProbeEnvironment,
+    0,
+    brainLabProfileComparisonBatchSize);
+  brainLabProfileComparisonResult = {
+    ...result,
+    profileScope: "sample",
+    isRunning: false
+  };
+  renderBrainLabProfileComparison();
+  brainLabStatus.textContent = [
+    "Profile comparison complete",
+    `${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} creatures`,
+    `${formatNumber(brainLabProfileComparisonResult.evaluatedFixtureCount)} setups`
+  ].join(" | ");
+}
+
+async function compareAllBrainLabProfiles(path, inputOverrides, worldProbeEnvironment) {
+  brainLabStatus.textContent = "Comparing all behavior profiles";
+  let offset = 0;
+  let template = null;
+  const rows = [];
+  while (true) {
+    const result = await fetchBrainLabProfileComparisonBatch(
+      path,
+      inputOverrides,
+      worldProbeEnvironment,
+      offset,
+      brainLabProfileComparisonBatchSize);
+    template ??= result;
+    const batchRows = result.rows || [];
+    rows.push(...batchRows);
+    offset += batchRows.length;
+
+    brainLabProfileComparisonResult = buildBrainLabProfileComparisonResult(
+      template,
+      rows,
+      result.totalCreatureCount,
+      true);
+    renderBrainLabProfileComparison();
+    brainLabStatus.textContent = [
+      "Comparing all behavior profiles",
+      `${formatNumber(rows.length)} / ${formatNumber(result.totalCreatureCount)} creatures`,
+      `${formatPercent(rows.length / Math.max(1, result.totalCreatureCount))}`
+    ].join(" | ");
+
+    if (batchRows.length === 0 || rows.length >= result.totalCreatureCount) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  if (template) {
+    brainLabProfileComparisonResult = buildBrainLabProfileComparisonResult(
+      template,
+      rows,
+      template.totalCreatureCount,
+      false);
+    renderBrainLabProfileComparison();
+  }
+
+  brainLabStatus.textContent = [
+    "Profile comparison complete",
+    `${formatNumber(rows.length)} creatures`,
+    `${formatNumber(template?.evaluatedFixtureCount || 0)} setups`
+  ].join(" | ");
+}
+
+async function fetchBrainLabProfileComparisonBatch(
+  path,
+  inputOverrides,
+  worldProbeEnvironment,
+  creatureOffset,
+  maxCreatures) {
   const response = await fetch("/api/brain-lab/profile-comparison", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       snapshotPath: path,
-      inputOverrides: brainLabOverrides,
-      worldProbeEnvironment: buildBrainLabWorldProbeEnvironmentPayload(),
-      maxCreatures: 100,
+      inputOverrides,
+      worldProbeEnvironment,
+      creatureOffset,
+      maxCreatures,
       maxFixtures: 100
     })
   });
 
   if (!response.ok) {
     brainLabStatus.textContent = await responseErrorMessage(response, "Behavior profile comparison failed.");
-    return;
+    throw new Error(brainLabStatus.textContent);
   }
 
-  brainLabProfileComparisonResult = await response.json();
-  brainLabProfileComparisonCohortKey = null;
-  renderBrainLabProfileComparison();
-  updateBrainLabButtons();
-  brainLabStatus.textContent = [
-    `Profile comparison complete`,
-    `${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} creatures`,
-    `${formatNumber(brainLabProfileComparisonResult.evaluatedFixtureCount)} setups`
-  ].join(" | ");
+  return response.json();
+}
+
+function buildBrainLabProfileComparisonResult(template, rows, totalCreatureCount, isRunning) {
+  const total = Number(totalCreatureCount || template?.totalCreatureCount || rows.length);
+  return {
+    snapshotPath: template?.snapshotPath || brainLabSelectedPath(),
+    totalCreatureCount: total,
+    creatureOffset: 0,
+    maxCreatures: total,
+    evaluatedCreatureCount: rows.length,
+    skippedCreatureCount: Math.max(0, total - rows.length),
+    totalFixtureCount: template?.totalFixtureCount || 0,
+    evaluatedFixtureCount: template?.evaluatedFixtureCount || 0,
+    skippedFixtureCount: template?.skippedFixtureCount || 0,
+    cohorts: buildBrainLabProfileComparisonCohorts(rows),
+    rows: [...rows],
+    profileScope: "all",
+    isRunning,
+    progressLabel: `${formatNumber(rows.length)} / ${formatNumber(total)} creatures`
+  };
+}
+
+function buildBrainLabProfileComparisonCohorts(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = row.cohortKey || "weak-mixed-no-clear-signal";
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+
+    groups.get(key).push(row);
+  }
+
+  return [...groups.entries()]
+    .map(([key, groupRows]) => {
+      const orderedRows = [...groupRows].sort((left, right) =>
+        Number(right.generation || 0) - Number(left.generation || 0)
+        || Number(left.creatureId || 0) - Number(right.creatureId || 0));
+      const traits = countBrainLabProfileCohortValues(orderedRows.flatMap((row) => row.cohortTraits || []));
+      const fingerprints = countBrainLabProfileCohortValues(orderedRows.flatMap((row) => row.cohortFingerprints || []));
+      return {
+        key,
+        name: brainLabProfileCohortName(traits, fingerprints),
+        summary: brainLabProfileCohortSummary(orderedRows.length, traits, fingerprints),
+        creatureCount: orderedRows.length,
+        representativeCreatureId: orderedRows[0]?.creatureId || 0,
+        creatureIds: orderedRows.map((row) => row.creatureId),
+        traits,
+        fingerprints
+      };
+    })
+    .sort((left, right) =>
+      Number(right.creatureCount || 0) - Number(left.creatureCount || 0)
+      || String(left.name || "").localeCompare(String(right.name || "")));
+}
+
+function countBrainLabProfileCohortValues(values) {
+  const counts = new Map();
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 6)
+    .map(([value, count]) => `${value} (${formatNumber(count)})`);
+}
+
+function brainLabProfileCohortName(traits, fingerprints) {
+  if (traits.length > 0) {
+    return traits.slice(0, 3).map(brainLabProfileCohortNamePart).join(" / ");
+  }
+
+  if (fingerprints.length > 0) {
+    return `Fingerprint: ${fingerprints.slice(0, 3).map(brainLabProfileCohortNamePart).join(" / ")}`;
+  }
+
+  return "Weak/Mixed: no clear signal";
+}
+
+function brainLabProfileCohortSummary(creatureCount, traits, fingerprints) {
+  if (traits.length > 0) {
+    return `${formatNumber(creatureCount)} creatures matching ${traits.slice(0, 4).join(", ")}`;
+  }
+
+  if (fingerprints.length > 0) {
+    return `${formatNumber(creatureCount)} creatures matching ${fingerprints.slice(0, 4).join(", ")}`;
+  }
+
+  return `${formatNumber(creatureCount)} creatures with no strong profile signals or fingerprints`;
+}
+
+function brainLabProfileCohortNamePart(value) {
+  const index = String(value || "").indexOf(" (");
+  return index > 0 ? value.slice(0, index) : value;
 }
 
 function renderBrainLabProfileComparison() {
@@ -3813,16 +4013,20 @@ function renderBrainLabProfileComparison() {
   const rows = (brainLabProfileComparisonResult.rows || [])
     .filter((row) => !selectedCreatureIds || selectedCreatureIds.has(Number(row.creatureId)));
   const cohortCards = renderBrainLabProfileCohorts(cohorts, selectedCohort);
+  const scopeLabel = brainLabProfileComparisonResult.profileScope === "all"
+    ? "all creatures"
+    : `cap ${formatNumber(brainLabProfileComparisonResult.maxCreatures)}`;
   brainLabProfileComparison.innerHTML = `
     <div class="brain-lab-profile-comparison-summary">
       <strong>${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} profiled</strong>
       <span>${formatNumber(brainLabProfileComparisonResult.totalCreatureCount)} total creatures</span>
-      <span>cap ${formatNumber(brainLabProfileComparisonResult.maxCreatures)}</span>
+      <span>${scopeLabel}</span>
       <span>${formatNumber(brainLabProfileComparisonResult.evaluatedFixtureCount)} setups</span>
       ${selectedCohort ? `<span>showing ${formatNumber(rows.length)} in ${escapeHtml(selectedCohort.name)}</span>` : ""}
-      ${brainLabProfileComparisonResult.skippedCreatureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedCreatureCount)} creatures skipped by cap</span>` : ""}
+      ${brainLabProfileComparisonResult.skippedCreatureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedCreatureCount)} creatures ${brainLabProfileComparisonResult.isRunning ? "remaining" : "skipped by cap"}</span>` : ""}
       ${brainLabProfileComparisonResult.skippedFixtureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedFixtureCount)} setups skipped by cap</span>` : ""}
     </div>
+    ${renderBrainLabProfileComparisonProgress(brainLabProfileComparisonResult)}
     ${cohortCards}
     <table class="brain-lab-profile-comparison-table">
       <thead>
@@ -3845,6 +4049,22 @@ function renderBrainLabProfileComparison() {
   `;
 }
 
+function renderBrainLabProfileComparisonProgress(result) {
+  if (!result?.isRunning) {
+    return "";
+  }
+
+  const total = Math.max(1, Number(result.totalCreatureCount || 0));
+  const value = Math.max(0, Math.min(total, Number(result.evaluatedCreatureCount || 0)));
+  const label = result.progressLabel || `${formatNumber(value)} / ${formatNumber(total)} creatures`;
+  return `
+    <div class="brain-lab-profile-progress">
+      <progress max="${total}" value="${value}"></progress>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
 function renderBrainLabProfileCohorts(cohorts, selectedCohort) {
   if (!cohorts?.length) {
     return "";
@@ -3853,7 +4073,7 @@ function renderBrainLabProfileCohorts(cohorts, selectedCohort) {
   const allActive = !selectedCohort ? " is-active" : "";
   return `
     <div class="brain-lab-profile-cohorts">
-      <button class="brain-lab-profile-cohort${allActive}" type="button" data-brain-lab-profile-cohort="">
+      <button class="brain-lab-profile-cohort${allActive}" type="button" data-brain-lab-profile-cohort="__all">
         <strong>All Profiles</strong>
         <span>${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} creatures</span>
       </button>
@@ -4475,7 +4695,10 @@ function updateBrainLabButtons() {
     runBrainLabPresetMatrixButton.disabled = !hasSnapshot;
   }
   if (compareBrainLabProfilesButton) {
-    compareBrainLabProfilesButton.disabled = !hasSnapshot;
+    compareBrainLabProfilesButton.disabled = !hasSnapshot || brainLabProfileComparisonRunning;
+  }
+  if (brainLabProfileScopeSelect) {
+    brainLabProfileScopeSelect.disabled = !hasSnapshot || brainLabProfileComparisonRunning;
   }
   if (runBrainLabProbeTestsButton) {
     runBrainLabProbeTestsButton.disabled = !hasSnapshot || !hasCreature;
@@ -8064,7 +8287,8 @@ runBrainLabProbeTestsButton.addEventListener("click", runBrainLabProbeTests);
 brainLabProfileComparison.addEventListener("click", (event) => {
   const cohortButton = event.target.closest("[data-brain-lab-profile-cohort]");
   if (cohortButton) {
-    selectBrainLabProfileCohort(cohortButton.dataset.brainLabProfileCohort || "");
+    const cohortKey = cohortButton.dataset.brainLabProfileCohort || "";
+    selectBrainLabProfileCohort(cohortKey === "__all" ? "" : cohortKey);
     return;
   }
 
