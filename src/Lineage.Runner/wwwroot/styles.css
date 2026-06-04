@@ -1467,6 +1467,89 @@ button.scenario-tab.is-active {
   font-weight: 800;
 }
 
+.brain-lab-profile-cohort-detail {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #b9c9dc;
+  border-radius: 6px;
+  background: #f6f9fc;
+  color: var(--ink);
+}
+
+.brain-lab-profile-cohort-detail-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.brain-lab-profile-cohort-detail h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.brain-lab-profile-cohort-detail-heading span,
+.brain-lab-profile-cohort-detail p,
+.brain-lab-profile-cohort-detail li,
+.brain-lab-profile-cohort-evidence span,
+.brain-lab-profile-cohort-evidence code {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brain-lab-profile-cohort-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.brain-lab-profile-cohort-detail-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.brain-lab-profile-cohort-detail ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.brain-lab-profile-cohort-detail p {
+  margin: 0;
+}
+
+.brain-lab-profile-cohort-detail-tags,
+.brain-lab-profile-cohort-evidence {
+  display: grid;
+  gap: 5px;
+}
+
+.brain-lab-profile-cohort-detail-tags span {
+  display: block;
+  padding: 4px 6px;
+  border: 1px solid #d7e1eb;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.brain-lab-profile-cohort-evidence div {
+  display: grid;
+  gap: 2px;
+}
+
+.brain-lab-profile-cohort-evidence code {
+  overflow-wrap: anywhere;
+}
+
 .brain-lab-profile-load-creature {
   margin-top: 6px;
   padding: 4px 8px;

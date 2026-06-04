@@ -28,6 +28,10 @@ public sealed partial class LineageRunManager
     private const float BrainLabMaximumHabitatProbeDistance = 80f;
     private const float BrainLabWorldProbeBoundaryTargetCellSize = 32f;
     private const int BrainLabWorldProbeBoundaryMaxCells = 200_000;
+    private const double BrainLabProbeAheadVisualDistance = 56;
+    private const double BrainLabProbeSideVisualForward = 48;
+    private const double BrainLabProbeSideVisualOffset = 42;
+    private const double BrainLabProbeScentSideDistance = 160;
 
     private readonly object _brainLabSnapshotLock = new();
     private readonly BrainProbeService _brainProbeService = new();
@@ -59,21 +63,76 @@ public sealed partial class LineageRunManager
             "Plant Ahead",
             "plant-ahead",
             "One generic plant in front of the selected creature.",
-            ["plant", "food"],
+            ["plant", "food", "vision"],
             new BrainLabWorldProbeEditSet(
                 [
-                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", 110, 0, 8, 25, 25, 1)
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", BrainLabProbeAheadVisualDistance, 0, 8, 25, 25, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Plant Left",
+            "plant-left",
+            "One generic plant in the selected creature's forward-left visual area.",
+            ["plant", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", BrainLabProbeSideVisualForward, -BrainLabProbeSideVisualOffset, 8, 25, 25, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Plant Right",
+            "plant-right",
+            "One generic plant in the selected creature's forward-right visual area.",
+            ["plant", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", BrainLabProbeSideVisualForward, BrainLabProbeSideVisualOffset, 8, 25, 25, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Meat Ahead",
+            "meat-ahead",
+            "One fresh meat patch in front of the selected creature.",
+            ["meat", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, BrainLabProbeAheadVisualDistance, 0, 6, 24, 24, 1)
                 ],
                 [],
                 [])),
         BuiltInBrainLabWorldProbeFixture(
             "Meat Left",
             "meat-left",
-            "One fresh meat patch to the selected creature's left.",
-            ["meat", "food"],
+            "One fresh meat patch in the selected creature's forward-left visual area.",
+            ["meat", "food", "vision"],
             new BrainLabWorldProbeEditSet(
                 [
-                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, -110, 6, 18, 18, 1)
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, BrainLabProbeSideVisualForward, -BrainLabProbeSideVisualOffset, 6, 24, 24, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Meat Right",
+            "meat-right",
+            "One fresh meat patch in the selected creature's forward-right visual area.",
+            ["meat", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, BrainLabProbeSideVisualForward, BrainLabProbeSideVisualOffset, 6, 24, 24, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Rotten Meat Ahead",
+            "rotten-meat-ahead",
+            "One stale meat patch in front of the selected creature.",
+            ["rotten meat", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, BrainLabProbeAheadVisualDistance, 0, 6, 24, 24, MeatQuality.MinimumFreshness)
                 ],
                 [],
                 [])),
@@ -84,7 +143,18 @@ public sealed partial class LineageRunManager
             ["meat", "scent", "food"],
             new BrainLabWorldProbeEditSet(
                 [
-                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, 160, 6, 24, 24, 1)
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, BrainLabProbeScentSideDistance, 6, 24, 24, 1)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Meat Scent Left",
+            "meat-scent-left",
+            "One fresh meat patch off to the selected creature's left, outside the usual forward vision cone.",
+            ["meat", "scent", "food"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, -BrainLabProbeScentSideDistance, 6, 24, 24, 1)
                 ],
                 [],
                 [])),
@@ -95,7 +165,18 @@ public sealed partial class LineageRunManager
             ["rotten meat", "scent", "food"],
             new BrainLabWorldProbeEditSet(
                 [
-                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, -160, 6, 24, 24, MeatQuality.MinimumFreshness)
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, -BrainLabProbeScentSideDistance, 6, 24, 24, MeatQuality.MinimumFreshness)
+                ],
+                [],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Rotten Scent Right",
+            "rotten-scent-right",
+            "One stale meat patch off to the selected creature's right, outside the usual forward vision cone.",
+            ["rotten meat", "scent", "food"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, 0, BrainLabProbeScentSideDistance, 6, 24, 24, MeatQuality.MinimumFreshness)
                 ],
                 [],
                 [])),
@@ -103,30 +184,100 @@ public sealed partial class LineageRunManager
             "Egg Ahead",
             "egg-ahead",
             "One egg in front of the selected creature.",
-            ["egg", "food"],
+            ["egg", "food", "vision"],
             new BrainLabWorldProbeEditSet(
                 [],
                 [
-                    new BrainLabWorldProbeEditedEgg(-1, 0, 96, 0, 5, 16, 1)
+                    new BrainLabWorldProbeEditedEgg(-1, 0, BrainLabProbeAheadVisualDistance, 0, 5, 16, 1)
+                ],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Egg Left",
+            "egg-left",
+            "One egg in the selected creature's forward-left visual area.",
+            ["egg", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [
+                    new BrainLabWorldProbeEditedEgg(-1, 0, BrainLabProbeSideVisualForward, -BrainLabProbeSideVisualOffset, 5, 16, 1)
+                ],
+                [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Egg Right",
+            "egg-right",
+            "One egg in the selected creature's forward-right visual area.",
+            ["egg", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [
+                    new BrainLabWorldProbeEditedEgg(-1, 0, BrainLabProbeSideVisualForward, BrainLabProbeSideVisualOffset, 5, 16, 1)
                 ],
                 [])),
         BuiltInBrainLabWorldProbeFixture(
             "Small Prey Ahead",
             "small-prey-ahead",
             "One live small prey animal in front of the selected creature.",
-            ["small prey", "meat", "food"],
+            ["small prey", "meat", "food", "vision"],
             new BrainLabWorldProbeEditSet(
                 [],
                 [],
                 [],
                 [
-                    new BrainLabWorldProbeEditedSmallPrey(-1, 110, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                    new BrainLabWorldProbeEditedSmallPrey(-1, BrainLabProbeAheadVisualDistance, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey Left",
+            "small-prey-left",
+            "One live small prey animal in the selected creature's forward-left visual area.",
+            ["small prey", "meat", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, BrainLabProbeSideVisualForward, -BrainLabProbeSideVisualOffset, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey Right",
+            "small-prey-right",
+            "One live small prey animal in the selected creature's forward-right visual area.",
+            ["small prey", "meat", "food", "vision"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, BrainLabProbeSideVisualForward, BrainLabProbeSideVisualOffset, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey Scent Left",
+            "small-prey-scent-left",
+            "One live small prey animal off to the selected creature's left, outside the usual forward vision cone.",
+            ["small prey", "meat", "scent", "food"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, 0, -BrainLabProbeScentSideDistance, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey Scent Right",
+            "small-prey-scent-right",
+            "One live small prey animal off to the selected creature's right, outside the usual forward vision cone.",
+            ["small prey", "meat", "scent", "food"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, 0, BrainLabProbeScentSideDistance, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
                 ])),
         BuiltInBrainLabWorldProbeFixture(
             "Creature Ahead",
             "creature-ahead",
             "One healthy creature in front of the selected creature.",
-            ["creature", "contact"],
+            ["creature", "contact", "vision"],
             new BrainLabWorldProbeEditSet(
                 [],
                 [],
@@ -206,8 +357,8 @@ public sealed partial class LineageRunManager
             ["plant", "meat", "scent", "food", "conflict"],
             new BrainLabWorldProbeEditSet(
                 [
-                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", 110, 0, 8, 25, 25, 1),
-                    new BrainLabWorldProbeEditedResource(-2, "Meat", null, 0, 160, 6, 24, 24, 1)
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", BrainLabProbeAheadVisualDistance, 0, 8, 25, 25, 1),
+                    new BrainLabWorldProbeEditedResource(-2, "Meat", null, 0, BrainLabProbeScentSideDistance, 6, 24, 24, 1)
                 ],
                 [],
                 [])),
@@ -218,11 +369,38 @@ public sealed partial class LineageRunManager
             ["plant", "creature", "food", "conflict"],
             new BrainLabWorldProbeEditSet(
                 [
-                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", 110, 0, 8, 25, 25, 1)
+                    new BrainLabWorldProbeEditedResource(-1, "Plant", "Generic", BrainLabProbeAheadVisualDistance, 0, 8, 25, 25, 1)
                 ],
                 [],
                 [
-                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", 72, 32, 8, Math.PI, 1, 1, 0, 0, 0)
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", BrainLabProbeSideVisualForward, 32, 8, Math.PI, 1, 1, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Meat Ahead Creature Near",
+            "meat-ahead-creature-near",
+            "Visible fresh meat ahead with another creature close to that food cue.",
+            ["meat", "creature", "food", "conflict"],
+            new BrainLabWorldProbeEditSet(
+                [
+                    new BrainLabWorldProbeEditedResource(-1, "Meat", null, BrainLabProbeAheadVisualDistance, 0, 6, 24, 24, 1)
+                ],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", BrainLabProbeSideVisualForward, 32, 8, Math.PI, 1, 1, 0, 0, 0)
+                ])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey With Competitor",
+            "small-prey-with-competitor",
+            "Visible small prey ahead with another creature close to that prey cue.",
+            ["small prey", "creature", "food", "conflict"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", BrainLabProbeSideVisualForward, 32, 8, Math.PI, 1, 1, 0, 0, 0)
+                ],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, BrainLabProbeAheadVisualDistance, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
                 ])),
         BuiltInBrainLabWorldProbeFixture(
             "Small Prey Ahead Loud Sound Behind",
@@ -236,7 +414,7 @@ public sealed partial class LineageRunManager
                     new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeSound", -180, 0, 0.5, 0, 1, 1, 0, 1, 0.6, true)
                 ],
                 [
-                    new BrainLabWorldProbeEditedSmallPrey(-1, 110, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                    new BrainLabWorldProbeEditedSmallPrey(-1, BrainLabProbeAheadVisualDistance, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
                 ])),
         BuiltInBrainLabWorldProbeFixture(
             "Egg With Guard",
@@ -246,10 +424,10 @@ public sealed partial class LineageRunManager
             new BrainLabWorldProbeEditSet(
                 [],
                 [
-                    new BrainLabWorldProbeEditedEgg(-1, 0, 96, 0, 5, 16, 1)
+                    new BrainLabWorldProbeEditedEgg(-1, 0, BrainLabProbeAheadVisualDistance, 0, 5, 16, 1)
                 ],
                 [
-                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", 72, -28, 8, Math.PI, 1, 1, 0, 0, 0)
+                    new BrainLabWorldProbeEditedCreature(-2, 0, "ProbeCreature", BrainLabProbeSideVisualForward, -32, 8, Math.PI, 1, 1, 0, 0, 0)
                 ]))
     ];
 
@@ -1002,7 +1180,7 @@ public sealed partial class LineageRunManager
                     AddLabel($"{cue.Kind}.ignores", $"ignores {cue.Label}", "Food", 1);
                 }
 
-                if (isScentFixture && (cue.Kind is "meat" or "rottenMeat"))
+                if (isScentFixture && (cue.Kind is "meat" or "rottenMeat" or "smallPrey"))
                 {
                     if (toward)
                     {
@@ -1276,6 +1454,16 @@ public sealed partial class LineageRunManager
             "Turns toward, approaches, or tries to eat live small prey setups.",
             "smallPrey.approaches",
             "food.eats.smallPrey");
+        AddFingerprint(
+            "small_prey_scent_follower",
+            "small-prey scent follower",
+            "Moves toward live small prey scent setups.",
+            "smallPrey.scent_follows");
+        AddFingerprint(
+            "small_prey_scent_avoidant",
+            "small-prey scent avoidant",
+            "Moves away from live small prey scent setups.",
+            "smallPrey.scent_avoids");
         AddFingerprint(
             "egg_predator",
             "egg responsive",
@@ -1581,6 +1769,9 @@ public sealed partial class LineageRunManager
         var rottenScentFollow = CountLabels("rottenMeat.scent_follows");
         var rottenScentAvoid = CountLabels("rottenMeat.scent_avoids");
         var rottenScentIgnore = CountLabels("rottenMeat.scent_ignores");
+        var smallPreyScentFollow = CountLabels("smallPrey.scent_follows");
+        var smallPreyScentAvoid = CountLabels("smallPrey.scent_avoids");
+        var smallPreyScentIgnore = CountLabels("smallPrey.scent_ignores");
         var scentTraits = new List<string>();
         AddTrait(scentTraits, "follows fresh meat scent", freshScentFollow);
         AddTrait(scentTraits, "avoids fresh meat scent", freshScentAvoid);
@@ -1588,6 +1779,9 @@ public sealed partial class LineageRunManager
         AddTrait(scentTraits, "follows rotten scent", rottenScentFollow);
         AddTrait(scentTraits, "avoids rotten scent", rottenScentAvoid);
         AddTrait(scentTraits, "ignores rotten scent", rottenScentIgnore);
+        AddTrait(scentTraits, "follows small prey scent", smallPreyScentFollow);
+        AddTrait(scentTraits, "avoids small prey scent", smallPreyScentAvoid);
+        AddTrait(scentTraits, "ignores small prey scent", smallPreyScentIgnore);
         AddSection(
             "scent",
             "Scent",
@@ -1597,12 +1791,14 @@ public sealed partial class LineageRunManager
                     ("avoids fresh meat scent", freshScentAvoid),
                     ("follows rotten scent", rottenScentFollow),
                     ("avoids rotten scent", rottenScentAvoid),
-                    ("ignores scent", freshScentIgnore + rottenScentIgnore)
+                    ("follows small prey scent", smallPreyScentFollow),
+                    ("avoids small prey scent", smallPreyScentAvoid),
+                    ("ignores scent", freshScentIgnore + rottenScentIgnore + smallPreyScentIgnore)
                 ],
                 "No clear scent response.",
                 "strongest scent pattern"),
             scentTraits,
-            EvidenceForLabels("meat.scent_", "rottenMeat.scent_"));
+            EvidenceForLabels("meat.scent_", "rottenMeat.scent_", "smallPrey.scent_"));
 
         var soundApproach = CountLabels("sound.approaches");
         var soundAvoid = CountLabels("sound.avoids");

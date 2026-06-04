@@ -4028,6 +4028,7 @@ function renderBrainLabProfileComparison() {
     </div>
     ${renderBrainLabProfileComparisonProgress(brainLabProfileComparisonResult)}
     ${cohortCards}
+    ${renderBrainLabProfileCohortDetail(selectedCohort, rows)}
     <table class="brain-lab-profile-comparison-table">
       <thead>
         <tr>
@@ -4097,6 +4098,180 @@ function renderBrainLabProfileCohort(cohort, selected) {
   `;
 }
 
+function renderBrainLabProfileCohortDetail(cohort, rows) {
+  if (!cohort) {
+    return "";
+  }
+
+  const representative = brainLabProfileComparisonCreature(cohort.representativeCreatureId) || rows[0] || null;
+  const interpretation = renderBrainLabProfileCohortInterpretation(cohort);
+  const evidence = renderBrainLabProfileCohortEvidence(rows);
+  const traits = (cohort.traits || [])
+    .slice(0, 8)
+    .map((trait) => `<span>${escapeHtml(trait)}</span>`)
+    .join("");
+  const fingerprints = (cohort.fingerprints || [])
+    .slice(0, 8)
+    .map((fingerprint) => `<span>${escapeHtml(fingerprint)}</span>`)
+    .join("");
+  const representativeLabel = representative
+    ? `#${formatNumber(representative.creatureId)} gen ${formatNumber(representative.generation)} ${escapeHtml(representative.brainArchitectureKind || "")}`
+    : `#${formatNumber(cohort.representativeCreatureId)}`;
+
+  return `
+    <div class="brain-lab-profile-cohort-detail">
+      <div class="brain-lab-profile-cohort-detail-heading">
+        <div>
+          <h4>${escapeHtml(cohort.name || "Selected Cohort")}</h4>
+          <span>${formatNumber(cohort.creatureCount)} creatures | representative ${representativeLabel}</span>
+        </div>
+        <div class="brain-lab-actions">
+          <button class="secondary" type="button" data-brain-lab-profile-creature="${escapeHtml(cohort.representativeCreatureId)}">Load Rep</button>
+          <button class="secondary" type="button" data-brain-lab-profile-action="export-species" data-brain-lab-profile-action-creature="${escapeHtml(cohort.representativeCreatureId)}">Export Rep Species</button>
+          <button class="secondary" type="button" data-brain-lab-profile-action="export-brain" data-brain-lab-profile-action-creature="${escapeHtml(cohort.representativeCreatureId)}">Export Rep Brain</button>
+        </div>
+      </div>
+      <div class="brain-lab-profile-cohort-detail-grid">
+        <div>
+          <strong>Meaning</strong>
+          ${interpretation}
+        </div>
+        <div>
+          <strong>Shared Signals</strong>
+          <div class="brain-lab-profile-cohort-detail-tags">${traits || `<span>No strong profile traits.</span>`}</div>
+        </div>
+        <div>
+          <strong>Fingerprints</strong>
+          <div class="brain-lab-profile-cohort-detail-tags">${fingerprints || `<span>No strong fingerprints.</span>`}</div>
+        </div>
+        <div>
+          <strong>Probe Evidence</strong>
+          ${evidence}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderBrainLabProfileCohortInterpretation(cohort) {
+  const traits = cohort.traits || [];
+  const explanations = traits
+    .slice(0, 8)
+    .map(brainLabProfileTraitMeaning)
+    .filter(Boolean);
+  const hasConflict = traits.some((trait) => String(trait).startsWith("Conflict:"));
+  const conflictNote = hasConflict
+    ? `<p><strong>Conflict</strong> means a compound probe setup where cues compete, such as food plus creature or food plus sound. It does not mean combat by itself.</p>`
+    : "";
+
+  if (explanations.length === 0) {
+    return `
+      <p>This cohort has weak or mixed profile signals. The creatures grouped together because the suite did not find a stronger shared food, sound, creature, conflict, scent, or idle pattern.</p>
+      ${conflictNote}
+    `;
+  }
+
+  return `
+    ${conflictNote}
+    <ul>
+      ${explanations.map((explanation) => `<li>${escapeHtml(explanation)}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function brainLabProfileTraitMeaning(rawTrait) {
+  const trait = brainLabProfileCohortNamePart(rawTrait || "");
+  const separator = trait.indexOf(":");
+  if (separator < 0) {
+    return trait;
+  }
+
+  const section = trait.slice(0, separator).trim();
+  const value = trait.slice(separator + 1).trim();
+  if (!value) {
+    return trait;
+  }
+
+  switch (section) {
+    case "Food":
+      return `Food: strongest pull is ${value}.`;
+    case "Scent":
+      return `Scent: strongest scent pattern is ${value}.`;
+    case "Sound":
+      return `Sound: strongest sound pattern is ${value}.`;
+    case "Creature":
+      return `Creature: response to another creature is ${value}.`;
+    case "Conflict":
+      return `Conflict: when cues compete, ${value} tends to dominate.`;
+    case "Idle":
+      return `Idle: with no clear cue, tendency is ${value}.`;
+    default:
+      return `${section}: ${value}.`;
+  }
+}
+
+function renderBrainLabProfileCohortEvidence(rows) {
+  const evidence = aggregateBrainLabProfileCohortEvidence(rows);
+  if (evidence.length === 0) {
+    return `<p class="brain-lab-muted">No probe evidence was attached to these profile sections.</p>`;
+  }
+
+  return `
+    <div class="brain-lab-profile-cohort-evidence">
+      ${evidence.map((section) => `
+        <div>
+          <span>${escapeHtml(section.name)}</span>
+          <code>${section.items.map((item) => `${escapeHtml(item.name)} (${formatNumber(item.count)})`).join(" | ")}</code>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function aggregateBrainLabProfileCohortEvidence(rows) {
+  const order = ["Food", "Scent", "Sound", "Creature", "Conflict", "Idle"];
+  const sections = new Map();
+  for (const row of rows || []) {
+    for (const section of row.profile?.sections || []) {
+      const name = section.name || section.key || "Profile";
+      if (!sections.has(name)) {
+        sections.set(name, new Map());
+      }
+
+      const counts = sections.get(name);
+      for (const item of section.evidence || []) {
+        counts.set(item, (counts.get(item) || 0) + 1);
+      }
+    }
+  }
+
+  return [...sections.entries()]
+    .map(([name, counts]) => ({
+      name,
+      items: [...counts.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, 5)
+        .map(([itemName, count]) => ({ name: itemName, count }))
+    }))
+    .filter((section) => section.items.length > 0)
+    .sort((left, right) => {
+      const leftIndex = order.indexOf(left.name);
+      const rightIndex = order.indexOf(right.name);
+      return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex)
+        || left.name.localeCompare(right.name);
+    });
+}
+
+function brainLabProfileComparisonCreature(creatureId) {
+  const id = Number(creatureId || 0);
+  if (!id) {
+    return null;
+  }
+
+  return (brainLabProfileComparisonResult?.rows || [])
+    .find((row) => Number(row.creatureId) === id) ?? null;
+}
+
 function renderBrainLabProfileComparisonRow(row) {
   const fingerprints = (row.fingerprints || [])
     .slice(0, 4)
@@ -4155,8 +4330,18 @@ async function loadBrainLabProfileCreature(creatureId) {
 
   const value = String(creatureId);
   if (![...brainLabCreatureSelect.options].some((option) => option.value === value)) {
-    brainLabStatus.textContent = `Creature #${formatNumber(creatureId)} is outside the loaded snapshot creature list.`;
-    return;
+    const row = brainLabProfileComparisonCreature(creatureId);
+    if (!row) {
+      brainLabStatus.textContent = `Creature #${formatNumber(creatureId)} is outside the loaded snapshot creature list.`;
+      return;
+    }
+
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = `#${formatNumber(row.creatureId)} gen ${formatNumber(row.generation)} ${row.brainArchitectureKind}`;
+    option.title = "Added from behavior profile comparison.";
+    brainLabCreatureSelect.append(option);
+    brainLabCreatureSelect.disabled = false;
   }
 
   brainLabCreatureSelect.value = value;
@@ -4165,15 +4350,16 @@ async function loadBrainLabProfileCreature(creatureId) {
   await evaluateBrainLab();
 }
 
-async function saveBrainLabSpeciesProfile() {
+async function saveBrainLabSpeciesProfile(creatureOverride = null) {
   const path = brainLabSelectedPath();
-  const creature = selectedBrainLabCreature();
+  const creature = creatureOverride || selectedBrainLabCreature();
   if (!path || !creature) {
     brainLabStatus.textContent = "Load a snapshot and choose a creature before exporting.";
     return;
   }
 
-  const defaultName = `${brainLabSnapshot?.scenarioName || "Brain Lab"} #${creature.id} gen ${creature.generation}`;
+  const creatureId = Number(creature.id ?? creature.creatureId);
+  const defaultName = `${brainLabSnapshot?.scenarioName || "Brain Lab"} #${creatureId} gen ${creature.generation}`;
   const name = prompt("Species profile name", defaultName);
   if (name === null) {
     return;
@@ -4187,7 +4373,7 @@ async function saveBrainLabSpeciesProfile() {
 
   const notes = prompt(
     "Species notes",
-    `Saved from Brain Lab snapshot ${path}, creature #${creature.id} gen ${creature.generation}.`);
+    `Saved from Brain Lab snapshot ${path}, creature #${creatureId} gen ${creature.generation}.`);
   if (notes === null) {
     return;
   }
@@ -4201,7 +4387,7 @@ async function saveBrainLabSpeciesProfile() {
       snapshotPath: path,
       name: trimmedName,
       notes: notes.trim(),
-      creatureId: creature.id,
+      creatureId,
       exportPairedBrain
     })
   });
@@ -4223,15 +4409,16 @@ async function saveBrainLabSpeciesProfile() {
     : `Saved species profile ${result.species.name}.`;
 }
 
-async function saveBrainLabBrainProfile() {
+async function saveBrainLabBrainProfile(creatureOverride = null) {
   const path = brainLabSelectedPath();
-  const creature = selectedBrainLabCreature();
+  const creature = creatureOverride || selectedBrainLabCreature();
   if (!path || !creature) {
     brainLabStatus.textContent = "Load a snapshot and choose a creature before exporting.";
     return;
   }
 
-  const defaultName = `${brainLabSnapshot?.scenarioName || "Brain Lab"} #${creature.id} brain`;
+  const creatureId = Number(creature.id ?? creature.creatureId);
+  const defaultName = `${brainLabSnapshot?.scenarioName || "Brain Lab"} #${creatureId} brain`;
   const name = prompt("Brain profile name", defaultName);
   if (name === null) {
     return;
@@ -4245,7 +4432,7 @@ async function saveBrainLabBrainProfile() {
 
   const notes = prompt(
     "Brain notes",
-    `Saved from Brain Lab snapshot ${path}, creature #${creature.id} gen ${creature.generation}.`);
+    `Saved from Brain Lab snapshot ${path}, creature #${creatureId} gen ${creature.generation}.`);
   if (notes === null) {
     return;
   }
@@ -4258,7 +4445,7 @@ async function saveBrainLabBrainProfile() {
       snapshotPath: path,
       name: trimmedName,
       notes: notes.trim(),
-      creatureId: creature.id
+      creatureId
     })
   });
 
@@ -8275,8 +8462,8 @@ deleteBrainCatalogButton.addEventListener("click", deleteSelectedBrainCatalogEnt
 refreshBrainLabSnapshotsButton.addEventListener("click", () => loadBrainLabSnapshots());
 loadBrainLabSnapshotButton.addEventListener("click", loadBrainLabSnapshot);
 evaluateBrainLabButton.addEventListener("click", evaluateBrainLab);
-exportBrainLabSpeciesButton.addEventListener("click", saveBrainLabSpeciesProfile);
-exportBrainLabBrainButton.addEventListener("click", saveBrainLabBrainProfile);
+exportBrainLabSpeciesButton.addEventListener("click", () => saveBrainLabSpeciesProfile());
+exportBrainLabBrainButton.addEventListener("click", () => saveBrainLabBrainProfile());
 muteBrainLabSoundButton.addEventListener("click", muteBrainLabSound);
 resetBrainLabOverridesButton.addEventListener("click", resetBrainLabOverrides);
 applyBrainLabPresetButton.addEventListener("click", applyBrainLabPreset);
@@ -8289,6 +8476,24 @@ brainLabProfileComparison.addEventListener("click", (event) => {
   if (cohortButton) {
     const cohortKey = cohortButton.dataset.brainLabProfileCohort || "";
     selectBrainLabProfileCohort(cohortKey === "__all" ? "" : cohortKey);
+    return;
+  }
+
+  const profileActionButton = event.target.closest("[data-brain-lab-profile-action]");
+  if (profileActionButton) {
+    const creatureId = Number(profileActionButton.dataset.brainLabProfileActionCreature || 0);
+    const creature = brainLabProfileComparisonCreature(creatureId);
+    if (!creature) {
+      brainLabStatus.textContent = `Creature #${formatNumber(creatureId)} is not in the current profile comparison.`;
+      return;
+    }
+
+    if (profileActionButton.dataset.brainLabProfileAction === "export-species") {
+      void saveBrainLabSpeciesProfile(creature);
+    } else if (profileActionButton.dataset.brainLabProfileAction === "export-brain") {
+      void saveBrainLabBrainProfile(creature);
+    }
+
     return;
   }
 
