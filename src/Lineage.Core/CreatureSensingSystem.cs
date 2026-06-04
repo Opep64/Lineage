@@ -937,7 +937,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             plantPayoffTraceHalfLifeSeconds);
         var isReadyToLay =
             eggReserveRatio >= 1f
-            && creature.AgeSeconds >= genome.MaturityAgeSeconds
+            && CreatureGrowth.IsMature(creature, genome)
             && creature.ReproductionCooldownSeconds <= 0f;
 
         senses.EnergyRatio = energyRatio;

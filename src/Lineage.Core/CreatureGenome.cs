@@ -17,6 +17,7 @@ public readonly record struct CreatureGenome
         MaxTurnRadiansPerSecond = 3f,
         SenseRadius = 90f,
         VisionAngleRadians = MathF.PI * 2f / 3f,
+        MetabolicPace = CreatureMetabolism.DefaultPace,
         BasalEnergyPerSecond = 0.25f,
         MovementEnergyPerSecond = 0.35f,
         EatCaloriesPerSecond = 18f,
@@ -44,7 +45,7 @@ public readonly record struct CreatureGenome
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 27;
+    private const int MutatingTraitCount = 28;
 
     public float BodyRadius { get; init; }
 
@@ -55,6 +56,8 @@ public readonly record struct CreatureGenome
     public float SenseRadius { get; init; }
 
     public float VisionAngleRadians { get; init; }
+
+    public float MetabolicPace { get; init; }
 
     public float BasalEnergyPerSecond { get; init; }
 
@@ -167,6 +170,13 @@ public readonly record struct CreatureGenome
                 strength * 0.7f,
                 CreatureThermal.MinimumTolerance,
                 CreatureThermal.MaximumTolerance),
+            MetabolicPace = MutateTraitIfSelected(
+                random,
+                mutations[27],
+                MetabolicPace,
+                strength,
+                CreatureMetabolism.MinimumPace,
+                CreatureMetabolism.MaximumPace),
             MutationStrength = mutationProfile.MutationStrength,
             TraitMutationRate = mutationProfile.TraitMutationRate,
             BrainMutationRate = mutationProfile.BrainMutationRate
@@ -210,11 +220,17 @@ public readonly record struct CreatureGenome
             normalized = normalized with { ThermalTolerance = Baseline.ThermalTolerance };
         }
 
+        if (normalized.MetabolicPace <= 0f || !float.IsFinite(normalized.MetabolicPace))
+        {
+            normalized = normalized with { MetabolicPace = Baseline.MetabolicPace };
+        }
+
         EnsurePositive(normalized.BodyRadius, nameof(BodyRadius));
         EnsurePositive(normalized.MaxSpeed, nameof(MaxSpeed));
         EnsurePositive(normalized.MaxTurnRadiansPerSecond, nameof(MaxTurnRadiansPerSecond));
         EnsurePositive(normalized.SenseRadius, nameof(SenseRadius));
         EnsureRange(normalized.VisionAngleRadians, MathF.PI / 12f, MathF.Tau, nameof(VisionAngleRadians));
+        EnsureRange(normalized.MetabolicPace, CreatureMetabolism.MinimumPace, CreatureMetabolism.MaximumPace, nameof(MetabolicPace));
         EnsureNonNegative(normalized.BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
         EnsureNonNegative(normalized.MovementEnergyPerSecond, nameof(MovementEnergyPerSecond));
         EnsurePositive(normalized.EatCaloriesPerSecond, nameof(EatCaloriesPerSecond));

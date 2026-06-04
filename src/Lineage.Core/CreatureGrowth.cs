@@ -15,9 +15,10 @@ public static class CreatureGrowth
 
     public static float MaturityProgress(CreatureState creature, CreatureGenome genome)
     {
-        return genome.MaturityAgeSeconds <= 0f
+        var effectiveMaturityAge = CreatureMetabolism.EffectiveMaturityAgeSeconds(genome);
+        return effectiveMaturityAge <= 0f
             ? 1f
-            : Math.Clamp(creature.AgeSeconds / genome.MaturityAgeSeconds, 0f, 1f);
+            : Math.Clamp(creature.AgeSeconds / effectiveMaturityAge, 0f, 1f);
     }
 
     public static float GrowthFactor(CreatureState creature, CreatureGenome genome)
@@ -102,7 +103,9 @@ public static class CreatureGrowth
 
     public static float EffectiveDigestionCaloriesPerSecond(CreatureState creature, CreatureGenome genome)
     {
-        return genome.DigestionCaloriesPerSecond * GrowthFactor(creature, genome);
+        return genome.DigestionCaloriesPerSecond
+            * GrowthFactor(creature, genome)
+            * CreatureMetabolism.DigestionRateMultiplier(genome);
     }
 
     public static float EffectiveBiteStrength(CreatureState creature, CreatureGenome genome)

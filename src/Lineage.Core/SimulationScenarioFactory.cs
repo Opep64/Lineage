@@ -252,6 +252,7 @@ public static class SimulationScenarioFactory
             MaxSpeed = scenario.InitialMaxSpeed,
             MaxTurnRadiansPerSecond = scenario.InitialMaxTurnRadiansPerSecond,
             SenseRadius = scenario.InitialSenseRadius,
+            MetabolicPace = scenario.MetabolicPace,
             BasalEnergyPerSecond = scenario.BasalEnergyPerSecond,
             MovementEnergyPerSecond = scenario.MovementEnergyPerSecond,
             EatCaloriesPerSecond = scenario.EatCaloriesPerSecond,

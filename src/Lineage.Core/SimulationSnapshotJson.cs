@@ -231,6 +231,11 @@ public static class SimulationSnapshotJson
             genome = genome with { VisionAngleRadians = CreatureGenome.Baseline.VisionAngleRadians };
         }
 
+        if (genome.MetabolicPace <= 0f)
+        {
+            genome = genome with { MetabolicPace = CreatureGenome.Baseline.MetabolicPace };
+        }
+
         if (genome.EggIncubationSeconds <= 0f)
         {
             genome = genome with { EggIncubationSeconds = CreatureGenome.Baseline.EggIncubationSeconds };

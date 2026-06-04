@@ -55,7 +55,9 @@ public sealed class ReproductionSystem(
             {
                 var availableEnergy = Math.Max(0f, parent.Energy - parentGenome.ReproductionEnergyThreshold);
                 var remainingEggEnergy = parentGenome.OffspringEnergyInvestment - parent.ReproductiveEnergy;
-                var eggProductionRate = parentGenome.EggProductionEnergyPerSecond * fertilityMultiplier;
+                var eggProductionRate = parentGenome.EggProductionEnergyPerSecond
+                    * CreatureMetabolism.EggProductionRateMultiplier(parentGenome)
+                    * fertilityMultiplier;
                 var transfer = Math.Min(
                     Math.Min(eggProductionRate * deltaSeconds, availableEnergy),
                     remainingEggEnergy);
@@ -131,19 +133,20 @@ public sealed class ReproductionSystem(
 
     private float CalculateAgeFertilityMultiplier(CreatureState parent, CreatureGenome genome)
     {
-        var matureAge = Math.Max(0f, genome.MaturityAgeSeconds);
+        var matureAge = Math.Max(0f, CreatureMetabolism.EffectiveMaturityAgeSeconds(genome));
         if (parent.AgeSeconds < matureAge)
         {
             return 0f;
         }
 
-        var primeAge = Math.Max(matureAge, _reproductivePrimeAgeSeconds);
+        var biologicalAgeRate = CreatureMetabolism.BiologicalAgeRateMultiplier(genome);
+        var primeAge = Math.Max(matureAge, _reproductivePrimeAgeSeconds / biologicalAgeRate);
         if (parent.AgeSeconds <= primeAge)
         {
             return 1f;
         }
 
-        var senescenceAge = Math.Max(primeAge, _reproductiveSenescenceAgeSeconds);
+        var senescenceAge = Math.Max(primeAge, _reproductiveSenescenceAgeSeconds / biologicalAgeRate);
         if (senescenceAge <= primeAge)
         {
             return _senescentFertilityMultiplier;

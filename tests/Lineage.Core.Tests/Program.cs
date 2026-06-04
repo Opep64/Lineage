@@ -63,6 +63,9 @@ var tests = new (string Name, Action Body)[]
     ("Metabolism charges rtNEAT topology upkeep", MetabolismChargesRtNeatTopologyUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
     ("Metabolism basal cost follows thermal mismatch", MetabolismBasalCostFollowsThermalMismatch),
+    ("Metabolic pace scales helper rates", MetabolicPaceScalesHelperRates),
+    ("Metabolic pace scales basal drain and cooldown", MetabolicPaceScalesBasalDrainAndCooldown),
+    ("Metabolic pace speeds life-history systems", MetabolicPaceSpeedsLifeHistorySystems),
     ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
     ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
@@ -187,6 +190,7 @@ var tests = new (string Name, Action Body)[]
     ("Pruned simulation snapshots restore continuation", PrunedSimulationSnapshotsRestoreContinuation),
     ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
+    ("Stats recording reports metabolic pace bands", StatsRecordingReportsMetabolicPaceBands),
     ("Stats recording ignores extinct brain payloads", StatsRecordingIgnoresExtinctBrainPayloads),
     ("Stats recording reports rtNEAT topology telemetry", StatsRecordingReportsRtNeatTopologyTelemetry),
     ("Stats recording reports biome pressure telemetry", StatsRecordingReportsBiomePressureTelemetry),
@@ -2493,6 +2497,146 @@ static void MetabolismBasalCostFollowsThermalMismatch()
     simulation.Step();
 
     AssertClose(7f, simulation.State.Creatures[0].Energy, 0.000001, "Thermal mismatch basal energy");
+}
+
+static void MetabolicPaceScalesHelperRates()
+{
+    var fast = CreatureGenome.Baseline with
+    {
+        MetabolicPace = 2f,
+        MaturityAgeSeconds = 100f
+    };
+    var slow = CreatureGenome.Baseline with
+    {
+        MetabolicPace = 0.5f,
+        MaturityAgeSeconds = 100f
+    };
+
+    AssertEqual(MetabolicPaceBand.High, CreatureMetabolism.PaceBand(fast), "Fast pace band");
+    AssertEqual(MetabolicPaceBand.Low, CreatureMetabolism.PaceBand(slow), "Slow pace band");
+    AssertClose(MathF.Pow(2f, 1.25f), CreatureMetabolism.BasalCostMultiplier(fast), 0.000001, "Fast basal multiplier");
+    AssertClose(MathF.Pow(2f, 0.6f), CreatureMetabolism.EggProductionRateMultiplier(fast), 0.000001, "Fast egg production multiplier");
+    AssertTrue(
+        CreatureMetabolism.BasalCostMultiplier(fast) - 1f
+            > CreatureMetabolism.EggProductionRateMultiplier(fast) - 1f,
+        "Fast pace should make basal penalty steeper than egg-production benefit");
+    AssertClose(100f / MathF.Pow(2f, 0.7f), CreatureMetabolism.EffectiveMaturityAgeSeconds(fast), 0.000001, "Fast effective maturity age");
+    AssertClose(100f / MathF.Pow(0.5f, 0.7f), CreatureMetabolism.EffectiveMaturityAgeSeconds(slow), 0.000001, "Slow effective maturity age");
+}
+
+static void MetabolicPaceScalesBasalDrainAndCooldown()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 835,
+        systems: [new MetabolismSystem()]);
+
+    var genome = CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 2f,
+        MetabolicPace = 2f,
+        MaturityAgeSeconds = 0f
+    };
+    var genomeId = simulation.State.AddGenome(genome);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.ReproductionCooldownSeconds = 10f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertClose(
+        20f - 2f * CreatureMetabolism.BasalCostMultiplier(genome),
+        simulation.State.Creatures[0].Energy,
+        0.000001,
+        "Fast pace basal drain");
+    AssertClose(
+        10f - CreatureMetabolism.CooldownRecoveryMultiplier(genome),
+        simulation.State.Creatures[0].ReproductionCooldownSeconds,
+        0.000001,
+        "Fast pace cooldown recovery");
+}
+
+static void MetabolicPaceSpeedsLifeHistorySystems()
+{
+    var fastGenome = CreatureGenome.Baseline with
+    {
+        MetabolicPace = 2f,
+        MaturityAgeSeconds = 100f
+    };
+    var normalGenome = CreatureGenome.Baseline with
+    {
+        MetabolicPace = 1f,
+        MaturityAgeSeconds = 100f
+    };
+
+    AssertTrue(
+        CreatureGrowth.MaturityProgress(new CreatureState { AgeSeconds = 75f }, fastGenome)
+            > CreatureGrowth.MaturityProgress(new CreatureState { AgeSeconds = 75f }, normalGenome),
+        "Fast pace should mature sooner at the same chronological age");
+
+    var reproduction = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 836,
+        systems: [new ReproductionSystem()]);
+    var reproductionGenome = fastGenome with
+    {
+        ReproductionEnergyThreshold = 100f,
+        OffspringEnergyInvestment = 100f,
+        EggProductionEnergyPerSecond = 4f,
+        MaturityAgeSeconds = 0f
+    };
+    var reproductionGenomeId = reproduction.State.AddGenome(reproductionGenome);
+    reproduction.State.SpawnCreature(reproductionGenomeId, new SimVector2(20f, 20f), energy: 200f);
+
+    reproduction.Step();
+
+    AssertClose(
+        4f * CreatureMetabolism.EggProductionRateMultiplier(reproductionGenome),
+        reproduction.State.Creatures[0].ReproductiveEnergy,
+        0.000001,
+        "Fast pace egg reserve transfer");
+
+    var digestion = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 837,
+        systems: [new DigestionSystem()]);
+    var digestionGenome = fastGenome with
+    {
+        DigestionCaloriesPerSecond = 4f,
+        MaturityAgeSeconds = 0f
+    };
+    var digestionGenomeId = digestion.State.AddGenome(digestionGenome);
+    digestion.State.SpawnCreature(digestionGenomeId, new SimVector2(20f, 20f), energy: 1f);
+    var eater = digestion.State.Creatures[0];
+    eater.GutPlantCalories = 50f;
+    digestion.State.Creatures[0] = eater;
+
+    digestion.Step();
+
+    AssertClose(
+        4f * CreatureMetabolism.DigestionRateMultiplier(digestionGenome) * CreatureDigestion.PlantEfficiency(digestionGenome),
+        digestion.State.Creatures[0].LastCaloriesDigested,
+        0.000001,
+        "Fast pace digestion rate");
+
+    var healing = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 838,
+        systems: [new CreatureHealingSystem(healingDelaySeconds: 0f, healingHealthFractionPerSecond: 0.1f, healingEnergyCostPerHealth: 0f)]);
+    var healingGenomeId = healing.State.AddGenome(fastGenome);
+    healing.State.SpawnCreature(healingGenomeId, new SimVector2(20f, 20f), energy: 100f);
+    var patient = healing.State.Creatures[0];
+    patient.Health = 0.5f;
+    healing.State.Creatures[0] = patient;
+
+    healing.Step();
+
+    AssertClose(
+        0.1f * CreatureMetabolism.HealingRateMultiplier(fastGenome),
+        healing.State.Creatures[0].LastHealingReceived,
+        0.000001,
+        "Fast pace healing rate");
 }
 
 static void FatStoragePreservesEggReservePriority()
@@ -9161,6 +9305,29 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
 }
 
+static void StatsRecordingReportsMetabolicPaceBands()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 839,
+        systems: [new StatsRecordingSystem()]);
+
+    var lowGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { MetabolicPace = 0.6f });
+    var normalGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { MetabolicPace = 1f });
+    var highGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with { MetabolicPace = 1.4f });
+    simulation.State.SpawnCreature(lowGenomeId, new SimVector2(10f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(normalGenomeId, new SimVector2(20f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(highGenomeId, new SimVector2(30f, 10f), energy: 10f);
+
+    simulation.Step();
+
+    var snapshot = simulation.State.Stats.Snapshots[0];
+    AssertClose(1f, snapshot.AverageMetabolicPace, 0.000001, "Average metabolic pace");
+    AssertEqual(1, snapshot.LowMetabolicPaceCreatureCount, "Low pace count");
+    AssertEqual(1, snapshot.NormalMetabolicPaceCreatureCount, "Normal pace count");
+    AssertEqual(1, snapshot.HighMetabolicPaceCreatureCount, "High pace count");
+}
+
 static void StatsRecordingIgnoresExtinctBrainPayloads()
 {
     var simulation = new Simulation(
@@ -12145,6 +12312,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         InitialCreatureEnergyMin = 10f,
         InitialCreatureEnergyMax = 10f,
         BasalEnergyPerSecond = 0.75f,
+        MetabolicPace = 1.4f,
         BodyRadiusEnergyCostPerSecond = 0.2f,
         MaxSpeedEnergyCostPerSecond = 0.01f,
         TurnRateEnergyCostPerSecond = 0.02f,
@@ -12197,6 +12365,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     var genome = simulation.State.Genomes[0];
 
     AssertClose(0.75f, genome.BasalEnergyPerSecond, 0.000001, "Seeded basal energy");
+    AssertClose(1.4f, genome.MetabolicPace, 0.000001, "Seeded metabolic pace");
     AssertClose(0.01f, scenario.MaxSpeedEnergyCostPerSecond, 0.000001, "Scenario max-speed energy");
     AssertClose(0.02f, scenario.TurnRateEnergyCostPerSecond, 0.000001, "Scenario turn-rate energy");
     AssertClose(0.001f, scenario.SenseRadiusEnergyCostPerSecond, 0.000001, "Scenario sense-radius energy");
@@ -12245,7 +12414,18 @@ static void ScenarioPressureKnobsSeedStartingGenome()
 
     simulation.Step();
 
-    AssertClose(7.608353f, simulation.State.Creatures[0].Energy, 0.00001, "Scenario energy pressure");
+    var biome = simulation.State.Biomes.GetKindAt(simulation.State.Creatures[0].Position);
+    var metabolicPaceExtraBasal = scenario.BasalEnergyPerSecond
+        * scenario.CreateBiomeBasalCostProfile().For(biome)
+        * (CreatureMetabolism.BasalCostMultiplier(genome) - 1f);
+    var metabolicPaceExtraDigestionUpkeep =
+        (CreatureGrowth.EffectiveDigestionCaloriesPerSecond(simulation.State.Creatures[0], genome) - genome.DigestionCaloriesPerSecond)
+        * scenario.DigestionRateEnergyCostPerSecond;
+    AssertClose(
+        7.608353f - metabolicPaceExtraBasal - metabolicPaceExtraDigestionUpkeep,
+        simulation.State.Creatures[0].Energy,
+        0.00001,
+        "Scenario energy pressure");
 }
 
 static void ScenarioJsonMigratesLegacyResourceCount()
@@ -12534,6 +12714,7 @@ static void ScenarioJsonRoundTrips()
         ForestBiomeBasalCostMultiplier = 0.88f,
         WetlandBiomeBasalCostMultiplier = 1.08f,
         BasalEnergyPerSecond = 0.31f,
+        MetabolicPace = 1.35f,
         ThermalMismatchBasalCostMultiplier = 0.47f,
         BodyRadiusEnergyCostPerSecond = 0.04f,
         MaxSpeedEnergyCostPerSecond = 0.003f,
@@ -12659,6 +12840,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"tenderPlantAdaptation\""), "JSON should serialize tender plant adaptation");
     AssertTrue(json.Contains("\"thermalMismatchBasalCostMultiplier\""), "JSON should serialize thermal mismatch basal cost");
     AssertTrue(json.Contains("\"thermalOptimum\""), "JSON should serialize thermal optimum");
+    AssertTrue(json.Contains("\"metabolicPace\""), "JSON should serialize metabolic pace");
     AssertEqual(scenario.Name, roundTripped.Name, "Scenario name");
     AssertEqual(scenario.Seed, roundTripped.Seed, "Scenario seed");
     AssertEqual(scenario.PipelineKind, roundTripped.PipelineKind, "Scenario pipeline kind");
@@ -12750,6 +12932,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.ForestBiomeBasalCostMultiplier, roundTripped.ForestBiomeBasalCostMultiplier, 0.000001, "Scenario forest basal biome cost");
     AssertClose(scenario.WetlandBiomeBasalCostMultiplier, roundTripped.WetlandBiomeBasalCostMultiplier, 0.000001, "Scenario wetland basal biome cost");
     AssertClose(scenario.BasalEnergyPerSecond, roundTripped.BasalEnergyPerSecond, 0.000001, "Scenario basal energy");
+    AssertClose(scenario.MetabolicPace, roundTripped.MetabolicPace, 0.000001, "Scenario metabolic pace");
     AssertClose(scenario.ThermalMismatchBasalCostMultiplier, roundTripped.ThermalMismatchBasalCostMultiplier, 0.000001, "Scenario thermal mismatch basal cost");
     AssertClose(scenario.BodyRadiusEnergyCostPerSecond, roundTripped.BodyRadiusEnergyCostPerSecond, 0.000001, "Scenario body-size energy");
     AssertClose(scenario.MaxSpeedEnergyCostPerSecond, roundTripped.MaxSpeedEnergyCostPerSecond, 0.000001, "Scenario max-speed energy");

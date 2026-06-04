@@ -33,6 +33,7 @@ public sealed class CreatureHealingSystem(
         for (var i = 0; i < state.Creatures.Count; i++)
         {
             var creature = state.Creatures[i];
+            var genome = state.GetGenome(creature.GenomeId);
             creature.LastHealingReceived = 0f;
             creature.LastHealingEnergySpent = 0f;
 
@@ -76,7 +77,10 @@ public sealed class CreatureHealingSystem(
                 continue;
             }
 
-            var healingByRate = _healingHealthFractionPerSecond * maxHealth * deltaSeconds;
+            var healingByRate = _healingHealthFractionPerSecond
+                * CreatureMetabolism.HealingRateMultiplier(genome)
+                * maxHealth
+                * deltaSeconds;
             var healingByEnergy = _healingEnergyCostPerHealth > 0f
                 ? MathF.Max(0f, (creature.Energy - _healingMinimumEnergy) / _healingEnergyCostPerHealth)
                 : float.PositiveInfinity;

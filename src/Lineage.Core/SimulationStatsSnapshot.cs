@@ -316,4 +316,8 @@ public readonly record struct SimulationStatsSnapshot(
     float HotTemperatureBirths,
     float ColdTemperatureDeaths,
     float TemperateTemperatureDeaths,
-    float HotTemperatureDeaths);
+    float HotTemperatureDeaths,
+    float AverageMetabolicPace,
+    int LowMetabolicPaceCreatureCount,
+    int NormalMetabolicPaceCreatureCount,
+    int HighMetabolicPaceCreatureCount);

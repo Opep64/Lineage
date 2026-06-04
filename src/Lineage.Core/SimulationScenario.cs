@@ -249,6 +249,8 @@ public sealed record SimulationScenario
 
     public float BasalEnergyPerSecond { get; init; } = 0.18f;
 
+    public float MetabolicPace { get; init; } = CreatureMetabolism.DefaultPace;
+
     public float ThermalMismatchBasalCostMultiplier { get; init; }
 
     public float BodyRadiusEnergyCostPerSecond { get; init; } = 0.04f;
@@ -532,6 +534,7 @@ public sealed record SimulationScenario
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeSeasonalAmplitudeProfile(), "BiomeSeasonalAmplitudeProfile");
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
+        EnsureRange(MetabolicPace, CreatureMetabolism.MinimumPace, CreatureMetabolism.MaximumPace, nameof(MetabolicPace));
         EnsureNonNegative(ThermalMismatchBasalCostMultiplier, nameof(ThermalMismatchBasalCostMultiplier));
         EnsureNonNegative(BodyRadiusEnergyCostPerSecond, nameof(BodyRadiusEnergyCostPerSecond));
         EnsureNonNegative(MaxSpeedEnergyCostPerSecond, nameof(MaxSpeedEnergyCostPerSecond));

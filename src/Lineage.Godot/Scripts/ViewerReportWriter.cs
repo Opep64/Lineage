@@ -197,6 +197,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Ready to lay", FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
         WriteMetric(writer, "Energy surplus", FormatPercent(snapshot.AverageEnergySurplusRatio));
+        WriteMetric(writer, "Metabolic pace", $"{snapshot.AverageMetabolicPace:0.###} avg; {snapshot.LowMetabolicPaceCreatureCount} low / {snapshot.NormalMetabolicPaceCreatureCount} normal / {snapshot.HighMetabolicPaceCreatureCount} high");
         WriteMetric(writer, "Fat reserve", FormatPercent(snapshot.AverageFatRatio));
         WriteMetric(writer, "Fat calories", snapshot.TotalFatCalories.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Fat mass burden", FormatPercent(snapshot.AverageMassBurdenRatio));
@@ -436,6 +437,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Biome speed", FormatBiomePressureProfile(scenario.CreateBiomeSpeedProfile()));
         WriteMetric(writer, "Biome vision range", FormatBiomePressureProfile(scenario.CreateBiomeVisionRangeProfile()));
         WriteMetric(writer, "Basal upkeep", $"{scenario.BasalEnergyPerSecond:0.###} energy/s");
+        WriteMetric(writer, "Starting metabolic pace", $"{scenario.MetabolicPace:0.###}x");
         WriteMetric(writer, "Thermal mismatch basal cost", $"{scenario.ThermalMismatchBasalCostMultiplier:0.###}x at full mismatch");
         WriteMetric(writer, "Body radius upkeep", $"{scenario.BodyRadiusEnergyCostPerSecond:0.###} energy/radius/s");
         WriteMetric(writer, "Max speed upkeep", $"{scenario.MaxSpeedEnergyCostPerSecond:0.######} energy/speed/s");
@@ -578,6 +580,7 @@ public static class ViewerReportWriter
             WriteTraitRow(writer, "Max speed", traitSummary.MaxSpeed);
             WriteTraitRow(writer, "Vision range", traitSummary.SenseRadius);
             WriteDegreesTraitRow(writer, "Vision angle degrees", traitSummary.VisionAngleRadians);
+            WriteTraitRow(writer, "Metabolic pace", traitSummary.MetabolicPace);
             WriteTraitRow(writer, "Reproduction threshold", traitSummary.ReproductionThreshold);
             WriteTraitRow(writer, "Offspring investment", traitSummary.OffspringInvestment);
             WriteTraitRow(writer, "Egg production per second", traitSummary.EggProductionEnergyPerSecond);
@@ -687,6 +690,7 @@ public static class ViewerReportWriter
             summary.MaxSpeed.Add(genome.MaxSpeed);
             summary.SenseRadius.Add(genome.SenseRadius);
             summary.VisionAngleRadians.Add(genome.VisionAngleRadians);
+            summary.MetabolicPace.Add(CreatureMetabolism.NormalizePace(genome.MetabolicPace));
             summary.ReproductionThreshold.Add(genome.ReproductionEnergyThreshold);
             summary.OffspringInvestment.Add(genome.OffspringEnergyInvestment);
             summary.EggProductionEnergyPerSecond.Add(genome.EggProductionEnergyPerSecond);
@@ -2169,7 +2173,7 @@ public static class ViewerReportWriter
         {
             entries.Add(new("Body genes", $"radius {FormatCompactNumber(genome.BodyRadius)}, speed {FormatCompactNumber(genome.MaxSpeed)}, turn {FormatCompactNumber(genome.MaxTurnRadiansPerSecond)} rad/s"));
             entries.Add(new("Sense genes", $"range {FormatCompactNumber(genome.SenseRadius)}, vision {FormatCompactNumber(genome.VisionAngleRadians * 180f / MathF.PI)} deg"));
-            entries.Add(new("Energy genes", $"basal {FormatCompactNumber(genome.BasalEnergyPerSecond)}/s, move {FormatCompactNumber(genome.MovementEnergyPerSecond)}/s, eat {FormatCompactNumber(genome.EatCaloriesPerSecond)}/s"));
+            entries.Add(new("Energy genes", $"pace {FormatCompactNumber(genome.MetabolicPace)}x, basal {FormatCompactNumber(genome.BasalEnergyPerSecond)}/s, move {FormatCompactNumber(genome.MovementEnergyPerSecond)}/s, eat {FormatCompactNumber(genome.EatCaloriesPerSecond)}/s"));
             entries.Add(new("Repro genes", $"threshold {FormatCompactNumber(genome.ReproductionEnergyThreshold)}, investment {FormatCompactNumber(genome.OffspringEnergyInvestment)}, cooldown {FormatCompactNumber(genome.ReproductionCooldownSeconds)}s"));
             entries.Add(new("Diet genes", $"diet {FormatCompactNumber(genome.DietaryAdaptation)}, carrion {FormatCompactNumber(genome.CarrionAdaptation)}, tender/rich/tough {FormatCompactNumber(genome.TenderPlantAdaptation)}/{FormatCompactNumber(genome.RichPlantAdaptation)}/{FormatCompactNumber(genome.ToughPlantAdaptation)}"));
             entries.Add(new("Combat genes", $"bite {FormatCompactNumber(genome.BiteStrength)}, resist {FormatCompactNumber(genome.DamageResistance)}"));
@@ -3101,7 +3105,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Thermal Niche</th><th>Current Temp</th><th>Lifetime Temp</th><th>Mismatch</th><th>Living C/T/H</th><th>Genome Div</th><th>Brain Div</th><th>Plant Adapt</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Share</th><th>Founders</th><th>Dominant Founder</th><th>Representative</th><th>Generation</th><th>Diet</th><th>Tactic</th><th>Region</th><th>Thermal Niche</th><th>Current Temp</th><th>Lifetime Temp</th><th>Mismatch</th><th>Living C/T/H</th><th>Pace</th><th>Genome Div</th><th>Brain Div</th><th>Plant Adapt</th><th>Plant Digest</th><th>Meat Digest</th><th>Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -3123,6 +3127,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(summary.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.AverageOccupiedThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html($"{summary.ColdTemperatureLivingCreatures}/{summary.TemperateTemperatureLivingCreatures}/{summary.HotTemperatureLivingCreatures}")}</td>" +
+                $"<td>{Html(summary.AverageMetabolicPace.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.AverageGenomeDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(summary.AverageBrainDistance.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPlantAdaptation(summary))}</td>" +
@@ -4977,6 +4982,7 @@ public static class ViewerReportWriter
         public FloatAccumulator MaxSpeed;
         public FloatAccumulator SenseRadius;
         public FloatAccumulator VisionAngleRadians;
+        public FloatAccumulator MetabolicPace;
         public FloatAccumulator ReproductionThreshold;
         public FloatAccumulator OffspringInvestment;
         public FloatAccumulator EggProductionEnergyPerSecond;

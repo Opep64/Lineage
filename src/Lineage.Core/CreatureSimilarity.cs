@@ -19,6 +19,7 @@ internal static class CreatureSimilarity
         AddLogScaledDifference(left.MaxTurnRadiansPerSecond, right.MaxTurnRadiansPerSecond, 0.1f, 12f, 0.35f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.SenseRadius, right.SenseRadius, 5f, 300f, 0.7f, ref weightedDistance, ref totalWeight);
         AddLinearDifference(left.VisionAngleRadians, right.VisionAngleRadians, MathF.PI / 12f, MathF.Tau, 0.35f, ref weightedDistance, ref totalWeight);
+        AddLogScaledDifference(left.MetabolicPace, right.MetabolicPace, CreatureMetabolism.MinimumPace, CreatureMetabolism.MaximumPace, 0.45f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.BasalEnergyPerSecond, right.BasalEnergyPerSecond, 0.01f, 5f, 0.55f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.MovementEnergyPerSecond, right.MovementEnergyPerSecond, 0.01f, 5f, 0.55f, ref weightedDistance, ref totalWeight);
         AddLogScaledDifference(left.EatCaloriesPerSecond, right.EatCaloriesPerSecond, 1f, 100f, 0.45f, ref weightedDistance, ref totalWeight);

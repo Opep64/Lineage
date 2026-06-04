@@ -733,6 +733,7 @@ public static class SpeciesClusterAnalyzer
         var totalBodyRadius = 0f;
         var totalMaxSpeed = 0f;
         var totalSenseRadius = 0f;
+        var totalMetabolicPace = 0f;
         var totalDietaryAdaptation = 0f;
         var totalCarrionAdaptation = 0f;
         var totalTenderPlantAdaptation = 0f;
@@ -778,6 +779,7 @@ public static class SpeciesClusterAnalyzer
             totalBodyRadius += genome.BodyRadius;
             totalMaxSpeed += genome.MaxSpeed;
             totalSenseRadius += genome.SenseRadius;
+            totalMetabolicPace += CreatureMetabolism.NormalizePace(genome.MetabolicPace);
             totalDietaryAdaptation += genome.DietaryAdaptation;
             totalCarrionAdaptation += genome.CarrionAdaptation;
             totalTenderPlantAdaptation += genome.TenderPlantAdaptation;
@@ -852,6 +854,7 @@ public static class SpeciesClusterAnalyzer
             AverageBodyRadius: totalBodyRadius / count,
             AverageMaxSpeed: totalMaxSpeed / count,
             AverageSenseRadius: totalSenseRadius / count,
+            AverageMetabolicPace: totalMetabolicPace / count,
             AverageDietaryAdaptation: averageDietaryAdaptation,
             AverageCarrionAdaptation: averageCarrionAdaptation,
             AverageTenderPlantAdaptation: averageTenderPlantAdaptation,
@@ -1061,6 +1064,7 @@ public static class SpeciesClusterAnalyzer
             LogFeature(genome.MaxTurnRadiansPerSecond, 0.1f, 12f),
             LogFeature(genome.SenseRadius, 5f, 300f),
             LinearFeature(genome.VisionAngleRadians, MathF.PI / 12f, MathF.Tau),
+            LogFeature(genome.MetabolicPace, CreatureMetabolism.MinimumPace, CreatureMetabolism.MaximumPace),
             LogFeature(genome.BasalEnergyPerSecond, 0.01f, 5f),
             LogFeature(genome.MovementEnergyPerSecond, 0.01f, 5f),
             LogFeature(genome.EatCaloriesPerSecond, 1f, 100f),
@@ -1927,6 +1931,7 @@ public readonly record struct SpeciesClusterSummary(
     float AverageBodyRadius,
     float AverageMaxSpeed,
     float AverageSenseRadius,
+    float AverageMetabolicPace,
     float AverageDietaryAdaptation,
     float AverageCarrionAdaptation,
     float AverageTenderPlantAdaptation,

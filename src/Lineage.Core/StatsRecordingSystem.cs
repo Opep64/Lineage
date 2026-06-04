@@ -119,6 +119,7 @@ public sealed class StatsRecordingSystem(
         var nonMemoryUserMaxXReachedTotal = 0f;
         var totalVisionRange = 0f;
         var totalVisionAngle = 0f;
+        var totalMetabolicPace = 0f;
         var totalDietaryAdaptation = 0f;
         var totalCarrionAdaptation = 0f;
         var totalTenderPlantAdaptation = 0f;
@@ -142,6 +143,9 @@ public sealed class StatsRecordingSystem(
         var coldTemperatureCreatureCount = 0;
         var temperateTemperatureCreatureCount = 0;
         var hotTemperatureCreatureCount = 0;
+        var lowMetabolicPaceCreatureCount = 0;
+        var normalMetabolicPaceCreatureCount = 0;
+        var highMetabolicPaceCreatureCount = 0;
         var totalForwardObstacle = 0f;
         var totalLeftObstacle = 0f;
         var totalRightObstacle = 0f;
@@ -357,6 +361,13 @@ public sealed class StatsRecordingSystem(
 
             totalVisionRange += CreatureGrowth.EffectiveSenseRadius(creature, genome);
             totalVisionAngle += CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
+            var metabolicPace = CreatureMetabolism.NormalizePace(genome.MetabolicPace);
+            totalMetabolicPace += metabolicPace;
+            AddMetabolicPaceBandCount(
+                metabolicPace,
+                ref lowMetabolicPaceCreatureCount,
+                ref normalMetabolicPaceCreatureCount,
+                ref highMetabolicPaceCreatureCount);
             totalDietaryAdaptation += genome.DietaryAdaptation;
             totalCarrionAdaptation += genome.CarrionAdaptation;
             totalTenderPlantAdaptation += genome.TenderPlantAdaptation;
@@ -378,6 +389,7 @@ public sealed class StatsRecordingSystem(
             totalThermalTolerance += thermalTolerance;
             totalCreatureThermalMismatch += thermalMismatch;
             totalThermalBasalEnergyPerSecond += genome.BasalEnergyPerSecond
+                * CreatureMetabolism.BasalCostMultiplier(genome)
                 * _biomeBasalCostProfile.For(biome)
                 * thermalMismatch
                 * _thermalMismatchBasalCostMultiplier;
@@ -1364,7 +1376,31 @@ public sealed class StatsRecordingSystem(
             temperatureEventBands.HotBirths,
             temperatureEventBands.ColdDeaths,
             temperatureEventBands.TemperateDeaths,
-            temperatureEventBands.HotDeaths));
+            temperatureEventBands.HotDeaths,
+            totalMetabolicPace / divisor,
+            lowMetabolicPaceCreatureCount,
+            normalMetabolicPaceCreatureCount,
+            highMetabolicPaceCreatureCount));
+    }
+
+    private static void AddMetabolicPaceBandCount(
+        float metabolicPace,
+        ref int lowCount,
+        ref int normalCount,
+        ref int highCount)
+    {
+        if (metabolicPace < CreatureMetabolism.LowPaceThreshold)
+        {
+            lowCount++;
+        }
+        else if (metabolicPace > CreatureMetabolism.HighPaceThreshold)
+        {
+            highCount++;
+        }
+        else
+        {
+            normalCount++;
+        }
     }
 
     private SeasonalFertilityState CalculateRegionSeason(WorldState state, float xFraction)

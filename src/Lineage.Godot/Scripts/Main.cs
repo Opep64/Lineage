@@ -1338,6 +1338,7 @@ public partial class Main : Node2D
             $"Repro attempts {state.Stats.ReproductionAttemptCount}  success {FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount))}\n" +
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +
             $"Egg health {snapshot.AverageEggHealthRatio * 100f:0}%  Birth inv {snapshot.AverageBirthInvestmentRatio:0.00}x\n" +
+            $"Pace {snapshot.AverageMetabolicPace:0.00} avg  low/norm/high {snapshot.LowMetabolicPaceCreatureCount}/{snapshot.NormalMetabolicPaceCreatureCount}/{snapshot.HighMetabolicPaceCreatureCount}\n" +
             $"Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}  burden {FormatPercent(snapshot.AverageMassBurdenRatio)}  speed {snapshot.AverageFatSpeedMultiplier:0.00}x  cap {snapshot.AverageFatStorageCapacityCalories:0} eff {FormatPercent(snapshot.AverageFatStorageEfficiency)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}  Rotten {state.Stats.RottenMeatDeathCount}\n" +
             $"Repro intent {FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount))}  ready {FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount))}\n" +
@@ -1704,7 +1705,7 @@ public partial class Main : Node2D
             $"Since meal {creature.SecondsSinceLastMeal:0.0}s  {creature.DistanceSinceLastMeal:0.0}u\n" +
             $"Moved last tick {creature.LastDistanceTraveled:0.00}u\n" +
             $"Repro at {genome.ReproductionEnergyThreshold:0.0}\n" +
-            $"Mature at {genome.MaturityAgeSeconds:0.0}s\n" +
+            $"Pace {genome.MetabolicPace:0.00}  mature at {CreatureMetabolism.EffectiveMaturityAgeSeconds(genome):0.0}s ({genome.MaturityAgeSeconds:0.0}s base)\n" +
             $"World mutation {_scenario.MutationStrength:0.000}\n" +
             $"World trait mut {_scenario.TraitMutationRate:P0}\n" +
             $"World brain mut {_scenario.BrainMutationRate:P0}\n" +
@@ -1969,8 +1970,9 @@ public partial class Main : Node2D
             $"Grabbed by {FormatCreatureReference(creature.GrabbedByCreatureId)}   pressure {creature.GrabPressure:0.00}\n" +
             $"Attack damage last tick {creature.LastAttackDamageDealt:0.000}\n\n" +
             $"Development & Mutation\n" +
-            $"Mature at {genome.MaturityAgeSeconds:0.0}s   egg incubation {genome.EggIncubationSeconds:0.0}s\n" +
-            $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s   repro threshold {genome.ReproductionEnergyThreshold:0.0}\n" +
+            $"Pace {genome.MetabolicPace:0.00}   mature at {CreatureMetabolism.EffectiveMaturityAgeSeconds(genome):0.0}s ({genome.MaturityAgeSeconds:0.0}s base)\n" +
+            $"Egg build {genome.EggProductionEnergyPerSecond * CreatureMetabolism.EggProductionRateMultiplier(genome):0.0}/s ({genome.EggProductionEnergyPerSecond:0.0}/s base)   incubation {genome.EggIncubationSeconds:0.0}s\n" +
+            $"Cooldown recovery {CreatureMetabolism.CooldownRecoveryMultiplier(genome):0.00}x   repro threshold {genome.ReproductionEnergyThreshold:0.0}\n" +
             $"World mutation strength {_scenario.MutationStrength:0.000}\n" +
             $"World trait mutation {_scenario.TraitMutationRate:P0}   brain mutation {_scenario.BrainMutationRate:P0}\n";
     }

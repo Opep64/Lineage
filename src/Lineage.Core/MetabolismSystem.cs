@@ -68,7 +68,8 @@ public sealed class MetabolismSystem(
             creature.SecondsSinceLastMeal += deltaSeconds;
             creature.ReproductionCooldownSeconds = Math.Max(
                 0f,
-                creature.ReproductionCooldownSeconds - deltaSeconds);
+                creature.ReproductionCooldownSeconds
+                    - deltaSeconds * CreatureMetabolism.CooldownRecoveryMultiplier(genome));
             var traitUpkeep =
                 CreatureGrowth.EffectiveBodyRadius(creature, genome) * _bodyRadiusEnergyCostPerSecond
                 + CreatureGrowth.EffectiveMaxSpeed(creature, genome) * _maxSpeedEnergyCostPerSecond
@@ -88,7 +89,12 @@ public sealed class MetabolismSystem(
                 ? CreatureThermal.ThermalMismatch(state.Temperature.GetTemperatureAt(creature.Position), genome)
                 : 0f;
             var thermalBasalCostMultiplier = 1f + thermalMismatch * _thermalMismatchBasalCostMultiplier;
-            creature.Energy -= (genome.BasalEnergyPerSecond * biomeBasalCostMultiplier * thermalBasalCostMultiplier + traitUpkeep) * deltaSeconds;
+            creature.Energy -= (
+                genome.BasalEnergyPerSecond
+                    * CreatureMetabolism.BasalCostMultiplier(genome)
+                    * biomeBasalCostMultiplier
+                    * thermalBasalCostMultiplier
+                + traitUpkeep) * deltaSeconds;
 
             state.Creatures[i] = creature;
         }
