@@ -550,7 +550,7 @@ public static class ViewerReportWriter
         WriteSpatialHeatmapSection(writer, state.Biomes, state.Stats.SpatialHeatmaps);
 
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
-        WriteThermalNicheSection(writer, allFounderSummaries, speciesSummaries, snapshot);
+        WriteThermalNicheSection(writer, state, allFounderSummaries, speciesSummaries, snapshot);
         WriteSpeciesClusterSection(writer, speciesSummaries);
         WriteSpeciesBehaviorFingerprintSection(writer, speciesBehaviorFingerprints);
         WriteSpeciesBrainInputDiagnosticsSection(writer, speciesBrainInputDiagnostics);
@@ -2921,6 +2921,7 @@ public static class ViewerReportWriter
 
     private static void WriteThermalNicheSection(
         StreamWriter writer,
+        WorldState state,
         IReadOnlyList<FounderSummary> founderSummaries,
         IReadOnlyList<SpeciesClusterSummary> speciesSummaries,
         SimulationStatsSnapshot snapshot)
@@ -2936,6 +2937,7 @@ public static class ViewerReportWriter
             .OrderByDescending(summary => summary.LivingCreatures)
             .ThenBy(summary => summary.Rank)
             .ToArray();
+        var ecotypes = ThermalEcotypeAnalyzer.Analyze(state);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Thermal Niches</h2>");
@@ -2949,6 +2951,38 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Births C/T/H", FormatThermalBandValues(snapshot.ColdTemperatureBirths, snapshot.TemperateTemperatureBirths, snapshot.HotTemperatureBirths));
         WriteMetric(writer, "Deaths C/T/H", FormatThermalBandValues(snapshot.ColdTemperatureDeaths, snapshot.TemperateTemperatureDeaths, snapshot.HotTemperatureDeaths));
         writer.WriteLine("</div>");
+
+        writer.WriteLine("<h3>Thermal Ecotypes</h3>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Ecotype</th><th>Founders</th><th>Living</th><th>Total</th><th>Max Gen</th><th>Dominant Founder</th><th>Opt/Tol</th><th>Avg Temp</th><th>Mismatch</th><th>Lifetime C/T/H</th><th>Stress C/H</th><th>Births C/T/H</th><th>Deaths C/T/H</th><th>Top Founders</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var ecotype in ecotypes)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(ecotype.Label)}</td>" +
+                $"<td>{Html(ecotype.FounderLineageCount)}</td>" +
+                $"<td>{Html(ecotype.LivingCreatures)}</td>" +
+                $"<td>{Html(ecotype.TotalCreatures)}</td>" +
+                $"<td>{Html(ecotype.MaxGeneration)}</td>" +
+                $"<td>#{Html(ecotype.DominantFounderId.Value)} ({Html(ecotype.DominantFounderLivingCreatures)})</td>" +
+                $"<td>{Html($"{ecotype.AverageLivingThermalOptimum:0.###} / {ecotype.AverageLivingThermalTolerance:0.###}")}</td>" +
+                $"<td>{Html(ecotype.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(ecotype.AverageThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatEcotypeThermalShares(ecotype))}</td>" +
+                $"<td>{Html(FormatEcotypeStressShares(ecotype))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(ecotype.ColdTemperatureBirths, ecotype.TemperateTemperatureBirths, ecotype.HotTemperatureBirths))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(ecotype.ColdTemperatureDeaths, ecotype.TemperateTemperatureDeaths, ecotype.HotTemperatureDeaths))}</td>" +
+                $"<td>{Html(FormatEcotypeTopFounders(ecotype.TopFounders))}</td>" +
+                "</tr>");
+        }
+
+        if (ecotypes.Count == 0)
+        {
+            writer.WriteLine("<tr><td class=\"empty\" colspan=\"14\">No living thermal ecotypes were present.</td></tr>");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
 
         writer.WriteLine("<h3>Founder Niches</h3>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -4619,6 +4653,23 @@ public static class ViewerReportWriter
     private static string FormatSpeciesStressShares(SpeciesClusterSummary summary)
     {
         return $"{FormatPercent(summary.ColdThermalStressLifetimeShare)} / {FormatPercent(summary.HotThermalStressLifetimeShare)}";
+    }
+
+    private static string FormatEcotypeThermalShares(ThermalEcotypeSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdTemperatureShare)} / {FormatPercent(summary.TemperateTemperatureShare)} / {FormatPercent(summary.HotTemperatureShare)}";
+    }
+
+    private static string FormatEcotypeStressShares(ThermalEcotypeSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdThermalStressShare)} / {FormatPercent(summary.HotThermalStressShare)}";
+    }
+
+    private static string FormatEcotypeTopFounders(IReadOnlyList<ThermalEcotypeFounderSummary> founders)
+    {
+        return founders.Count == 0
+            ? "n/a"
+            : string.Join(", ", founders.Select(founder => $"#{founder.FounderId.Value} ({founder.LivingCreatures})"));
     }
 
     private static string FormatThermalBandCounts(int cold, int temperate, int hot)

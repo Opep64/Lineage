@@ -32,6 +32,7 @@ public static class GodotRunExportWriter
         GodotSpeciesClusterCsvWriter.Write(paths.SpeciesSummaryPath, state);
         GodotSpeciesClusterTrendCsvWriter.Write(paths.SpeciesTrendPath, state.Stats.Snapshots, state);
         GodotFounderSummaryCsvWriter.Write(paths.FounderSummaryPath, state.LineageRecords);
+        GodotThermalEcotypeCsvWriter.Write(paths.ThermalEcotypeSummaryPath, state);
         GodotGenerationSummaryCsvWriter.Write(paths.GenerationSummaryPath, state.LineageRecords);
         GodotLineageTrendCsvWriter.Write(paths.LineageTrendPath, state.Stats.Snapshots, state.LineageRecords);
         GodotRosterLineageSummaryCsvWriter.Write(paths.RosterSummaryPath, state.LineageRecords, speciesInjections);
@@ -48,6 +49,7 @@ public static class GodotRunExportWriter
             paths.SpeciesSummaryPath,
             paths.SpeciesTrendPath,
             paths.FounderSummaryPath,
+            paths.ThermalEcotypeSummaryPath,
             paths.GenerationSummaryPath,
             paths.LineageTrendPath,
             paths.RosterSummaryPath,
@@ -64,6 +66,7 @@ public sealed record GodotRunExportResult(
     string SpeciesSummaryPath,
     string SpeciesTrendPath,
     string FounderSummaryPath,
+    string ThermalEcotypeSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
     string RosterSummaryPath,
@@ -71,7 +74,7 @@ public sealed record GodotRunExportResult(
     string ReportPath,
     string SnapshotPath)
 {
-    public int FileCount => 12;
+    public int FileCount => 13;
 }
 
 internal sealed record GodotRunExportPaths(
@@ -81,6 +84,7 @@ internal sealed record GodotRunExportPaths(
     string SpeciesSummaryPath,
     string SpeciesTrendPath,
     string FounderSummaryPath,
+    string ThermalEcotypeSummaryPath,
     string GenerationSummaryPath,
     string LineageTrendPath,
     string RosterSummaryPath,
@@ -97,6 +101,7 @@ internal sealed record GodotRunExportPaths(
             AddSuffix(statsPath, "species"),
             AddSuffix(statsPath, "species_trends"),
             AddSuffix(statsPath, "founders"),
+            AddSuffix(statsPath, "thermal_ecotypes"),
             AddSuffix(statsPath, "generations"),
             AddSuffix(statsPath, "lineage_trends"),
             AddSuffix(statsPath, "roster"),
@@ -848,6 +853,65 @@ internal readonly record struct GodotFounderSummary(
     int DeadCreatures,
     int MaxGeneration,
     ThermalLineageNicheSummary ThermalNiche);
+
+internal static class GodotThermalEcotypeCsvWriter
+{
+    public static void Write(string path, WorldState state)
+    {
+        using var writer = GodotStatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("thermal_ecotype,founder_lineages,total_creatures,living_creatures,dead_creatures,max_generation,dominant_founder,dominant_founder_living,avg_living_thermal_optimum,avg_living_thermal_tolerance,avg_occupied_temperature,avg_thermal_mismatch,cold_temperature_share,temperate_temperature_share,hot_temperature_share,comfortable_thermal_share,cold_thermal_stress_share,hot_thermal_stress_share,cold_temperature_births,temperate_temperature_births,hot_temperature_births,cold_temperature_deaths,temperate_temperature_deaths,hot_temperature_deaths,top_founders");
+
+        foreach (var summary in ThermalEcotypeAnalyzer.Analyze(state).OrderBy(summary => summary.Label, StringComparer.Ordinal))
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                Escape(summary.Label),
+                summary.FounderLineageCount.ToString(CultureInfo.InvariantCulture),
+                summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.DeadCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderId.Value.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                Format(summary.AverageLivingThermalOptimum),
+                Format(summary.AverageLivingThermalTolerance),
+                Format(summary.AverageOccupiedTemperature),
+                Format(summary.AverageThermalMismatch),
+                Format(summary.ColdTemperatureShare),
+                Format(summary.TemperateTemperatureShare),
+                Format(summary.HotTemperatureShare),
+                Format(summary.ComfortableThermalShare),
+                Format(summary.ColdThermalStressShare),
+                Format(summary.HotThermalStressShare),
+                summary.ColdTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.ColdTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                Escape(FormatTopFounders(summary.TopFounders))));
+        }
+    }
+
+    private static string Format(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatTopFounders(IReadOnlyList<ThermalEcotypeFounderSummary> founders)
+    {
+        return string.Join(
+            "; ",
+            founders.Select(founder => $"#{founder.FounderId.Value} living {founder.LivingCreatures}"));
+    }
+
+    private static string Escape(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r') || value.Contains(';')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
 
 internal static class GodotRosterLineageSummaryCsvWriter
 {

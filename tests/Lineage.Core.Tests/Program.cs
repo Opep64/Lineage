@@ -179,6 +179,7 @@ var tests = new (string Name, Action Body)[]
     ("Spawned creatures create lineage records", SpawnedCreaturesCreateLineageRecords),
     ("Offspring lineage records parent and generation", OffspringLineageRecordsParentAndGeneration),
     ("Lineage telemetry records thermal niche exposure", LineageTelemetryRecordsThermalNicheExposure),
+    ("Thermal ecotype analyzer groups living founder niches", ThermalEcotypeAnalyzerGroupsLivingFounderNiches),
     ("Death system marks lineage death reason", DeathSystemMarksLineageDeathReason),
     ("Spatial heatmaps record lifecycle and interaction events", SpatialHeatmapsRecordLifecycleAndInteractionEvents),
     ("World state prunes extinct payloads", WorldStatePrunesExtinctPayloads),
@@ -8427,6 +8428,74 @@ static void LineageTelemetryRecordsThermalNicheExposure()
     AssertClose(1f, summary.HotThermalStressShare, 0.000001, "Hot stress share");
     AssertEqual(1, summary.HotTemperatureBirths, "Hot birth count");
     AssertEqual(1, summary.HotTemperatureDeaths, "Hot death count");
+}
+
+static void ThermalEcotypeAnalyzerGroupsLivingFounderNiches()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            FixedDeltaSeconds = 1f,
+            WorldWidth = 300f,
+            WorldHeight = 100f
+        },
+        seed: 13,
+        systems: []);
+    simulation.State.SetTemperature(TemperatureMap.CreateFromCells(
+        simulation.State.Bounds,
+        enabled: true,
+        cellSize: 100f,
+        cellCountX: 3,
+        cellCountY: 1,
+        [0.2f, 0.8f, 0.8f]));
+
+    var coldGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ThermalOptimum = 0.2f,
+        ThermalTolerance = 0.2f
+    });
+    var hotGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ThermalOptimum = 0.8f,
+        ThermalTolerance = 0.3f
+    });
+    var stressedGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ThermalOptimum = 0.2f,
+        ThermalTolerance = 0.2f
+    });
+
+    var coldFounderId = simulation.State.SpawnCreature(coldGenomeId, new SimVector2(50f, 50f), energy: 20f);
+    var hotFounderId = simulation.State.SpawnCreature(hotGenomeId, new SimVector2(150f, 50f), energy: 20f);
+    simulation.State.SpawnCreature(stressedGenomeId, new SimVector2(250f, 50f), energy: 20f);
+
+    new LineageTelemetrySystem().Update(simulation.State, 10f);
+
+    var summaries = ThermalEcotypeAnalyzer.Analyze(simulation.State).ToDictionary(summary => summary.Label);
+
+    AssertEqual(3, summaries.Count, "Thermal ecotype count");
+    AssertTrue(summaries.ContainsKey("cold-biased"), "Cold-biased ecotype should be present");
+    AssertTrue(summaries.ContainsKey("hot-biased"), "Hot-biased ecotype should be present");
+    AssertTrue(summaries.ContainsKey("thermal-stressed"), "Thermal-stressed ecotype should be present");
+
+    var cold = summaries["cold-biased"];
+    AssertEqual(1, cold.FounderLineageCount, "Cold founder count");
+    AssertEqual(1, cold.LivingCreatures, "Cold living creatures");
+    AssertEqual(coldFounderId, cold.DominantFounderId, "Cold dominant founder");
+    AssertClose(0.2f, cold.AverageLivingThermalOptimum, 0.000001, "Cold avg living optimum");
+    AssertClose(1f, cold.ColdTemperatureShare, 0.000001, "Cold lifetime share");
+
+    var hot = summaries["hot-biased"];
+    AssertEqual(1, hot.FounderLineageCount, "Hot founder count");
+    AssertEqual(1, hot.LivingCreatures, "Hot living creatures");
+    AssertClose(0.8f, hot.AverageLivingThermalOptimum, 0.000001, "Hot avg living optimum");
+    AssertClose(1f, hot.HotTemperatureShare, 0.000001, "Hot lifetime share");
+
+    var stressed = summaries["thermal-stressed"];
+    AssertEqual(1, stressed.FounderLineageCount, "Stressed founder count");
+    AssertEqual(1, stressed.LivingCreatures, "Stressed living creatures");
+    AssertClose(1f, stressed.AverageThermalMismatch, 0.000001, "Stressed avg mismatch");
+    AssertClose(1f, stressed.HotThermalStressShare, 0.000001, "Stressed hot stress share");
 }
 
 static void DeathSystemMarksLineageDeathReason()

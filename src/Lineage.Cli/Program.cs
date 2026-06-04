@@ -80,6 +80,7 @@ static void PrintHelp()
           --species-output <path>    Living species cluster summary CSV output path.
           --species-trends-output <path> Species cluster trend CSV output path.
           --founders-output <path>   Founder lineage summary CSV output path.
+          --thermal-ecotypes-output <path> Thermal ecotype summary CSV output path.
           --generations-output <path> Generation survival summary CSV output path.
           --lineage-trends-output <path> Founder lineage trend CSV output path.
           --roster-output <path>     Starter profile lineage summary CSV output path.
@@ -739,6 +740,7 @@ static void WriteRunOutputs(
         SpeciesClusterCsvWriter.Write(outputPaths.SpeciesSummaryPath!, simulation.State);
         SpeciesClusterTrendCsvWriter.Write(outputPaths.SpeciesTrendPath!, simulation.State.Stats.Snapshots, simulation.State);
         FounderSummaryCsvWriter.Write(outputPaths.FounderSummaryPath!, simulation.State.LineageRecords);
+        ThermalEcotypeCsvWriter.Write(outputPaths.ThermalEcotypeSummaryPath!, simulation.State);
         GenerationSummaryCsvWriter.Write(outputPaths.GenerationSummaryPath!, simulation.State.LineageRecords);
         LineageTrendCsvWriter.Write(outputPaths.LineageTrendPath!, simulation.State.Stats.Snapshots, simulation.State.LineageRecords);
         RosterLineageSummaryCsvWriter.Write(
@@ -831,6 +833,7 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Species clusters CSV: {Path.GetFullPath(outputPaths.SpeciesSummaryPath!)}");
         Console.WriteLine($"Species trends CSV: {Path.GetFullPath(outputPaths.SpeciesTrendPath!)}");
         Console.WriteLine($"Founders CSV: {Path.GetFullPath(outputPaths.FounderSummaryPath!)}");
+        Console.WriteLine($"Thermal ecotypes CSV: {Path.GetFullPath(outputPaths.ThermalEcotypeSummaryPath!)}");
         Console.WriteLine($"Generations CSV: {Path.GetFullPath(outputPaths.GenerationSummaryPath!)}");
         Console.WriteLine($"Lineage trends CSV: {Path.GetFullPath(outputPaths.LineageTrendPath!)}");
         Console.WriteLine($"Roster lineages CSV: {Path.GetFullPath(outputPaths.RosterSummaryPath!)}");
@@ -1061,6 +1064,8 @@ internal sealed record RunOptions
 
     public string? FounderSummaryOutputPath { get; init; }
 
+    public string? ThermalEcotypeSummaryOutputPath { get; init; }
+
     public string? GenerationSummaryOutputPath { get; init; }
 
     public string? LineageTrendOutputPath { get; init; }
@@ -1207,6 +1212,7 @@ internal sealed record RunOptions
             SpeciesSummaryOutputPath = ExpandProcessIdToken(SpeciesSummaryOutputPath),
             SpeciesTrendOutputPath = ExpandProcessIdToken(SpeciesTrendOutputPath),
             FounderSummaryOutputPath = ExpandProcessIdToken(FounderSummaryOutputPath),
+            ThermalEcotypeSummaryOutputPath = ExpandProcessIdToken(ThermalEcotypeSummaryOutputPath),
             GenerationSummaryOutputPath = ExpandProcessIdToken(GenerationSummaryOutputPath),
             LineageTrendOutputPath = ExpandProcessIdToken(LineageTrendOutputPath),
             RosterSummaryOutputPath = ExpandProcessIdToken(RosterSummaryOutputPath),
@@ -1311,6 +1317,7 @@ internal sealed record RunOptions
                 null,
                 null,
                 null,
+                null,
                 ReportPath,
                 ProfileOutputPath,
                 disabledSensingProfilePath,
@@ -1330,6 +1337,7 @@ internal sealed record RunOptions
             SpeciesSummaryOutputPath ?? AddSuffix(statsPath, "species"),
             SpeciesTrendOutputPath ?? AddSuffix(statsPath, "species_trends"),
             FounderSummaryOutputPath ?? AddSuffix(statsPath, "founders"),
+            ThermalEcotypeSummaryOutputPath ?? AddSuffix(statsPath, "thermal_ecotypes"),
             GenerationSummaryOutputPath ?? AddSuffix(statsPath, "generations"),
             LineageTrendOutputPath ?? AddSuffix(statsPath, "lineage_trends"),
             RosterSummaryOutputPath ?? AddSuffix(statsPath, "roster"),
@@ -1357,6 +1365,7 @@ internal sealed record RunOptions
             SpeciesSummaryOutputPath = null,
             SpeciesTrendOutputPath = null,
             FounderSummaryOutputPath = null,
+            ThermalEcotypeSummaryOutputPath = null,
             GenerationSummaryOutputPath = null,
             LineageTrendOutputPath = null,
             RosterSummaryOutputPath = null,
@@ -1440,6 +1449,9 @@ internal sealed record RunOptions
                     break;
                 case "--founders-output":
                     options = options with { FounderSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
+                    break;
+                case "--thermal-ecotypes-output":
+                    options = options with { ThermalEcotypeSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
                     break;
                 case "--generations-output":
                     options = options with { GenerationSummaryOutputPath = ReadValue(args, ref i, arg), DisableOutput = false };
@@ -1857,6 +1869,7 @@ internal readonly record struct OutputPaths(
     string? SpeciesSummaryPath,
     string? SpeciesTrendPath,
     string? FounderSummaryPath,
+    string? ThermalEcotypeSummaryPath,
     string? GenerationSummaryPath,
     string? LineageTrendPath,
     string? RosterSummaryPath,
@@ -4026,6 +4039,65 @@ internal readonly record struct FounderSummary(
     int MaxGeneration,
     ThermalLineageNicheSummary ThermalNiche);
 
+internal static class ThermalEcotypeCsvWriter
+{
+    public static void Write(string path, WorldState state)
+    {
+        using var writer = StatsCsvWriter.CreateWriter(path);
+        writer.WriteLine("thermal_ecotype,founder_lineages,total_creatures,living_creatures,dead_creatures,max_generation,dominant_founder,dominant_founder_living,avg_living_thermal_optimum,avg_living_thermal_tolerance,avg_occupied_temperature,avg_thermal_mismatch,cold_temperature_share,temperate_temperature_share,hot_temperature_share,comfortable_thermal_share,cold_thermal_stress_share,hot_thermal_stress_share,cold_temperature_births,temperate_temperature_births,hot_temperature_births,cold_temperature_deaths,temperate_temperature_deaths,hot_temperature_deaths,top_founders");
+
+        foreach (var summary in ThermalEcotypeAnalyzer.Analyze(state).OrderBy(summary => summary.Label, StringComparer.Ordinal))
+        {
+            writer.WriteLine(string.Join(
+                ',',
+                Escape(summary.Label),
+                summary.FounderLineageCount.ToString(CultureInfo.InvariantCulture),
+                summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.DeadCreatures.ToString(CultureInfo.InvariantCulture),
+                summary.MaxGeneration.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderId.Value.ToString(CultureInfo.InvariantCulture),
+                summary.DominantFounderLivingCreatures.ToString(CultureInfo.InvariantCulture),
+                Format(summary.AverageLivingThermalOptimum),
+                Format(summary.AverageLivingThermalTolerance),
+                Format(summary.AverageOccupiedTemperature),
+                Format(summary.AverageThermalMismatch),
+                Format(summary.ColdTemperatureShare),
+                Format(summary.TemperateTemperatureShare),
+                Format(summary.HotTemperatureShare),
+                Format(summary.ComfortableThermalShare),
+                Format(summary.ColdThermalStressShare),
+                Format(summary.HotThermalStressShare),
+                summary.ColdTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureBirths.ToString(CultureInfo.InvariantCulture),
+                summary.ColdTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.TemperateTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                summary.HotTemperatureDeaths.ToString(CultureInfo.InvariantCulture),
+                Escape(FormatTopFounders(summary.TopFounders))));
+        }
+    }
+
+    private static string Format(float value)
+    {
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatTopFounders(IReadOnlyList<ThermalEcotypeFounderSummary> founders)
+    {
+        return string.Join(
+            "; ",
+            founders.Select(founder => $"#{founder.FounderId.Value} living {founder.LivingCreatures}"));
+    }
+
+    private static string Escape(string value)
+    {
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r') || value.Contains(';')
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
+    }
+}
+
 internal static class RosterLineageSummaryCsvWriter
 {
     public static void Write(
@@ -5865,7 +5937,7 @@ internal static class RunReportWriter
         WriteSpatialHeatmapSection(writer, state.Biomes, state.Stats.SpatialHeatmaps);
 
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
-        WriteThermalNicheSection(writer, founderSummaries, speciesSummaries, finalSnapshot);
+        WriteThermalNicheSection(writer, state, founderSummaries, speciesSummaries, finalSnapshot);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Trends</h2>");
@@ -6154,6 +6226,7 @@ internal static class RunReportWriter
         WriteOptionalPath(writer, "Species clusters CSV", outputPaths.SpeciesSummaryPath);
         WriteOptionalPath(writer, "Species trends CSV", outputPaths.SpeciesTrendPath);
         WriteOptionalPath(writer, "Founders CSV", outputPaths.FounderSummaryPath);
+        WriteOptionalPath(writer, "Thermal ecotypes CSV", outputPaths.ThermalEcotypeSummaryPath);
         WriteOptionalPath(writer, "Generations CSV", outputPaths.GenerationSummaryPath);
         WriteOptionalPath(writer, "Lineage trends CSV", outputPaths.LineageTrendPath);
         WriteOptionalPath(writer, "Roster lineages CSV", outputPaths.RosterSummaryPath);
@@ -8403,6 +8476,7 @@ internal static class RunReportWriter
 
     private static void WriteThermalNicheSection(
         StreamWriter writer,
+        WorldState state,
         IReadOnlyList<FounderSummary> founderSummaries,
         IReadOnlyList<SpeciesClusterSummary> speciesSummaries,
         SimulationStatsSnapshot snapshot)
@@ -8418,6 +8492,7 @@ internal static class RunReportWriter
             .OrderByDescending(summary => summary.LivingCreatures)
             .ThenBy(summary => summary.Rank)
             .ToArray();
+        var ecotypes = ThermalEcotypeAnalyzer.Analyze(state);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Thermal Niches</h2>");
@@ -8431,6 +8506,38 @@ internal static class RunReportWriter
         WriteMetric(writer, "Births C/T/H", FormatThermalBandValues(snapshot.ColdTemperatureBirths, snapshot.TemperateTemperatureBirths, snapshot.HotTemperatureBirths));
         WriteMetric(writer, "Deaths C/T/H", FormatThermalBandValues(snapshot.ColdTemperatureDeaths, snapshot.TemperateTemperatureDeaths, snapshot.HotTemperatureDeaths));
         writer.WriteLine("</div>");
+
+        writer.WriteLine("<h3>Thermal Ecotypes</h3>");
+        writer.WriteLine("<div class=\"table-wrap\"><table>");
+        writer.WriteLine("<thead><tr><th>Ecotype</th><th>Founders</th><th>Living</th><th>Total</th><th>Max Gen</th><th>Dominant Founder</th><th>Opt/Tol</th><th>Avg Temp</th><th>Mismatch</th><th>Lifetime C/T/H</th><th>Stress C/H</th><th>Births C/T/H</th><th>Deaths C/T/H</th><th>Top Founders</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var ecotype in ecotypes)
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(ecotype.Label)}</td>" +
+                $"<td>{Html(ecotype.FounderLineageCount)}</td>" +
+                $"<td>{Html(ecotype.LivingCreatures)}</td>" +
+                $"<td>{Html(ecotype.TotalCreatures)}</td>" +
+                $"<td>{Html(ecotype.MaxGeneration)}</td>" +
+                $"<td>#{Html(ecotype.DominantFounderId.Value)} ({Html(ecotype.DominantFounderLivingCreatures)})</td>" +
+                $"<td>{Html($"{ecotype.AverageLivingThermalOptimum:0.###} / {ecotype.AverageLivingThermalTolerance:0.###}")}</td>" +
+                $"<td>{Html(ecotype.AverageOccupiedTemperature.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(ecotype.AverageThermalMismatch.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatEcotypeThermalShares(ecotype))}</td>" +
+                $"<td>{Html(FormatEcotypeStressShares(ecotype))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(ecotype.ColdTemperatureBirths, ecotype.TemperateTemperatureBirths, ecotype.HotTemperatureBirths))}</td>" +
+                $"<td>{Html(FormatThermalBandCounts(ecotype.ColdTemperatureDeaths, ecotype.TemperateTemperatureDeaths, ecotype.HotTemperatureDeaths))}</td>" +
+                $"<td>{Html(FormatEcotypeTopFounders(ecotype.TopFounders))}</td>" +
+                "</tr>");
+        }
+
+        if (ecotypes.Count == 0)
+        {
+            WriteEmptyRow(writer, 14, "No living thermal ecotypes were present.");
+        }
+
+        writer.WriteLine("</tbody></table></div>");
 
         writer.WriteLine("<h3>Founder Niches</h3>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -9585,6 +9692,23 @@ internal static class RunReportWriter
     private static string FormatSpeciesStressShares(SpeciesClusterSummary summary)
     {
         return $"{FormatPercent(summary.ColdThermalStressLifetimeShare)} / {FormatPercent(summary.HotThermalStressLifetimeShare)}";
+    }
+
+    private static string FormatEcotypeThermalShares(ThermalEcotypeSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdTemperatureShare)} / {FormatPercent(summary.TemperateTemperatureShare)} / {FormatPercent(summary.HotTemperatureShare)}";
+    }
+
+    private static string FormatEcotypeStressShares(ThermalEcotypeSummary summary)
+    {
+        return $"{FormatPercent(summary.ColdThermalStressShare)} / {FormatPercent(summary.HotThermalStressShare)}";
+    }
+
+    private static string FormatEcotypeTopFounders(IReadOnlyList<ThermalEcotypeFounderSummary> founders)
+    {
+        return founders.Count == 0
+            ? "n/a"
+            : string.Join(", ", founders.Select(founder => $"#{founder.FounderId.Value} ({founder.LivingCreatures})"));
     }
 
     private static string FormatThermalBandCounts(int cold, int temperate, int hot)
