@@ -524,6 +524,60 @@ Open design questions after the first pass:
 - Should rtNEAT eventually get recurrent/self connections for memory, or should memory wait for a separate recurrent/plastic architecture pass?
 - Should the sparse predator starter add a kill/contact-to-feeding scaffold, or should that wait until predator-prey rtNEAT lineages show stronger attack/grab inheritance?
 
+### Future Drive-Modulated Sparse Graph Brain
+
+This can either extend `RtNeatGraph` or become a second rtNEAT-like architecture if the current feed-forward graph should stay simple. The motivating idea is that internal drives should modulate behavior pathways, not only enter the brain as flat additive inputs. Hunger, thirst, temperature stress, injury, reproductive readiness, age pressure, fatigue, fat reserves, and future protein/mineral needs should be able to open, suppress, amplify, or accumulate intent inside the graph.
+
+Why this matters:
+
+- A flat input can say "hunger is high" or "temperature stress is high," but evolution must discover many weights to make that state change the meaning of plant, meat, water, shelter, prey, or mate cues.
+- A modulated graph can let the same sensory cue behave differently under different body states. For example, plant direction can matter strongly when hungry and weakly when fed; smaller-creature proximity can increase attack when hungry but be suppressed when injured or overheated.
+- Social behavior probably needs this style of conditional control. A similar nearby creature might be ignored, followed, tolerated, avoided, courted, or attacked depending on reproductive state, crowding, injury, hunger, temperature stress, and memory.
+
+Initial node/operator candidates:
+
+| Node type | First role | Example |
+| --- | --- | --- |
+| Threshold | Fires only after input crosses a learned threshold. | Attack or grab only when prey proximity is high enough. |
+| Gate | Lets a signal pass when a control signal is high. | Hunger gates plant-seeking or meat-scent pursuit. |
+| Amplifier | Scales a signal up or down from a control signal. | Temperature stress amplifies water/shade seeking; injury dampens attack. |
+| Integrator | Accumulates state across ticks with decay. | Repeated heat stress builds a cooling drive; repeated failed attacks build avoidance or frustration. |
+| Inhibitor | Explicit suppressor for a competing pathway. | Injury suppresses attack while boosting flee/rest. This may wait because negative weights already provide simple inhibition. |
+
+First design suggestion:
+
+1. Start with only `Threshold`, one combined `Gate`/`Amplifier`, and `Integrator`.
+2. Keep direct input-to-output wiring viable so simple reflex survival remains easy.
+3. Store per-node parameters such as bias/threshold, gain, decay, and optional clamp range. These parameters should mutate like weights.
+4. Let structural mutation insert an operator node into an existing connection, change one hidden node's operator type, or add a new operator node with one or two incoming controls and one outgoing target.
+5. Charge metabolic complexity costs for stateful or expensive operator nodes. Integrators should cost more than simple threshold/gate nodes because they carry runtime state.
+6. Keep recurrent/self links out of the first version unless the integrator node itself owns the needed state. This keeps evaluation deterministic and easier to serialize.
+7. Add report/Brain Lab visualization labels for operator type and parameters so evolved graphs remain readable.
+
+Possible graph fragments:
+
+```text
+vision.plant.direction_right -> gate -> action.turn
+internal.hunger -------------^
+```
+
+```text
+vision.smaller_creature.proximity -> threshold -> action.attack
+internal.hunger ------------------> amplifier -> action.attack
+internal.health_or_injury --------> inhibitor  -> action.attack
+```
+
+```text
+body.temperature_stress -> integrator -> action.move_forward / action.turn toward cooler cues
+```
+
+Open design questions:
+
+- Should drive-modulated nodes use fixed two-input conventions, or should they consume arbitrary incoming weighted controls?
+- Should this be an `RtNeatGraph` version upgrade or a separate `RtNeatModulatedGraph`/`SparseModulatedGraph` architecture so comparisons stay clean?
+- Should integrator runtime state be inherited, reset at birth, or initialized from node parameters?
+- What minimum set of social cues should exist before expecting the architecture to evolve more than attraction/avoidance?
+
 ### HyperNEAT
 
 Not the first target.

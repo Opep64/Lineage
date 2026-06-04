@@ -39,6 +39,7 @@ Status: active design direction
 - Continue comparing `HiddenLayerNeural`; the main visible starter catalog currently uses Hidden 16, while Hidden 8, Hidden 8x8, and Hidden 24 remain experiment references.
 - Continue tuning `RtNeatGraph` topology mutation, graph metabolism cost, species clustering thresholds, and predator/prey payoff.
 - Explore a less dense or modular controller architecture that avoids evaluating every possible connection every tick.
+- Explore drive-modulated sparse graph brains, either as an extension of `RtNeatGraph` or as a second rtNEAT-like architecture. Candidate hidden node/operator types include threshold, gate/amplifier, and integrator nodes so hunger, thirst, temperature stress, injury, reproductive readiness, age pressure, fatigue, fat reserves, and future protein/mineral needs can modulate behavior pathways rather than only acting as flat additive inputs.
 - Keep all current senses unless a specific experiment shows a sense is actively harmful. Rich behavior is more important than saving time by making creatures poorer.
 - Do not do sparse-weight pruning on the current dense controller unless it is introduced as a separate architecture or thoroughly proven safe.
 - Record and test lower brain decision frequency as an optional performance mode; the first accepted version reuses all neural outputs when world senses are stale and remains configurable.
