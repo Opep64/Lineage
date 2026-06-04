@@ -2057,6 +2057,9 @@ internal readonly record struct ProbeRunResult(
     float AverageRtNeatEnabledConnectionCount,
     int MaxRtNeatEnabledConnectionCount,
     float FinalResourceRatio,
+    float TotalCreatureEnergy,
+    float TotalLivingStoredEnergy,
+    float TotalEggEnergy,
     float TotalResourceCalories,
     float TotalPlantCalories,
     float TotalMeatCalories,
@@ -2172,6 +2175,9 @@ internal readonly record struct ProbeRunResult(
     long TailEndTick,
     double TailSeconds,
     float TailAverageCreatures,
+    float TailAverageCreatureEnergy,
+    float TailAverageLivingStoredEnergy,
+    float TailAverageEggEnergy,
     float TailAverageFatRatio,
     float TailAverageMassBurdenRatio,
     float TailAverageFatSpeedMultiplier,
@@ -2252,6 +2258,7 @@ internal readonly record struct ProbeRunResult(
         var resourceCalories = state.Resources.Sum(resource => resource.Calories);
         var wallSeconds = Math.Max(elapsed.TotalSeconds, 0.000001);
         var tail = ProbeTailSummary.From(state.Stats.Snapshots);
+        var livingEnergy = ProbeLivingEnergySummary.From(state);
         var metabolicPace = ProbeMetabolicPaceSummary.From(state);
         var behavior = BehaviorAssay.Analyze(state);
 
@@ -2298,6 +2305,9 @@ internal readonly record struct ProbeRunResult(
             snapshot.AverageRtNeatEnabledConnectionCount,
             snapshot.MaxRtNeatEnabledConnectionCount,
             resourceCapacity > 0f ? resourceCalories / resourceCapacity : 0f,
+            livingEnergy.CreatureEnergy,
+            livingEnergy.StoredEnergy,
+            livingEnergy.EggEnergy,
             snapshot.TotalResourceCalories,
             snapshot.TotalPlantCalories,
             snapshot.TotalMeatCalories,
@@ -2413,6 +2423,9 @@ internal readonly record struct ProbeRunResult(
             tail.EndTick,
             tail.Seconds,
             tail.AverageCreatures,
+            tail.AverageCreatureEnergy,
+            tail.AverageLivingStoredEnergy,
+            tail.AverageEggEnergy,
             tail.AverageFatRatio,
             tail.AverageMassBurdenRatio,
             tail.AverageFatSpeedMultiplier,
@@ -2517,12 +2530,37 @@ internal readonly record struct ProbeMetabolicPaceSummary(float Average, int Low
     }
 }
 
+internal readonly record struct ProbeLivingEnergySummary(float CreatureEnergy, float StoredEnergy, float EggEnergy)
+{
+    public static ProbeLivingEnergySummary From(WorldState state)
+    {
+        var creatureEnergy = 0f;
+        var fatCalories = 0f;
+        foreach (var creature in state.Creatures)
+        {
+            creatureEnergy += creature.Energy;
+            fatCalories += creature.FatCalories;
+        }
+
+        var eggEnergy = 0f;
+        foreach (var egg in state.Eggs)
+        {
+            eggEnergy += egg.Energy;
+        }
+
+        return new ProbeLivingEnergySummary(creatureEnergy, creatureEnergy + fatCalories, eggEnergy);
+    }
+}
+
 internal readonly record struct ProbeTailSummary(
     int SnapshotCount,
     long StartTick,
     long EndTick,
     double Seconds,
     float AverageCreatures,
+    float AverageCreatureEnergy,
+    float AverageLivingStoredEnergy,
+    float AverageEggEnergy,
     float AverageFatRatio,
     float AverageMassBurdenRatio,
     float AverageFatSpeedMultiplier,
@@ -2599,6 +2637,9 @@ internal readonly record struct ProbeTailSummary(
         var seconds = Math.Max(0.0, last.ElapsedSeconds - first.ElapsedSeconds);
 
         var averageCreatures = 0f;
+        var averageCreatureEnergy = 0f;
+        var averageLivingStoredEnergy = 0f;
+        var averageEggEnergy = 0f;
         var averageFatRatio = 0f;
         var averageMassBurdenRatio = 0f;
         var averageFatSpeedMultiplier = 0f;
@@ -2662,6 +2703,9 @@ internal readonly record struct ProbeTailSummary(
         {
             var snapshot = snapshots[i];
             averageCreatures += snapshot.CreatureCount;
+            averageCreatureEnergy += snapshot.TotalCreatureEnergy;
+            averageLivingStoredEnergy += snapshot.TotalCreatureEnergy + snapshot.TotalFatCalories;
+            averageEggEnergy += snapshot.TotalEggEnergy;
             averageFatRatio += snapshot.AverageFatRatio;
             averageMassBurdenRatio += snapshot.AverageMassBurdenRatio;
             averageFatSpeedMultiplier += snapshot.AverageFatSpeedMultiplier;
@@ -2730,6 +2774,9 @@ internal readonly record struct ProbeTailSummary(
             last.Tick,
             seconds,
             averageCreatures / divisor,
+            averageCreatureEnergy / divisor,
+            averageLivingStoredEnergy / divisor,
+            averageEggEnergy / divisor,
             averageFatRatio / divisor,
             averageMassBurdenRatio / divisor,
             averageFatSpeedMultiplier / divisor,
@@ -2809,7 +2856,7 @@ internal static class ProbeCsvWriter
     public static void Write(string path, IReadOnlyList<ProbeRunResult> results)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("scenario,scenario_path,variant,variant_overrides,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,rtneat_brains,rtneat_brain_share,avg_rtneat_hidden_nodes,max_rtneat_hidden_nodes,avg_rtneat_connections,max_rtneat_connections,avg_rtneat_enabled_connections,max_rtneat_enabled_connections,final_resource_ratio,total_resource_calories,total_plant_calories,total_meat_calories,total_fat_calories,avg_fat_ratio,avg_mass_burden,avg_fat_speed_multiplier,avg_fat_storage_capacity,avg_fat_storage_efficiency,fat_stored_calories_per_second,fat_released_calories_per_second,avg_metabolic_pace,low_metabolic_pace_creatures,normal_metabolic_pace_creatures,high_metabolic_pace_creatures,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,current_east_progress_share,run_east_progress_share,middle_region_creatures,right_region_creatures,behavior_movement_style,behavior_search_tendency,behavior_ecotype,behavior_terrain_response,behavior_rotten_meat_response,behavior_fresh_meat_preference_score,behavior_rotten_scent_avoidance_score,food_detected_share,plant_detected_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,stale_meat_avoided_share,avg_visible_meat_freshness,meat_scent_detected_share,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,avg_carrion_adaptation,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,rotten_meat_damage_per_second,rotten_meat_damaged_share,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_fat_ratio,tail_avg_mass_burden,tail_avg_fat_speed_multiplier,tail_avg_fat_storage_capacity,tail_avg_fat_storage_efficiency,tail_fat_stored_calories_per_second,tail_fat_released_calories_per_second,tail_avg_metabolic_pace,tail_low_metabolic_pace_creatures,tail_normal_metabolic_pace_creatures,tail_high_metabolic_pace_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_fresh_meat_detected_share,tail_stale_meat_detected_share,tail_stale_meat_avoided_share,tail_avg_visible_meat_freshness,tail_rotten_meat_scent_detected_share,tail_avg_rotten_meat_scent_density,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_rotten_meat_damage_per_second,tail_rotten_meat_damaged_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal,tail_plant_patch_occupied_cell_share,tail_plant_patch_top_decile_calories_share,tail_plant_patchiness,tail_avg_local_fertility_multiplier,tail_min_local_fertility_multiplier,tail_depleted_local_fertility_cell_share,creature_contact_share,attack_intent_share,attack_intent_touching_share,attack_no_intent_contact_share,raw_attack_positive_share,raw_attack_near_gate_share,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,tail_creature_contact_share,tail_attack_intent_share,tail_attack_intent_touching_share,tail_attack_no_intent_contact_share,tail_raw_attack_near_gate_touching_share,tail_avg_attack_output,tail_avg_touching_attack_output,grab_intent_share,can_grab_share,grab_intent_can_grab_share,grab_intent_no_contact_share,holding_share,grabbed_share,avg_grab_output,avg_can_grab_grab_output,avg_grab_pressure,avg_grab_strength,sound_emitting_share,sound_heard_share,avg_sound_amplitude,avg_sound_density,avg_sound_tone_clarity,tail_grab_intent_share,tail_can_grab_share,tail_grab_intent_can_grab_share,tail_grab_intent_no_contact_share,tail_holding_share,tail_grabbed_share,tail_avg_grab_output,tail_avg_can_grab_grab_output,tail_avg_grab_pressure,tail_avg_grab_strength,tail_sound_emitting_share,tail_sound_heard_share,tail_avg_sound_amplitude,tail_avg_sound_density,tail_avg_sound_tone_clarity");
+        writer.WriteLine("scenario,scenario_path,variant,variant_overrides,seed,status,requested_ticks,final_tick,simulated_seconds,wall_seconds,ticks_per_second,pipeline,initial_brain,initial_creatures,initial_resources,resource_density_per_million,resource_cluster_strength,resource_cluster_radius,final_creatures,final_eggs,final_resources,final_plants,final_meat,births,eggs_laid,eggs_hatched,egg_deaths,egg_predation_deaths,deaths,starvation_deaths,injury_deaths,max_generation,rtneat_brains,rtneat_brain_share,avg_rtneat_hidden_nodes,max_rtneat_hidden_nodes,avg_rtneat_connections,max_rtneat_connections,avg_rtneat_enabled_connections,max_rtneat_enabled_connections,final_resource_ratio,total_creature_energy,total_living_stored_energy,total_egg_energy,total_resource_calories,total_plant_calories,total_meat_calories,total_fat_calories,avg_fat_ratio,avg_mass_burden,avg_fat_speed_multiplier,avg_fat_storage_capacity,avg_fat_storage_efficiency,fat_stored_calories_per_second,fat_released_calories_per_second,avg_metabolic_pace,low_metabolic_pace_creatures,normal_metabolic_pace_creatures,high_metabolic_pace_creatures,barren_creatures,sparse_creatures,grassland_creatures,rich_creatures,avg_biome_movement_cost,avg_biome_basal_cost,avg_biome_speed,barren_calories_eaten_per_second,sparse_calories_eaten_per_second,grassland_calories_eaten_per_second,rich_calories_eaten_per_second,barren_deaths,sparse_deaths,grassland_deaths,rich_deaths,current_east_progress_share,run_east_progress_share,middle_region_creatures,right_region_creatures,behavior_movement_style,behavior_search_tendency,behavior_ecotype,behavior_terrain_response,behavior_rotten_meat_response,behavior_fresh_meat_preference_score,behavior_rotten_scent_avoidance_score,food_detected_share,plant_detected_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,stale_meat_avoided_share,avg_visible_meat_freshness,meat_scent_detected_share,rotten_meat_scent_detected_share,avg_rotten_meat_scent_density,creature_detected_share,food_contact_share,eating_share,attacking_share,visible_food_density,calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,avg_meat_freshness,avg_carrion_adaptation,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,rotten_meat_damage_per_second,rotten_meat_damaged_share,meat_digested_energy_share,calories_eaten_per_distance,calories_digested_per_distance,calories_eaten_per_food_vision_event,avg_seconds_since_last_meal,avg_distance_since_last_meal,plant_depletions,plant_local_dispersals,plant_cluster_relocations,plant_global_relocations,plant_dormancy_started,plant_dormancy_completed,plant_patch_occupied_cell_share,plant_patch_top_decile_calories_share,plant_patchiness,local_fertility_cells,avg_local_fertility_multiplier,min_local_fertility_multiplier,depleted_local_fertility_cell_share,tail_snapshot_count,tail_start_tick,tail_end_tick,tail_seconds,tail_avg_creatures,tail_avg_creature_energy,tail_avg_living_stored_energy,tail_avg_egg_energy,tail_avg_fat_ratio,tail_avg_mass_burden,tail_avg_fat_speed_multiplier,tail_avg_fat_storage_capacity,tail_avg_fat_storage_efficiency,tail_fat_stored_calories_per_second,tail_fat_released_calories_per_second,tail_avg_metabolic_pace,tail_low_metabolic_pace_creatures,tail_normal_metabolic_pace_creatures,tail_high_metabolic_pace_creatures,tail_avg_dietary_adaptation,tail_avg_carrion_adaptation,tail_fresh_meat_detected_share,tail_stale_meat_detected_share,tail_stale_meat_avoided_share,tail_avg_visible_meat_freshness,tail_rotten_meat_scent_detected_share,tail_avg_rotten_meat_scent_density,tail_meat_calories_eaten_share,tail_fresh_kill_calories_eaten_share,tail_avg_meat_freshness,tail_fresh_meat_calories_eaten_share,tail_stale_meat_calories_eaten_share,tail_rotten_meat_damage_per_second,tail_rotten_meat_damaged_share,tail_meat_digested_energy_share,tail_attacking_share,tail_deaths_per_second,tail_starvation_deaths_per_second,tail_injury_deaths_per_second,tail_calories_eaten_per_distance,tail_avg_seconds_since_last_meal,tail_plant_patch_occupied_cell_share,tail_plant_patch_top_decile_calories_share,tail_plant_patchiness,tail_avg_local_fertility_multiplier,tail_min_local_fertility_multiplier,tail_depleted_local_fertility_cell_share,creature_contact_share,attack_intent_share,attack_intent_touching_share,attack_no_intent_contact_share,raw_attack_positive_share,raw_attack_near_gate_share,raw_attack_near_gate_touching_share,avg_attack_output,avg_touching_attack_output,tail_creature_contact_share,tail_attack_intent_share,tail_attack_intent_touching_share,tail_attack_no_intent_contact_share,tail_raw_attack_near_gate_touching_share,tail_avg_attack_output,tail_avg_touching_attack_output,grab_intent_share,can_grab_share,grab_intent_can_grab_share,grab_intent_no_contact_share,holding_share,grabbed_share,avg_grab_output,avg_can_grab_grab_output,avg_grab_pressure,avg_grab_strength,sound_emitting_share,sound_heard_share,avg_sound_amplitude,avg_sound_density,avg_sound_tone_clarity,tail_grab_intent_share,tail_can_grab_share,tail_grab_intent_can_grab_share,tail_grab_intent_no_contact_share,tail_holding_share,tail_grabbed_share,tail_avg_grab_output,tail_avg_can_grab_grab_output,tail_avg_grab_pressure,tail_avg_grab_strength,tail_sound_emitting_share,tail_sound_heard_share,tail_avg_sound_amplitude,tail_avg_sound_density,tail_avg_sound_tone_clarity");
 
         foreach (var result in results)
         {
@@ -2856,6 +2903,9 @@ internal static class ProbeCsvWriter
                 Format(result.AverageRtNeatEnabledConnectionCount),
                 result.MaxRtNeatEnabledConnectionCount.ToString(CultureInfo.InvariantCulture),
                 Format(result.FinalResourceRatio),
+                Format(result.TotalCreatureEnergy),
+                Format(result.TotalLivingStoredEnergy),
+                Format(result.TotalEggEnergy),
                 Format(result.TotalResourceCalories),
                 Format(result.TotalPlantCalories),
                 Format(result.TotalMeatCalories),
@@ -2947,6 +2997,9 @@ internal static class ProbeCsvWriter
                 result.TailEndTick.ToString(CultureInfo.InvariantCulture),
                 Format(result.TailSeconds),
                 Format(result.TailAverageCreatures),
+                Format(result.TailAverageCreatureEnergy),
+                Format(result.TailAverageLivingStoredEnergy),
+                Format(result.TailAverageEggEnergy),
                 Format(result.TailAverageFatRatio),
                 Format(result.TailAverageMassBurdenRatio),
                 Format(result.TailAverageFatSpeedMultiplier),
@@ -3088,7 +3141,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</div></section>");
 
         writer.WriteLine("<section><h2>Scenario Summary</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Overrides</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Pace</th><th>L/N/H</th><th>Tail pace</th><th>Tail L/N/H</th><th>Tail fat</th><th>Tail burden</th><th>Tail fat speed</th><th>Tail fat cap</th><th>Tail fat eff</th><th>Tail fat in</th><th>Tail fat out</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Graph share</th><th>Graph hidden</th><th>Graph conn</th><th>Graph enabled</th><th>East max</th><th>Right now</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail can grab</th><th>Tail grab</th><th>Tail grab+touch</th><th>Tail off-touch grab</th><th>Tail held</th><th>Tail sound</th><th>Tail heard</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Tail patch</th><th>Tail avg fert</th><th>Tail min fert</th><th>Tail dep fert</th><th>Ticks/s</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Overrides</th><th>Runs</th><th>Status</th><th>Avg final</th><th>Range</th><th>Tail pop</th><th>Energy</th><th>Stored</th><th>Tail energy</th><th>Tail stored</th><th>Pace</th><th>L/N/H</th><th>Tail pace</th><th>Tail L/N/H</th><th>Tail fat</th><th>Tail burden</th><th>Tail fat speed</th><th>Tail fat cap</th><th>Tail fat eff</th><th>Tail fat in</th><th>Tail fat out</th><th>Avg eggs</th><th>Avg deaths</th><th>Avg injury</th><th>Graph share</th><th>Graph hidden</th><th>Graph conn</th><th>Graph enabled</th><th>East max</th><th>Right now</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail can grab</th><th>Tail grab</th><th>Tail grab+touch</th><th>Tail off-touch grab</th><th>Tail held</th><th>Tail sound</th><th>Tail heard</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Tail patch</th><th>Tail avg fert</th><th>Tail min fert</th><th>Tail dep fert</th><th>Ticks/s</th></tr></thead><tbody>");
         foreach (var group in groups)
         {
             writer.WriteLine(
@@ -3101,6 +3154,10 @@ internal static class ProbeReportWriter
                 $"<td>{Html(group.Average(result => result.FinalCreatures).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html($"{group.Min(result => result.FinalCreatures)}-{group.Max(result => result.FinalCreatures)}")}</td>" +
                 $"<td>{Html(group.Average(result => result.TailAverageCreatures).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.TotalCreatureEnergy).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.TotalLivingStoredEnergy).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.TailAverageCreatureEnergy).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(group.Average(result => result.TailAverageLivingStoredEnergy).ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(group.Average(result => result.AverageMetabolicPace).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPaceCounts(group.Average(result => result.LowMetabolicPaceCreatureCount), group.Average(result => result.NormalMetabolicPaceCreatureCount), group.Average(result => result.HighMetabolicPaceCreatureCount)))}</td>" +
                 $"<td>{Html(group.Average(result => result.TailAverageMetabolicPace).ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
@@ -3166,7 +3223,7 @@ internal static class ProbeReportWriter
         writer.WriteLine("</tbody></table></div></section>");
 
         writer.WriteLine("<section><h2>Run Rows</h2><div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Pace</th><th>L/N/H</th><th>Tail pace</th><th>Tail L/N/H</th><th>Tail fat</th><th>Tail burden</th><th>Tail fat speed</th><th>Tail fat cap</th><th>Tail fat eff</th><th>Tail fat in</th><th>Tail fat out</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Graph share</th><th>Graph hidden</th><th>Graph conn</th><th>Graph enabled</th><th>East now</th><th>East max</th><th>Middle</th><th>Right</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail can grab</th><th>Tail grab</th><th>Tail grab+touch</th><th>Tail off-touch grab</th><th>Tail held</th><th>Tail sound</th><th>Tail heard</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Patch</th><th>Avg fert</th><th>Min fert</th><th>Dep fert</th></tr></thead><tbody>");
+        writer.WriteLine("<thead><tr><th>Scenario</th><th>Variant</th><th>Seed</th><th>Status</th><th>Tick</th><th>Wall</th><th>Ticks/s</th><th>Final pop</th><th>Tail pop</th><th>Energy</th><th>Stored</th><th>Tail energy</th><th>Tail stored</th><th>Pace</th><th>L/N/H</th><th>Tail pace</th><th>Tail L/N/H</th><th>Tail fat</th><th>Tail burden</th><th>Tail fat speed</th><th>Tail fat cap</th><th>Tail fat eff</th><th>Tail fat in</th><th>Tail fat out</th><th>Eggs</th><th>Deaths</th><th>Injury</th><th>Max gen</th><th>Graph share</th><th>Graph hidden</th><th>Graph conn</th><th>Graph enabled</th><th>East now</th><th>East max</th><th>Middle</th><th>Right</th><th>Biome speed</th><th>Rough kcal/s</th><th>Rich kcal/s</th><th>Rough deaths</th><th>Terrain assay</th><th>Rot assay</th><th>Fresh pref</th><th>Rot avoid</th><th>Tail window</th><th>Food seen</th><th>Final meat</th><th>Tail meat</th><th>Tail fresh</th><th>Tail stale</th><th>Tail stale seen</th><th>Tail stale avoided</th><th>Tail rot scent</th><th>Tail rot dmg/s</th><th>Tail diet</th><th>Tail carrion</th><th>Tail attack</th><th>Tail contact</th><th>Tail intent</th><th>Tail touch intent</th><th>Tail near touch</th><th>Tail raw</th><th>Tail can grab</th><th>Tail grab</th><th>Tail grab+touch</th><th>Tail off-touch grab</th><th>Tail held</th><th>Tail sound</th><th>Tail heard</th><th>Tail deaths/s</th><th>kcal/distance</th><th>Plant dep</th><th>Patch</th><th>Avg fert</th><th>Min fert</th><th>Dep fert</th></tr></thead><tbody>");
         foreach (var result in results
             .OrderBy(result => result.ScenarioName)
             .ThenBy(result => result.VariantName)
@@ -3183,6 +3240,10 @@ internal static class ProbeReportWriter
                 $"<td>{Html(result.TicksPerSecond.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.FinalCreatures)}</td>" +
                 $"<td>{Html(result.TailAverageCreatures.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.TotalCreatureEnergy.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.TotalLivingStoredEnergy.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.TailAverageCreatureEnergy.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(result.TailAverageLivingStoredEnergy.ToString("0.0", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(result.AverageMetabolicPace.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(FormatPaceCounts(result.LowMetabolicPaceCreatureCount, result.NormalMetabolicPaceCreatureCount, result.HighMetabolicPaceCreatureCount))}</td>" +
                 $"<td>{Html(result.TailAverageMetabolicPace.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
