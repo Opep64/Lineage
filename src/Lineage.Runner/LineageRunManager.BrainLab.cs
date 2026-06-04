@@ -8,6 +8,7 @@ public sealed partial class LineageRunManager
     private const int MaxBrainLabSnapshotOptions = 200;
     private const int MaxBrainLabCreatures = 1000;
     private const int MaxBrainLabPopulationCreatures = 5000;
+    private const int MaxBrainLabProbeTestFixtures = 100;
     private const int MaxBrainLabWorldProbeResources = 500;
     private const int MaxBrainLabWorldProbeEggs = 250;
     private const int MaxBrainLabWorldProbeSmallPrey = 500;
@@ -329,6 +330,79 @@ public sealed partial class LineageRunManager
             NormalizeArtifactRelativePath(resolvedPath),
             restored.Simulation.State.Creatures.Count,
             maxCreatures,
+            rows);
+    }
+
+    public BrainLabProbeTestResult EvaluateBrainLabProbeTests(BrainLabProbeTestRequest request)
+    {
+        if (request.CreatureId <= 0)
+        {
+            throw new ArgumentException("Creature ID is required.");
+        }
+
+        var resolvedPath = ResolveBrainLabSnapshotPath(request.SnapshotPath);
+        var restored = LoadBrainLabSimulation(resolvedPath);
+        var state = restored.Simulation.State;
+        if (!TryFindBrainLabCreature(state, new EntityId(request.CreatureId), out var focus))
+        {
+            throw new ArgumentException($"Creature {request.CreatureId} was not found.");
+        }
+
+        var fixtures = ResolveBrainLabProbeTestFixtures(request.FixturePaths);
+        var totalFixtureCount = fixtures.Count;
+        var maxFixtures = Math.Clamp(
+            request.MaxFixtures ?? MaxBrainLabProbeTestFixtures,
+            1,
+            MaxBrainLabProbeTestFixtures);
+        var rows = fixtures
+            .Take(maxFixtures)
+            .Select(fixture =>
+            {
+                var editedSenses = RecomputeBrainLabWorldProbeSenses(
+                    restored,
+                    focus.Id,
+                    NormalizeBrainLabWorldProbeEditSet(fixture.WorldProbe),
+                    request.WorldProbeEnvironment);
+                var evaluation = _brainProbeService.EvaluateWithModifiedSenses(
+                    state,
+                    focus.Id,
+                    editedSenses,
+                    request.InputOverrides);
+                var topOutputs = evaluation.Outputs
+                    .OrderByDescending(output => Math.Abs(output.Delta))
+                    .ThenByDescending(output => output.Changed)
+                    .Take(4)
+                    .Select(output => new BrainLabProbeTestOutput(
+                        output.Key,
+                        output.Name,
+                        output.BaselineValue,
+                        output.ModifiedValue,
+                        output.Delta,
+                        output.Changed,
+                        output.BaselineActive,
+                        output.ModifiedActive))
+                    .ToArray();
+
+                return new BrainLabProbeTestRow(
+                    fixture.Path,
+                    fixture.Name,
+                    fixture.IsBuiltIn,
+                    fixture.Tags,
+                    evaluation.OverrideCount,
+                    evaluation.ChangedOutputCount,
+                    evaluation.GateFlipCount,
+                    evaluation.MaxAbsoluteOutputDelta,
+                    topOutputs);
+            })
+            .ToArray();
+
+        return new BrainLabProbeTestResult(
+            NormalizeArtifactRelativePath(resolvedPath),
+            focus.Id.Value,
+            state.GetBrainArchitectureKind(focus.BrainId).ToString(),
+            totalFixtureCount,
+            rows.Length,
+            Math.Max(0, totalFixtureCount - rows.Length),
             rows);
     }
 
@@ -1041,6 +1115,34 @@ public sealed partial class LineageRunManager
             NormalizeBrainLabWorldProbeEditSet(file.WorldProbe),
             file.CreatedAtUtc,
             file.UpdatedAtUtc);
+    }
+
+    private IReadOnlyList<BrainLabWorldProbeFixture> ResolveBrainLabProbeTestFixtures(IReadOnlyList<string>? fixturePaths)
+    {
+        var allFixtures = ListBrainLabWorldProbeFixtures();
+        var requestedPaths = (fixturePaths ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (requestedPaths.Length == 0)
+        {
+            return allFixtures;
+        }
+
+        var byPath = allFixtures.ToDictionary(fixture => fixture.Path, StringComparer.OrdinalIgnoreCase);
+        var fixtures = new List<BrainLabWorldProbeFixture>(requestedPaths.Length);
+        foreach (var path in requestedPaths)
+        {
+            if (!byPath.TryGetValue(path, out var fixture))
+            {
+                throw new ArgumentException($"Probe fixture '{path}' was not found.");
+            }
+
+            fixtures.Add(fixture);
+        }
+
+        return fixtures;
     }
 
     private static BrainLabWorldProbeEditSet NormalizeBrainLabWorldProbeEditSet(BrainLabWorldProbeEditSet? editSet)

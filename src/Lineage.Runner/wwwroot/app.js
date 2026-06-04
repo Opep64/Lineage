@@ -83,9 +83,11 @@ const brainLabPresetSelect = document.querySelector("#brainLabPresetSelect");
 const applyBrainLabPresetButton = document.querySelector("#applyBrainLabPresetButton");
 const compareBrainLabPopulationButton = document.querySelector("#compareBrainLabPopulationButton");
 const runBrainLabPresetMatrixButton = document.querySelector("#runBrainLabPresetMatrixButton");
+const runBrainLabProbeTestsButton = document.querySelector("#runBrainLabProbeTestsButton");
 const brainLabMeta = document.querySelector("#brainLabMeta");
 const brainLabInputs = document.querySelector("#brainLabInputs");
 const brainLabOutputs = document.querySelector("#brainLabOutputs");
+const brainLabProbeTests = document.querySelector("#brainLabProbeTests");
 const brainLabPopulation = document.querySelector("#brainLabPopulation");
 const brainLabPresetMatrix = document.querySelector("#brainLabPresetMatrix");
 const brainLabWorldProbe = document.querySelector("#brainLabWorldProbe");
@@ -137,6 +139,7 @@ let brainLabSnapshot = null;
 let brainLabEvaluation = null;
 let brainLabPopulationEvaluation = null;
 let brainLabPresetMatrixResult = null;
+let brainLabProbeTestResult = null;
 let brainLabWorldProbeScene = null;
 let brainLabWorldProbeBaseScene = null;
 let brainLabOverrides = {};
@@ -699,6 +702,7 @@ async function loadBrainLabSnapshot() {
   brainLabEvaluation = null;
   brainLabPopulationEvaluation = null;
   brainLabPresetMatrixResult = null;
+  brainLabProbeTestResult = null;
   brainLabSelectedInputKey = null;
   brainLabWorldProbeScene = null;
   brainLabWorldProbeBaseScene = null;
@@ -728,6 +732,7 @@ function renderBrainLabSnapshot() {
   renderBrainLabCreatureOptions();
   renderBrainLabInputs();
   renderBrainLabOutputs();
+  renderBrainLabProbeTests();
   renderBrainLabPopulation();
   renderBrainLabPresetMatrix();
   renderBrainLabWorldProbe();
@@ -3736,6 +3741,104 @@ function renderBrainLabPresetMatrixRow(row) {
   `;
 }
 
+async function runBrainLabProbeTests() {
+  const path = brainLabSelectedPath();
+  const creatureId = Number(brainLabCreatureSelect?.value || 0);
+  if (!path || !creatureId) {
+    updateBrainLabButtons();
+    return;
+  }
+
+  brainLabStatus.textContent = "Running probe tests";
+  const response = await fetch("/api/brain-lab/probe-tests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      snapshotPath: path,
+      creatureId,
+      inputOverrides: brainLabOverrides,
+      worldProbeEnvironment: buildBrainLabWorldProbeEnvironmentPayload(),
+      maxFixtures: 100
+    })
+  });
+
+  if (!response.ok) {
+    brainLabStatus.textContent = await responseErrorMessage(response, "Probe tests failed.");
+    return;
+  }
+
+  brainLabProbeTestResult = await response.json();
+  renderBrainLabProbeTests();
+  updateBrainLabButtons();
+  const strongest = [...(brainLabProbeTestResult.rows || [])]
+    .sort((left, right) => Number(right.maxAbsoluteOutputDelta || 0) - Number(left.maxAbsoluteOutputDelta || 0))[0];
+  brainLabStatus.textContent = strongest
+    ? `Probe tests complete | strongest ${strongest.name} (${formatBrainLabNumber(strongest.maxAbsoluteOutputDelta)} max delta)`
+    : "Probe tests complete";
+}
+
+function renderBrainLabProbeTests() {
+  if (!brainLabProbeTests) {
+    return;
+  }
+
+  if (!brainLabProbeTestResult) {
+    brainLabProbeTests.textContent = "No probe tests yet.";
+    return;
+  }
+
+  const rows = [...(brainLabProbeTestResult.rows || [])]
+    .sort((left, right) => Number(right.maxAbsoluteOutputDelta || 0) - Number(left.maxAbsoluteOutputDelta || 0));
+  brainLabProbeTests.innerHTML = `
+    <div class="brain-lab-probe-tests-summary">
+      <strong>${formatNumber(brainLabProbeTestResult.evaluatedFixtureCount)} setups</strong>
+      <span>${escapeHtml(brainLabProbeTestResult.brainArchitectureKind || "unknown brain")}</span>
+      <span>${escapeHtml(brainLabProbeTestResult.snapshotPath || "")}</span>
+      ${brainLabProbeTestResult.skippedFixtureCount ? `<span>${formatNumber(brainLabProbeTestResult.skippedFixtureCount)} skipped</span>` : ""}
+    </div>
+    <table class="brain-lab-probe-tests-table">
+      <thead>
+        <tr>
+          <th>Setup</th>
+          <th>Inputs</th>
+          <th>Changed</th>
+          <th>Gate Flips</th>
+          <th>Max Delta</th>
+          <th>Top Outputs</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(renderBrainLabProbeTestRow).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderBrainLabProbeTestRow(row) {
+  const topOutputs = (row.topOutputs || [])
+    .map((output) => {
+      const deltaClass = output.delta > 0 ? "is-positive" : output.delta < 0 ? "is-negative" : "";
+      const gate = output.baselineActive === null || output.baselineActive === undefined
+        ? ""
+        : ` ${output.baselineActive ? "on" : "off"} -> ${output.modifiedActive ? "on" : "off"}`;
+      return `<div><strong>${escapeHtml(output.name)}</strong> <span class="${deltaClass}">${formatBrainLabDelta(output.delta)}</span>${escapeHtml(gate)}</div>`;
+    })
+    .join("");
+  const tags = (row.tags || []).length > 0
+    ? `<code>${escapeHtml((row.tags || []).join(", "))}</code>`
+    : `<code>${escapeHtml(row.path || "")}</code>`;
+  return `
+    <tr class="${Number(row.changedOutputCount || 0) > 0 ? "is-changed" : ""}">
+      <td><strong>${escapeHtml(row.name)}</strong>${tags}</td>
+      <td>${formatNumber(row.overrideCount)}</td>
+      <td>${formatNumber(row.changedOutputCount)}</td>
+      <td>${formatNumber(row.gateFlipCount)}</td>
+      <td>${formatBrainLabNumber(row.maxAbsoluteOutputDelta)}</td>
+      <td>${topOutputs}</td>
+    </tr>
+  `;
+}
+
 function updateBrainLabInputOverride(control) {
   if (brainLabEvaluation?.supportsRawInputOverrides === false) {
     return;
@@ -3943,7 +4046,9 @@ function isBrainLabMeatOrEggInput(input) {
 
 function clearBrainLabPopulation() {
   brainLabPopulationEvaluation = null;
+  brainLabProbeTestResult = null;
   renderBrainLabPopulation();
+  renderBrainLabProbeTests();
 }
 
 function updateBrainLabButtons() {
@@ -3973,6 +4078,9 @@ function updateBrainLabButtons() {
   }
   if (runBrainLabPresetMatrixButton) {
     runBrainLabPresetMatrixButton.disabled = !hasSnapshot;
+  }
+  if (runBrainLabProbeTestsButton) {
+    runBrainLabProbeTestsButton.disabled = !hasSnapshot || !hasCreature;
   }
   if (brainLabWorldProbeFixtureSelect) {
     brainLabWorldProbeFixtureSelect.disabled = brainLabWorldProbeFixtures.length === 0;
@@ -7551,6 +7659,7 @@ resetBrainLabOverridesButton.addEventListener("click", resetBrainLabOverrides);
 applyBrainLabPresetButton.addEventListener("click", applyBrainLabPreset);
 compareBrainLabPopulationButton.addEventListener("click", compareBrainLabPopulation);
 runBrainLabPresetMatrixButton.addEventListener("click", runBrainLabPresetMatrix);
+runBrainLabProbeTestsButton.addEventListener("click", runBrainLabProbeTests);
 brainLabWorldProbeFixtureSelect.addEventListener("change", updateBrainLabButtons);
 applyBrainLabWorldProbeFixtureButton.addEventListener("click", applyBrainLabWorldProbeFixture);
 saveBrainLabWorldProbeFixtureButton.addEventListener("click", saveBrainLabWorldProbeFixture);

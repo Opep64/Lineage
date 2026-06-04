@@ -304,6 +304,44 @@ public sealed record BrainLabPresetMatrixOutput(
     int GateFlipCount,
     double GateFlipShare);
 
+public sealed record BrainLabProbeTestRequest(
+    string SnapshotPath,
+    int CreatureId,
+    Dictionary<string, float>? InputOverrides,
+    BrainLabWorldProbeEnvironment? WorldProbeEnvironment = null,
+    IReadOnlyList<string>? FixturePaths = null,
+    int? MaxFixtures = null);
+
+public sealed record BrainLabProbeTestResult(
+    string SnapshotPath,
+    int CreatureId,
+    string BrainArchitectureKind,
+    int TotalFixtureCount,
+    int EvaluatedFixtureCount,
+    int SkippedFixtureCount,
+    IReadOnlyList<BrainLabProbeTestRow> Rows);
+
+public sealed record BrainLabProbeTestRow(
+    string Path,
+    string Name,
+    bool IsBuiltIn,
+    IReadOnlyList<string> Tags,
+    int OverrideCount,
+    int ChangedOutputCount,
+    int GateFlipCount,
+    double MaxAbsoluteOutputDelta,
+    IReadOnlyList<BrainLabProbeTestOutput> TopOutputs);
+
+public sealed record BrainLabProbeTestOutput(
+    string Key,
+    string Name,
+    double BaselineValue,
+    double ModifiedValue,
+    double Delta,
+    bool Changed,
+    bool? BaselineActive,
+    bool? ModifiedActive);
+
 public sealed record BrainLabWorldProbeRequest(
     string SnapshotPath,
     int CreatureId);

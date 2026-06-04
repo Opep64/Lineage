@@ -1375,7 +1375,8 @@ button.scenario-tab.is-active {
 }
 
 .brain-lab-population,
-.brain-lab-preset-matrix {
+.brain-lab-preset-matrix,
+.brain-lab-probe-tests {
   margin-top: 12px;
   overflow-x: auto;
   padding: 10px;
@@ -1386,7 +1387,8 @@ button.scenario-tab.is-active {
 }
 
 .brain-lab-population-summary,
-.brain-lab-preset-matrix-summary {
+.brain-lab-preset-matrix-summary,
+.brain-lab-probe-tests-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
@@ -1397,12 +1399,14 @@ button.scenario-tab.is-active {
 }
 
 .brain-lab-population-summary strong,
-.brain-lab-preset-matrix-summary strong {
+.brain-lab-preset-matrix-summary strong,
+.brain-lab-probe-tests-summary strong {
   color: var(--ink);
 }
 
 .brain-lab-population-table,
-.brain-lab-preset-matrix-table {
+.brain-lab-preset-matrix-table,
+.brain-lab-probe-tests-table {
   min-width: 780px;
   table-layout: auto;
   font-size: 12px;
@@ -1411,16 +1415,20 @@ button.scenario-tab.is-active {
 .brain-lab-population-table th,
 .brain-lab-population-table td,
 .brain-lab-preset-matrix-table th,
-.brain-lab-preset-matrix-table td {
+.brain-lab-preset-matrix-table td,
+.brain-lab-probe-tests-table th,
+.brain-lab-probe-tests-table td {
   padding: 8px;
 }
 
-.brain-lab-population-table tr.is-changed td {
+.brain-lab-population-table tr.is-changed td,
+.brain-lab-probe-tests-table tr.is-changed td {
   background: #fffaf0;
 }
 
 .brain-lab-population-table code,
-.brain-lab-preset-matrix-table code {
+.brain-lab-preset-matrix-table code,
+.brain-lab-probe-tests-table code {
   display: block;
   margin-top: 2px;
   color: var(--muted);
@@ -1430,12 +1438,14 @@ button.scenario-tab.is-active {
   overflow-wrap: anywhere;
 }
 
-.brain-lab-population-table .is-positive {
+.brain-lab-population-table .is-positive,
+.brain-lab-probe-tests-table .is-positive {
   color: var(--ok);
   font-weight: 700;
 }
 
-.brain-lab-population-table .is-negative {
+.brain-lab-population-table .is-negative,
+.brain-lab-probe-tests-table .is-negative {
   color: var(--danger);
   font-weight: 700;
 }
