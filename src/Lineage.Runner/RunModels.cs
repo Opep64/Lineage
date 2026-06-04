@@ -347,7 +347,8 @@ public sealed record BrainLabWorldProbeBiomeBoundary(
 public sealed record BrainLabWorldProbeEditSet(
     IReadOnlyList<BrainLabWorldProbeEditedResource>? Resources,
     IReadOnlyList<BrainLabWorldProbeEditedEgg>? Eggs,
-    IReadOnlyList<BrainLabWorldProbeEditedCreature>? Creatures);
+    IReadOnlyList<BrainLabWorldProbeEditedCreature>? Creatures,
+    IReadOnlyList<BrainLabWorldProbeEditedSmallPrey>? SmallPrey = null);
 
 public sealed record BrainLabWorldProbeEditedResource(
     int Id,
@@ -384,6 +385,19 @@ public sealed record BrainLabWorldProbeEditedCreature(
     double SoundTone,
     bool IsProbeSoundOnly = false);
 
+public sealed record BrainLabWorldProbeEditedSmallPrey(
+    int Id,
+    double X,
+    double Y,
+    double Radius,
+    double Calories,
+    double MaxCalories,
+    double Health,
+    double MaxHealth,
+    double HeadingRadians,
+    double Speed,
+    double GrabPressure);
+
 public sealed record BrainLabWorldProbeScene(
     string SnapshotPath,
     int CreatureId,
@@ -398,6 +412,7 @@ public sealed record BrainLabWorldProbeScene(
     BrainLabWorldProbeCreature Focus,
     IReadOnlyList<BrainLabWorldProbeResource> Resources,
     IReadOnlyList<BrainLabWorldProbeEgg> Eggs,
+    IReadOnlyList<BrainLabWorldProbeSmallPrey> SmallPrey,
     IReadOnlyList<BrainLabWorldProbeCreature> Creatures);
 
 public sealed record BrainLabWorldProbeEnvironmentSample(
@@ -413,10 +428,12 @@ public sealed record BrainLabWorldProbeCounts(
     int PlantCount,
     int MeatCount,
     int EggCount,
+    int SmallPreyCount,
     int CreatureCount,
     int SoundSourceCount,
     int ReturnedResourceCount,
     int ReturnedEggCount,
+    int ReturnedSmallPreyCount,
     int ReturnedCreatureCount);
 
 public sealed record BrainLabWorldProbeResource(
@@ -440,6 +457,22 @@ public sealed record BrainLabWorldProbeEgg(
     double Radius,
     double Energy,
     double Health);
+
+public sealed record BrainLabWorldProbeSmallPrey(
+    int Id,
+    double X,
+    double Y,
+    double Distance,
+    double Radius,
+    double Calories,
+    double MaxCalories,
+    double Health,
+    double MaxHealth,
+    double HeadingRadians,
+    double Speed,
+    double AgeSeconds,
+    bool IsHeld,
+    double GrabPressure);
 
 public sealed record BrainLabWorldProbeCreature(
     int Id,

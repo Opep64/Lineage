@@ -10,6 +10,7 @@ public sealed partial class LineageRunManager
     private const int MaxBrainLabPopulationCreatures = 5000;
     private const int MaxBrainLabWorldProbeResources = 500;
     private const int MaxBrainLabWorldProbeEggs = 250;
+    private const int MaxBrainLabWorldProbeSmallPrey = 500;
     private const int MaxBrainLabWorldProbeCreatures = 500;
     private const string BrainLabWorldProbeFixtureFileExtension = ".lineage-probe.json";
     private const float BrainLabWorldProbePadding = 24f;
@@ -67,6 +68,18 @@ public sealed partial class LineageRunManager
                 ],
                 [],
                 [])),
+        BuiltInBrainLabWorldProbeFixture(
+            "Small Prey Ahead",
+            "small-prey-ahead",
+            "One live small prey animal in front of the selected creature.",
+            ["small prey", "meat", "food"],
+            new BrainLabWorldProbeEditSet(
+                [],
+                [],
+                [],
+                [
+                    new BrainLabWorldProbeEditedSmallPrey(-1, 110, 0, 2, 16, 16, 0.2, 0.2, 0, 0, 0)
+                ])),
         BuiltInBrainLabWorldProbeFixture(
             "Creature Ahead",
             "creature-ahead",
@@ -353,6 +366,12 @@ public sealed partial class LineageRunManager
             .Where(egg => egg.Distance <= probeRadius + egg.Radius)
             .OrderBy(egg => egg.Distance)
             .ToArray();
+        var smallPreyCandidates = state.SmallPrey
+            .Where(prey => prey.Health > 0f && prey.Calories > 0f)
+            .Select(prey => CreateBrainLabProbeSmallPrey(prey, center))
+            .Where(prey => prey.Distance <= probeRadius + prey.Radius)
+            .OrderBy(prey => prey.Distance)
+            .ToArray();
         var creatureCandidates = state.Creatures
             .Where(creature => creature.Id != focus.Id && creature.Health > 0f && creature.Energy > 0f)
             .Select(creature => CreateBrainLabProbeCreature(state, creature, center, isFocus: false))
@@ -366,6 +385,9 @@ public sealed partial class LineageRunManager
         var returnedEggs = eggCandidates
             .Take(MaxBrainLabWorldProbeEggs)
             .ToArray();
+        var returnedSmallPrey = smallPreyCandidates
+            .Take(MaxBrainLabWorldProbeSmallPrey)
+            .ToArray();
         var returnedCreatures = creatureCandidates
             .Take(MaxBrainLabWorldProbeCreatures)
             .ToArray();
@@ -374,10 +396,12 @@ public sealed partial class LineageRunManager
             resourceCandidates.Count(resource => string.Equals(resource.Kind, nameof(ResourceKind.Plant), StringComparison.Ordinal)),
             resourceCandidates.Count(resource => string.Equals(resource.Kind, nameof(ResourceKind.Meat), StringComparison.Ordinal)),
             eggCandidates.Length,
+            smallPreyCandidates.Length,
             creatureCandidates.Length,
             creatureCandidates.Count(creature => creature.SoundAmplitude > BrainLabSoundEmissionThreshold),
             returnedResources.Length,
             returnedEggs.Length,
+            returnedSmallPrey.Length,
             returnedCreatures.Length);
 
         return new BrainLabWorldProbeScene(
@@ -390,12 +414,14 @@ public sealed partial class LineageRunManager
             state.Bounds.Height,
             resourceCandidates.Length > returnedResources.Length
                 || eggCandidates.Length > returnedEggs.Length
+                || smallPreyCandidates.Length > returnedSmallPrey.Length
                 || creatureCandidates.Length > returnedCreatures.Length,
             CreateBrainLabProbeEnvironmentSample(state, focus, focusGenome, senseRadius),
             counts,
             CreateBrainLabProbeCreature(state, focus, center, isFocus: true),
             returnedResources,
             returnedEggs,
+            returnedSmallPrey,
             returnedCreatures);
     }
 
@@ -445,6 +471,11 @@ public sealed partial class LineageRunManager
         foreach (var eggEdit in edits.Eggs ?? [])
         {
             editedState.Eggs.Add(CreateEditedBrainLabEgg(eggEdit, center, focus, editedState.Bounds));
+        }
+
+        foreach (var smallPreyEdit in edits.SmallPrey ?? [])
+        {
+            editedState.SmallPrey.Add(CreateEditedBrainLabSmallPrey(smallPreyEdit, center, editedState.Bounds));
         }
 
         foreach (var creatureEdit in edits.Creatures ?? [])
@@ -678,6 +709,30 @@ public sealed partial class LineageRunManager
         };
     }
 
+    private static SmallPreyState CreateEditedBrainLabSmallPrey(
+        BrainLabWorldProbeEditedSmallPrey edit,
+        SimVector2 center,
+        WorldBounds bounds)
+    {
+        var health = PositiveFinite(edit.Health, 0.2f);
+        var calories = PositiveFinite(edit.Calories, 16f);
+        var heading = Finite(edit.HeadingRadians, 0f);
+        var speed = Math.Max(0f, Finite(edit.Speed, 0f));
+        return new SmallPreyState
+        {
+            Id = new EntityId(edit.Id),
+            Position = BrainLabProbeWorldPosition(center, edit.X, edit.Y, bounds),
+            Velocity = SimVector2.FromAngle(heading) * speed,
+            HeadingRadians = heading,
+            Radius = PositiveFinite(edit.Radius, 2f),
+            Calories = calories,
+            MaxCalories = Math.Max(calories, PositiveFinite(edit.MaxCalories, calories)),
+            Health = health,
+            MaxHealth = Math.Max(health, PositiveFinite(edit.MaxHealth, health)),
+            GrabPressure = Math.Max(0f, Finite(edit.GrabPressure, 0f))
+        };
+    }
+
     private static CreatureState CreateEditedBrainLabCreature(
         BrainLabWorldProbeEditedCreature edit,
         SimVector2 center,
@@ -822,6 +877,38 @@ public sealed partial class LineageRunManager
             bestFoodDistance = edgeDistance;
         }
 
+        foreach (var prey in state.SmallPrey)
+        {
+            if (prey.Calories <= 0f || prey.Health <= 0f)
+            {
+                continue;
+            }
+
+            var centerDistance = SimVector2.Distance(focus.Position, prey.Position);
+            var edgeDistance = Math.Max(0f, centerDistance - prey.Radius);
+            if (edgeDistance > focusRadius)
+            {
+                continue;
+            }
+
+            var efficiency = CreatureDigestion.FreshMeatEnergyEfficiency(focusGenome);
+            if (efficiency < bestFoodEfficiency
+                || (Math.Abs(efficiency - bestFoodEfficiency) <= 0.0001f && edgeDistance >= bestFoodDistance))
+            {
+                continue;
+            }
+
+            focus.IsTouchingFood = true;
+            focus.FoodContactKind = FoodContactKind.SmallPrey;
+            focus.FoodContactResourceKind = ResourceKind.Meat;
+            focus.FoodContactPlantKind = default;
+            focus.FoodContactResourceId = prey.Id;
+            focus.FoodContactEdgeDistance = edgeDistance;
+            focus.FoodContactCalories = prey.Calories;
+            bestFoodEfficiency = efficiency;
+            bestFoodDistance = edgeDistance;
+        }
+
         var forward = SimVector2.FromAngle(focus.HeadingRadians);
         var bestCreatureDistance = float.PositiveInfinity;
         for (var i = 1; i < state.Creatures.Count; i++)
@@ -961,7 +1048,8 @@ public sealed partial class LineageRunManager
         return new BrainLabWorldProbeEditSet(
             (editSet?.Resources ?? []).Take(MaxBrainLabWorldProbeResources).ToArray(),
             (editSet?.Eggs ?? []).Take(MaxBrainLabWorldProbeEggs).ToArray(),
-            (editSet?.Creatures ?? []).Take(MaxBrainLabWorldProbeCreatures).ToArray());
+            (editSet?.Creatures ?? []).Take(MaxBrainLabWorldProbeCreatures).ToArray(),
+            (editSet?.SmallPrey ?? []).Take(MaxBrainLabWorldProbeSmallPrey).ToArray());
     }
 
     private static void SaveBrainLabWorldProbeFixtureFile(string path, BrainLabWorldProbeFixtureFile file)
@@ -1088,6 +1176,26 @@ public sealed partial class LineageRunManager
             EggPredation.ContactRadius(egg),
             egg.Energy,
             egg.Health);
+    }
+
+    private static BrainLabWorldProbeSmallPrey CreateBrainLabProbeSmallPrey(SmallPreyState prey, SimVector2 center)
+    {
+        var relative = prey.Position - center;
+        return new BrainLabWorldProbeSmallPrey(
+            prey.Id.Value,
+            relative.X,
+            relative.Y,
+            relative.Length,
+            prey.Radius,
+            prey.Calories,
+            prey.MaxCalories,
+            prey.Health,
+            prey.MaxHealth,
+            prey.HeadingRadians,
+            prey.Velocity.Length,
+            prey.AgeSeconds,
+            prey.HeldByCreatureId.Value != 0,
+            prey.GrabPressure);
     }
 
     private static BrainLabWorldProbeEnvironmentSample CreateBrainLabProbeEnvironmentSample(

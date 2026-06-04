@@ -1005,6 +1005,27 @@ function renderBrainLabWorldProbe() {
     }
   }
 
+  if (toggles.smallPrey) {
+    for (const prey of scene.smallPrey || []) {
+      if (!isBrainLabWorldProbeSmallPreyVisible(prey)) {
+        continue;
+      }
+
+      const point = toScreen(prey);
+      const preyRadius = drawBrainLabProbeSmallPrey(context, point, prey, scale);
+      drawBrainLabProbeTraceHighlight(context, point, preyRadius, brainLabWorldProbeTraceContribution(visionTrace, "smallPrey", prey.id));
+      addBrainLabWorldProbeHitTarget({
+        type: "smallPrey",
+        id: prey.id,
+        key: brainLabWorldProbeObjectKey("smallPrey", prey.id),
+        item: prey,
+        point,
+        radius: preyRadius,
+        priority: 2.5
+      });
+    }
+  }
+
   if (toggles.creatures) {
     for (const creature of scene.creatures || []) {
       if (!isBrainLabWorldProbeCreatureVisible(creature)) {
@@ -1065,6 +1086,7 @@ function renderBrainLabWorldProbeSummary(scene, toggles) {
     brainLabWorldProbeSummaryCell("Plants shown", `${formatNumber(counts.plants.visible)} / ${formatNumber(counts.plants.total)}`),
     brainLabWorldProbeSummaryCell("Meat shown", `${formatNumber(counts.meat.visible)} / ${formatNumber(counts.meat.total)}`),
     brainLabWorldProbeSummaryCell("Eggs shown", `${formatNumber(counts.eggs.visible)} / ${formatNumber(counts.eggs.total)}`),
+    brainLabWorldProbeSummaryCell("Small prey shown", `${formatNumber(counts.smallPrey.visible)} / ${formatNumber(counts.smallPrey.total)}`),
     brainLabWorldProbeSummaryCell("Creatures shown", `${formatNumber(counts.creatures.visible)} / ${formatNumber(counts.creatures.total)}`),
     brainLabWorldProbeSummaryCell("Sound shown", `${formatNumber(counts.sound.visible)} / ${formatNumber(counts.sound.total)}`),
     brainLabWorldProbeEdited ? brainLabWorldProbeSummaryCell("Probe edits", "active") : "",
@@ -1188,6 +1210,7 @@ function brainLabWorldProbeVisibleSummary(scene, toggles) {
   const plants = (scene.resources || []).filter((resource) => resource.kind === "Plant");
   const meat = (scene.resources || []).filter((resource) => resource.kind === "Meat");
   const eggs = scene.eggs || [];
+  const smallPrey = scene.smallPrey || [];
   const creatures = scene.creatures || [];
   const sound = creatures.filter((creature) => Number(creature.soundAmplitude || 0) > 0.05);
   return {
@@ -1202,6 +1225,10 @@ function brainLabWorldProbeVisibleSummary(scene, toggles) {
     eggs: {
       total: eggs.length,
       visible: toggles.meatEggs ? eggs.filter(isBrainLabWorldProbeEggVisible).length : 0
+    },
+    smallPrey: {
+      total: smallPrey.length,
+      visible: toggles.smallPrey ? smallPrey.filter(isBrainLabWorldProbeSmallPreyVisible).length : 0
     },
     creatures: {
       total: creatures.length,
@@ -1511,6 +1538,14 @@ function brainLabWorldProbeVisionContributors(scene, spec) {
     for (const resource of (scene.resources || []).filter((item) => item.kind === "Meat")) {
       if (isBrainLabWorldProbeResourceVisible(resource)) {
         brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "resource", "Meat", resource);
+      }
+    }
+  }
+
+  if (spec.categories.includes("meat") && toggles.smallPrey) {
+    for (const prey of scene.smallPrey || []) {
+      if (isBrainLabWorldProbeSmallPreyVisible(prey)) {
+        brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "smallPrey", "Small prey", prey);
       }
     }
   }
@@ -1853,6 +1888,28 @@ function drawBrainLabProbeSound(context, point, creature) {
   context.restore();
 }
 
+function drawBrainLabProbeSmallPrey(context, point, prey, scale) {
+  const bodyRadius = Math.max(3, Math.min(10, Number(prey.radius || 0) * scale));
+  const heading = Number(prey.headingRadians || 0);
+  const lineLength = bodyRadius + 5;
+  context.save();
+  context.fillStyle = "#c57a35";
+  context.strokeStyle = "#7f481f";
+  context.lineWidth = 1.25;
+  context.beginPath();
+  context.arc(point.x, point.y, bodyRadius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.strokeStyle = "#6a3916";
+  context.lineWidth = 1.75;
+  context.beginPath();
+  context.moveTo(point.x, point.y);
+  context.lineTo(point.x + Math.cos(heading) * lineLength, point.y - Math.sin(heading) * lineLength);
+  context.stroke();
+  context.restore();
+  return bodyRadius;
+}
+
 function drawBrainLabProbeCreature(context, point, creature, scale) {
   const bodyRadius = Math.max(4, Math.min(14, Number(creature.radius || 0) * scale));
   const heading = Number(creature.headingRadians || 0);
@@ -2190,6 +2247,9 @@ function resolveBrainLabWorldProbeMutableItem(type, id) {
   if (type === "egg") {
     return (brainLabWorldProbeScene.eggs || []).find((candidate) => Number(candidate.id) === numericId) ?? null;
   }
+  if (type === "smallPrey") {
+    return (brainLabWorldProbeScene.smallPrey || []).find((candidate) => Number(candidate.id) === numericId) ?? null;
+  }
   if (type === "creature") {
     return (brainLabWorldProbeScene.creatures || []).find((candidate) => Number(candidate.id) === numericId) ?? null;
   }
@@ -2239,6 +2299,26 @@ function addBrainLabWorldProbeItem(tool, worldPoint) {
     updateBrainLabWorldProbeItemDistance(egg);
     brainLabWorldProbeScene.eggs = [...(brainLabWorldProbeScene.eggs || []), egg];
     brainLabWorldProbeSelected = { type: "egg", id };
+  } else if (tool === "addSmallPrey") {
+    const prey = {
+      id,
+      x: worldPoint.x,
+      y: worldPoint.y,
+      distance: 0,
+      radius: Math.max(2, baseRadius * 0.25),
+      calories: 16,
+      maxCalories: 16,
+      health: 0.2,
+      maxHealth: 0.2,
+      headingRadians: 0,
+      speed: 0,
+      ageSeconds: 0,
+      isHeld: false,
+      grabPressure: 0
+    };
+    updateBrainLabWorldProbeItemDistance(prey);
+    brainLabWorldProbeScene.smallPrey = [...(brainLabWorldProbeScene.smallPrey || []), prey];
+    brainLabWorldProbeSelected = { type: "smallPrey", id };
   } else if (tool === "addCreature" || tool === "addSound") {
     const soundOnly = tool === "addSound";
     const creature = {
@@ -2278,6 +2358,7 @@ function applyBrainLabWorldProbeFixture() {
   resetBrainLabWorldProbeEdits({ restoreScene: false, clearSelection: true });
   brainLabWorldProbeScene.resources = (editSet.resources || []).map(brainLabWorldProbeFixtureResourceToScene);
   brainLabWorldProbeScene.eggs = (editSet.eggs || []).map(brainLabWorldProbeFixtureEggToScene);
+  brainLabWorldProbeScene.smallPrey = (editSet.smallPrey || []).map(brainLabWorldProbeFixtureSmallPreyToScene);
   brainLabWorldProbeScene.creatures = (editSet.creatures || []).map(brainLabWorldProbeFixtureCreatureToScene);
   brainLabWorldProbeNextSyntheticId = nextBrainLabWorldProbeSyntheticId();
   brainLabWorldProbeEdited = true;
@@ -2375,6 +2456,24 @@ function buildBrainLabWorldProbeFixturePayload() {
         health: Number(egg.health || 1)
       };
     });
+  const smallPrey = (brainLabWorldProbeScene.smallPrey || [])
+    .filter(isBrainLabWorldProbeSmallPreyVisible)
+    .map((prey) => {
+      const local = brainLabWorldProbeWorldToFixturePoint(prey);
+      return {
+        id: nextId--,
+        x: local.x,
+        y: local.y,
+        radius: Number(prey.radius || 1),
+        calories: Number(prey.calories || 0),
+        maxCalories: Number(prey.maxCalories || prey.calories || 1),
+        health: Number(prey.health || 0.2),
+        maxHealth: Number(prey.maxHealth || prey.health || 0.2),
+        headingRadians: normalizeBrainLabWorldProbeRadians(Number(prey.headingRadians || 0) - brainLabWorldProbeFocusHeading()),
+        speed: Number(prey.speed || 0),
+        grabPressure: Number(prey.grabPressure || 0)
+      };
+    });
   const creatures = (brainLabWorldProbeScene.creatures || [])
     .filter(isBrainLabWorldProbeCreatureVisible)
     .map((creature) => {
@@ -2398,7 +2497,7 @@ function buildBrainLabWorldProbeFixturePayload() {
       };
     });
 
-  return { resources, eggs, creatures };
+  return { resources, eggs, creatures, smallPrey };
 }
 
 function brainLabWorldProbeFixtureResourceToScene(resource) {
@@ -2433,6 +2532,28 @@ function brainLabWorldProbeFixtureEggToScene(egg) {
   };
   updateBrainLabWorldProbeItemDistance(sceneEgg);
   return sceneEgg;
+}
+
+function brainLabWorldProbeFixtureSmallPreyToScene(prey) {
+  const point = brainLabWorldProbeFixtureToWorldPoint(prey);
+  const scenePrey = {
+    id: Number(prey.id),
+    x: point.x,
+    y: point.y,
+    distance: 0,
+    radius: Number(prey.radius || 1),
+    calories: Number(prey.calories || 0),
+    maxCalories: Number(prey.maxCalories || prey.calories || 1),
+    health: Number(prey.health || 0.2),
+    maxHealth: Number(prey.maxHealth || prey.health || 0.2),
+    headingRadians: normalizeBrainLabWorldProbeRadians(Number(prey.headingRadians || 0) + brainLabWorldProbeFocusHeading()),
+    speed: Number(prey.speed || 0),
+    ageSeconds: 0,
+    isHeld: false,
+    grabPressure: Number(prey.grabPressure || 0)
+  };
+  updateBrainLabWorldProbeItemDistance(scenePrey);
+  return scenePrey;
 }
 
 function brainLabWorldProbeFixtureCreatureToScene(creature) {
@@ -2497,6 +2618,7 @@ function nextBrainLabWorldProbeSyntheticId() {
   const ids = [
     ...(brainLabWorldProbeScene?.resources || []).map((item) => Number(item.id)),
     ...(brainLabWorldProbeScene?.eggs || []).map((item) => Number(item.id)),
+    ...(brainLabWorldProbeScene?.smallPrey || []).map((item) => Number(item.id)),
     ...(brainLabWorldProbeScene?.creatures || []).map((item) => Number(item.id))
   ].filter(Number.isFinite);
   return Math.min(-1, ...ids) - 1;
@@ -2747,6 +2869,18 @@ function brainLabWorldProbeEditorFields(selection) {
     return fields;
   }
 
+  if (selection.type === "smallPrey") {
+    fields.push(brainLabWorldProbeNumberField("radius", "Radius", item.radius, 0.1, radius, 0.1));
+    fields.push(brainLabWorldProbeNumberField("headingDegrees", "Heading", radiansToDegrees(item.headingRadians), -180, 180, 1));
+    fields.push(brainLabWorldProbeNumberField("speed", "Speed", item.speed || 0, 0, 1000, 0.1));
+    fields.push(brainLabWorldProbeNumberField("calories", "Calories", item.calories, 0, 100000, 0.1));
+    fields.push(brainLabWorldProbeNumberField("maxCalories", "Max kcal", item.maxCalories, 0.1, 100000, 0.1));
+    fields.push(brainLabWorldProbeNumberField("health", "Health", item.health, 0, 100000, 0.01));
+    fields.push(brainLabWorldProbeNumberField("maxHealth", "Max health", item.maxHealth, 0.01, 100000, 0.01));
+    fields.push(brainLabWorldProbeRangeField("grabPressure", "Grab pressure", item.grabPressure || 0, 0, 1, 0.01));
+    return fields;
+  }
+
   if (selection.type === "creature" || selection.type === "sound") {
     if (selection.type === "creature") {
       fields.push(brainLabWorldProbeNumberField("generation", "Generation", item.generation, 0, 1000000, 1));
@@ -2841,6 +2975,9 @@ function brainLabWorldProbeEditorNote(selection, deleted) {
   if (selection.type === "sound") {
     return "Sound edits use the source creature position and emitted tone.";
   }
+  if (selection.type === "smallPrey") {
+    return "Small prey is sensed as live fresh meat and generic food.";
+  }
   return "";
 }
 
@@ -2880,6 +3017,12 @@ function updateBrainLabWorldProbeEditorField(control) {
   }
   if (fieldKey === "maxCalories" && Number(item.maxCalories || 0) < Number(item.calories || 0)) {
     item.maxCalories = Number(item.calories || 0);
+  }
+  if (fieldKey === "health" && Number(item.maxHealth || 0) < Number(item.health || 0)) {
+    item.maxHealth = Number(item.health || 0);
+  }
+  if (fieldKey === "maxHealth" && Number(item.maxHealth || 0) < Number(item.health || 0)) {
+    item.maxHealth = Number(item.health || 0);
   }
   if (fieldKey === "soundAmplitude" && Number(item.soundAmplitude || 0) > 0.05) {
     brainLabWorldProbeMutedSoundKeys.delete(brainLabWorldProbeSoundKey(selection.id));
@@ -2950,6 +3093,9 @@ function resolveBrainLabWorldProbeSelection() {
   } else if (type === "egg") {
     item = (brainLabWorldProbeScene.eggs || []).find((candidate) => Number(candidate.id) === id) ?? null;
     key = brainLabWorldProbeObjectKey("egg", id);
+  } else if (type === "smallPrey") {
+    item = (brainLabWorldProbeScene.smallPrey || []).find((candidate) => Number(candidate.id) === id) ?? null;
+    key = brainLabWorldProbeObjectKey("smallPrey", id);
   } else if (type === "creature" || type === "sound") {
     item = (brainLabWorldProbeScene.creatures || []).find((candidate) => Number(candidate.id) === id) ?? null;
     key = type === "sound"
@@ -2981,6 +3127,13 @@ function brainLabWorldProbeSelectionDetails(selection) {
   } else if (selection.type === "egg") {
     facts.push(`gen ${formatNumber(item.generation)}`);
     facts.push(`${formatBrainLabNumber(item.energy)} kcal`);
+  } else if (selection.type === "smallPrey") {
+    facts.push(`${formatBrainLabNumber(item.calories)} kcal`);
+    facts.push(`health ${formatBrainLabNumber(item.health)}`);
+    facts.push(`speed ${formatBrainLabNumber(item.speed || 0)}`);
+    if (item.isHeld) {
+      facts.push("held");
+    }
   } else if (selection.type === "creature" || selection.type === "focus" || selection.type === "sound") {
     facts.push(`gen ${formatNumber(item.generation)}`);
     facts.push(`energy ${formatPercent(item.energyRatio)}`);
@@ -3010,6 +3163,9 @@ function brainLabWorldProbeSelectionTitle(selection) {
   }
   if (selection.type === "egg") {
     return `Egg #${formatNumber(selection.id)}`;
+  }
+  if (selection.type === "smallPrey") {
+    return `Small prey #${formatNumber(selection.id)}`;
   }
   if (selection.type === "creature") {
     return `Creature #${formatNumber(selection.id)}`;
@@ -3043,6 +3199,10 @@ function isBrainLabWorldProbeEggVisible(egg) {
   return !brainLabWorldProbeHiddenKeys.has(brainLabWorldProbeObjectKey("egg", egg.id));
 }
 
+function isBrainLabWorldProbeSmallPreyVisible(prey) {
+  return !brainLabWorldProbeHiddenKeys.has(brainLabWorldProbeObjectKey("smallPrey", prey.id));
+}
+
 function isBrainLabWorldProbeCreatureVisible(creature) {
   return !brainLabWorldProbeHiddenKeys.has(brainLabWorldProbeObjectKey("creature", creature.id));
 }
@@ -3064,6 +3224,7 @@ function brainLabWorldProbeToggles() {
   const state = {
     plants: true,
     meatEggs: true,
+    smallPrey: true,
     creatures: true,
     sound: true
   };
@@ -3127,7 +3288,7 @@ function applyBrainLabWorldProbeLocalEdits(inputs, toggles) {
   if (toggles.meatEggs && ratios.meatEggs < 0.999) {
     scaleBrainLabWorldProbeInputs(inputs, isBrainLabMeatOrEggInput, ratios.meatEggs);
   }
-  if ((toggles.plants || toggles.meatEggs) && ratios.food < 0.999) {
+  if ((toggles.plants || toggles.meatEggs || toggles.smallPrey) && ratios.food < 0.999) {
     scaleBrainLabWorldProbeInputs(inputs, isBrainLabWorldProbeGenericFoodInput, ratios.food);
   }
   if (toggles.creatures && ratios.creatures < 0.999) {
@@ -3144,6 +3305,7 @@ function brainLabWorldProbeVisibleRatios(toggles) {
     return {
       plants: 1,
       meatEggs: 1,
+      smallPrey: 1,
       food: 1,
       creatures: 1,
       sound: 1
@@ -3153,22 +3315,27 @@ function brainLabWorldProbeVisibleRatios(toggles) {
   const plants = (scene.resources || []).filter((resource) => resource.kind === "Plant");
   const meat = (scene.resources || []).filter((resource) => resource.kind === "Meat");
   const eggs = scene.eggs || [];
+  const smallPrey = scene.smallPrey || [];
   const creatures = scene.creatures || [];
   const soundSources = creatures.filter((creature) => Number(creature.soundAmplitude || 0) > 0.05);
   const plantCounts = brainLabWorldProbeVisibleCount(plants, isBrainLabWorldProbeResourceVisible);
   const meatCounts = brainLabWorldProbeVisibleCount(meat, isBrainLabWorldProbeResourceVisible);
   const eggCounts = brainLabWorldProbeVisibleCount(eggs, isBrainLabWorldProbeEggVisible);
+  const smallPreyCounts = brainLabWorldProbeVisibleCount(smallPrey, isBrainLabWorldProbeSmallPreyVisible);
   const creatureCounts = brainLabWorldProbeVisibleCount(creatures, isBrainLabWorldProbeCreatureVisible);
   const soundCounts = brainLabWorldProbeVisibleCount(soundSources, (creature) =>
     isBrainLabWorldProbeCreatureVisible(creature) && isBrainLabWorldProbeSoundVisible(creature));
   const enabledFoodTotal = (toggles.plants ? plantCounts.total : 0)
-    + (toggles.meatEggs ? meatCounts.total + eggCounts.total : 0);
+    + (toggles.meatEggs ? meatCounts.total + eggCounts.total : 0)
+    + (toggles.smallPrey ? smallPreyCounts.total : 0);
   const enabledFoodVisible = (toggles.plants ? plantCounts.visible : 0)
-    + (toggles.meatEggs ? meatCounts.visible + eggCounts.visible : 0);
+    + (toggles.meatEggs ? meatCounts.visible + eggCounts.visible : 0)
+    + (toggles.smallPrey ? smallPreyCounts.visible : 0);
 
   return {
     plants: brainLabWorldProbeRatio(plantCounts.visible, plantCounts.total),
     meatEggs: brainLabWorldProbeRatio(meatCounts.visible + eggCounts.visible, meatCounts.total + eggCounts.total),
+    smallPrey: brainLabWorldProbeRatio(smallPreyCounts.visible, smallPreyCounts.total),
     food: brainLabWorldProbeRatio(enabledFoodVisible, enabledFoodTotal),
     creatures: brainLabWorldProbeRatio(creatureCounts.visible, creatureCounts.total),
     sound: brainLabWorldProbeRatio(soundCounts.visible, soundCounts.total)
@@ -3259,6 +3426,21 @@ function buildBrainLabWorldProbeEditPayload(force = false) {
       energy: Number(egg.energy || 0),
       health: Number(egg.health || 1)
     }));
+  const smallPrey = (brainLabWorldProbeScene.smallPrey || [])
+    .filter(isBrainLabWorldProbeSmallPreyVisible)
+    .map((prey) => ({
+      id: Number(prey.id),
+      x: Number(prey.x || 0),
+      y: Number(prey.y || 0),
+      radius: Number(prey.radius || 1),
+      calories: Number(prey.calories || 0),
+      maxCalories: Number(prey.maxCalories || prey.calories || 1),
+      health: Number(prey.health || 0.2),
+      maxHealth: Number(prey.maxHealth || prey.health || 0.2),
+      headingRadians: Number(prey.headingRadians || 0),
+      speed: Number(prey.speed || 0),
+      grabPressure: Number(prey.grabPressure || 0)
+    }));
   const creatures = (brainLabWorldProbeScene.creatures || [])
     .filter(isBrainLabWorldProbeCreatureVisible)
     .map((creature) => ({
@@ -3279,7 +3461,7 @@ function buildBrainLabWorldProbeEditPayload(force = false) {
       isProbeSoundOnly: Boolean(creature.isProbeSoundOnly)
     }));
 
-  return { resources, eggs, creatures };
+  return { resources, eggs, creatures, smallPrey };
 }
 
 function isBrainLabCreatureInput(input) {
