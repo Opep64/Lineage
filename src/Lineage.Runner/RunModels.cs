@@ -352,7 +352,18 @@ public sealed record BrainLabBehaviorProfileComparisonResult(
     int TotalFixtureCount,
     int EvaluatedFixtureCount,
     int SkippedFixtureCount,
+    IReadOnlyList<BrainLabBehaviorProfileCohort> Cohorts,
     IReadOnlyList<BrainLabBehaviorProfileComparisonRow> Rows);
+
+public sealed record BrainLabBehaviorProfileCohort(
+    string Key,
+    string Name,
+    string Summary,
+    int CreatureCount,
+    int RepresentativeCreatureId,
+    IReadOnlyList<int> CreatureIds,
+    IReadOnlyList<string> Traits,
+    IReadOnlyList<string> Fingerprints);
 
 public sealed record BrainLabBehaviorProfileComparisonRow(
     int CreatureId,

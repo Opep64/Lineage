@@ -1407,6 +1407,52 @@ button.scenario-tab.is-active {
   color: var(--ink);
 }
 
+.brain-lab-profile-cohorts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.brain-lab-profile-cohort {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #cfd9e5;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.brain-lab-profile-cohort.is-active {
+  border-color: #7ca4ff;
+  background: #eef5ff;
+}
+
+.brain-lab-profile-cohort strong,
+.brain-lab-profile-cohort span,
+.brain-lab-profile-cohort small,
+.brain-lab-profile-cohort code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.brain-lab-profile-cohort span,
+.brain-lab-profile-cohort small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.brain-lab-profile-load-creature {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 .brain-lab-muted {
   color: var(--muted);
   font-size: 12px;

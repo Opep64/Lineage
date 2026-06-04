@@ -571,6 +571,7 @@ public sealed partial class LineageRunManager
                     fingerprints.Take(8).ToArray());
             })
             .ToArray();
+        var cohorts = CreateBrainLabBehaviorProfileCohorts(rows);
 
         return new BrainLabBehaviorProfileComparisonResult(
             NormalizeArtifactRelativePath(resolvedPath),
@@ -581,7 +582,129 @@ public sealed partial class LineageRunManager
             totalFixtureCount,
             selectedFixtures.Length,
             Math.Max(0, totalFixtureCount - selectedFixtures.Length),
+            cohorts,
             rows);
+    }
+
+    private static IReadOnlyList<BrainLabBehaviorProfileCohort> CreateBrainLabBehaviorProfileCohorts(
+        IReadOnlyList<BrainLabBehaviorProfileComparisonRow> rows)
+    {
+        return rows
+            .Select(row => new
+            {
+                Row = row,
+                Traits = BrainLabBehaviorProfileCohortTraits(row.Profile),
+                FingerprintKeys = row.Fingerprints.Take(4).Select(fingerprint => fingerprint.Key).ToArray(),
+                FingerprintNames = row.Fingerprints.Take(4).Select(fingerprint => fingerprint.Name).ToArray()
+            })
+            .GroupBy(
+                item => BrainLabBehaviorProfileCohortKey(item.Traits, item.FingerprintKeys),
+                StringComparer.Ordinal)
+            .Select((group, index) =>
+            {
+                var items = group.ToArray();
+                var orderedRows = items
+                    .Select(item => item.Row)
+                    .OrderByDescending(row => row.Generation)
+                    .ThenBy(row => row.CreatureId)
+                    .ToArray();
+                var representative = orderedRows[0];
+                var traits = items
+                    .SelectMany(item => item.Traits)
+                    .GroupBy(trait => trait, StringComparer.Ordinal)
+                    .OrderByDescending(traitGroup => traitGroup.Count())
+                    .ThenBy(traitGroup => traitGroup.Key, StringComparer.Ordinal)
+                    .Take(6)
+                    .Select(traitGroup => $"{traitGroup.Key} ({traitGroup.Count()})")
+                    .ToArray();
+                var fingerprints = items
+                    .SelectMany(item => item.FingerprintNames)
+                    .GroupBy(fingerprint => fingerprint, StringComparer.Ordinal)
+                    .OrderByDescending(fingerprintGroup => fingerprintGroup.Count())
+                    .ThenBy(fingerprintGroup => fingerprintGroup.Key, StringComparer.Ordinal)
+                    .Take(6)
+                    .Select(fingerprintGroup => $"{fingerprintGroup.Key} ({fingerprintGroup.Count()})")
+                    .ToArray();
+                var name = traits.Length > 0
+                    ? string.Join(" / ", traits.Take(3).Select(BrainLabBehaviorProfileCohortNamePart))
+                    : $"Cohort {index + 1}";
+                var summary = traits.Length > 0
+                    ? $"{items.Length} creatures matching {string.Join(", ", traits.Take(4))}"
+                    : $"{items.Length} creatures with weak or mixed profile signals";
+
+                return new BrainLabBehaviorProfileCohort(
+                    group.Key,
+                    name,
+                    summary,
+                    items.Length,
+                    representative.CreatureId,
+                    orderedRows.Select(row => row.CreatureId).ToArray(),
+                    traits,
+                    fingerprints);
+            })
+            .OrderByDescending(cohort => cohort.CreatureCount)
+            .ThenBy(cohort => cohort.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> BrainLabBehaviorProfileCohortTraits(BrainLabBehaviorProfile profile)
+    {
+        var traits = new List<string>();
+        foreach (var section in profile.Sections)
+        {
+            if (section.Summary.StartsWith("No clear", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var summary = section.Summary
+                .Replace("strongest pull: ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("strongest scent pattern: ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("strongest sound pattern: ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("strongest creature pattern: ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("priority: ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("tendency: ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                traits.Add($"{section.Name}: {summary}");
+            }
+        }
+
+        return traits;
+    }
+
+    private static string BrainLabBehaviorProfileCohortKey(
+        IReadOnlyList<string> traits,
+        IReadOnlyList<string> fingerprintKeys)
+    {
+        var traitKeys = traits
+            .Take(5)
+            .Select(BrainLabBehaviorProfileCohortToken);
+        var fingerprintKeyPart = fingerprintKeys
+            .Take(4)
+            .Select(BrainLabBehaviorProfileCohortToken);
+        return string.Join("|", traitKeys.Concat(fingerprintKeyPart));
+    }
+
+    private static string BrainLabBehaviorProfileCohortNamePart(string trait)
+    {
+        var index = trait.IndexOf(" (", StringComparison.Ordinal);
+        return index > 0 ? trait[..index] : trait;
+    }
+
+    private static string BrainLabBehaviorProfileCohortToken(string value)
+    {
+        var token = new string(value
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+            .ToArray());
+        while (token.Contains("--", StringComparison.Ordinal))
+        {
+            token = token.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        return token.Trim('-');
     }
 
     private IReadOnlyList<BrainLabProbeTestRow> EvaluateBrainLabProbeTestRows(

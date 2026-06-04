@@ -143,6 +143,7 @@ let brainLabPopulationEvaluation = null;
 let brainLabPresetMatrixResult = null;
 let brainLabProbeTestResult = null;
 let brainLabProfileComparisonResult = null;
+let brainLabProfileComparisonCohortKey = null;
 let brainLabWorldProbeScene = null;
 let brainLabWorldProbeBaseScene = null;
 let brainLabOverrides = {};
@@ -707,6 +708,7 @@ async function loadBrainLabSnapshot() {
   brainLabPresetMatrixResult = null;
   brainLabProbeTestResult = null;
   brainLabProfileComparisonResult = null;
+  brainLabProfileComparisonCohortKey = null;
   brainLabSelectedInputKey = null;
   brainLabWorldProbeScene = null;
   brainLabWorldProbeBaseScene = null;
@@ -3772,6 +3774,7 @@ async function compareBrainLabProfiles() {
   }
 
   brainLabProfileComparisonResult = await response.json();
+  brainLabProfileComparisonCohortKey = null;
   renderBrainLabProfileComparison();
   updateBrainLabButtons();
   brainLabStatus.textContent = [
@@ -3791,16 +3794,25 @@ function renderBrainLabProfileComparison() {
     return;
   }
 
-  const rows = brainLabProfileComparisonResult.rows || [];
+  const cohorts = brainLabProfileComparisonResult.cohorts || [];
+  const selectedCohort = cohorts.find((cohort) => cohort.key === brainLabProfileComparisonCohortKey) || null;
+  const selectedCreatureIds = selectedCohort
+    ? new Set((selectedCohort.creatureIds || []).map((id) => Number(id)))
+    : null;
+  const rows = (brainLabProfileComparisonResult.rows || [])
+    .filter((row) => !selectedCreatureIds || selectedCreatureIds.has(Number(row.creatureId)));
+  const cohortCards = renderBrainLabProfileCohorts(cohorts, selectedCohort);
   brainLabProfileComparison.innerHTML = `
     <div class="brain-lab-profile-comparison-summary">
       <strong>${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} profiled</strong>
       <span>${formatNumber(brainLabProfileComparisonResult.totalCreatureCount)} total creatures</span>
       <span>cap ${formatNumber(brainLabProfileComparisonResult.maxCreatures)}</span>
       <span>${formatNumber(brainLabProfileComparisonResult.evaluatedFixtureCount)} setups</span>
+      ${selectedCohort ? `<span>showing ${formatNumber(rows.length)} in ${escapeHtml(selectedCohort.name)}</span>` : ""}
       ${brainLabProfileComparisonResult.skippedCreatureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedCreatureCount)} creatures skipped by cap</span>` : ""}
       ${brainLabProfileComparisonResult.skippedFixtureCount ? `<span>${formatNumber(brainLabProfileComparisonResult.skippedFixtureCount)} setups skipped by cap</span>` : ""}
     </div>
+    ${cohortCards}
     <table class="brain-lab-profile-comparison-table">
       <thead>
         <tr>
@@ -3822,6 +3834,38 @@ function renderBrainLabProfileComparison() {
   `;
 }
 
+function renderBrainLabProfileCohorts(cohorts, selectedCohort) {
+  if (!cohorts?.length) {
+    return "";
+  }
+
+  const allActive = !selectedCohort ? " is-active" : "";
+  return `
+    <div class="brain-lab-profile-cohorts">
+      <button class="brain-lab-profile-cohort${allActive}" type="button" data-brain-lab-profile-cohort="">
+        <strong>All Profiles</strong>
+        <span>${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} creatures</span>
+      </button>
+      ${cohorts.map((cohort) => renderBrainLabProfileCohort(cohort, selectedCohort?.key === cohort.key)).join("")}
+    </div>
+  `;
+}
+
+function renderBrainLabProfileCohort(cohort, selected) {
+  const traits = (cohort.traits || []).slice(0, 4).join(" | ");
+  const fingerprints = (cohort.fingerprints || []).slice(0, 4).join(" | ");
+  const title = [cohort.summary, traits, fingerprints].filter(Boolean).join(" | ");
+  return `
+    <button class="brain-lab-profile-cohort${selected ? " is-active" : ""}" type="button" data-brain-lab-profile-cohort="${escapeHtml(cohort.key || "")}" title="${escapeHtml(title)}">
+      <strong>${escapeHtml(cohort.name || "Cohort")}</strong>
+      <span>${formatNumber(cohort.creatureCount)} creatures</span>
+      <code>rep #${formatNumber(cohort.representativeCreatureId)}</code>
+      ${traits ? `<small>${escapeHtml(traits)}</small>` : ""}
+      ${fingerprints ? `<small>${escapeHtml(fingerprints)}</small>` : ""}
+    </button>
+  `;
+}
+
 function renderBrainLabProfileComparisonRow(row) {
   const fingerprints = (row.fingerprints || [])
     .slice(0, 4)
@@ -3832,6 +3876,7 @@ function renderBrainLabProfileComparisonRow(row) {
       <td>
         <strong>#${formatNumber(row.creatureId)}</strong>
         <code>gen ${formatNumber(row.generation)}</code>
+        <button class="secondary brain-lab-profile-load-creature" type="button" data-brain-lab-profile-creature="${escapeHtml(row.creatureId)}">Load</button>
       </td>
       <td>
         <strong>${escapeHtml(row.brainArchitectureKind || "unknown")}</strong>
@@ -3865,6 +3910,28 @@ function renderBrainLabProfileComparisonCell(profile, key) {
       ${traits ? `<code>${escapeHtml(traits)}</code>` : ""}
     </td>
   `;
+}
+
+function selectBrainLabProfileCohort(key) {
+  brainLabProfileComparisonCohortKey = key || null;
+  renderBrainLabProfileComparison();
+}
+
+async function loadBrainLabProfileCreature(creatureId) {
+  if (!brainLabSnapshot || !brainLabCreatureSelect) {
+    return;
+  }
+
+  const value = String(creatureId);
+  if (![...brainLabCreatureSelect.options].some((option) => option.value === value)) {
+    brainLabStatus.textContent = `Creature #${formatNumber(creatureId)} is outside the loaded snapshot creature list.`;
+    return;
+  }
+
+  brainLabCreatureSelect.value = value;
+  brainLabStatus.textContent = `Loading creature #${formatNumber(creatureId)}`;
+  await loadBrainLabWorldProbe();
+  await evaluateBrainLab();
 }
 
 async function runBrainLabProbeTests() {
@@ -4248,6 +4315,7 @@ function clearBrainLabPopulation() {
   brainLabPopulationEvaluation = null;
   brainLabProbeTestResult = null;
   brainLabProfileComparisonResult = null;
+  brainLabProfileComparisonCohortKey = null;
   renderBrainLabPopulation();
   renderBrainLabProbeTests();
   renderBrainLabProfileComparison();
@@ -7866,6 +7934,18 @@ compareBrainLabPopulationButton.addEventListener("click", compareBrainLabPopulat
 runBrainLabPresetMatrixButton.addEventListener("click", runBrainLabPresetMatrix);
 compareBrainLabProfilesButton.addEventListener("click", compareBrainLabProfiles);
 runBrainLabProbeTestsButton.addEventListener("click", runBrainLabProbeTests);
+brainLabProfileComparison.addEventListener("click", (event) => {
+  const cohortButton = event.target.closest("[data-brain-lab-profile-cohort]");
+  if (cohortButton) {
+    selectBrainLabProfileCohort(cohortButton.dataset.brainLabProfileCohort || "");
+    return;
+  }
+
+  const creatureButton = event.target.closest("[data-brain-lab-profile-creature]");
+  if (creatureButton) {
+    void loadBrainLabProfileCreature(Number(creatureButton.dataset.brainLabProfileCreature || 0));
+  }
+});
 brainLabWorldProbeFixtureSelect.addEventListener("change", updateBrainLabButtons);
 applyBrainLabWorldProbeFixtureButton.addEventListener("click", applyBrainLabWorldProbeFixture);
 saveBrainLabWorldProbeFixtureButton.addEventListener("click", saveBrainLabWorldProbeFixture);
