@@ -68,7 +68,7 @@ public static class CreatureMetabolism
 
     public static float LocomotionRateMultiplier(CreatureGenome genome)
     {
-        return Pow(NormalizePace(genome.MetabolicPace), 0.3f);
+        return Pow(NormalizePace(genome.MetabolicPace), 0.1f);
     }
 
     public static float EffectiveMaturityAgeSeconds(CreatureGenome genome)

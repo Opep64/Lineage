@@ -2519,7 +2519,7 @@ static void MetabolicPaceScalesHelperRates()
     AssertEqual(MetabolicPaceBand.Low, CreatureMetabolism.PaceBand(slow), "Slow pace band");
     AssertClose(MathF.Pow(2f, 1.1f), CreatureMetabolism.BasalCostMultiplier(fast), 0.000001, "Fast basal multiplier");
     AssertClose(MathF.Pow(2f, 0.85f), CreatureMetabolism.EggProductionRateMultiplier(fast), 0.000001, "Fast egg production multiplier");
-    AssertClose(MathF.Pow(2f, 0.3f), CreatureMetabolism.LocomotionRateMultiplier(fast), 0.000001, "Fast locomotion multiplier");
+    AssertClose(MathF.Pow(2f, 0.1f), CreatureMetabolism.LocomotionRateMultiplier(fast), 0.000001, "Fast locomotion multiplier");
     AssertTrue(
         CreatureMetabolism.BasalCostMultiplier(fast) - 1f
             > CreatureMetabolism.EggProductionRateMultiplier(fast) - 1f,
