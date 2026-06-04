@@ -66,6 +66,7 @@ var tests = new (string Name, Action Body)[]
     ("Metabolic pace scales helper rates", MetabolicPaceScalesHelperRates),
     ("Metabolic pace scales basal drain and cooldown", MetabolicPaceScalesBasalDrainAndCooldown),
     ("Metabolic pace speeds life-history systems", MetabolicPaceSpeedsLifeHistorySystems),
+    ("Metabolic pace scales locomotion", MetabolicPaceScalesLocomotion),
     ("Fat storage preserves egg reserve priority", FatStoragePreservesEggReservePriority),
     ("Fat storage releases before starvation death", FatStorageReleasesBeforeStarvationDeath),
     ("Reproduction builds egg reserve before laying", ReproductionBuildsEggReserveBeforeLaying),
@@ -2515,13 +2516,14 @@ static void MetabolicPaceScalesHelperRates()
     AssertEqual(MetabolicPaceBand.High, CreatureMetabolism.PaceBand(fast), "Fast pace band");
     AssertEqual(MetabolicPaceBand.Low, CreatureMetabolism.PaceBand(slow), "Slow pace band");
     AssertClose(MathF.Pow(2f, 1.25f), CreatureMetabolism.BasalCostMultiplier(fast), 0.000001, "Fast basal multiplier");
-    AssertClose(MathF.Pow(2f, 0.6f), CreatureMetabolism.EggProductionRateMultiplier(fast), 0.000001, "Fast egg production multiplier");
+    AssertClose(MathF.Pow(2f, 0.85f), CreatureMetabolism.EggProductionRateMultiplier(fast), 0.000001, "Fast egg production multiplier");
+    AssertClose(MathF.Pow(2f, 0.3f), CreatureMetabolism.LocomotionRateMultiplier(fast), 0.000001, "Fast locomotion multiplier");
     AssertTrue(
         CreatureMetabolism.BasalCostMultiplier(fast) - 1f
             > CreatureMetabolism.EggProductionRateMultiplier(fast) - 1f,
         "Fast pace should make basal penalty steeper than egg-production benefit");
-    AssertClose(100f / MathF.Pow(2f, 0.7f), CreatureMetabolism.EffectiveMaturityAgeSeconds(fast), 0.000001, "Fast effective maturity age");
-    AssertClose(100f / MathF.Pow(0.5f, 0.7f), CreatureMetabolism.EffectiveMaturityAgeSeconds(slow), 0.000001, "Slow effective maturity age");
+    AssertClose(100f / MathF.Pow(2f, 0.85f), CreatureMetabolism.EffectiveMaturityAgeSeconds(fast), 0.000001, "Fast effective maturity age");
+    AssertClose(100f / MathF.Pow(0.5f, 0.85f), CreatureMetabolism.EffectiveMaturityAgeSeconds(slow), 0.000001, "Slow effective maturity age");
 }
 
 static void MetabolicPaceScalesBasalDrainAndCooldown()
@@ -2637,6 +2639,36 @@ static void MetabolicPaceSpeedsLifeHistorySystems()
         healing.State.Creatures[0].LastHealingReceived,
         0.000001,
         "Fast pace healing rate");
+}
+
+static void MetabolicPaceScalesLocomotion()
+{
+    var fastGenome = CreatureGenome.Baseline with
+    {
+        MaxSpeed = 20f,
+        MaxTurnRadiansPerSecond = 4f,
+        MetabolicPace = 2f,
+        MaturityAgeSeconds = 0f
+    };
+    var slowGenome = fastGenome with { MetabolicPace = 0.5f };
+    var adult = new CreatureState { AgeSeconds = 100f };
+
+    AssertClose(
+        20f * CreatureMetabolism.LocomotionRateMultiplier(fastGenome),
+        CreatureGrowth.EffectiveMaxSpeed(adult, fastGenome),
+        0.000001,
+        "Fast pace effective speed");
+    AssertClose(
+        4f * CreatureMetabolism.LocomotionRateMultiplier(fastGenome),
+        CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(adult, fastGenome),
+        0.000001,
+        "Fast pace effective turn");
+    AssertTrue(
+        CreatureGrowth.EffectiveMaxSpeed(adult, fastGenome) > CreatureGrowth.EffectiveMaxSpeed(adult, slowGenome),
+        "Fast pace should move faster than slow pace");
+    AssertTrue(
+        CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(adult, fastGenome) > CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(adult, slowGenome),
+        "Fast pace should turn faster than slow pace");
 }
 
 static void FatStoragePreservesEggReservePriority()
@@ -12414,16 +12446,39 @@ static void ScenarioPressureKnobsSeedStartingGenome()
 
     simulation.Step();
 
-    var biome = simulation.State.Biomes.GetKindAt(simulation.State.Creatures[0].Position);
+    var creature = simulation.State.Creatures[0];
+    var biome = simulation.State.Biomes.GetKindAt(creature.Position);
+    var growthFactor = CreatureGrowth.GrowthFactor(creature, genome);
+    var preLocomotionSpeed = genome.MaxSpeed
+        * MathF.Sqrt(growthFactor)
+        * CreatureGrowth.FatSpeedMultiplier(creature, genome);
+    var preLocomotionTurn = genome.MaxTurnRadiansPerSecond * MathF.Sqrt(growthFactor);
     var metabolicPaceExtraBasal = scenario.BasalEnergyPerSecond
         * scenario.CreateBiomeBasalCostProfile().For(biome)
         * (CreatureMetabolism.BasalCostMultiplier(genome) - 1f);
     var metabolicPaceExtraDigestionUpkeep =
-        (CreatureGrowth.EffectiveDigestionCaloriesPerSecond(simulation.State.Creatures[0], genome) - genome.DigestionCaloriesPerSecond)
+        (CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) - genome.DigestionCaloriesPerSecond)
         * scenario.DigestionRateEnergyCostPerSecond;
+    var metabolicPaceExtraLocomotionUpkeep =
+        (CreatureGrowth.EffectiveMaxSpeed(creature, genome) - preLocomotionSpeed)
+        * scenario.MaxSpeedEnergyCostPerSecond
+        + (CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome) - preLocomotionTurn)
+        * scenario.TurnRateEnergyCostPerSecond;
+    var preLocomotionMovementSpeed = preLocomotionSpeed * creature.Actions.MoveForward;
+    var metabolicPaceExtraMovementCost =
+        genome.MovementEnergyPerSecond
+        * scenario.CreateBiomeMovementCostProfile().For(biome)
+        * growthFactor
+        * CreatureGrowth.FatMovementCostMultiplier(creature, genome)
+        * (MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, scenario.MovementSpeedCostExponent)
+            - MovementSystem.CalculateSpeedCostMultiplier(preLocomotionMovementSpeed, scenario.MovementSpeedCostExponent));
     AssertClose(
-        7.608353f - metabolicPaceExtraBasal - metabolicPaceExtraDigestionUpkeep,
-        simulation.State.Creatures[0].Energy,
+        7.608353f
+            - metabolicPaceExtraBasal
+            - metabolicPaceExtraDigestionUpkeep
+            - metabolicPaceExtraLocomotionUpkeep
+            - metabolicPaceExtraMovementCost,
+        creature.Energy,
         0.00001,
         "Scenario energy pressure");
 }

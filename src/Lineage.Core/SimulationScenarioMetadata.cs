@@ -241,7 +241,7 @@ public static class SimulationScenarioMetadata
             "ExtinctPayloadPruneIntervalTicks" => "How often survivor-ancestry-aware genome and brain payload compaction runs.",
             "RtNeatHiddenNodeEnergyCostPerSecond" => "Metabolic upkeep charged for each hidden node in an rtNEAT graph brain.",
             "RtNeatEnabledConnectionEnergyCostPerSecond" => "Metabolic upkeep charged for each enabled connection in an rtNEAT graph brain.",
-            "MetabolicPace" => "Starting life-history pace. Higher values burn more basal energy while speeding digestion, maturity, reproduction, healing, and fertility aging.",
+            "MetabolicPace" => "Starting life-history pace. Higher values burn more basal energy while speeding digestion, maturity, reproduction, healing, fertility aging, and locomotion.",
             "HealingDelaySeconds" => "Time after taking damage before passive healing can begin.",
             "HealingHealthFractionPerSecond" => "Fraction of maximum health restored per second once passive healing is active.",
             "HealingEnergyCostPerHealth" => "Energy spent for each point of health restored by passive healing.",

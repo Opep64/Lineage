@@ -44,12 +44,17 @@ public static class CreatureGrowth
 
     public static float EffectiveMaxSpeed(CreatureState creature, CreatureGenome genome)
     {
-        return genome.MaxSpeed * MathF.Sqrt(GrowthFactor(creature, genome)) * FatSpeedMultiplier(creature, genome);
+        return genome.MaxSpeed
+            * MathF.Sqrt(GrowthFactor(creature, genome))
+            * CreatureMetabolism.LocomotionRateMultiplier(genome)
+            * FatSpeedMultiplier(creature, genome);
     }
 
     public static float EffectiveMaxTurnRadiansPerSecond(CreatureState creature, CreatureGenome genome)
     {
-        return genome.MaxTurnRadiansPerSecond * MathF.Sqrt(GrowthFactor(creature, genome));
+        return genome.MaxTurnRadiansPerSecond
+            * MathF.Sqrt(GrowthFactor(creature, genome))
+            * CreatureMetabolism.LocomotionRateMultiplier(genome);
     }
 
     public static float EffectiveSenseRadius(CreatureState creature, CreatureGenome genome)

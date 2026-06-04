@@ -35,32 +35,37 @@ public static class CreatureMetabolism
 
     public static float DigestionRateMultiplier(CreatureGenome genome)
     {
-        return Pow(NormalizePace(genome.MetabolicPace), 0.5f);
+        return Pow(NormalizePace(genome.MetabolicPace), 0.65f);
     }
 
     public static float EggProductionRateMultiplier(CreatureGenome genome)
     {
-        return Pow(NormalizePace(genome.MetabolicPace), 0.6f);
+        return Pow(NormalizePace(genome.MetabolicPace), 0.85f);
     }
 
     public static float CooldownRecoveryMultiplier(CreatureGenome genome)
     {
-        return Pow(NormalizePace(genome.MetabolicPace), 0.4f);
+        return Pow(NormalizePace(genome.MetabolicPace), 0.65f);
     }
 
     public static float DevelopmentRateMultiplier(CreatureGenome genome)
     {
-        return Pow(NormalizePace(genome.MetabolicPace), 0.7f);
+        return Pow(NormalizePace(genome.MetabolicPace), 0.85f);
     }
 
     public static float HealingRateMultiplier(CreatureGenome genome)
     {
-        return Pow(NormalizePace(genome.MetabolicPace), 0.5f);
+        return Pow(NormalizePace(genome.MetabolicPace), 0.65f);
     }
 
     public static float BiologicalAgeRateMultiplier(CreatureGenome genome)
     {
         return Pow(NormalizePace(genome.MetabolicPace), 0.5f);
+    }
+
+    public static float LocomotionRateMultiplier(CreatureGenome genome)
+    {
+        return Pow(NormalizePace(genome.MetabolicPace), 0.3f);
     }
 
     public static float EffectiveMaturityAgeSeconds(CreatureGenome genome)
