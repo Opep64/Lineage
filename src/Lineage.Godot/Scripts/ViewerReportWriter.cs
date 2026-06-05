@@ -210,6 +210,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Plant payoff traces", FormatPlantPayoffTraces(snapshot));
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
         WriteMetric(writer, "Memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Injury memory", $"{FormatPercent(Share(snapshot.ActiveInjuryMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveInjuryMemoryCreatureCount}) @ {snapshot.AverageInjuryMemoryStrength:0.###}");
         WriteMetric(writer, "Deaths", state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Starvation deaths", state.Stats.StarvationDeathCount.ToString(CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rotten meat deaths", state.Stats.RottenMeatDeathCount.ToString(CultureInfo.InvariantCulture));
@@ -316,6 +317,8 @@ public static class ViewerReportWriter
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
         WriteMetric(writer, "Avg memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Active injury memory", $"{FormatPercent(Share(snapshot.ActiveInjuryMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveInjuryMemoryCreatureCount})");
+        WriteMetric(writer, "Avg injury memory strength", snapshot.AverageInjuryMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Food contact", $"{FormatPercent(snapshot.MemoryUserFoodContactShare)} memory / {FormatPercent(snapshot.NonMemoryUserFoodContactShare)} non");
         WriteMetric(writer, "Eating", $"{FormatPercent(snapshot.MemoryUserEatingShare)} memory / {FormatPercent(snapshot.NonMemoryUserEatingShare)} non");
         WriteMetric(writer, "Food success", $"{FormatPercent(snapshot.MemoryUserAverageRecentFoodSuccess)} memory / {FormatPercent(snapshot.NonMemoryUserAverageRecentFoodSuccess)} non");
@@ -3104,6 +3107,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Risk response", summary.RiskResponse);
         WriteMetric(writer, "Terrain response", summary.TerrainResponse);
         WriteMetric(writer, "Collision response", summary.CollisionResponse);
+        WriteMetric(writer, "Injury memory response", summary.InjuryMemoryResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
         WriteMetric(writer, "Fresh meat preference", summary.FreshMeatPreferenceScore.ToString("0.###", CultureInfo.InvariantCulture));

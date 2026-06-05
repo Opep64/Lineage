@@ -80,6 +80,8 @@ public static class BehaviorAssay
         var identityEggContact = new BehaviorAssayAccumulator();
         var obstacleBlocked = new BehaviorAssayAccumulator();
         var creatureBlocked = new BehaviorAssayAccumulator();
+        var injuryMemoryAhead = new BehaviorAssayAccumulator();
+        var injuryMemoryRight = new BehaviorAssayAccumulator();
         var slowTerrainHere = new BehaviorAssayAccumulator();
         var slowTerrainAhead = new BehaviorAssayAccumulator();
         var easierTerrainAhead = new BehaviorAssayAccumulator();
@@ -188,6 +190,8 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateIdentityEggContactSenses(), inputs, outputs, ref identityEggContact);
             Accumulate(brain, genome, CreateObstacleBlockedSenses(), inputs, outputs, ref obstacleBlocked);
             Accumulate(brain, genome, CreateCreatureBlockedSenses(), inputs, outputs, ref creatureBlocked);
+            Accumulate(brain, genome, CreateInjuryMemoryAheadSenses(), inputs, outputs, ref injuryMemoryAhead);
+            Accumulate(brain, genome, CreateInjuryMemoryRightSenses(), inputs, outputs, ref injuryMemoryRight);
             Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
             Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
             Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
@@ -255,6 +259,8 @@ public static class BehaviorAssay
             identityCreatureContact.ToResult("Identity creature contact"),
             obstacleBlocked.ToResult("Obstacle blocked"),
             creatureBlocked.ToResult("Creature body blocked"),
+            injuryMemoryAhead.ToResult("Injury memory ahead"),
+            injuryMemoryRight.ToResult("Injury memory right"),
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
@@ -274,6 +280,7 @@ public static class BehaviorAssay
             Ecotype = ClassifyEcotype(summary),
             TerrainResponse = ClassifyTerrainResponse(summary),
             CollisionResponse = ClassifyCollisionResponse(summary),
+            InjuryMemoryResponse = ClassifyInjuryMemoryResponse(summary),
             ReproductionTendency = ClassifyReproductionTendency(summary),
             FreshMeatPreferenceScore = CalculateFreshMeatPreferenceScore(summary),
             RottenScentAvoidanceScore = CalculateRottenScentAvoidanceScore(summary),
@@ -808,6 +815,24 @@ public static class BehaviorAssay
             relativeBodySize: 0.05f,
             approachRate: 0.35f,
             facingAlignment: 0.35f);
+    }
+
+    private static CreatureSenseState CreateInjuryMemoryAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            InjuryMemoryStrength = 0.8f,
+            InjuryMemoryDirectionForward = 0.8f
+        };
+    }
+
+    private static CreatureSenseState CreateInjuryMemoryRightSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            InjuryMemoryStrength = 0.8f,
+            InjuryMemoryDirectionRight = 0.8f
+        };
     }
 
     private static CreatureSenseState WithCreatureSector(
@@ -1431,6 +1456,42 @@ public static class BehaviorAssay
         return "little body-block differentiation";
     }
 
+    private static string ClassifyInjuryMemoryResponse(BehaviorAssaySummary summary)
+    {
+        var baselineMove = summary.Baseline.MoveForward;
+        var aheadMove = summary.InjuryMemoryAhead.MoveForward;
+        var aheadTurn = Math.Abs(summary.InjuryMemoryAhead.Turn);
+        var rightTurn = summary.InjuryMemoryRight.Turn;
+        var attack = MathF.Max(summary.InjuryMemoryAhead.AttackShare, summary.InjuryMemoryRight.AttackShare);
+
+        if (attack > 0.65f)
+        {
+            return "retaliates to injury memory";
+        }
+
+        if (rightTurn < -0.2f)
+        {
+            return "steers away from injury memory";
+        }
+
+        if (rightTurn > 0.2f)
+        {
+            return "steers toward injury memory";
+        }
+
+        if (aheadMove < baselineMove - 0.15f || aheadTurn > 0.25f)
+        {
+            return "cautious around injury memory";
+        }
+
+        if (aheadMove > baselineMove + 0.15f)
+        {
+            return "approaches injury memory";
+        }
+
+        return "little injury-memory differentiation";
+    }
+
     private static string ClassifyEcotype(BehaviorAssaySummary summary)
     {
         if (summary.EvaluatedCreatureCount == 0)
@@ -1707,6 +1768,8 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult IdentityCreatureContact,
     BehaviorAssayResult ObstacleBlocked,
     BehaviorAssayResult CreatureBlocked,
+    BehaviorAssayResult InjuryMemoryAhead,
+    BehaviorAssayResult InjuryMemoryRight,
     BehaviorAssayResult SlowTerrainHere,
     BehaviorAssayResult SlowTerrainAhead,
     BehaviorAssayResult EasierTerrainAhead,
@@ -1731,6 +1794,8 @@ public readonly record struct BehaviorAssaySummary(
     public string TerrainResponse { get; init; } = "not evaluated";
 
     public string CollisionResponse { get; init; } = "not evaluated";
+
+    public string InjuryMemoryResponse { get; init; } = "not evaluated";
 
     public string ReproductionTendency { get; init; } = "not evaluated";
 
@@ -1797,6 +1862,8 @@ public readonly record struct BehaviorAssaySummary(
         IdentityCreatureContact,
         ObstacleBlocked,
         CreatureBlocked,
+        InjuryMemoryAhead,
+        InjuryMemoryRight,
         SlowTerrainHere,
         SlowTerrainAhead,
         EasierTerrainAhead,

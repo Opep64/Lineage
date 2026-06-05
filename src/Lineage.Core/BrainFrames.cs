@@ -160,7 +160,10 @@ public readonly record struct BrainInputFrame(
                 senses.TenderPlantPayoffTrace,
                 senses.RichPlantPayoffTrace,
                 senses.ToughPlantPayoffTrace,
-                senses.RecentFoodEnergyYield));
+                senses.RecentFoodEnergyYield,
+                senses.InjuryMemoryDirectionForward,
+                senses.InjuryMemoryDirectionRight,
+                senses.InjuryMemoryStrength));
     }
 }
 
@@ -299,7 +302,10 @@ public readonly record struct InternalInputFrame(
     float TenderPlantPayoffTrace,
     float RichPlantPayoffTrace,
     float ToughPlantPayoffTrace,
-    float RecentFoodEnergyYield);
+    float RecentFoodEnergyYield,
+    float InjuryMemoryDirectionForward,
+    float InjuryMemoryDirectionRight,
+    float InjuryMemoryStrength);
 
 /// <summary>
 /// Architecture-neutral action intents produced by a brain before later systems resolve them.

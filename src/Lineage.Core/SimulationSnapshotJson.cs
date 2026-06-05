@@ -322,6 +322,10 @@ public static class SimulationSnapshotJson
             creature.LastEnergyOverflowCalories = 0f;
         }
 
+        creature.InjuryMemoryVector = creature.InjuryMemoryVector.IsFinite
+            ? creature.InjuryMemoryVector.ClampedLength(1f)
+            : SimVector2.Zero;
+
         if (creature.GutMeatCalories <= 0f)
         {
             creature.GutMeatQualityCalories = 0f;

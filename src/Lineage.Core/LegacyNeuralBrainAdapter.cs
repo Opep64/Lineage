@@ -121,6 +121,9 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.RightThermalMismatchInput] = frame.Body.RightThermalMismatch;
         inputs[NeuralBrainSchema.EnergyFullnessInput] = frame.Internal.EnergyFullnessRatio;
         inputs[NeuralBrainSchema.GutFullnessInput] = frame.Internal.GutFullnessRatio;
+        inputs[NeuralBrainSchema.InjuryMemoryForwardInput] = frame.Internal.InjuryMemoryDirectionForward;
+        inputs[NeuralBrainSchema.InjuryMemoryRightInput] = frame.Internal.InjuryMemoryDirectionRight;
+        inputs[NeuralBrainSchema.InjuryMemoryStrengthInput] = frame.Internal.InjuryMemoryStrength;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

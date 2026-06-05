@@ -422,6 +422,12 @@ public sealed record SimulationScenario
     public int CreatureCollisionSeparationIterations { get; init; } =
         CreatureCollisionSystem.DefaultSeparationIterations;
 
+    public bool EnableInjuryMemory { get; init; } = true;
+
+    public float InjuryMemoryHalfLifeSeconds { get; init; } = InjuryMemorySystem.DefaultHalfLifeSeconds;
+
+    public float InjuryMemoryDamageSignalScale { get; init; } = InjuryMemorySystem.DefaultDamageSignalScale;
+
     public float HealingDelaySeconds { get; init; } = CreatureHealingSystem.DefaultHealingDelaySeconds;
 
     public float HealingHealthFractionPerSecond { get; init; } =
@@ -632,6 +638,8 @@ public sealed record SimulationScenario
         EnsureNonNegative(CreatureCollisionSafeImpactSpeed, nameof(CreatureCollisionSafeImpactSpeed));
         EnsureNonNegative(CreatureCollisionDamageScale, nameof(CreatureCollisionDamageScale));
         EnsurePositive(CreatureCollisionSeparationIterations, nameof(CreatureCollisionSeparationIterations));
+        EnsurePositive(InjuryMemoryHalfLifeSeconds, nameof(InjuryMemoryHalfLifeSeconds));
+        EnsureNonNegative(InjuryMemoryDamageSignalScale, nameof(InjuryMemoryDamageSignalScale));
         EnsureNonNegative(HealingDelaySeconds, nameof(HealingDelaySeconds));
         EnsureNonNegative(HealingHealthFractionPerSecond, nameof(HealingHealthFractionPerSecond));
         EnsureNonNegative(HealingEnergyCostPerHealth, nameof(HealingEnergyCostPerHealth));

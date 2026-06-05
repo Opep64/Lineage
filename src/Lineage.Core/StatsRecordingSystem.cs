@@ -116,6 +116,7 @@ public sealed class StatsRecordingSystem(
         var totalRichPlantPayoffTrace = 0f;
         var totalToughPlantPayoffTrace = 0f;
         var totalMemoryStrength = 0f;
+        var totalInjuryMemoryStrength = 0f;
         var memoryUserCaloriesEaten = 0f;
         var nonMemoryUserCaloriesEaten = 0f;
         var memoryUserDistanceTraveled = 0f;
@@ -222,6 +223,7 @@ public sealed class StatsRecordingSystem(
         var reproductionReadyCreatureCount = 0;
         var reproductionIntentCreatureCount = 0;
         var activeMemoryCreatureCount = 0;
+        var activeInjuryMemoryCreatureCount = 0;
         var obstacleBlockedCreatureCount = 0;
         var obstacleSensedCreatureCount = 0;
         var nonMemoryCreatureCount = 0;
@@ -368,6 +370,15 @@ public sealed class StatsRecordingSystem(
             totalToughPlantPayoffTrace += creature.Senses.ToughPlantPayoffTrace;
             var memoryStrength = Math.Clamp(creature.MemoryVector.Length, 0f, 1f);
             totalMemoryStrength += memoryStrength;
+            var injuryMemoryStrength = creature.InjuryMemoryVector.IsFinite
+                ? Math.Clamp(creature.InjuryMemoryVector.Length, 0f, 1f)
+                : 0f;
+            totalInjuryMemoryStrength += injuryMemoryStrength;
+            if (injuryMemoryStrength > 0.05f)
+            {
+                activeInjuryMemoryCreatureCount++;
+            }
+
             var isActiveMemoryUser = memoryStrength > 0.05f;
             if (isActiveMemoryUser)
             {
@@ -1446,6 +1457,8 @@ public sealed class StatsRecordingSystem(
             totalToughPlantPayoffTrace / divisor,
             activeMemoryCreatureCount,
             totalMemoryStrength / divisor,
+            activeInjuryMemoryCreatureCount,
+            totalInjuryMemoryStrength / divisor,
             memoryUserFoodContactCount / (float)memoryUserDivisor,
             nonMemoryUserFoodContactCount / (float)nonMemoryUserDivisor,
             memoryUserEatingCount / (float)memoryUserDivisor,

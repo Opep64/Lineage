@@ -48,6 +48,9 @@ public static class SimulationPipelines
         float creatureCollisionSafeImpactSpeed = CreatureCollisionSystem.DefaultSafeImpactSpeed,
         float creatureCollisionDamageScale = CreatureCollisionSystem.DefaultDamageScale,
         int creatureCollisionSeparationIterations = CreatureCollisionSystem.DefaultSeparationIterations,
+        bool enableInjuryMemory = true,
+        float injuryMemoryHalfLifeSeconds = InjuryMemorySystem.DefaultHalfLifeSeconds,
+        float injuryMemoryDamageSignalScale = InjuryMemorySystem.DefaultDamageSignalScale,
         bool relocateDepletedResources = true,
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
@@ -155,6 +158,10 @@ public static class SimulationPipelines
             new CreatureSpatialIndexRebuildSystem(spatialIndex),
             new EatingSystem(spatialIndex),
             new DigestionSystem(rottenMeatDamagePerRawKcal),
+            new InjuryMemorySystem(
+                enableInjuryMemory,
+                injuryMemoryHalfLifeSeconds,
+                injuryMemoryDamageSignalScale),
             new ReproductionSystem(
                 requireReproductionIntent: requireReproductionIntent,
                 mutationPolicy: WorldMutationPolicy.Uniform(
@@ -248,6 +255,9 @@ public static class SimulationPipelines
         float creatureCollisionSafeImpactSpeed = CreatureCollisionSystem.DefaultSafeImpactSpeed,
         float creatureCollisionDamageScale = CreatureCollisionSystem.DefaultDamageScale,
         int creatureCollisionSeparationIterations = CreatureCollisionSystem.DefaultSeparationIterations,
+        bool enableInjuryMemory = true,
+        float injuryMemoryHalfLifeSeconds = InjuryMemorySystem.DefaultHalfLifeSeconds,
+        float injuryMemoryDamageSignalScale = InjuryMemorySystem.DefaultDamageSignalScale,
         bool relocateDepletedResources = true,
         float resourceClusterStrength = 0f,
         float resourceClusterRadius = 180f,
@@ -394,6 +404,10 @@ public static class SimulationPipelines
                 biteRangePadding,
                 CreatureGrabSystem.DefaultHoldRangePadding,
                 meatDecayCaloriesPerSecond),
+            new InjuryMemorySystem(
+                enableInjuryMemory,
+                injuryMemoryHalfLifeSeconds,
+                injuryMemoryDamageSignalScale),
             new FatStorageSystem(
                 fatDepositEnergyRatio,
                 fatWithdrawEnergyRatio,

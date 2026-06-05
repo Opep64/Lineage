@@ -286,6 +286,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             ? Stopwatch.GetTimestamp()
             : 0L;
         ApplyMemorySense(ref senses, creature, forward, right);
+        ApplyInjuryMemorySense(ref senses, creature, forward, right);
         sensingProfile?.RecordMemorySense(Stopwatch.GetTimestamp() - memorySenseStartedAt);
 
         if (!shouldRefreshWorldSense)
@@ -1296,6 +1297,30 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.MemoryStrength = memoryStrength;
         senses.MemoryDirectionForward = Math.Clamp(SimVector2.Dot(memory, forward), -1f, 1f);
         senses.MemoryDirectionRight = Math.Clamp(SimVector2.Dot(memory, right), -1f, 1f);
+    }
+
+    private static void ApplyInjuryMemorySense(
+        ref CreatureSenseState senses,
+        CreatureState creature,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        senses.InjuryMemoryStrength = 0f;
+        senses.InjuryMemoryDirectionForward = 0f;
+        senses.InjuryMemoryDirectionRight = 0f;
+
+        var memory = creature.InjuryMemoryVector.IsFinite
+            ? creature.InjuryMemoryVector.ClampedLength(1f)
+            : SimVector2.Zero;
+        var memoryStrength = Math.Clamp(memory.Length, 0f, 1f);
+        if (memoryStrength <= 0.000001f)
+        {
+            return;
+        }
+
+        senses.InjuryMemoryStrength = memoryStrength;
+        senses.InjuryMemoryDirectionForward = Math.Clamp(SimVector2.Dot(memory, forward), -1f, 1f);
+        senses.InjuryMemoryDirectionRight = Math.Clamp(SimVector2.Dot(memory, right), -1f, 1f);
     }
 
     private static float SpeedMultiplierToDrag(float speedMultiplier)

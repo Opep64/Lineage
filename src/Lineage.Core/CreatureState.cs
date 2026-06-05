@@ -60,6 +60,11 @@ public struct CreatureState
     /// </summary>
     public SimVector2 MemoryVector { get; set; }
 
+    /// <summary>
+    /// Decaying world-space direction toward the recent source of creature-inflicted injury.
+    /// </summary>
+    public SimVector2 InjuryMemoryVector { get; set; }
+
     public float AgeSeconds { get; set; }
 
     public float Energy { get; set; }

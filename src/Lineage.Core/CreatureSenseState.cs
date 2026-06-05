@@ -455,6 +455,21 @@ public struct CreatureSenseState
     public float RecentFoodEnergyYield { get; set; }
 
     /// <summary>
+    /// Decaying injury source memory projected onto the creature's forward direction.
+    /// </summary>
+    public float InjuryMemoryDirectionForward { get; set; }
+
+    /// <summary>
+    /// Decaying injury source memory projected onto the creature's right direction.
+    /// </summary>
+    public float InjuryMemoryDirectionRight { get; set; }
+
+    /// <summary>
+    /// Magnitude of the creature's current injury source memory, clamped to [0, 1].
+    /// </summary>
+    public float InjuryMemoryStrength { get; set; }
+
+    /// <summary>
     /// Persistent memory vector projected onto the creature's forward direction.
     /// </summary>
     public float MemoryDirectionForward { get; set; }

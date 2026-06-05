@@ -267,6 +267,8 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageToughPlantPayoffTrace,
     int ActiveMemoryCreatureCount,
     float AverageMemoryStrength,
+    int ActiveInjuryMemoryCreatureCount,
+    float AverageInjuryMemoryStrength,
     float MemoryUserFoodContactShare,
     float NonMemoryUserFoodContactShare,
     float MemoryUserEatingShare,
