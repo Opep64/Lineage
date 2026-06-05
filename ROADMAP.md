@@ -28,7 +28,7 @@ Status: active
   - predator/prey starter balance.
 - Add a catalog comparison report that summarizes viability, final population, births/deaths, meal gaps, brain architecture, body traits, and behavior assays.
 - Add explicit profile/schema version migration notes whenever senses or outputs change.
-- Consider brain editors later, starting with inspection and manual weight nudge tools before full visual editing.
+- Consider brain viewers/editors later, starting with probe-linked contribution traces and manual weight nudge tools before full visual editing.
 - Keep starter bodies and starter brains easy to export from runs so successful or interesting lineages can become future scenario founders.
 
 ## Brain Architecture

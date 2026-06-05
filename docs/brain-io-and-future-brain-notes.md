@@ -295,6 +295,39 @@ Potential hidden-node growth implementation:
 5. Initialize the new node neutrally or with tiny random weights.
 6. Add some cost, pressure, or cap so hidden count does not bloat without benefit.
 
+## Deferred Brain Viewer And Engineering Notes
+
+Status: defer until simulation mechanics, metabolism costs, and the brain I/O contract are more stable.
+
+The likely useful shape is not a full always-visible drawing of every node and edge. Dense and hybrid brains can have too many inputs, outputs, hidden nodes, and potential weights for a complete graph to stay readable. A full graph is most promising for sparse `RtNeatGraph` brains, where topology and enabled connections are meaningful.
+
+Near-term viewer idea:
+
+1. Add a probe-linked trace view in Brain Lab.
+2. Select a creature, probe setup, and output such as turn, eat, attack, reproduce, move, grab, or sound.
+3. Show the strongest active inputs, hidden nodes, and weighted paths pushing that output up or down.
+4. Treat this as a contribution trace, not a perfect causal explanation, especially for nonlinear, recurrent, memory-owning, or stateful future brains.
+5. For dense and hybrid brains, prefer top-K tables, grouped heatmaps, and filtered path views over drawing every possible edge.
+6. For rtNEAT brains, render the sparse graph with inactive edges faded, active nodes highlighted, edge thickness based on approximate contribution, and color showing positive versus negative influence.
+
+Engineering/editing idea:
+
+1. Start with inspection and small manual nudge tools rather than a full visual brain editor.
+2. Let the user choose an output lens, such as "turn toward plant" or "attack creature."
+3. Show the top positive and negative contributors behind that output in the current probe.
+4. Allow limited edits such as scale this input group, reduce sound influence, invert a selected path, mute an output, nudge a specific weight, enable or disable an rtNEAT connection, or clone plus perturb the brain.
+5. Re-run the same probe immediately after each edit so the effect is visible.
+6. Save edited brains as engineered brain profiles/species that can later be injected into scenarios.
+
+The required technical foundation is an introspection mode on brain evaluation. It should optionally record input activations, hidden activations, output activations, gates, and approximate per-path contribution. This is straightforward for feed-forward dense and sparse graphs, more nuanced for recurrent or plastic brains, and should stay per-selected-creature/probe/output rather than population-wide for performance and readability.
+
+Good first MVP:
+
+- Add an `Explain Output` action beside Brain Lab output rows.
+- Return the top 10-25 positive and negative contributors for that selected creature and probe setup.
+- Add a sparse graph visualization only for rtNEAT after the text/table trace proves useful.
+- Delay heavier brain engineering until metabolism, costs, and mechanics stop changing the meaning of a "good" brain.
+
 ## Future Brain Types Under Consideration
 
 ### Two-Layer Neural
