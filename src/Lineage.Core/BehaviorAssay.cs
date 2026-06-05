@@ -78,6 +78,8 @@ public static class BehaviorAssay
         var lineageCreatureContact = new BehaviorAssayAccumulator();
         var identityCreatureContact = new BehaviorAssayAccumulator();
         var identityEggContact = new BehaviorAssayAccumulator();
+        var obstacleBlocked = new BehaviorAssayAccumulator();
+        var creatureBlocked = new BehaviorAssayAccumulator();
         var slowTerrainHere = new BehaviorAssayAccumulator();
         var slowTerrainAhead = new BehaviorAssayAccumulator();
         var easierTerrainAhead = new BehaviorAssayAccumulator();
@@ -184,6 +186,8 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateLineageCreatureContactSenses(), inputs, outputs, ref lineageCreatureContact);
             Accumulate(brain, genome, CreateIdentityCreatureContactSenses(), inputs, outputs, ref identityCreatureContact);
             Accumulate(brain, genome, CreateIdentityEggContactSenses(), inputs, outputs, ref identityEggContact);
+            Accumulate(brain, genome, CreateObstacleBlockedSenses(), inputs, outputs, ref obstacleBlocked);
+            Accumulate(brain, genome, CreateCreatureBlockedSenses(), inputs, outputs, ref creatureBlocked);
             Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
             Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
             Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
@@ -249,6 +253,8 @@ public static class BehaviorAssay
             similarCreatureContact.ToResult("Similar creature contact"),
             lineageCreatureContact.ToResult("Lineage creature contact"),
             identityCreatureContact.ToResult("Identity creature contact"),
+            obstacleBlocked.ToResult("Obstacle blocked"),
+            creatureBlocked.ToResult("Creature body blocked"),
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
@@ -267,6 +273,7 @@ public static class BehaviorAssay
             RiskResponse = ClassifyRiskResponse(summary),
             Ecotype = ClassifyEcotype(summary),
             TerrainResponse = ClassifyTerrainResponse(summary),
+            CollisionResponse = ClassifyCollisionResponse(summary),
             ReproductionTendency = ClassifyReproductionTendency(summary),
             FreshMeatPreferenceScore = CalculateFreshMeatPreferenceScore(summary),
             RottenScentAvoidanceScore = CalculateRottenScentAvoidanceScore(summary),
@@ -768,6 +775,39 @@ public static class BehaviorAssay
             CreatureContactLineageSimilarity = 0f,
             CreatureContactIdentitySimilarity = 1f
         };
+    }
+
+    private static CreatureSenseState CreateObstacleBlockedSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            ForwardObstacle = 1f,
+            MovementBlocked = 1f
+        };
+    }
+
+    private static CreatureSenseState CreateCreatureBlockedSenses()
+    {
+        return WithCreatureSector(
+            CreateBaselineSenses() with
+            {
+                CreatureDetected = true,
+                CreatureProximity = 1f,
+                CreatureDirectionForward = 1f,
+                VisibleCreatureDensity = 0.2f,
+                CreatureRelativeBodySize = 0.05f,
+                CreatureRelativeSpeed = 0.2f,
+                CreatureApproachRate = 0.35f,
+                CreatureFacingAlignment = 0.35f,
+                CreatureContact = 1f,
+                CreatureContactSimilarity = 0.1f,
+                MovementBlocked = 1f
+            },
+            VisionSectorSet.CenterSectorIndex,
+            proximity: 1f,
+            relativeBodySize: 0.05f,
+            approachRate: 0.35f,
+            facingAlignment: 0.35f);
     }
 
     private static CreatureSenseState WithCreatureSector(
@@ -1343,6 +1383,54 @@ public static class BehaviorAssay
         return "little terrain differentiation";
     }
 
+    private static string ClassifyCollisionResponse(BehaviorAssaySummary summary)
+    {
+        var baselineMove = summary.Baseline.MoveForward;
+        var bodyMove = summary.CreatureBlocked.MoveForward;
+        var obstacleMove = summary.ObstacleBlocked.MoveForward;
+        var bodyTurn = Math.Abs(summary.CreatureBlocked.Turn);
+        var obstacleTurn = Math.Abs(summary.ObstacleBlocked.Turn);
+        var bodyAttack = summary.CreatureBlocked.AttackShare;
+        var slowsAtBody = bodyMove < baselineMove - 0.15f;
+        var pushesBody = bodyMove > baselineMove + 0.15f;
+        var bodySpecificSlowdown = bodyMove < obstacleMove - 0.15f;
+        var bodySpecificTurn = bodyTurn > obstacleTurn + 0.15f;
+
+        if (bodyAttack > 0.65f)
+        {
+            return slowsAtBody
+                ? "attacks while yielding to body blocks"
+                : "attacks body blocks";
+        }
+
+        if (bodySpecificSlowdown)
+        {
+            return "extra caution at body blocks";
+        }
+
+        if (slowsAtBody && bodyTurn > 0.25f)
+        {
+            return "turns away from body blocks";
+        }
+
+        if (slowsAtBody)
+        {
+            return "slows at body blocks";
+        }
+
+        if (bodySpecificTurn)
+        {
+            return "turns differently at body blocks";
+        }
+
+        if (pushesBody)
+        {
+            return "pushes into body blocks";
+        }
+
+        return "little body-block differentiation";
+    }
+
     private static string ClassifyEcotype(BehaviorAssaySummary summary)
     {
         if (summary.EvaluatedCreatureCount == 0)
@@ -1617,6 +1705,8 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult SimilarCreatureContact,
     BehaviorAssayResult LineageCreatureContact,
     BehaviorAssayResult IdentityCreatureContact,
+    BehaviorAssayResult ObstacleBlocked,
+    BehaviorAssayResult CreatureBlocked,
     BehaviorAssayResult SlowTerrainHere,
     BehaviorAssayResult SlowTerrainAhead,
     BehaviorAssayResult EasierTerrainAhead,
@@ -1639,6 +1729,8 @@ public readonly record struct BehaviorAssaySummary(
     public string Ecotype { get; init; } = "not evaluated";
 
     public string TerrainResponse { get; init; } = "not evaluated";
+
+    public string CollisionResponse { get; init; } = "not evaluated";
 
     public string ReproductionTendency { get; init; } = "not evaluated";
 
@@ -1703,6 +1795,8 @@ public readonly record struct BehaviorAssaySummary(
         SimilarCreatureContact,
         LineageCreatureContact,
         IdentityCreatureContact,
+        ObstacleBlocked,
+        CreatureBlocked,
         SlowTerrainHere,
         SlowTerrainAhead,
         EasierTerrainAhead,

@@ -805,7 +805,7 @@ static void PrintSummary(RunResult result)
         Console.WriteLine($"Old age deaths: {state.Stats.OldAgeDeathCount}");
     Console.WriteLine($"Max generation: {snapshot.MaxGeneration}");
     Console.WriteLine($"Obstacle sensed: {Percent(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount):0.0}%");
-    Console.WriteLine($"Obstacle blocked: {Percent(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount):0.0}%");
+    Console.WriteLine($"Movement blocked: {Percent(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount):0.0}%");
     Console.WriteLine($"Snapshots: {state.Stats.Snapshots.Count}");
     if (options.ProfileEnabled)
     {
@@ -6074,7 +6074,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Rot scent density", finalSnapshot.AverageRottenMeatScentDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible creature density", finalSnapshot.AverageVisibleCreatureDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Obstacle sensed", FormatPercent(Share(finalSnapshot.ObstacleSensedCreatureCount, finalSnapshot.CreatureCount)));
-        WriteMetric(writer, "Movement blocked", FormatPercent(Share(finalSnapshot.ObstacleBlockedCreatureCount, finalSnapshot.CreatureCount)));
+        WriteMetric(writer, "Movement blocked (all)", FormatPercent(Share(finalSnapshot.ObstacleBlockedCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Obstacle pressure", $"{finalSnapshot.AverageForwardObstacle:0.###} fwd / {finalSnapshot.AverageLeftObstacle:0.###} left / {finalSnapshot.AverageRightObstacle:0.###} right");
         WriteMetric(writer, "Calories eaten", $"{finalSnapshot.TotalCaloriesEatenPerSecond:0.###} raw kcal/s");
         WriteMetric(writer, "Plant eaten", $"{finalSnapshot.TotalPlantCaloriesEatenPerSecond:0.###} raw kcal/s");
@@ -6154,11 +6154,6 @@ internal static class RunReportWriter
         WriteMetric(writer, "Damage-dealing this tick", FormatPercent(Share(finalSnapshot.AttackingCreatureCount, finalSnapshot.CreatureCount)));
         WriteMetric(writer, "Attack damage", $"{finalSnapshot.TotalAttackDamagePerSecond:0.###} health/s");
         WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
-        WriteMetric(writer, "Collision pairs", finalSnapshot.CreatureCollisionPairCount.ToString(CultureInfo.InvariantCulture));
-        WriteMetric(writer, "Collision creatures", $"{FormatPercent(Share(finalSnapshot.CreatureCollisionCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.CreatureCollisionCreatureCount})");
-        WriteMetric(writer, "Collision damaged", $"{FormatPercent(Share(finalSnapshot.CreatureCollisionDamagedCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.CreatureCollisionDamagedCreatureCount})");
-        WriteMetric(writer, "Collision damage", $"{finalSnapshot.TotalCreatureCollisionDamagePerSecond:0.###} health/s");
-        WriteMetric(writer, "Impact speed", $"avg {finalSnapshot.AverageCreatureCollisionImpactSpeed:0.###} / max {finalSnapshot.MaxCreatureCollisionImpactSpeed:0.###}");
         WriteMetric(writer, "Healing", $"{finalSnapshot.TotalHealthHealedPerSecond:0.###} health/s");
         WriteMetric(writer, "Healing creatures", $"{FormatPercent(Share(finalSnapshot.HealingCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.HealingCreatureCount})");
         WriteMetric(writer, "Healing energy", $"{finalSnapshot.TotalHealingEnergySpentPerSecond:0.###} energy/s");
@@ -6200,6 +6195,8 @@ internal static class RunReportWriter
         WriteMetric(writer, "Non-attacker resistance", finalSnapshot.NonAttackerAverageDamageResistance.ToString("0.###", CultureInfo.InvariantCulture));
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
+
+        WriteCollisionDiagnosticsSection(writer, snapshots, finalSnapshot);
 
         WriteBiomeMapSection(writer, state.Biomes);
         WriteTemperatureMapSection(writer, state.Temperature);
@@ -8552,9 +8549,24 @@ internal static class RunReportWriter
             "%",
             snapshots,
             new ChartSeries("Sensed", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.ObstacleSensedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
-            new ChartSeries("Blocked", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Movement blocked", "#d96b3b", snapshots.Select(snapshot => Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Forward cue", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageForwardObstacle * 100f).ToArray()),
             new ChartSeries("Side cue", "#2f7d4f", snapshots.Select(snapshot => MathF.Max(snapshot.AverageLeftObstacle, snapshot.AverageRightObstacle) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Creature collision contact",
+            "%",
+            snapshots,
+            new ChartSeries("Body blocked", "#c24a8a", snapshots.Select(snapshot => Share(snapshot.CreatureCollisionCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Damaged", "#9d3434", snapshots.Select(snapshot => Share(snapshot.CreatureCollisionDamagedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Creature collision impacts",
+            "",
+            snapshots,
+            new ChartSeries("Damage/s", "#c24a8a", snapshots.Select(snapshot => snapshot.TotalCreatureCollisionDamagePerSecond).ToArray()),
+            new ChartSeries("Avg impact", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageCreatureCollisionImpactSpeed).ToArray()),
+            new ChartSeries("Max impact", "#d69d2f", snapshots.Select(snapshot => snapshot.MaxCreatureCollisionImpactSpeed).ToArray()));
         WriteLineChart(
             writer,
             "Search Efficiency",
@@ -8729,7 +8741,6 @@ internal static class RunReportWriter
             new ChartSeries("Avg grab output", "#ff8a30", snapshots.Select(snapshot => snapshot.AverageGrabOutput).ToArray()),
             new ChartSeries("Avg touch grab", "#ffcc66", snapshots.Select(snapshot => snapshot.AverageCanGrabGrabOutput).ToArray()),
             new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()),
-            new ChartSeries("Collision damage", "#c24a8a", snapshots.Select(snapshot => snapshot.TotalCreatureCollisionDamagePerSecond).ToArray()),
             new ChartSeries("Healing", "#2f9e73", snapshots.Select(snapshot => snapshot.TotalHealthHealedPerSecond).ToArray()),
             new ChartSeries("Healing %", "#62b6cb", snapshots.Select(snapshot => Share(snapshot.HealingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         writer.WriteLine("</div>");
@@ -8971,6 +8982,7 @@ internal static class RunReportWriter
         WriteMetric(writer, "Creature attack response", summary.PredatorTendency);
         WriteMetric(writer, "Risk response", summary.RiskResponse);
         WriteMetric(writer, "Terrain response", summary.TerrainResponse);
+        WriteMetric(writer, "Collision response", summary.CollisionResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
         WriteMetric(writer, "Fresh meat preference", summary.FreshMeatPreferenceScore.ToString("0.###", CultureInfo.InvariantCulture));
@@ -8994,6 +9006,56 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("</tbody></table></div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteCollisionDiagnosticsSection(
+        StreamWriter writer,
+        IReadOnlyList<SimulationStatsSnapshot> snapshots,
+        SimulationStatsSnapshot snapshot)
+    {
+        var peakPairs = snapshot.CreatureCollisionPairCount;
+        var peakCollisionCreatures = snapshot.CreatureCollisionCreatureCount;
+        var peakDamagedCreatures = snapshot.CreatureCollisionDamagedCreatureCount;
+        var peakDamagePerSecond = snapshot.TotalCreatureCollisionDamagePerSecond;
+        var peakImpactSpeed = snapshot.MaxCreatureCollisionImpactSpeed;
+        var contactSampleCount = snapshot.CreatureCollisionPairCount > 0 ? 1 : 0;
+        var damageSampleCount = snapshot.TotalCreatureCollisionDamagePerSecond > 0f ? 1 : 0;
+
+        if (snapshots.Count > 0)
+        {
+            peakPairs = snapshots.Max(row => row.CreatureCollisionPairCount);
+            peakCollisionCreatures = snapshots.Max(row => row.CreatureCollisionCreatureCount);
+            peakDamagedCreatures = snapshots.Max(row => row.CreatureCollisionDamagedCreatureCount);
+            peakDamagePerSecond = snapshots.Max(row => row.TotalCreatureCollisionDamagePerSecond);
+            peakImpactSpeed = snapshots.Max(row => row.MaxCreatureCollisionImpactSpeed);
+            contactSampleCount = snapshots.Count(row => row.CreatureCollisionPairCount > 0);
+            damageSampleCount = snapshots.Count(row => row.TotalCreatureCollisionDamagePerSecond > 0f);
+        }
+
+        var sampleCount = Math.Max(1, snapshots.Count);
+        var damagePerDamagedCreature = snapshot.CreatureCollisionDamagedCreatureCount > 0
+            ? snapshot.TotalCreatureCollisionDamagePerSecond / snapshot.CreatureCollisionDamagedCreatureCount
+            : 0f;
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Collision Diagnostics</h2>");
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Movement blocked (all)", $"{FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))} ({snapshot.ObstacleBlockedCreatureCount})");
+        WriteMetric(writer, "Body-blocked creatures", $"{FormatPercent(Share(snapshot.CreatureCollisionCreatureCount, snapshot.CreatureCount))} ({snapshot.CreatureCollisionCreatureCount})");
+        WriteMetric(writer, "Collision pairs", snapshot.CreatureCollisionPairCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Damaged creatures", $"{FormatPercent(Share(snapshot.CreatureCollisionDamagedCreatureCount, snapshot.CreatureCount))} ({snapshot.CreatureCollisionDamagedCreatureCount})");
+        WriteMetric(writer, "Collision damage", $"{snapshot.TotalCreatureCollisionDamagePerSecond:0.###} health/s");
+        WriteMetric(writer, "Damage per damaged", $"{damagePerDamagedCreature:0.###} health/s");
+        WriteMetric(writer, "Impact speed", $"avg {snapshot.AverageCreatureCollisionImpactSpeed:0.###} / max {snapshot.MaxCreatureCollisionImpactSpeed:0.###}");
+        WriteMetric(writer, "Contact samples", $"{FormatPercent(contactSampleCount / (float)sampleCount)} ({contactSampleCount}/{sampleCount})");
+        WriteMetric(writer, "Damage samples", $"{FormatPercent(damageSampleCount / (float)sampleCount)} ({damageSampleCount}/{sampleCount})");
+        WriteMetric(writer, "Peak pairs", peakPairs.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Peak body-blocked", peakCollisionCreatures.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Peak damaged", peakDamagedCreatures.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Peak damage", $"{peakDamagePerSecond:0.###} health/s");
+        WriteMetric(writer, "Peak impact", peakImpactSpeed.ToString("0.###", CultureInfo.InvariantCulture));
+        writer.WriteLine("</div>");
         writer.WriteLine("</section>");
     }
 
@@ -9061,7 +9123,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Search</th><th>Egg Laying</th><th>Plant Move</th><th>Meat Move</th><th>Rot Scent Move</th><th>Small Attack</th><th>Large Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Collision</th><th>Attack</th><th>Movement</th><th>Search</th><th>Egg Laying</th><th>Plant Move</th><th>Meat Move</th><th>Rot Scent Move</th><th>Body Block Move</th><th>Body Block Attack</th><th>Small Attack</th><th>Large Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var fingerprint in fingerprints)
         {
@@ -9076,6 +9138,7 @@ internal static class RunReportWriter
                 $"<td>{Html(fingerprint.RottenMeatResponse)}</td>" +
                 $"<td>{Html(fingerprint.RiskResponse)}</td>" +
                 $"<td>{Html(fingerprint.TerrainResponse)}</td>" +
+                $"<td>{Html(fingerprint.CollisionResponse)}</td>" +
                 $"<td>{Html(fingerprint.PredatorTendency)}</td>" +
                 $"<td>{Html(fingerprint.MovementStyle)}</td>" +
                 $"<td>{Html(fingerprint.SearchTendency)}</td>" +
@@ -9083,6 +9146,8 @@ internal static class RunReportWriter
                 $"<td>{Html(fingerprint.PlantAheadMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(fingerprint.MeatAheadMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
                 $"<td>{Html(fingerprint.RottenScentAheadMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(fingerprint.CreatureBlockedMoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(fingerprint.CreatureBlockedAttackShare))}</td>" +
                 $"<td>{Html(FormatPercent(fingerprint.SmallCreatureAttackShare))}</td>" +
                 $"<td>{Html(FormatPercent(fingerprint.LargeApproachAttackShare))}</td>" +
                 "</tr>");
@@ -9368,7 +9433,7 @@ internal static class RunReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Collision</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Body Block Move</th><th>Body Block Attack</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -9383,9 +9448,12 @@ internal static class RunReportWriter
                 $"<td>{Html(behavior.RottenMeatResponse)}</td>" +
                 $"<td>{Html(behavior.RiskResponse)}</td>" +
                 $"<td>{Html(behavior.TerrainResponse)}</td>" +
+                $"<td>{Html(behavior.CollisionResponse)}</td>" +
                 $"<td>{Html(behavior.PredatorTendency)}</td>" +
                 $"<td>{Html(behavior.MovementStyle)}</td>" +
                 $"<td>{Html(behavior.ReproductionTendency)}</td>" +
+                $"<td>{Html(behavior.CreatureBlocked.MoveForward.ToString("0.###", CultureInfo.InvariantCulture))}</td>" +
+                $"<td>{Html(FormatPercent(behavior.CreatureBlocked.AttackShare))}</td>" +
                 $"<td>{Html(FormatPercent(behavior.SmallCreatureAhead.AttackShare))}</td>" +
                 $"<td>{Html(FormatPercent(behavior.LargeCreatureApproaching.AttackShare))}</td>" +
                 "</tr>");

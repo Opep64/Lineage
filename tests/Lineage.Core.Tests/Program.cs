@@ -137,6 +137,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay reports plant choice probes", BehaviorAssayReportsPlantChoiceProbes),
     ("Behavior assay reports plant preference bridge probes", BehaviorAssayReportsPlantPreferenceBridgeProbes),
     ("Behavior assay reports lineage familiarity probes", BehaviorAssayReportsLineageFamiliarityProbes),
+    ("Behavior assay reports collision blocked probes", BehaviorAssayReportsCollisionBlockedProbes),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
@@ -6109,7 +6110,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(61, summary.Results.Count, "Assay result count");
+    AssertEqual(63, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
@@ -6188,6 +6189,42 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
         summary.IdentityEggContact.EatShare,
         0.000001,
         "Seed forager should not have built-in identity egg eating differences");
+}
+
+static void BehaviorAssayReportsCollisionBlockedProbes()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 413, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.5f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.MovementBlockedInput] = -4f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.MovementBlockedInput] = 4f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactInput] = 4f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(
+        summary.ObstacleBlocked.MoveForward < summary.Baseline.MoveForward - 0.3f,
+        "Obstacle blocked probe should expose movement-block slowdown wiring");
+    AssertTrue(
+        summary.ObstacleBlocked.Turn > summary.Baseline.Turn + 0.5f,
+        "Obstacle blocked probe should expose movement-block turning wiring");
+    AssertTrue(
+        summary.CreatureBlocked.MoveForward < summary.Baseline.MoveForward - 0.3f,
+        "Creature blocked probe should expose body-block slowdown wiring");
+    AssertTrue(
+        summary.CreatureBlocked.AttackShare > 0.9f,
+        "Creature blocked probe should expose body-contact attack wiring");
+    AssertEqual(
+        "attacks while yielding to body blocks",
+        summary.CollisionResponse,
+        "Collision response classifier");
 }
 
 static void BehaviorAssayReportsPlantChoiceProbes()
