@@ -369,6 +369,16 @@ public sealed record RtNeatBrainGenome
     ];
     private static readonly IReadOnlyDictionary<string, int> DenseInputIndexByKey =
         BrainIoRegistry.Inputs.ToDictionary(input => input.Key, input => input.FlatIndex, StringComparer.Ordinal);
+    private static readonly IReadOnlyDictionary<string, int> InputNodeIdByKey =
+        RtNeatBrainIoRegistry.Inputs
+            .Select((input, index) => new KeyValuePair<string, int>(input.Key, index))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    private static readonly IReadOnlyDictionary<string, int> OutputNodeIdByKey =
+        RtNeatBrainIoRegistry.Outputs
+            .Select((output, index) => new KeyValuePair<string, int>(output.Key, OutputNodeIdOffset + index))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    private static readonly HashSet<int> FixedNodeIds =
+        InputNodeIdByKey.Values.Concat(OutputNodeIdByKey.Values).ToHashSet();
     private static readonly int MoveForwardOutputNodeId = OutputNodeId("action.move_forward");
     private static readonly int TurnOutputNodeId = OutputNodeId("action.turn");
     private static readonly int EatOutputNodeId = OutputNodeId("action.eat");
@@ -718,6 +728,14 @@ public sealed record RtNeatBrainGenome
         var nodes = Nodes.Length == 0
             ? CreateFixedNodes(useStarterOutputBiases: false).ToArray()
             : Nodes;
+        nodes = NormalizeFixedNodeIds(nodes, out var nodeIdRemap);
+        var connections = Connections
+            .Select(connection => connection with
+            {
+                SourceNodeId = RemapNodeId(connection.SourceNodeId, nodeIdRemap),
+                TargetNodeId = RemapNodeId(connection.TargetNodeId, nodeIdRemap)
+            })
+            .ToArray();
         var ids = new HashSet<int>();
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var node in nodes)
@@ -744,7 +762,7 @@ public sealed record RtNeatBrainGenome
         }
 
         var nodesById = nodes.ToDictionary(node => node.Id);
-        foreach (var connection in Connections)
+        foreach (var connection in connections)
         {
             if (connection.InnovationId <= 0)
             {
@@ -776,11 +794,17 @@ public sealed record RtNeatBrainGenome
                 .OrderBy(node => node.Depth)
                 .ThenBy(node => node.Id)
                 .ToArray(),
-            Connections = Connections
+            Connections = connections
                 .OrderBy(connection => connection.InnovationId)
                 .ToArray(),
-            NextNodeId = Math.Max(NextNodeId, nodes.Select(node => node.Id).DefaultIfEmpty(FirstHiddenNodeId - 1).Max() + 1),
-            NextInnovationId = Math.Max(NextInnovationId, Connections.Select(connection => connection.InnovationId).DefaultIfEmpty(0).Max() + 1)
+            NextNodeId = Math.Max(
+                Math.Max(NextNodeId, FirstHiddenNodeId),
+                nodes
+                    .Where(node => node.Kind == RtNeatNodeKind.Hidden)
+                    .Select(node => node.Id)
+                    .DefaultIfEmpty(FirstHiddenNodeId - 1)
+                    .Max() + 1),
+            NextInnovationId = Math.Max(NextInnovationId, connections.Select(connection => connection.InnovationId).DefaultIfEmpty(0).Max() + 1)
         };
     }
 
@@ -1070,12 +1094,9 @@ public sealed record RtNeatBrainGenome
 
     private static int InputNodeId(string key)
     {
-        for (var i = 0; i < RtNeatBrainIoRegistry.Inputs.Count; i++)
+        if (InputNodeIdByKey.TryGetValue(key, out var nodeId))
         {
-            if (string.Equals(RtNeatBrainIoRegistry.Inputs[i].Key, key, StringComparison.Ordinal))
-            {
-                return i;
-            }
+            return nodeId;
         }
 
         throw new InvalidOperationException($"Unknown rtNEAT input key {key}.");
@@ -1083,15 +1104,125 @@ public sealed record RtNeatBrainGenome
 
     private static int OutputNodeId(string key)
     {
-        for (var i = 0; i < RtNeatBrainIoRegistry.Outputs.Count; i++)
+        if (OutputNodeIdByKey.TryGetValue(key, out var nodeId))
         {
-            if (string.Equals(RtNeatBrainIoRegistry.Outputs[i].Key, key, StringComparison.Ordinal))
-            {
-                return OutputNodeIdOffset + i;
-            }
+            return nodeId;
         }
 
         throw new InvalidOperationException($"Unknown rtNEAT output key {key}.");
+    }
+
+    private static RtNeatNodeGene[] NormalizeFixedNodeIds(
+        RtNeatNodeGene[] nodes,
+        out IReadOnlyDictionary<int, int> nodeIdRemap)
+    {
+        var remap = new Dictionary<int, int>();
+        var normalized = new List<RtNeatNodeGene>(nodes.Length + RtNeatBrainIoRegistry.Inputs.Count + RtNeatBrainIoRegistry.Outputs.Count);
+        var seenInputKeys = new HashSet<string>(StringComparer.Ordinal);
+        var seenOutputKeys = new HashSet<string>(StringComparer.Ordinal);
+        var usedIds = new HashSet<int>(FixedNodeIds);
+
+        foreach (var node in nodes)
+        {
+            if (node.Kind == RtNeatNodeKind.Input)
+            {
+                var nodeId = InputNodeId(node.Key);
+                remap.Add(node.Id, nodeId);
+                normalized.Add(node with
+                {
+                    Id = nodeId,
+                    Activation = RtNeatActivationKind.Linear,
+                    Bias = 0f,
+                    Depth = InputDepth
+                });
+                seenInputKeys.Add(node.Key);
+            }
+            else if (node.Kind == RtNeatNodeKind.Output)
+            {
+                var nodeId = OutputNodeId(node.Key);
+                remap.Add(node.Id, nodeId);
+                normalized.Add(node with
+                {
+                    Id = nodeId,
+                    Depth = OutputDepth
+                });
+                seenOutputKeys.Add(node.Key);
+            }
+        }
+
+        foreach (var input in RtNeatBrainIoRegistry.Inputs)
+        {
+            if (seenInputKeys.Contains(input.Key))
+            {
+                continue;
+            }
+
+            normalized.Add(new RtNeatNodeGene
+            {
+                Id = InputNodeId(input.Key),
+                Kind = RtNeatNodeKind.Input,
+                Key = input.Key,
+                Activation = RtNeatActivationKind.Linear,
+                Depth = InputDepth
+            });
+        }
+
+        foreach (var output in RtNeatBrainIoRegistry.Outputs)
+        {
+            if (seenOutputKeys.Contains(output.Key))
+            {
+                continue;
+            }
+
+            normalized.Add(new RtNeatNodeGene
+            {
+                Id = OutputNodeId(output.Key),
+                Kind = RtNeatNodeKind.Output,
+                Key = output.Key,
+                Activation = RtNeatActivationKind.Tanh,
+                Depth = OutputDepth
+            });
+        }
+
+        var nextHiddenNodeId = Math.Max(
+            FirstHiddenNodeId,
+            nodes
+                .Where(node => node.Kind == RtNeatNodeKind.Hidden && node.Id >= FirstHiddenNodeId)
+                .Select(node => node.Id)
+                .DefaultIfEmpty(FirstHiddenNodeId - 1)
+                .Max() + 1);
+        foreach (var node in nodes)
+        {
+            if (node.Kind != RtNeatNodeKind.Hidden)
+            {
+                continue;
+            }
+
+            var nodeId = node.Id;
+            if (nodeId < FirstHiddenNodeId || usedIds.Contains(nodeId))
+            {
+                while (usedIds.Contains(nextHiddenNodeId))
+                {
+                    nextHiddenNodeId++;
+                }
+
+                nodeId = nextHiddenNodeId++;
+            }
+
+            remap.Add(node.Id, nodeId);
+            usedIds.Add(nodeId);
+            normalized.Add(node with { Id = nodeId });
+        }
+
+        nodeIdRemap = remap;
+        return normalized.ToArray();
+    }
+
+    private static int RemapNodeId(int nodeId, IReadOnlyDictionary<int, int> nodeIdRemap)
+    {
+        return nodeIdRemap.TryGetValue(nodeId, out var remappedNodeId)
+            ? remappedNodeId
+            : nodeId;
     }
 
     private static void AddConnection(

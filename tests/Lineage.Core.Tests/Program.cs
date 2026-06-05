@@ -244,6 +244,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
     ("Brain profile JSON round trips neural controllers", BrainProfileJsonRoundTripsNeuralControllers),
     ("Brain profile JSON round trips rtNEAT graph controllers", BrainProfileJsonRoundTripsRtNeatGraphControllers),
+    ("rtNEAT catalog starter brains migrate semantic IO", RtNeatCatalogStarterBrainsMigrateSemanticIo),
     ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
     ("Starter catalog hybrid brains reproduce when ready", StarterCatalogHybridBrainsReproduceWhenReady),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
@@ -11666,6 +11667,202 @@ static void BrainProfileJsonRoundTripsRtNeatGraphControllers()
     AssertTrue(roundTripped.RtNeatBrain is not null, "Round-tripped rtNEAT profile should retain graph payload");
     AssertEqual(profile.RtNeatBrain!.ConnectionCount, loadedBrain.RtNeat!.ConnectionCount, "rtNEAT connection count");
     AssertEqual(profile.WeightCount, loadedBrain.WeightCount, "rtNEAT profile weight count");
+}
+
+static void RtNeatCatalogStarterBrainsMigrateSemanticIo()
+{
+    AssertRtNeatCatalogStarterMatchesFactory(
+        "brains/starter/starter-forager-rtneat.brain.json",
+        InitialBrainKind.SparseGraphForager,
+        RtNeatForagerProbeFrames());
+    AssertRtNeatCatalogStarterMatchesFactory(
+        "brains/starter/starter-omnivore-rtneat.brain.json",
+        InitialBrainKind.SparseGraphScavenger,
+        RtNeatScavengerProbeFrames());
+    AssertRtNeatCatalogStarterMatchesFactory(
+        "brains/starter/starter-predator-rtneat.brain.json",
+        InitialBrainKind.SparseGraphPredator,
+        RtNeatPredatorProbeFrames());
+}
+
+static void AssertRtNeatCatalogStarterMatchesFactory(
+    string path,
+    InitialBrainKind kind,
+    BrainInputFrame[] probeFrames)
+{
+    var catalogProfile = BrainProfileJson.Load(path);
+    var catalogBrain = catalogProfile.RtNeatBrain ?? throw new InvalidOperationException($"{path} should load an rtNEAT graph.");
+    var generatedBrain = BrainFactory.CreateStarter(BrainArchitectureKind.RtNeatGraph, kind).RtNeat!;
+
+    AssertEqual(NeuralBrainSchema.InputSchemaVersion, catalogBrain.InputSchemaVersion, $"{path} migrated input schema");
+    AssertEqual(NeuralBrainSchema.OutputSchemaVersion, catalogBrain.OutputSchemaVersion, $"{path} migrated output schema");
+    AssertEqual(generatedBrain.Nodes.Count(node => node.Kind == RtNeatNodeKind.Input), catalogBrain.Nodes.Count(node => node.Kind == RtNeatNodeKind.Input), $"{path} migrated input node count");
+    AssertEqual(generatedBrain.Nodes.Count(node => node.Kind == RtNeatNodeKind.Output), catalogBrain.Nodes.Count(node => node.Kind == RtNeatNodeKind.Output), $"{path} migrated output node count");
+
+    for (var i = 0; i < probeFrames.Length; i++)
+    {
+        var expected = generatedBrain.Evaluate(probeFrames[i], default);
+        var actual = catalogBrain.Evaluate(probeFrames[i], default);
+        AssertBrainOutputsClose(expected, actual, $"{path} rtNEAT starter probe {i}");
+    }
+}
+
+static BrainInputFrame[] RtNeatForagerProbeFrames()
+{
+    return
+    [
+        BrainInputFrame.FromSenses(new CreatureSenseState(), CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                PlantDetected = true,
+                PlantProximity = 0.35f,
+                PlantDirectionForward = 0.6f,
+                PlantDirectionRight = 0.7f,
+                VisiblePlantDensity = 0.5f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                PlantDetected = true,
+                PlantProximity = 1f,
+                PlantDirectionForward = 1f,
+                FoodContact = 1f,
+                PlantFoodContact = 1f,
+                VisiblePlantDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                FoodDetected = true,
+                FoodProximity = 1f,
+                FoodDirectionForward = 1f,
+                FoodContact = 1f,
+                EggFoodContact = 1f,
+                VisibleFoodDensity = 1f
+            },
+            CreatureGenome.Baseline)
+    ];
+}
+
+static BrainInputFrame[] RtNeatScavengerProbeFrames()
+{
+    return
+    [
+        BrainInputFrame.FromSenses(new CreatureSenseState(), CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                PlantDetected = true,
+                PlantProximity = 0.35f,
+                PlantDirectionForward = 0.6f,
+                PlantDirectionRight = 0.7f,
+                VisiblePlantDensity = 0.5f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 0.4f,
+                MeatDirectionForward = 0.5f,
+                MeatDirectionRight = 0.8f,
+                VisibleMeatDensity = 0.7f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 1f,
+                MeatDirectionForward = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                MeatDetected = true,
+                MeatProximity = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                RottenMeatScentDetected = true,
+                RottenMeatScentDensity = 1f
+            },
+            CreatureGenome.Baseline)
+    ];
+}
+
+static BrainInputFrame[] RtNeatPredatorProbeFrames()
+{
+    return
+    [
+        BrainInputFrame.FromSenses(new CreatureSenseState(), CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                CreatureDetected = true,
+                CreatureProximity = 0.5f,
+                CreatureDirectionForward = 0.45f,
+                CreatureDirectionRight = 0.8f,
+                VisibleCreatureDensity = 0.7f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                CreatureDetected = true,
+                CreatureProximity = 1f,
+                CreatureDirectionForward = 1f,
+                CreatureContact = 1f,
+                VisibleCreatureDensity = 1f
+            },
+            CreatureGenome.Baseline),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                Hunger = 1f,
+                MeatDetected = true,
+                MeatProximity = 1f,
+                MeatDirectionForward = 1f,
+                FoodContact = 1f,
+                MeatFoodContact = 1f,
+                VisibleMeatDensity = 1f,
+                VisibleMeatFreshness = 1f
+            },
+            CreatureGenome.Baseline with { DietaryAdaptation = 0.75f }),
+        BrainInputFrame.FromSenses(
+            new CreatureSenseState
+            {
+                Hunger = 0.9f,
+                CreatureDetected = true,
+                CreatureProximity = 1f,
+                CreatureDirectionForward = 1f,
+                CreatureContact = 1f,
+                CreatureContactSimilarity = 1f,
+                VisibleCreatureDensity = 1f
+            },
+            CreatureGenome.Baseline with { DietaryAdaptation = 0.75f })
+    ];
+}
+
+static void AssertBrainOutputsClose(BrainOutputFrame expected, BrainOutputFrame actual, string context)
+{
+    AssertClose(expected.MoveForward, actual.MoveForward, 0.000001, $"{context} move forward");
+    AssertClose(expected.Turn, actual.Turn, 0.000001, $"{context} turn");
+    AssertClose(expected.Eat, actual.Eat, 0.000001, $"{context} eat");
+    AssertClose(expected.Reproduce, actual.Reproduce, 0.000001, $"{context} reproduce");
+    AssertClose(expected.Attack, actual.Attack, 0.000001, $"{context} attack");
+    AssertClose(expected.Grab, actual.Grab, 0.000001, $"{context} grab");
+    AssertClose(expected.SoundAmplitude, actual.SoundAmplitude, 0.000001, $"{context} sound amplitude");
+    AssertClose(expected.SoundTone, actual.SoundTone, 0.000001, $"{context} sound tone");
 }
 
 static void BrainProfileCompatibilityReportsSchemaStatus()
