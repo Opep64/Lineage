@@ -113,6 +113,22 @@ public struct CreatureSenseState
 
     public float EggLineageScentDirectionRight { get; set; }
 
+    public bool CreatureIdentityScentDetected { get; set; }
+
+    public float CreatureIdentityScentDensity { get; set; }
+
+    public float CreatureIdentityScentDirectionForward { get; set; }
+
+    public float CreatureIdentityScentDirectionRight { get; set; }
+
+    public bool EggIdentityScentDetected { get; set; }
+
+    public float EggIdentityScentDensity { get; set; }
+
+    public float EggIdentityScentDirectionForward { get; set; }
+
+    public float EggIdentityScentDirectionRight { get; set; }
+
     public bool SoundDetected { get; set; }
 
     public float SoundDensity { get; set; }
@@ -301,6 +317,16 @@ public struct CreatureSenseState
     /// Founder-lineage match of the contacted egg's parent when egg touch/contact is available.
     /// </summary>
     public float EggContactLineageSimilarity { get; set; }
+
+    /// <summary>
+    /// Heritable scent-signature match of the contacted creature when touch/contact is available.
+    /// </summary>
+    public float CreatureContactIdentitySimilarity { get; set; }
+
+    /// <summary>
+    /// Heritable scent-signature match of the contacted egg's genome when egg touch/contact is available.
+    /// </summary>
+    public float EggContactIdentitySimilarity { get; set; }
 
     /// <summary>
     /// Strength of another creature's current hold on this creature, clamped to [0, 1].

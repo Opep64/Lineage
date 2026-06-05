@@ -89,7 +89,9 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports small prey as fresh meat", CreatureSensingReportsSmallPreyAsFreshMeat),
     ("Creature sensing smells similar creatures beyond vision", CreatureSensingSmellsSimilarCreaturesBeyondVision),
     ("Creature sensing smells same lineage creatures beyond vision", CreatureSensingSmellsSameLineageCreaturesBeyondVision),
+    ("Creature sensing compares identity scent signatures", CreatureSensingComparesIdentityScentSignatures),
     ("Creature sensing smells same lineage eggs beyond vision", CreatureSensingSmellsSameLineageEggsBeyondVision),
+    ("Creature sensing compares egg identity scent signatures", CreatureSensingComparesEggIdentityScentSignatures),
     ("Creature sensing reports egg lineage contact", CreatureSensingReportsEggLineageContact),
     ("Creature sensing separates predator prey similarity", CreatureSensingSeparatesPredatorPreySimilarity),
     ("Creature sensing hears intentional sound beyond vision", CreatureSensingHearsIntentionalSoundBeyondVision),
@@ -165,6 +167,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates fullness inputs", NeuralBrainMigratesFullnessInputs),
     ("Neural brain migrates lineage familiarity inputs", NeuralBrainMigratesLineageFamiliarityInputs),
     ("Neural brain migrates egg lineage scent inputs", NeuralBrainMigratesEggLineageScentInputs),
+    ("Neural brain migrates identity scent inputs", NeuralBrainMigratesIdentityScentInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -3018,7 +3021,7 @@ static void EggEnvironmentalDamageFollowsVoidAndBiomePressure()
     };
     var simulation = SimulationScenarioFactory.CreateSimulation(scenario);
     var state = simulation.State;
-    var genomeId = 0;
+    var genomeId = state.AddGenome(CreatureGenome.Baseline);
     var parentId = state.SpawnCreature(genomeId, new SimVector2(500f, 500f), energy: 50f);
     var voidPosition = new SimVector2(50f, 500f);
     var barrenPosition = FindBiomeCellCenter(state.Biomes, BiomeKind.Barren);
@@ -3039,8 +3042,9 @@ static void EggEnvironmentalDamageFollowsVoidAndBiomePressure()
 
     var lethalSimulation = SimulationScenarioFactory.CreateSimulation(scenario);
     var lethalState = lethalSimulation.State;
-    var lethalParentId = lethalState.SpawnCreature(genomeId, new SimVector2(500f, 500f), energy: 50f);
-    lethalState.SpawnEgg(genomeId, -1, lethalParentId, voidPosition, energy: 28f, incubationSeconds: 100f, generation: 1);
+    var lethalGenomeId = lethalState.AddGenome(CreatureGenome.Baseline);
+    var lethalParentId = lethalState.SpawnCreature(lethalGenomeId, new SimVector2(500f, 500f), energy: 50f);
+    lethalState.SpawnEgg(lethalGenomeId, -1, lethalParentId, voidPosition, energy: 28f, incubationSeconds: 100f, generation: 1);
 
     new EggEnvironmentalDamageSystem(2f).Update(lethalState, 1f);
     new EggSystem().Update(lethalState, 1f);
@@ -3652,6 +3656,9 @@ static void CreatureSensingSmellsSameLineageCreaturesBeyondVision()
         CarrionAdaptation = 0f,
         BiteStrength = 0.15f,
         DamageResistance = 0.7f,
+        ScentSignatureA = 0.1f,
+        ScentSignatureB = 0.2f,
+        ScentSignatureC = 0.3f,
         MaturityAgeSeconds = 0f
     };
     var predatorGenome = preyGenome with
@@ -3659,7 +3666,10 @@ static void CreatureSensingSmellsSameLineageCreaturesBeyondVision()
         DietaryAdaptation = 0.9f,
         CarrionAdaptation = 0.3f,
         BiteStrength = 1.2f,
-        DamageResistance = 1.2f
+        DamageResistance = 1.2f,
+        ScentSignatureA = 0.9f,
+        ScentSignatureB = 0.8f,
+        ScentSignatureC = 0.7f
     };
     var preyGenomeId = simulation.State.AddGenome(preyGenome);
     var predatorGenomeId = simulation.State.AddGenome(predatorGenome);
@@ -3691,6 +3701,85 @@ static void CreatureSensingSmellsSameLineageCreaturesBeyondVision()
     AssertClose(0f, senses.CreatureLineageScentDirectionRight, 0.0001, "Lineage scent right direction");
     AssertTrue(senses.CreatureContactSimilarity < 0.82f, "Trait-diverged descendant should stay below similarity scent floor");
     AssertClose(1f, senses.CreatureContactLineageSimilarity, 0.000001, "Same-lineage contact similarity");
+}
+
+static void CreatureSensingComparesIdentityScentSignatures()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 13074,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
+        ]);
+
+    var observerGenome = CreatureGenome.Baseline with
+    {
+        SenseRadius = 60f,
+        VisionAngleRadians = MathF.PI / 3f,
+        DietaryAdaptation = 0.05f,
+        CarrionAdaptation = 0f,
+        BiteStrength = 0.15f,
+        DamageResistance = 0.7f,
+        ScentSignatureA = 0.2f,
+        ScentSignatureB = 0.3f,
+        ScentSignatureC = 0.4f,
+        MaturityAgeSeconds = 0f
+    };
+    var familiarGenome = observerGenome with
+    {
+        DietaryAdaptation = 0.9f,
+        CarrionAdaptation = 0.3f,
+        BiteStrength = 1.2f,
+        DamageResistance = 1.2f
+    };
+    var strangerGenome = familiarGenome with
+    {
+        ScentSignatureA = 0.9f,
+        ScentSignatureB = 0.85f,
+        ScentSignatureC = 0.8f
+    };
+    var observerGenomeId = simulation.State.AddGenome(observerGenome);
+    var familiarGenomeId = simulation.State.AddGenome(familiarGenome);
+    var strangerGenomeId = simulation.State.AddGenome(strangerGenome);
+
+    simulation.State.SpawnCreature(observerGenomeId, new SimVector2(80f, 80f), energy: 25f);
+    var observer = simulation.State.Creatures[0];
+    observer.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = observer;
+
+    var familiarId = simulation.State.SpawnCreature(familiarGenomeId, new SimVector2(74f, 80f), energy: 25f);
+    observer = simulation.State.Creatures[0];
+    observer.IsTouchingCreature = true;
+    observer.CreatureContactId = familiarId;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.CreatureDetected, "Familiar-signature creature behind the observer should not be visually detected");
+    AssertTrue(!senses.CreatureSimilarityScentDetected, "Trait-diverged familiar signature should not trigger trait similarity scent");
+    AssertTrue(!senses.CreatureLineageScentDetected, "Independent familiar signature should not trigger lineage scent");
+    AssertTrue(senses.CreatureIdentityScentDetected, "Matching identity signature should create identity scent beyond vision");
+    AssertTrue(senses.CreatureIdentityScentDensity > 0.9f, "Nearby matching identity signature should have strong scent");
+    AssertTrue(senses.CreatureIdentityScentDirectionForward < -0.9f, "Identity scent should point behind");
+    AssertClose(0f, senses.CreatureIdentityScentDirectionRight, 0.0001, "Identity scent right direction");
+    AssertClose(1f, senses.CreatureContactIdentitySimilarity, 0.000001, "Matching identity contact similarity");
+
+    simulation.State.Creatures.RemoveAt(1);
+    var strangerId = simulation.State.SpawnCreature(strangerGenomeId, new SimVector2(74f, 80f), energy: 25f);
+    observer = simulation.State.Creatures[0];
+    observer.IsTouchingCreature = true;
+    observer.CreatureContactId = strangerId;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.CreatureIdentityScentDetected, "Distant identity signature should not create identity scent");
+    AssertTrue(senses.CreatureContactIdentitySimilarity < 0.6f, "Distant identity contact similarity should stay low");
 }
 
 static void CreatureSensingReportsEggLineageContact()
@@ -3816,6 +3905,93 @@ static void CreatureSensingSmellsSameLineageEggsBeyondVision()
     AssertClose(0f, senses.EggLineageScentDirectionRight, 0.0001, "Lineage egg scent right direction");
 }
 
+static void CreatureSensingComparesEggIdentityScentSignatures()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 13075,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
+        ]);
+
+    var familiarGenome = CreatureGenome.Baseline with
+    {
+        SenseRadius = 60f,
+        VisionAngleRadians = MathF.PI / 3f,
+        ScentSignatureA = 0.15f,
+        ScentSignatureB = 0.25f,
+        ScentSignatureC = 0.35f,
+        MaturityAgeSeconds = 0f
+    };
+    var strangerGenome = familiarGenome with
+    {
+        ScentSignatureA = 0.95f,
+        ScentSignatureB = 0.85f,
+        ScentSignatureC = 0.75f
+    };
+    var familiarGenomeId = simulation.State.AddGenome(familiarGenome);
+    var strangerGenomeId = simulation.State.AddGenome(strangerGenome);
+
+    var observerId = simulation.State.SpawnCreature(familiarGenomeId, new SimVector2(80f, 80f), energy: 25f);
+    var unrelatedParentId = simulation.State.SpawnCreature(strangerGenomeId, new SimVector2(200f, 80f), energy: 25f);
+    var observer = simulation.State.Creatures[0];
+    observer.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = observer;
+
+    var familiarEggId = simulation.State.SpawnEgg(
+        familiarGenomeId,
+        brainId: -1,
+        parentId: unrelatedParentId,
+        position: new SimVector2(72f, 80f),
+        energy: 10f,
+        incubationSeconds: 30f,
+        generation: 1);
+
+    observer = simulation.State.Creatures[0];
+    observer.IsTouchingFood = true;
+    observer.FoodContactKind = FoodContactKind.Egg;
+    observer.FoodContactResourceId = familiarEggId;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.FoodDetected, "Familiar-signature egg behind observer should remain hidden by the vision cone");
+    AssertTrue(!senses.EggLineageScentDetected, "Unrelated familiar-signature egg should not trigger lineage egg scent");
+    AssertTrue(senses.EggIdentityScentDetected, "Matching egg signature should create identity egg scent beyond vision");
+    AssertTrue(senses.EggIdentityScentDensity > 0.85f, "Nearby matching egg identity should have strong scent");
+    AssertTrue(senses.EggIdentityScentDirectionForward < -0.85f, "Identity egg scent should point behind");
+    AssertClose(0f, senses.EggIdentityScentDirectionRight, 0.0001, "Identity egg scent right direction");
+    AssertClose(1f, senses.EggFoodContact, 0.000001, "Familiar egg contact cue");
+    AssertClose(0f, senses.EggContactLineageSimilarity, 0.000001, "Unrelated familiar egg lineage contact similarity");
+    AssertClose(1f, senses.EggContactIdentitySimilarity, 0.000001, "Familiar egg identity contact similarity");
+
+    simulation.State.Eggs.RemoveAt(0);
+    var strangerEggId = simulation.State.SpawnEgg(
+        strangerGenomeId,
+        brainId: -1,
+        parentId: unrelatedParentId,
+        position: new SimVector2(72f, 80f),
+        energy: 10f,
+        incubationSeconds: 30f,
+        generation: 1);
+
+    observer = simulation.State.Creatures[0];
+    observer.IsTouchingFood = true;
+    observer.FoodContactKind = FoodContactKind.Egg;
+    observer.FoodContactResourceId = strangerEggId;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.EggIdentityScentDetected, "Distant egg signature should not create identity egg scent");
+    AssertTrue(senses.EggContactIdentitySimilarity < 0.6f, "Distant egg identity contact similarity should stay low");
+}
+
 static void CreatureSensingSeparatesPredatorPreySimilarity()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -3836,6 +4012,9 @@ static void CreatureSensingSeparatesPredatorPreySimilarity()
         CarrionAdaptation = 0f,
         BiteStrength = 0.15f,
         DamageResistance = 0.7f,
+        ScentSignatureA = 0.1f,
+        ScentSignatureB = 0.2f,
+        ScentSignatureC = 0.3f,
         MaturityAgeSeconds = 0f
     };
     var predatorGenome = preyGenome with
@@ -3843,7 +4022,10 @@ static void CreatureSensingSeparatesPredatorPreySimilarity()
         DietaryAdaptation = 0.9f,
         CarrionAdaptation = 0.3f,
         BiteStrength = 1.2f,
-        DamageResistance = 1.2f
+        DamageResistance = 1.2f,
+        ScentSignatureA = 0.9f,
+        ScentSignatureB = 0.8f,
+        ScentSignatureC = 0.7f
     };
     var preyGenomeId = simulation.State.AddGenome(preyGenome);
     var predatorGenomeId = simulation.State.AddGenome(predatorGenome);
@@ -3867,6 +4049,8 @@ static void CreatureSensingSeparatesPredatorPreySimilarity()
     AssertTrue(senses.CreatureContactSimilarity < 0.82f, "Predator-prey trait split should stay below scent similarity floor");
     AssertTrue(!senses.CreatureLineageScentDetected, "Unrelated predator-prey trait split should not create lineage scent");
     AssertClose(0f, senses.CreatureContactLineageSimilarity, 0.000001, "Unrelated contact lineage similarity");
+    AssertTrue(!senses.CreatureIdentityScentDetected, "Unrelated predator-prey split should not create identity scent");
+    AssertTrue(senses.CreatureContactIdentitySimilarity < 0.6f, "Unrelated predator-prey identity contact similarity should stay low");
 }
 
 static void CreatureSensingHearsIntentionalSoundBeyondVision()
@@ -4666,6 +4850,8 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var climateInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CurrentTemperatureInput);
     var fullnessInput = BrainIoRegistry.GetInput(NeuralBrainSchema.EnergyFullnessInput);
     var eggLineageScentInput = BrainIoRegistry.GetInput(NeuralBrainSchema.EggLineageScentDensityInput);
+    var identityScentInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CreatureIdentityScentDensityInput);
+    var identityContactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CreatureContactIdentitySimilarityInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -4681,8 +4867,14 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(7, fullnessInput.IntroducedVersion, "Fullness input introduced version");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, eggLineageScentInput.Freshness, "Egg lineage scent input freshness");
     AssertEqual(9, eggLineageScentInput.IntroducedVersion, "Egg lineage scent input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, identityScentInput.Freshness, "Identity scent input freshness");
+    AssertEqual(10, identityScentInput.IntroducedVersion, "Identity scent input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, identityContactInput.Freshness, "Identity contact input freshness");
+    AssertEqual(10, identityContactInput.IntroducedVersion, "Identity contact input introduced version");
     AssertEqual("internal.energy_fullness", fullnessInput.Key, "Fullness input key");
     AssertEqual("scent.egg_lineage_density", eggLineageScentInput.Key, "Egg lineage scent input key");
+    AssertEqual("scent.creature_identity_density", identityScentInput.Key, "Identity scent input key");
+    AssertEqual("contact.creature_identity_similarity", identityContactInput.Key, "Identity contact input key");
     AssertEqual("climate.current_temperature", climateInput.Key, "Climate input key");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
@@ -4753,6 +4945,12 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         EggLineageScentDensity = 0.53f,
         EggLineageScentDirectionForward = -0.64f,
         EggLineageScentDirectionRight = 0.74f,
+        CreatureIdentityScentDensity = 0.31f,
+        CreatureIdentityScentDirectionForward = -0.41f,
+        CreatureIdentityScentDirectionRight = 0.51f,
+        EggIdentityScentDensity = 0.61f,
+        EggIdentityScentDirectionForward = -0.71f,
+        EggIdentityScentDirectionRight = 0.81f,
         SoundDensity = 0.29f,
         SoundDirectionForward = 0.39f,
         SoundDirectionRight = -0.49f,
@@ -4790,6 +4988,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         CreatureContactSimilarity = 0.85f,
         CreatureContactLineageSimilarity = 0.95f,
         EggContactLineageSimilarity = 0.15f,
+        CreatureContactIdentitySimilarity = 0.55f,
+        EggContactIdentitySimilarity = 0.65f,
         GrabPressure = 0.65f,
         GrabDirectionForward = -0.45f,
         GrabDirectionRight = 0.35f,
@@ -4836,6 +5036,12 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.53f, inputs[NeuralBrainSchema.EggLineageScentDensityInput], 0.000001, "Egg lineage scent density input");
     AssertClose(-0.64f, inputs[NeuralBrainSchema.EggLineageScentForwardInput], 0.000001, "Egg lineage scent forward input");
     AssertClose(0.74f, inputs[NeuralBrainSchema.EggLineageScentRightInput], 0.000001, "Egg lineage scent right input");
+    AssertClose(0.31f, inputs[NeuralBrainSchema.CreatureIdentityScentDensityInput], 0.000001, "Creature identity scent density input");
+    AssertClose(-0.41f, inputs[NeuralBrainSchema.CreatureIdentityScentForwardInput], 0.000001, "Creature identity scent forward input");
+    AssertClose(0.51f, inputs[NeuralBrainSchema.CreatureIdentityScentRightInput], 0.000001, "Creature identity scent right input");
+    AssertClose(0.61f, inputs[NeuralBrainSchema.EggIdentityScentDensityInput], 0.000001, "Egg identity scent density input");
+    AssertClose(-0.71f, inputs[NeuralBrainSchema.EggIdentityScentForwardInput], 0.000001, "Egg identity scent forward input");
+    AssertClose(0.81f, inputs[NeuralBrainSchema.EggIdentityScentRightInput], 0.000001, "Egg identity scent right input");
     AssertClose(0.29f, inputs[NeuralBrainSchema.SoundDensityInput], 0.000001, "Sound density input");
     AssertClose(0.39f, inputs[NeuralBrainSchema.SoundDirectionForwardInput], 0.000001, "Sound forward input");
     AssertClose(-0.49f, inputs[NeuralBrainSchema.SoundDirectionRightInput], 0.000001, "Sound right input");
@@ -4869,6 +5075,8 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.85f, inputs[NeuralBrainSchema.CreatureContactSimilarityInput], 0.000001, "Creature contact similarity input");
     AssertClose(0.95f, inputs[NeuralBrainSchema.CreatureContactLineageSimilarityInput], 0.000001, "Creature contact lineage similarity input");
     AssertClose(0.15f, inputs[NeuralBrainSchema.EggContactLineageSimilarityInput], 0.000001, "Egg contact lineage similarity input");
+    AssertClose(0.55f, inputs[NeuralBrainSchema.CreatureContactIdentitySimilarityInput], 0.000001, "Creature contact identity similarity input");
+    AssertClose(0.65f, inputs[NeuralBrainSchema.EggContactIdentitySimilarityInput], 0.000001, "Egg contact identity similarity input");
     AssertClose(0.65f, inputs[NeuralBrainSchema.GrabPressureInput], 0.000001, "Grab pressure input");
     AssertClose(-0.45f, inputs[NeuralBrainSchema.GrabDirectionForwardInput], 0.000001, "Grab direction forward input");
     AssertClose(0.35f, inputs[NeuralBrainSchema.GrabDirectionRightInput], 0.000001, "Grab direction right input");
@@ -5663,7 +5871,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(56, summary.Results.Count, "Assay result count");
+    AssertEqual(61, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
@@ -5703,20 +5911,45 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
         0.000001,
         "Seed forager should not have built-in lineage egg scent approach");
     AssertClose(
+        summary.Baseline.MoveForward,
+        summary.IdentityCreatureScentAhead.MoveForward,
+        0.000001,
+        "Seed forager should not have built-in identity scent approach");
+    AssertClose(
+        summary.Baseline.MoveForward,
+        summary.IdentityEggScentAhead.MoveForward,
+        0.000001,
+        "Seed forager should not have built-in identity egg scent approach");
+    AssertClose(
         summary.Baseline.Turn,
         summary.LineageEggScentRight.Turn,
         0.000001,
         "Seed forager should not have built-in lineage egg scent turning");
+    AssertClose(
+        summary.Baseline.Turn,
+        summary.IdentityEggScentRight.Turn,
+        0.000001,
+        "Seed forager should not have built-in identity egg scent turning");
     AssertClose(
         summary.UnrelatedCreatureContact.AttackShare,
         summary.LineageCreatureContact.AttackShare,
         0.000001,
         "Seed forager should not have built-in lineage contact attack differences");
     AssertClose(
+        summary.UnrelatedCreatureContact.AttackShare,
+        summary.IdentityCreatureContact.AttackShare,
+        0.000001,
+        "Seed forager should not have built-in identity contact attack differences");
+    AssertClose(
         summary.UnrelatedEggContact.EatShare,
         summary.LineageEggContact.EatShare,
         0.000001,
         "Seed forager should not have built-in lineage egg eating differences");
+    AssertClose(
+        summary.UnrelatedEggContact.EatShare,
+        summary.IdentityEggContact.EatShare,
+        0.000001,
+        "Seed forager should not have built-in identity egg eating differences");
 }
 
 static void BehaviorAssayReportsPlantChoiceProbes()
@@ -5791,13 +6024,18 @@ static void BehaviorAssayReportsLineageFamiliarityProbes()
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.5f;
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureSimilarityScentForwardInput] = 3.5f;
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureLineageScentForwardInput] = -3.5f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureIdentityScentForwardInput] = 3.5f;
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggLineageScentForwardInput] = 3.5f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggIdentityScentForwardInput] = 3.5f;
     weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggLineageScentRightInput] = 3.5f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggIdentityScentRightInput] = 3.5f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactInput] = 3.5f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactSimilarityInput] = -5f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactLineageSimilarityInput] = -5f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactIdentitySimilarityInput] = -5f;
     weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggFoodContactInput] = 3.5f;
     weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggContactLineageSimilarityInput] = -5f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggContactIdentitySimilarityInput] = -5f;
     var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
@@ -5811,11 +6049,20 @@ static void BehaviorAssayReportsLineageFamiliarityProbes()
         summary.LineageCreatureScentAhead.MoveForward < summary.Baseline.MoveForward - 0.3f,
         "Lineage scent probe should expose forward avoidance wiring");
     AssertTrue(
+        summary.IdentityCreatureScentAhead.MoveForward > summary.Baseline.MoveForward + 0.4f,
+        "Identity scent probe should expose forward attraction wiring");
+    AssertTrue(
         summary.LineageEggScentAhead.MoveForward > summary.Baseline.MoveForward + 0.4f,
         "Lineage egg scent ahead should expose forward egg familiarity wiring");
     AssertTrue(
+        summary.IdentityEggScentAhead.MoveForward > summary.Baseline.MoveForward + 0.4f,
+        "Identity egg scent ahead should expose forward egg familiarity wiring");
+    AssertTrue(
         summary.LineageEggScentRight.Turn > summary.Baseline.Turn + 0.4f,
         "Lineage egg scent right should expose lateral egg familiarity wiring");
+    AssertTrue(
+        summary.IdentityEggScentRight.Turn > summary.Baseline.Turn + 0.4f,
+        "Identity egg scent right should expose lateral egg familiarity wiring");
     AssertTrue(
         summary.UnrelatedCreatureContact.AttackShare > 0.9f,
         "Unrelated creature contact should expose contact attack wiring");
@@ -5826,11 +6073,17 @@ static void BehaviorAssayReportsLineageFamiliarityProbes()
         summary.LineageCreatureContact.AttackShare < summary.UnrelatedCreatureContact.AttackShare,
         "Lineage creature contact should expose lineage attack suppression");
     AssertTrue(
+        summary.IdentityCreatureContact.AttackShare < summary.UnrelatedCreatureContact.AttackShare,
+        "Identity creature contact should expose identity attack suppression");
+    AssertTrue(
         summary.UnrelatedEggContact.EatShare > 0.9f,
         "Unrelated egg contact should expose egg eating wiring");
     AssertTrue(
         summary.LineageEggContact.EatShare < summary.UnrelatedEggContact.EatShare,
         "Lineage egg contact should expose familiar egg eating suppression");
+    AssertTrue(
+        summary.IdentityEggContact.EatShare < summary.UnrelatedEggContact.EatShare,
+        "Identity egg contact should expose familiar egg eating suppression");
 }
 
 static void BehaviorAssayDetectsFreshMeatPreference()
@@ -7261,6 +7514,46 @@ static void NeuralBrainMigratesEggLineageScentInputs()
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentDensityInput), 0.000001, "New hidden egg lineage scent density starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentForwardInput), 0.000001, "New hidden egg lineage scent forward starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentRightInput), 0.000001, "New hidden egg lineage scent right starts neutral");
+}
+
+static void NeuralBrainMigratesIdentityScentInputs()
+{
+    const int legacyInputCount = 253;
+    const int legacyOutputCount = NeuralBrainSchema.OutputCount;
+    const int hiddenNodeCount = 1;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.EggLineageScentRightInput] = 0.7f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.EggLineageScentRightInput] = -0.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.TurnOutput * hiddenNodeCount] = 0.9f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Identity scent migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Identity scent migrated weight count");
+    AssertClose(
+        0.7f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.EggLineageScentRightInput),
+        0.000001,
+        "Existing egg lineage scent direct input remains in place");
+    AssertClose(
+        -0.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentRightInput),
+        0.000001,
+        "Existing hidden egg lineage scent input remains in place");
+    AssertClose(
+        0.9f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.TurnOutput, 0),
+        0.000001,
+        "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureIdentityScentDensityInput), 0.000001, "New creature identity scent density starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureIdentityScentForwardInput), 0.000001, "New creature identity scent forward starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.EggIdentityScentRightInput), 0.000001, "New egg identity scent right starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactIdentitySimilarityInput), 0.000001, "New hidden creature identity contact starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggContactIdentitySimilarityInput), 0.000001, "New hidden egg identity contact starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -9566,6 +9859,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
         CreatureLineageScentDensity = 0.7f,
         EggLineageScentDetected = true,
         EggLineageScentDensity = 0.6f,
+        CreatureIdentityScentDetected = true,
+        CreatureIdentityScentDensity = 0.9f,
+        EggIdentityScentDetected = true,
+        EggIdentityScentDensity = 0.8f,
         SoundDetected = true,
         SoundDensity = 0.3f,
         SoundToneClarity = 0.6f,
@@ -9573,8 +9870,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
         VisibleCreatureDensity = 0.05f,
         CreatureContactSimilarity = 0.9f,
         CreatureContactLineageSimilarity = 1f,
+        CreatureContactIdentitySimilarity = 1f,
         EggFoodContact = 1f,
         EggContactLineageSimilarity = 1f,
+        EggContactIdentitySimilarity = 1f,
         CanGrabCreature = 1f,
         EggReserveRatio = 0.5f,
         EnergySurplusRatio = 0.25f,
@@ -9646,12 +9945,17 @@ static void StatsRecordingCapturesAggregateSnapshot()
         CreatureLineageScentDensity = 0.3f,
         EggLineageScentDetected = true,
         EggLineageScentDensity = 0.2f,
+        CreatureIdentityScentDetected = true,
+        CreatureIdentityScentDensity = 0.1f,
+        EggIdentityScentDetected = true,
+        EggIdentityScentDensity = 0.4f,
         SoundDetected = false,
         SoundDensity = 0f,
         SoundToneClarity = 0f,
         VisibleCreatureDensity = 0.15f,
         CreatureContactSimilarity = 0.2f,
         CreatureContactLineageSimilarity = 0f,
+        CreatureContactIdentitySimilarity = 0.2f,
         EggReserveRatio = 0.25f,
         EnergySurplusRatio = 0.05f,
         FatRatio = 0.25f,
@@ -9803,6 +10107,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.5f, snapshot.AverageCreatureLineageScentDensity, 0.000001, "Average creature lineage scent density");
     AssertEqual(2, snapshot.EggLineageScentDetectedCreatureCount, "Egg lineage scent detected count");
     AssertClose(0.4f, snapshot.AverageEggLineageScentDensity, 0.000001, "Average egg lineage scent density");
+    AssertEqual(2, snapshot.CreatureIdentityScentDetectedCreatureCount, "Creature identity scent detected count");
+    AssertClose(0.5f, snapshot.AverageCreatureIdentityScentDensity, 0.000001, "Average creature identity scent density");
+    AssertEqual(2, snapshot.EggIdentityScentDetectedCreatureCount, "Egg identity scent detected count");
+    AssertClose(0.6f, snapshot.AverageEggIdentityScentDensity, 0.000001, "Average egg identity scent density");
     AssertClose(4.25f, snapshot.TotalCaloriesEatenPerSecond, 0.000001, "Calories eaten per second");
     AssertClose(2.5f, snapshot.TotalPlantCaloriesEatenPerSecond, 0.000001, "Plant calories eaten per second");
     AssertClose(1f, snapshot.TotalCarcassCaloriesEatenPerSecond, 0.000001, "Carcass calories eaten per second");
@@ -9832,6 +10140,10 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.5f, snapshot.AverageCreatureContactLineageSimilarity, 0.000001, "Average creature contact lineage similarity");
     AssertEqual(1, snapshot.EggLineageContactCreatureCount, "Egg lineage contact count");
     AssertClose(1f, snapshot.AverageEggContactLineageSimilarity, 0.000001, "Average egg contact lineage similarity");
+    AssertEqual(1, snapshot.IdentityCreatureContactCreatureCount, "Identity creature contact count");
+    AssertClose(0.6f, snapshot.AverageCreatureContactIdentitySimilarity, 0.000001, "Average creature contact identity similarity");
+    AssertEqual(1, snapshot.EggIdentityContactCreatureCount, "Egg identity contact count");
+    AssertClose(1f, snapshot.AverageEggContactIdentitySimilarity, 0.000001, "Average egg contact identity similarity");
     AssertEqual(1, snapshot.AttackIntentCreatureCount, "Attack intent count");
     AssertEqual(1, snapshot.AttackIntentWhileTouchingCreatureCount, "Attack intent while touching count");
     AssertEqual(1, snapshot.AttackIntentWhileTouchingSimilarCreatureCount, "Attack intent while touching similar count");
@@ -10261,15 +10573,31 @@ static void ScenarioFactorySeedsRequestedWorld()
 
     AssertEqual(3, first.State.Creatures.Count, "Creature count");
     AssertEqual(4, first.State.Resources.Count, "Resource count");
-    AssertEqual(1, first.State.Genomes.Count, "Genome count");
+    AssertEqual(3, first.State.Genomes.Count, "Genome count");
     AssertEqual(1, first.State.Brains.Count, "Brain count");
     AssertEqual(3, first.State.Stats.CreatureBirthCount, "Birth count");
+    AssertEqual(
+        first.State.Creatures.Count,
+        first.State.Creatures.Select(creature => creature.GenomeId).Distinct().Count(),
+        "Each generic founder should get a distinct identity genome");
+    AssertTrue(
+        first.State.Creatures
+            .Select(creature => first.State.GetGenome(creature.GenomeId))
+            .Select(genome => $"{genome.ScentSignatureA:0.######},{genome.ScentSignatureB:0.######},{genome.ScentSignatureC:0.######}")
+            .Distinct(StringComparer.Ordinal)
+            .Count() > 1,
+        "Generic founders should not all share the same scent signature");
 
     for (var i = 0; i < first.State.Creatures.Count; i++)
     {
         AssertClose(first.State.Creatures[i].Position.X, second.State.Creatures[i].Position.X, 0.000001, $"Creature {i} x");
         AssertClose(first.State.Creatures[i].Position.Y, second.State.Creatures[i].Position.Y, 0.000001, $"Creature {i} y");
         AssertClose(first.State.Creatures[i].Energy, second.State.Creatures[i].Energy, 0.000001, $"Creature {i} energy");
+        var firstGenome = first.State.GetGenome(first.State.Creatures[i].GenomeId);
+        var secondGenome = second.State.GetGenome(second.State.Creatures[i].GenomeId);
+        AssertClose(firstGenome.ScentSignatureA, secondGenome.ScentSignatureA, 0.000001, $"Creature {i} scent signature A");
+        AssertClose(firstGenome.ScentSignatureB, secondGenome.ScentSignatureB, 0.000001, $"Creature {i} scent signature B");
+        AssertClose(firstGenome.ScentSignatureC, secondGenome.ScentSignatureC, 0.000001, $"Creature {i} scent signature C");
     }
 
     for (var i = 0; i < first.State.Resources.Count; i++)

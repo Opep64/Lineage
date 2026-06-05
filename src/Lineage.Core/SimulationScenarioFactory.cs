@@ -246,7 +246,7 @@ public static class SimulationScenarioFactory
             return;
         }
 
-        var genomeId = state.AddGenome(CreatureGenome.Baseline with
+        var initialGenome = (CreatureGenome.Baseline with
         {
             BodyRadius = scenario.InitialBodyRadius,
             MaxSpeed = scenario.InitialMaxSpeed,
@@ -280,20 +280,20 @@ public static class SimulationScenarioFactory
             MutationStrength = scenario.MutationStrength,
             TraitMutationRate = scenario.TraitMutationRate,
             BrainMutationRate = scenario.BrainMutationRate
-        });
+        }).Validated();
         var sharedBrainId = CreateSharedInitialBrainId(state, scenario);
         var initialBrainRandom = scenario.InitialBrainKind == InitialBrainKind.RandomPerFounder
             ? new DeterministicRandom(scenario.Seed ^ InitialBrainRandomizationSalt)
             : null;
-        var initialGenome = state.GetGenome(genomeId);
         var initialBodyRadius = initialGenome.BodyRadius;
         var initialMutationProfile = MutationProfile.FromScenario(scenario);
 
         for (var i = 0; i < scenario.InitialCreatureCount; i++)
         {
             var brainId = CreateFounderBrainId(state, scenario, sharedBrainId, initialBrainRandom);
+            var founderGenomeId = state.AddGenome(initialGenome.WithRandomScentSignature(state.Random));
             state.SpawnCreature(
-                genomeId,
+                founderGenomeId,
                 RandomCreaturePosition(state, scenario.InitialCreatureSpawnRegion, initialBodyRadius),
                 energy: RandomRange(
                     state,

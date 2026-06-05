@@ -338,10 +338,14 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Similarity scent", $"{FormatPercent(Share(snapshot.CreatureSimilarityScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageCreatureSimilarityScentDensity:0.###}");
         WriteMetric(writer, "Lineage scent", $"{FormatPercent(Share(snapshot.CreatureLineageScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageCreatureLineageScentDensity:0.###}");
         WriteMetric(writer, "Lineage egg scent", $"{FormatPercent(Share(snapshot.EggLineageScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageEggLineageScentDensity:0.###}");
+        WriteMetric(writer, "Identity scent", $"{FormatPercent(Share(snapshot.CreatureIdentityScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageCreatureIdentityScentDensity:0.###}");
+        WriteMetric(writer, "Identity egg scent", $"{FormatPercent(Share(snapshot.EggIdentityScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageEggIdentityScentDensity:0.###}");
         WriteMetric(writer, "Creature contact", FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Similar contact", $"{FormatPercent(Share(snapshot.SimilarCreatureContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageCreatureContactSimilarity:0.###}");
         WriteMetric(writer, "Lineage contact", $"{FormatPercent(Share(snapshot.LineageCreatureContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageCreatureContactLineageSimilarity:0.###}");
         WriteMetric(writer, "Lineage egg touch", $"{FormatPercent(Share(snapshot.EggLineageContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageEggContactLineageSimilarity:0.###}");
+        WriteMetric(writer, "Identity contact", $"{FormatPercent(Share(snapshot.IdentityCreatureContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageCreatureContactIdentitySimilarity:0.###}");
+        WriteMetric(writer, "Identity egg touch", $"{FormatPercent(Share(snapshot.EggIdentityContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageEggContactIdentitySimilarity:0.###}");
         WriteMetric(writer, "Attack intent", FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Intent while touching", FormatPercent(Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Intent on similar touch", FormatPercent(Share(snapshot.AttackIntentWhileTouchingSimilarCreatureCount, snapshot.CreatureCount)));

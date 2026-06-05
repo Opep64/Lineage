@@ -62,8 +62,11 @@ public static class BehaviorAssay
         var rottenMeatScentRight = new BehaviorAssayAccumulator();
         var similarCreatureScentAhead = new BehaviorAssayAccumulator();
         var lineageCreatureScentAhead = new BehaviorAssayAccumulator();
+        var identityCreatureScentAhead = new BehaviorAssayAccumulator();
         var lineageEggScentAhead = new BehaviorAssayAccumulator();
         var lineageEggScentRight = new BehaviorAssayAccumulator();
+        var identityEggScentAhead = new BehaviorAssayAccumulator();
+        var identityEggScentRight = new BehaviorAssayAccumulator();
         var creatureAhead = new BehaviorAssayAccumulator();
         var creatureRight = new BehaviorAssayAccumulator();
         var smallCreatureAhead = new BehaviorAssayAccumulator();
@@ -73,6 +76,8 @@ public static class BehaviorAssay
         var unrelatedCreatureContact = new BehaviorAssayAccumulator();
         var similarCreatureContact = new BehaviorAssayAccumulator();
         var lineageCreatureContact = new BehaviorAssayAccumulator();
+        var identityCreatureContact = new BehaviorAssayAccumulator();
+        var identityEggContact = new BehaviorAssayAccumulator();
         var slowTerrainHere = new BehaviorAssayAccumulator();
         var slowTerrainAhead = new BehaviorAssayAccumulator();
         var easierTerrainAhead = new BehaviorAssayAccumulator();
@@ -163,8 +168,11 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateRottenMeatScentRightSenses(), inputs, outputs, ref rottenMeatScentRight);
             Accumulate(brain, genome, CreateSimilarCreatureScentAheadSenses(), inputs, outputs, ref similarCreatureScentAhead);
             Accumulate(brain, genome, CreateLineageCreatureScentAheadSenses(), inputs, outputs, ref lineageCreatureScentAhead);
+            Accumulate(brain, genome, CreateIdentityCreatureScentAheadSenses(), inputs, outputs, ref identityCreatureScentAhead);
             Accumulate(brain, genome, CreateLineageEggScentAheadSenses(), inputs, outputs, ref lineageEggScentAhead);
             Accumulate(brain, genome, CreateLineageEggScentRightSenses(), inputs, outputs, ref lineageEggScentRight);
+            Accumulate(brain, genome, CreateIdentityEggScentAheadSenses(), inputs, outputs, ref identityEggScentAhead);
+            Accumulate(brain, genome, CreateIdentityEggScentRightSenses(), inputs, outputs, ref identityEggScentRight);
             Accumulate(brain, genome, CreateCreatureAheadSenses(), inputs, outputs, ref creatureAhead);
             Accumulate(brain, genome, CreateCreatureRightSenses(), inputs, outputs, ref creatureRight);
             Accumulate(brain, genome, CreateSmallCreatureAheadSenses(), inputs, outputs, ref smallCreatureAhead);
@@ -174,6 +182,8 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateUnrelatedCreatureContactSenses(), inputs, outputs, ref unrelatedCreatureContact);
             Accumulate(brain, genome, CreateSimilarCreatureContactSenses(), inputs, outputs, ref similarCreatureContact);
             Accumulate(brain, genome, CreateLineageCreatureContactSenses(), inputs, outputs, ref lineageCreatureContact);
+            Accumulate(brain, genome, CreateIdentityCreatureContactSenses(), inputs, outputs, ref identityCreatureContact);
+            Accumulate(brain, genome, CreateIdentityEggContactSenses(), inputs, outputs, ref identityEggContact);
             Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
             Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
             Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
@@ -217,14 +227,18 @@ public static class BehaviorAssay
             eggContact.ToResult("Egg contact"),
             unrelatedEggContact.ToResult("Unrelated egg contact"),
             lineageEggContact.ToResult("Lineage egg contact"),
+            identityEggContact.ToResult("Identity egg contact"),
             meatScentAhead.ToResult("Meat scent ahead"),
             meatScentRight.ToResult("Meat scent right"),
             rottenMeatScentAhead.ToResult("Rotten meat scent ahead"),
             rottenMeatScentRight.ToResult("Rotten meat scent right"),
             similarCreatureScentAhead.ToResult("Similar creature scent ahead"),
             lineageCreatureScentAhead.ToResult("Lineage creature scent ahead"),
+            identityCreatureScentAhead.ToResult("Identity creature scent ahead"),
             lineageEggScentAhead.ToResult("Lineage egg scent ahead"),
             lineageEggScentRight.ToResult("Lineage egg scent right"),
+            identityEggScentAhead.ToResult("Identity egg scent ahead"),
+            identityEggScentRight.ToResult("Identity egg scent right"),
             creatureAhead.ToResult("Creature sector ahead"),
             creatureRight.ToResult("Creature sector right"),
             smallCreatureAhead.ToResult("Small creature sector ahead"),
@@ -234,6 +248,7 @@ public static class BehaviorAssay
             unrelatedCreatureContact.ToResult("Unrelated creature contact"),
             similarCreatureContact.ToResult("Similar creature contact"),
             lineageCreatureContact.ToResult("Lineage creature contact"),
+            identityCreatureContact.ToResult("Identity creature contact"),
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
@@ -670,7 +685,8 @@ public static class BehaviorAssay
     {
         return CreateEggContactSenses() with
         {
-            EggContactLineageSimilarity = 0f
+            EggContactLineageSimilarity = 0f,
+            EggContactIdentitySimilarity = 0f
         };
     }
 
@@ -679,6 +695,14 @@ public static class BehaviorAssay
         return CreateEggContactSenses() with
         {
             EggContactLineageSimilarity = 1f
+        };
+    }
+
+    private static CreatureSenseState CreateIdentityEggContactSenses()
+    {
+        return CreateEggContactSenses() with
+        {
+            EggContactIdentitySimilarity = 1f
         };
     }
 
@@ -708,7 +732,8 @@ public static class BehaviorAssay
         {
             CreatureContact = 1f,
             CreatureContactSimilarity = 0.1f,
-            CreatureContactLineageSimilarity = 0f
+            CreatureContactLineageSimilarity = 0f,
+            CreatureContactIdentitySimilarity = 0f
         };
     }
 
@@ -718,7 +743,8 @@ public static class BehaviorAssay
         {
             CreatureContact = 1f,
             CreatureContactSimilarity = 1f,
-            CreatureContactLineageSimilarity = 0f
+            CreatureContactLineageSimilarity = 0f,
+            CreatureContactIdentitySimilarity = 0f
         };
     }
 
@@ -728,7 +754,19 @@ public static class BehaviorAssay
         {
             CreatureContact = 1f,
             CreatureContactSimilarity = 0.1f,
-            CreatureContactLineageSimilarity = 1f
+            CreatureContactLineageSimilarity = 1f,
+            CreatureContactIdentitySimilarity = 0f
+        };
+    }
+
+    private static CreatureSenseState CreateIdentityCreatureContactSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureContact = 1f,
+            CreatureContactSimilarity = 0.1f,
+            CreatureContactLineageSimilarity = 0f,
+            CreatureContactIdentitySimilarity = 1f
         };
     }
 
@@ -902,6 +940,16 @@ public static class BehaviorAssay
         };
     }
 
+    private static CreatureSenseState CreateIdentityCreatureScentAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureIdentityScentDetected = true,
+            CreatureIdentityScentDensity = 0.65f,
+            CreatureIdentityScentDirectionForward = 0.65f
+        };
+    }
+
     private static CreatureSenseState CreateLineageEggScentAheadSenses()
     {
         return CreateBaselineSenses() with
@@ -919,6 +967,26 @@ public static class BehaviorAssay
             EggLineageScentDetected = true,
             EggLineageScentDensity = 0.65f,
             EggLineageScentDirectionRight = 0.65f
+        };
+    }
+
+    private static CreatureSenseState CreateIdentityEggScentAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            EggIdentityScentDetected = true,
+            EggIdentityScentDensity = 0.65f,
+            EggIdentityScentDirectionForward = 0.65f
+        };
+    }
+
+    private static CreatureSenseState CreateIdentityEggScentRightSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            EggIdentityScentDetected = true,
+            EggIdentityScentDensity = 0.65f,
+            EggIdentityScentDirectionRight = 0.65f
         };
     }
 
@@ -1527,14 +1595,18 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult EggContact,
     BehaviorAssayResult UnrelatedEggContact,
     BehaviorAssayResult LineageEggContact,
+    BehaviorAssayResult IdentityEggContact,
     BehaviorAssayResult MeatScentAhead,
     BehaviorAssayResult MeatScentRight,
     BehaviorAssayResult RottenMeatScentAhead,
     BehaviorAssayResult RottenMeatScentRight,
     BehaviorAssayResult SimilarCreatureScentAhead,
     BehaviorAssayResult LineageCreatureScentAhead,
+    BehaviorAssayResult IdentityCreatureScentAhead,
     BehaviorAssayResult LineageEggScentAhead,
     BehaviorAssayResult LineageEggScentRight,
+    BehaviorAssayResult IdentityEggScentAhead,
+    BehaviorAssayResult IdentityEggScentRight,
     BehaviorAssayResult CreatureAhead,
     BehaviorAssayResult CreatureRight,
     BehaviorAssayResult SmallCreatureAhead,
@@ -1544,6 +1616,7 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult UnrelatedCreatureContact,
     BehaviorAssayResult SimilarCreatureContact,
     BehaviorAssayResult LineageCreatureContact,
+    BehaviorAssayResult IdentityCreatureContact,
     BehaviorAssayResult SlowTerrainHere,
     BehaviorAssayResult SlowTerrainAhead,
     BehaviorAssayResult EasierTerrainAhead,
@@ -1608,14 +1681,18 @@ public readonly record struct BehaviorAssaySummary(
         EggContact,
         UnrelatedEggContact,
         LineageEggContact,
+        IdentityEggContact,
         MeatScentAhead,
         MeatScentRight,
         RottenMeatScentAhead,
         RottenMeatScentRight,
         SimilarCreatureScentAhead,
         LineageCreatureScentAhead,
+        IdentityCreatureScentAhead,
         LineageEggScentAhead,
         LineageEggScentRight,
+        IdentityEggScentAhead,
+        IdentityEggScentRight,
         CreatureAhead,
         CreatureRight,
         SmallCreatureAhead,
@@ -1625,6 +1702,7 @@ public readonly record struct BehaviorAssaySummary(
         UnrelatedCreatureContact,
         SimilarCreatureContact,
         LineageCreatureContact,
+        IdentityCreatureContact,
         SlowTerrainHere,
         SlowTerrainAhead,
         EasierTerrainAhead,

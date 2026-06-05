@@ -39,6 +39,9 @@ public readonly record struct CreatureGenome
         FatStorageEfficiency = 0.85f,
         ThermalOptimum = CreatureThermal.DefaultOptimum,
         ThermalTolerance = CreatureThermal.DefaultTolerance,
+        ScentSignatureA = 0.5f,
+        ScentSignatureB = 0.5f,
+        ScentSignatureC = 0.5f,
         BiteStrength = 0.55f,
         DamageResistance = 1f,
         MutationStrength = 0.05f,
@@ -46,7 +49,7 @@ public readonly record struct CreatureGenome
         BrainMutationRate = 0.08f
     };
 
-    private const int MutatingTraitCount = 29;
+    private const int MutatingTraitCount = 32;
 
     public float BodyRadius { get; init; }
 
@@ -101,6 +104,12 @@ public readonly record struct CreatureGenome
     public float ThermalOptimum { get; init; }
 
     public float ThermalTolerance { get; init; }
+
+    public float ScentSignatureA { get; init; }
+
+    public float ScentSignatureB { get; init; }
+
+    public float ScentSignatureC { get; init; }
 
     public float BiteStrength { get; init; }
 
@@ -187,6 +196,9 @@ public readonly record struct CreatureGenome
                 strength,
                 120f,
                 5000f),
+            ScentSignatureA = MutateUnitIntervalTraitIfSelected(random, mutations[29], ScentSignatureA, strength * 0.35f),
+            ScentSignatureB = MutateUnitIntervalTraitIfSelected(random, mutations[30], ScentSignatureB, strength * 0.35f),
+            ScentSignatureC = MutateUnitIntervalTraitIfSelected(random, mutations[31], ScentSignatureC, strength * 0.35f),
             MutationStrength = mutationProfile.MutationStrength,
             TraitMutationRate = mutationProfile.TraitMutationRate,
             BrainMutationRate = mutationProfile.BrainMutationRate
@@ -267,6 +279,9 @@ public readonly record struct CreatureGenome
         EnsureRange(normalized.FatStorageEfficiency, 0.05f, 1f, nameof(FatStorageEfficiency));
         EnsureRange(normalized.ThermalOptimum, CreatureThermal.MinimumOptimum, CreatureThermal.MaximumOptimum, nameof(ThermalOptimum));
         EnsureRange(normalized.ThermalTolerance, CreatureThermal.MinimumTolerance, CreatureThermal.MaximumTolerance, nameof(ThermalTolerance));
+        EnsureProbability(normalized.ScentSignatureA, nameof(ScentSignatureA));
+        EnsureProbability(normalized.ScentSignatureB, nameof(ScentSignatureB));
+        EnsureProbability(normalized.ScentSignatureC, nameof(ScentSignatureC));
         EnsurePositive(normalized.BiteStrength, nameof(BiteStrength));
         EnsurePositive(normalized.DamageResistance, nameof(DamageResistance));
         EnsureNonNegative(normalized.MutationStrength, nameof(MutationStrength));
@@ -279,6 +294,16 @@ public readonly record struct CreatureGenome
         }
 
         return normalized;
+    }
+
+    public CreatureGenome WithRandomScentSignature(DeterministicRandom random)
+    {
+        return (this with
+        {
+            ScentSignatureA = random.NextSingle(),
+            ScentSignatureB = random.NextSingle(),
+            ScentSignatureC = random.NextSingle()
+        }).Validated();
     }
 
     private static bool[] CreateMutationMask(

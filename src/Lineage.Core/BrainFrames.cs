@@ -81,7 +81,17 @@ public readonly record struct BrainInputFrame(
                     senses.EggLineageScentDetected,
                     senses.EggLineageScentDensity,
                     senses.EggLineageScentDirectionForward,
-                    senses.EggLineageScentDirectionRight)),
+                    senses.EggLineageScentDirectionRight),
+                new DirectionalGradientSignal(
+                    senses.CreatureIdentityScentDetected,
+                    senses.CreatureIdentityScentDensity,
+                    senses.CreatureIdentityScentDirectionForward,
+                    senses.CreatureIdentityScentDirectionRight),
+                new DirectionalGradientSignal(
+                    senses.EggIdentityScentDetected,
+                    senses.EggIdentityScentDensity,
+                    senses.EggIdentityScentDirectionForward,
+                    senses.EggIdentityScentDirectionRight)),
             new CommunicationInputFrame(
                 new DirectionalToneSignal(
                     senses.SoundDetected,
@@ -122,6 +132,8 @@ public readonly record struct BrainInputFrame(
                 senses.CreatureContactSimilarity,
                 senses.CreatureContactLineageSimilarity,
                 senses.EggContactLineageSimilarity,
+                senses.CreatureContactIdentitySimilarity,
+                senses.EggContactIdentitySimilarity,
                 senses.GrabPressure,
                 senses.GrabDirectionForward,
                 senses.GrabDirectionRight,
@@ -210,7 +222,9 @@ public readonly record struct ScentInputFrame(
     DirectionalGradientSignal RottenMeat,
     DirectionalGradientSignal CreatureSimilarity,
     DirectionalGradientSignal CreatureLineage,
-    DirectionalGradientSignal EggLineage);
+    DirectionalGradientSignal EggLineage,
+    DirectionalGradientSignal CreatureIdentity,
+    DirectionalGradientSignal EggIdentity);
 
 /// <summary>
 /// Intentional signals emitted by creature actions.
@@ -253,6 +267,8 @@ public readonly record struct BodyInputFrame(
     float CreatureContactSimilarity,
     float CreatureContactLineageSimilarity,
     float EggContactLineageSimilarity,
+    float CreatureContactIdentitySimilarity,
+    float EggContactIdentitySimilarity,
     float GrabPressure,
     float GrabDirectionForward,
     float GrabDirectionRight,

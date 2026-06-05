@@ -70,6 +70,12 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.EggLineageScentDensityInput] = frame.Scent.EggLineage.Density;
         inputs[NeuralBrainSchema.EggLineageScentForwardInput] = frame.Scent.EggLineage.DirectionForward;
         inputs[NeuralBrainSchema.EggLineageScentRightInput] = frame.Scent.EggLineage.DirectionRight;
+        inputs[NeuralBrainSchema.CreatureIdentityScentDensityInput] = frame.Scent.CreatureIdentity.Density;
+        inputs[NeuralBrainSchema.CreatureIdentityScentForwardInput] = frame.Scent.CreatureIdentity.DirectionForward;
+        inputs[NeuralBrainSchema.CreatureIdentityScentRightInput] = frame.Scent.CreatureIdentity.DirectionRight;
+        inputs[NeuralBrainSchema.EggIdentityScentDensityInput] = frame.Scent.EggIdentity.Density;
+        inputs[NeuralBrainSchema.EggIdentityScentForwardInput] = frame.Scent.EggIdentity.DirectionForward;
+        inputs[NeuralBrainSchema.EggIdentityScentRightInput] = frame.Scent.EggIdentity.DirectionRight;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;
@@ -91,6 +97,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.CreatureContactSimilarityInput] = frame.Body.CreatureContactSimilarity;
         inputs[NeuralBrainSchema.CreatureContactLineageSimilarityInput] = frame.Body.CreatureContactLineageSimilarity;
         inputs[NeuralBrainSchema.EggContactLineageSimilarityInput] = frame.Body.EggContactLineageSimilarity;
+        inputs[NeuralBrainSchema.CreatureContactIdentitySimilarityInput] = frame.Body.CreatureContactIdentitySimilarity;
+        inputs[NeuralBrainSchema.EggContactIdentitySimilarityInput] = frame.Body.EggContactIdentitySimilarity;
         inputs[NeuralBrainSchema.GrabPressureInput] = frame.Body.GrabPressure;
         inputs[NeuralBrainSchema.GrabDirectionForwardInput] = frame.Body.GrabDirectionForward;
         inputs[NeuralBrainSchema.GrabDirectionRightInput] = frame.Body.GrabDirectionRight;
