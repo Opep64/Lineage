@@ -124,6 +124,7 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.InjuryMemoryForwardInput] = frame.Internal.InjuryMemoryDirectionForward;
         inputs[NeuralBrainSchema.InjuryMemoryRightInput] = frame.Internal.InjuryMemoryDirectionRight;
         inputs[NeuralBrainSchema.InjuryMemoryStrengthInput] = frame.Internal.InjuryMemoryStrength;
+        inputs[NeuralBrainSchema.MaturityProgressInput] = frame.Internal.MaturityProgress;
 
         if (!frame.Vision.Sectors.HasAnySignal)
         {

@@ -111,6 +111,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports local obstacles", CreatureSensingReportsLocalObstacles),
     ("Creature sensing reports memory direction", CreatureSensingReportsMemoryDirection),
     ("Creature sensing reports injury memory direction", CreatureSensingReportsInjuryMemoryDirection),
+    ("Creature sensing reports maturity progress", CreatureSensingReportsMaturityProgress),
     ("Creature sensing reports egg reserve readiness", CreatureSensingReportsEggReserveReadiness),
     ("Creature sensing reports reproductive context", CreatureSensingReportsReproductiveContext),
     ("Creature sensing reports fullness", CreatureSensingReportsFullness),
@@ -141,6 +142,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay reports lineage familiarity probes", BehaviorAssayReportsLineageFamiliarityProbes),
     ("Behavior assay reports collision blocked probes", BehaviorAssayReportsCollisionBlockedProbes),
     ("Behavior assay reports injury memory probes", BehaviorAssayReportsInjuryMemoryProbes),
+    ("Behavior assay reports maturity progress probes", BehaviorAssayReportsMaturityProgressProbes),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
@@ -177,6 +179,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates fullness inputs", NeuralBrainMigratesFullnessInputs),
     ("Neural brain migrates lineage familiarity inputs", NeuralBrainMigratesLineageFamiliarityInputs),
     ("Neural brain migrates injury memory inputs", NeuralBrainMigratesInjuryMemoryInputs),
+    ("Neural brain migrates maturity progress input", NeuralBrainMigratesMaturityProgressInput),
     ("Neural brain migrates egg lineage scent inputs", NeuralBrainMigratesEggLineageScentInputs),
     ("Neural brain migrates identity scent inputs", NeuralBrainMigratesIdentityScentInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
@@ -4776,6 +4779,35 @@ static void CreatureSensingReportsInjuryMemoryDirection()
     AssertClose(0.65f, senses.InjuryMemoryDirectionRight, 0.000001, "Injury memory right direction");
 }
 
+static void CreatureSensingReportsMaturityProgress()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 411,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        MaturityAgeSeconds = 20f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    var creature = simulation.State.Creatures[0];
+    creature.AgeSeconds = 5f;
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertClose(0.25f, senses.MaturityProgress, 0.000001, "Maturity progress");
+}
+
 static void CreatureSensingReportsLocalObstacles()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -5166,6 +5198,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var identityScentInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CreatureIdentityScentDensityInput);
     var identityContactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CreatureContactIdentitySimilarityInput);
     var injuryMemoryInput = BrainIoRegistry.GetInput(NeuralBrainSchema.InjuryMemoryStrengthInput);
+    var maturityProgressInput = BrainIoRegistry.GetInput(NeuralBrainSchema.MaturityProgressInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -5187,6 +5220,9 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(10, identityContactInput.IntroducedVersion, "Identity contact input introduced version");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, injuryMemoryInput.Freshness, "Injury memory input freshness");
     AssertEqual(11, injuryMemoryInput.IntroducedVersion, "Injury memory input introduced version");
+    AssertEqual("internal.maturity_progress", maturityProgressInput.Key, "Maturity progress input key");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, maturityProgressInput.Freshness, "Maturity progress input freshness");
+    AssertEqual(12, maturityProgressInput.IntroducedVersion, "Maturity progress input introduced version");
     AssertEqual("internal.energy_fullness", fullnessInput.Key, "Fullness input key");
     AssertEqual("scent.egg_lineage_density", eggLineageScentInput.Key, "Egg lineage scent input key");
     AssertEqual("scent.creature_identity_density", identityScentInput.Key, "Identity scent input key");
@@ -5205,6 +5241,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         EnergyRatio = 0.8f,
         HealthRatio = 0.66f,
         Hunger = 0.2f,
+        MaturityProgress = 0.77f,
         FoodProximity = 0.7f,
         FoodDirectionForward = 0.6f,
         FoodDirectionRight = -0.3f,
@@ -5337,6 +5374,7 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(1f, inputs[NeuralBrainSchema.BiasInput], 0.000001, "Bias input");
     AssertClose(0.8f, inputs[NeuralBrainSchema.EnergyRatioInput], 0.000001, "Energy input");
     AssertClose(0.66f, inputs[NeuralBrainSchema.HealthRatioInput], 0.000001, "Health input");
+    AssertClose(0.77f, inputs[NeuralBrainSchema.MaturityProgressInput], 0.000001, "Maturity progress input");
     AssertClose(0.35f, inputs[NeuralBrainSchema.DietaryMeatBiasInput], 0.000001, "Diet input");
     AssertClose(0.4f, inputs[NeuralBrainSchema.VisibleFoodDensityInput], 0.000001, "Food density input");
     AssertClose(0.45f, inputs[NeuralBrainSchema.VisiblePlantDensityInput], 0.000001, "Plant density input");
@@ -6194,7 +6232,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(65, summary.Results.Count, "Assay result count");
+    AssertEqual(66, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
@@ -6224,6 +6262,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     AssertClose(0f, summary.RottenScentAvoidanceScore, 0.000001, "Seed forager rot scent score");
     AssertEqual("little freshness differentiation", summary.RottenMeatResponse, "Seed forager should not arrive with built-in rot response");
     AssertEqual("little injury-memory differentiation", summary.InjuryMemoryResponse, "Seed forager should not arrive with built-in injury memory response");
+    AssertEqual("little maturity differentiation", summary.MaturityResponse, "Seed forager should not arrive with built-in maturity response");
     AssertClose(
         summary.Baseline.MoveForward,
         summary.LineageCreatureScentAhead.MoveForward,
@@ -6339,6 +6378,36 @@ static void BehaviorAssayReportsInjuryMemoryProbes()
         "steers away from injury memory",
         summary.InjuryMemoryResponse,
         "Injury memory response classifier");
+}
+
+static void BehaviorAssayReportsMaturityProgressProbes()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 415, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 20f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.2f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.MaturityProgressInput] = 2f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = -1f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.MaturityProgressInput] = 2f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(
+        summary.JuvenileSelf.MoveForward < summary.Baseline.MoveForward - 0.3f,
+        "Juvenile probe should expose maturity-scaled movement wiring");
+    AssertTrue(
+        summary.JuvenileSelf.AttackShare < summary.Baseline.AttackShare - 0.5f,
+        "Juvenile probe should expose maturity-scaled attack wiring");
+    AssertEqual(
+        "juvenile caution",
+        summary.MaturityResponse,
+        "Maturity response classifier");
 }
 
 static void BehaviorAssayReportsPlantChoiceProbes()
@@ -7981,6 +8050,44 @@ static void NeuralBrainMigratesInjuryMemoryInputs()
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.InjuryMemoryForwardInput), 0.000001, "New injury memory forward starts neutral");
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.InjuryMemoryRightInput), 0.000001, "New injury memory right starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.InjuryMemoryStrengthInput), 0.000001, "New hidden injury memory strength starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MaturityProgressInput), 0.000001, "New maturity progress starts neutral");
+}
+
+static void NeuralBrainMigratesMaturityProgressInput()
+{
+    const int legacyInputCount = NeuralBrainSchema.MaturityProgressInput;
+    const int legacyOutputCount = NeuralBrainSchema.OutputCount;
+    const int hiddenNodeCount = 1;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.InjuryMemoryStrengthInput] = 0.8f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.InjuryMemoryRightInput] = -0.5f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.AttackOutput * hiddenNodeCount] = 0.6f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Maturity migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Maturity migrated weight count");
+    AssertClose(
+        0.8f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.InjuryMemoryStrengthInput),
+        0.000001,
+        "Existing injury memory strength direct input remains in place");
+    AssertClose(
+        -0.5f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.InjuryMemoryRightInput),
+        0.000001,
+        "Existing hidden injury memory right input remains in place");
+    AssertClose(
+        0.6f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.AttackOutput, 0),
+        0.000001,
+        "Existing hidden attack output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MaturityProgressInput), 0.000001, "New maturity progress direct input starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.MaturityProgressInput), 0.000001, "New maturity progress hidden input starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -8379,6 +8486,9 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
     AssertEqual(BrainArchitectureKind.RtNeatGraph, descriptor.Kind, "rtNEAT descriptor kind");
     AssertEqual("rtNEAT graph", descriptor.Name, "rtNEAT descriptor name");
     AssertTrue(descriptor.InputCount >= BrainIoRegistry.Inputs.Count, "rtNEAT should expose semantic inputs");
+    AssertTrue(
+        RtNeatBrainIoRegistry.Inputs.Any(input => string.Equals(input.Key, "internal.maturity_progress", StringComparison.Ordinal)),
+        "rtNEAT should expose maturity progress input");
     AssertEqual(BrainIoRegistry.PhysicalActionOutputs.Count, descriptor.OutputCount, "rtNEAT output count");
 
     var starter = BrainFactory.CreateStarter(
@@ -10269,6 +10379,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 20f), energy: 7f, generation: 2, brainId: brainId);
     var childId = simulation.State.Creatures[1].Id;
     var seeingCreature = simulation.State.Creatures[0];
+    seeingCreature.AgeSeconds = 9f;
     seeingCreature.Senses = new CreatureSenseState
     {
         FoodDetected = true,
@@ -10355,6 +10466,7 @@ static void StatsRecordingCapturesAggregateSnapshot()
     seeingCreature.InjuryMemoryVector = new SimVector2(0.4f, 0f);
     simulation.State.Creatures[0] = seeingCreature;
     var searchingCreature = simulation.State.Creatures[1];
+    searchingCreature.AgeSeconds = 60f;
     searchingCreature.Senses = new CreatureSenseState
     {
         FoodDetected = true,
@@ -10622,10 +10734,15 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(3.5f / 8f, snapshot.CaloriesDigestedPerDistance, 0.000001, "Calories digested per distance");
     AssertClose(4.25f / 2f, snapshot.CaloriesEatenPerFoodVisionEvent, 0.000001, "Calories eaten per food vision event");
     AssertClose(1f, snapshot.AverageBirthInvestmentRatio, 0.000001, "Average birth investment");
+    AssertClose(0.6f, snapshot.AverageMaturityProgress, 0.000001, "Average maturity progress");
+    AssertEqual(1, snapshot.AdultCreatureCount, "Adult creature count");
     AssertClose(0.375f, snapshot.AverageEggReserveRatio, 0.000001, "Average egg reserve ratio");
     AssertClose(0.15f, snapshot.AverageEnergySurplusRatio, 0.000001, "Average energy surplus ratio");
-    var expectedEnergyCapacity = CreatureGrowth.EffectiveEnergyCapacityCalories(default, CreatureGenome.Baseline);
-    AssertClose(6f / expectedEnergyCapacity, snapshot.AverageEnergyFullnessRatio, 0.000001, "Average energy fullness ratio");
+    var expectedEnergyFullness = simulation.State.Creatures
+        .Average(creature => CreatureGrowth.EnergyFullnessRatio(creature, CreatureGenome.Baseline));
+    var expectedEnergyCapacity = simulation.State.Creatures
+        .Average(creature => CreatureGrowth.EffectiveEnergyCapacityCalories(creature, CreatureGenome.Baseline));
+    AssertClose(expectedEnergyFullness, snapshot.AverageEnergyFullnessRatio, 0.000001, "Average energy fullness ratio");
     AssertClose(expectedEnergyCapacity, snapshot.AverageEnergyCapacityCalories, 0.000001, "Average energy capacity");
     AssertClose(0.8f, snapshot.TotalEnergyOverflowCaloriesPerSecond, 0.000001, "Energy overflow calories per second");
     AssertClose(0.375f, snapshot.AverageFatRatio, 0.000001, "Average fat ratio");
@@ -10663,7 +10780,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0f, snapshot.MemoryUserRightRegionShare, 0.000001, "Memory right region share");
     AssertClose(0f, snapshot.NonMemoryUserRightRegionShare, 0.000001, "Non-memory right region share");
     AssertClose(1f, snapshot.AverageEggHealthRatio, 0.000001, "Average egg health ratio");
-    var expectedVisionRange = CreatureGrowth.EffectiveSenseRadius(simulation.State.Creatures[0], CreatureGenome.Baseline);
+    var expectedVisionRange = simulation.State.Creatures
+        .Average(creature => CreatureGrowth.EffectiveSenseRadius(creature, CreatureGenome.Baseline));
     AssertClose(expectedVisionRange, snapshot.AverageVisionRange, 0.000001, "Average vision range");
     AssertClose(CreatureGenome.Baseline.VisionAngleRadians, snapshot.AverageVisionAngleRadians, 0.000001, "Average vision angle");
     AssertEqual(2, snapshot.CreatureBirthCount, "Snapshot birth count");

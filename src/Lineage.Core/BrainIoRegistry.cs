@@ -220,7 +220,8 @@ public static class BrainIoRegistry
             Input("contact.egg_identity_similarity", "Egg contact identity similarity", NeuralBrainSchema.EggContactIdentitySimilarityInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Heritable scent-signature match of a contacted egg.", introducedVersion: 10),
             Input("internal.injury_memory_forward", "Injury memory forward", NeuralBrainSchema.InjuryMemoryForwardInput, BrainIoSignalGroup.Internal, -1f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Decaying memory of the recent injury source projected forward.", introducedVersion: 11),
             Input("internal.injury_memory_right", "Injury memory right", NeuralBrainSchema.InjuryMemoryRightInput, BrainIoSignalGroup.Internal, -1f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Decaying memory of the recent injury source projected right.", introducedVersion: 11),
-            Input("internal.injury_memory_strength", "Injury memory strength", NeuralBrainSchema.InjuryMemoryStrengthInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Magnitude of the decaying recent injury source memory.", introducedVersion: 11)
+            Input("internal.injury_memory_strength", "Injury memory strength", NeuralBrainSchema.InjuryMemoryStrengthInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Magnitude of the decaying recent injury source memory.", introducedVersion: 11),
+            Input("internal.maturity_progress", "Maturity progress", NeuralBrainSchema.MaturityProgressInput, BrainIoSignalGroup.Internal, 0f, 1f, 1f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Juvenile-to-adult development progress after metabolic pace scaling.", introducedVersion: 12)
         });
 
         return ValidateInputs(inputs);

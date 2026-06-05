@@ -105,6 +105,8 @@ public sealed class StatsRecordingSystem(
         var totalDistanceTraveled = 0f;
         var totalDistanceSinceLastMeal = 0f;
         var totalBirthInvestmentRatio = 0f;
+        var totalMaturityProgress = 0f;
+        var adultCreatureCount = 0;
         var totalEggReserveRatio = 0f;
         var totalEnergySurplusRatio = 0f;
         var totalEnergyFullnessRatio = 0f;
@@ -358,6 +360,13 @@ public sealed class StatsRecordingSystem(
             totalDistanceTraveled += creature.LastDistanceTraveled;
             totalDistanceSinceLastMeal += creature.DistanceSinceLastMeal;
             totalBirthInvestmentRatio += OffspringDevelopment.NormalizeInvestmentRatio(creature.BirthInvestmentRatio);
+            var maturityProgress = CreatureGrowth.MaturityProgress(creature, genome);
+            totalMaturityProgress += maturityProgress;
+            if (maturityProgress >= 1f)
+            {
+                adultCreatureCount++;
+            }
+
             totalEggReserveRatio += creature.Senses.EggReserveRatio;
             totalEnergySurplusRatio += creature.Senses.EnergySurplusRatio;
             totalEnergyFullnessRatio += CreatureGrowth.EnergyFullnessRatio(creature, genome);
@@ -1388,6 +1397,8 @@ public sealed class StatsRecordingSystem(
             caloriesDigestedPerDistance,
             caloriesEatenPerFoodVisionEvent,
             totalBirthInvestmentRatio / divisor,
+            totalMaturityProgress / divisor,
+            adultCreatureCount,
             totalEggHealthRatio / Math.Max(1, state.Eggs.Count),
             totalVisionRange / divisor,
             totalVisionAngle / divisor,

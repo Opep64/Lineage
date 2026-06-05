@@ -223,6 +223,7 @@ public static class RtNeatBrainIoRegistry
             "internal.injury_memory_forward" => frame.Internal.InjuryMemoryDirectionForward,
             "internal.injury_memory_right" => frame.Internal.InjuryMemoryDirectionRight,
             "internal.injury_memory_strength" => frame.Internal.InjuryMemoryStrength,
+            "internal.maturity_progress" => frame.Internal.MaturityProgress,
             "vision.food_density" => frame.Vision.Food.Density,
             "vision.food.proximity" => frame.Vision.Food.Proximity,
             "vision.food.direction_forward" => frame.Vision.Food.DirectionForward,

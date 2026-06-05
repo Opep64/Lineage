@@ -198,6 +198,8 @@ public readonly record struct SimulationStatsSnapshot(
     float CaloriesDigestedPerDistance,
     float CaloriesEatenPerFoodVisionEvent,
     float AverageBirthInvestmentRatio,
+    float AverageMaturityProgress,
+    int AdultCreatureCount,
     float AverageEggHealthRatio,
     float AverageVisionRange,
     float AverageVisionAngleRadians,

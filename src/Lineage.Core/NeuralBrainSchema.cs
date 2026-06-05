@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 11;
+    public const int InputSchemaVersion = 12;
 
     public const int OutputSchemaVersion = 3;
 
@@ -170,7 +170,9 @@ public static class NeuralBrainSchema
 
     public const int InjuryMemoryStrengthInput = InjuryMemoryRightInput + 1;
 
-    public const int InputCount = InjuryMemoryStrengthInput + 1;
+    public const int MaturityProgressInput = InjuryMemoryStrengthInput + 1;
+
+    public const int InputCount = MaturityProgressInput + 1;
 
     public const int OutputCount = 10;
 

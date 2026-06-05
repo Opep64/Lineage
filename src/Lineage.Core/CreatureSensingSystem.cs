@@ -1020,6 +1020,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.EnergyRatio = energyRatio;
         senses.HealthRatio = healthRatio;
         senses.Hunger = 1f - energyRatio;
+        senses.MaturityProgress = CreatureGrowth.MaturityProgress(creature, genome);
         senses.EggReserveRatio = eggReserveRatio;
         senses.EnergySurplusRatio = energySurplusRatio;
         senses.EnergyFullnessRatio = CreatureGrowth.EnergyFullnessRatio(creature, genome);

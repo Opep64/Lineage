@@ -193,6 +193,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Offspring alive", FormatPercent(Share(state.Creatures.Count(creature => creature.Generation > 0), state.Stats.EggHatchedCount)));
         WriteMetric(writer, "Egg health", $"{snapshot.AverageEggHealthRatio * 100f:0.0}%");
         WriteMetric(writer, "Birth investment", $"{snapshot.AverageBirthInvestmentRatio:0.###}x");
+        WriteMetric(writer, "Maturity", $"{FormatPercent(snapshot.AverageMaturityProgress)} avg; {FormatPercent(Share(snapshot.AdultCreatureCount, snapshot.CreatureCount))} adult");
         WriteMetric(writer, "Reproduction intent", FormatPercent(Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Ready to lay", FormatPercent(Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Egg reserve", FormatPercent(snapshot.AverageEggReserveRatio));
@@ -2565,6 +2566,8 @@ public static class ViewerReportWriter
             snapshots,
             new ChartSeries("Intent", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.ReproductionIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Ready", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.ReproductionReadyCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Adult", "#4b8f83", snapshots.Select(snapshot => Share(snapshot.AdultCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Maturity", "#7a6bb0", snapshots.Select(snapshot => snapshot.AverageMaturityProgress * 100f).ToArray()),
             new ChartSeries("Reserve", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageEggReserveRatio * 100f).ToArray()),
             new ChartSeries("Surplus", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageEnergySurplusRatio * 100f).ToArray()),
             new ChartSeries("Energy full", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageEnergyFullnessRatio * 100f).ToArray()));
@@ -3108,6 +3111,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Terrain response", summary.TerrainResponse);
         WriteMetric(writer, "Collision response", summary.CollisionResponse);
         WriteMetric(writer, "Injury memory response", summary.InjuryMemoryResponse);
+        WriteMetric(writer, "Maturity response", summary.MaturityResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
         WriteMetric(writer, "Fresh meat preference", summary.FreshMeatPreferenceScore.ToString("0.###", CultureInfo.InvariantCulture));

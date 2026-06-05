@@ -373,6 +373,11 @@ public struct CreatureSenseState
 
     public float Hunger { get; set; }
 
+    /// <summary>
+    /// Juvenile-to-adult development progress after metabolic pace scaling. Newborns are near 0; adults are 1.
+    /// </summary>
+    public float MaturityProgress { get; set; }
+
     public float EggReserveRatio { get; set; }
 
     public float EnergySurplusRatio { get; set; }

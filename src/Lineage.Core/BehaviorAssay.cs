@@ -82,6 +82,7 @@ public static class BehaviorAssay
         var creatureBlocked = new BehaviorAssayAccumulator();
         var injuryMemoryAhead = new BehaviorAssayAccumulator();
         var injuryMemoryRight = new BehaviorAssayAccumulator();
+        var juvenileSelf = new BehaviorAssayAccumulator();
         var slowTerrainHere = new BehaviorAssayAccumulator();
         var slowTerrainAhead = new BehaviorAssayAccumulator();
         var easierTerrainAhead = new BehaviorAssayAccumulator();
@@ -192,6 +193,7 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateCreatureBlockedSenses(), inputs, outputs, ref creatureBlocked);
             Accumulate(brain, genome, CreateInjuryMemoryAheadSenses(), inputs, outputs, ref injuryMemoryAhead);
             Accumulate(brain, genome, CreateInjuryMemoryRightSenses(), inputs, outputs, ref injuryMemoryRight);
+            Accumulate(brain, genome, CreateJuvenileSelfSenses(), inputs, outputs, ref juvenileSelf);
             Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
             Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
             Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
@@ -261,6 +263,7 @@ public static class BehaviorAssay
             creatureBlocked.ToResult("Creature body blocked"),
             injuryMemoryAhead.ToResult("Injury memory ahead"),
             injuryMemoryRight.ToResult("Injury memory right"),
+            juvenileSelf.ToResult("Juvenile self"),
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
@@ -281,6 +284,7 @@ public static class BehaviorAssay
             TerrainResponse = ClassifyTerrainResponse(summary),
             CollisionResponse = ClassifyCollisionResponse(summary),
             InjuryMemoryResponse = ClassifyInjuryMemoryResponse(summary),
+            MaturityResponse = ClassifyMaturityResponse(summary),
             ReproductionTendency = ClassifyReproductionTendency(summary),
             FreshMeatPreferenceScore = CalculateFreshMeatPreferenceScore(summary),
             RottenScentAvoidanceScore = CalculateRottenScentAvoidanceScore(summary),
@@ -368,7 +372,8 @@ public static class BehaviorAssay
         return new CreatureSenseState
         {
             EnergyRatio = 0.45f,
-            Hunger = 0.55f
+            Hunger = 0.55f,
+            MaturityProgress = 1f
         };
     }
 
@@ -832,6 +837,14 @@ public static class BehaviorAssay
         {
             InjuryMemoryStrength = 0.8f,
             InjuryMemoryDirectionRight = 0.8f
+        };
+    }
+
+    private static CreatureSenseState CreateJuvenileSelfSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            MaturityProgress = 0.25f
         };
     }
 
@@ -1492,6 +1505,39 @@ public static class BehaviorAssay
         return "little injury-memory differentiation";
     }
 
+    private static string ClassifyMaturityResponse(BehaviorAssaySummary summary)
+    {
+        var juvenile = summary.JuvenileSelf;
+        var baseline = summary.Baseline;
+        var moveDelta = juvenile.MoveForward - baseline.MoveForward;
+        var turnDelta = MathF.Abs(juvenile.Turn - baseline.Turn);
+        var attackDelta = juvenile.AttackShare - baseline.AttackShare;
+        var eatDelta = juvenile.EatShare - baseline.EatShare;
+        var reproduceDelta = juvenile.ReproduceShare - baseline.ReproduceShare;
+
+        if (moveDelta < -0.15f || attackDelta < -0.25f)
+        {
+            return "juvenile caution";
+        }
+
+        if (eatDelta > 0.25f)
+        {
+            return "juvenile foraging emphasis";
+        }
+
+        if (moveDelta > 0.15f || attackDelta > 0.25f)
+        {
+            return "juvenile boldness";
+        }
+
+        if (turnDelta > 0.25f || MathF.Abs(reproduceDelta) > 0.25f)
+        {
+            return "juvenile behavior differs";
+        }
+
+        return "little maturity differentiation";
+    }
+
     private static string ClassifyEcotype(BehaviorAssaySummary summary)
     {
         if (summary.EvaluatedCreatureCount == 0)
@@ -1770,6 +1816,7 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult CreatureBlocked,
     BehaviorAssayResult InjuryMemoryAhead,
     BehaviorAssayResult InjuryMemoryRight,
+    BehaviorAssayResult JuvenileSelf,
     BehaviorAssayResult SlowTerrainHere,
     BehaviorAssayResult SlowTerrainAhead,
     BehaviorAssayResult EasierTerrainAhead,
@@ -1796,6 +1843,8 @@ public readonly record struct BehaviorAssaySummary(
     public string CollisionResponse { get; init; } = "not evaluated";
 
     public string InjuryMemoryResponse { get; init; } = "not evaluated";
+
+    public string MaturityResponse { get; init; } = "not evaluated";
 
     public string ReproductionTendency { get; init; } = "not evaluated";
 
@@ -1864,6 +1913,7 @@ public readonly record struct BehaviorAssaySummary(
         CreatureBlocked,
         InjuryMemoryAhead,
         InjuryMemoryRight,
+        JuvenileSelf,
         SlowTerrainHere,
         SlowTerrainAhead,
         EasierTerrainAhead,
