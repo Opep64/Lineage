@@ -17,7 +17,7 @@
     "initialSenseRadius": 130,
     "initialResourcesPerMillionArea": 25,
     "initialCreatureEnergyMin": 65,
-    "initialCreatureEnergyMax": 110,
+    "initialCreatureEnergyMax": 67,
     "resourceRegrowthMin": 0.22,
     "resourceRegrowthMax": 1.1,
     "plantRespawnDelaySecondsMin": 80,

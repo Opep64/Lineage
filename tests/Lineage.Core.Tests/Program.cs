@@ -241,6 +241,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
+    ("Species profile default injection energy fits newborn capacity", SpeciesProfileDefaultInjectionEnergyFitsNewbornCapacity),
     ("Species profile injection honors quadrant spawn region", SpeciesProfileInjectionHonorsQuadrantSpawnRegion),
     ("Species profile injection can override brain kind", SpeciesProfileInjectionCanOverrideBrainKind),
     ("Species profile injection can randomize brains per founder", SpeciesProfileInjectionCanRandomizeBrainsPerFounder),
@@ -11393,6 +11394,39 @@ static void SpeciesProfileInjectionCreatesFounderCreatures()
         AssertClose(33f, creature.Energy, 0.000001, "Injected creature energy");
         AssertTrue(creature.Position.X >= 20f && creature.Position.X <= target.State.Bounds.Width / 3f, "Injected creature should spawn in left third away from void");
     }
+}
+
+static void SpeciesProfileDefaultInjectionEnergyFitsNewbornCapacity()
+{
+    var sourceScenario = new SimulationScenario
+    {
+        Name = "Species Source",
+        Seed = 912,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialBrainKind = InitialBrainKind.ExplorerForager,
+        InitialCreatureCount = 1,
+        InitialResourcesPerMillionArea = 0f,
+        ReproductionEnergyThreshold = 120f,
+        OffspringEnergyInvestment = 42f
+    };
+    var source = SimulationScenarioFactory.CreateSimulation(sourceScenario);
+    var profile = SpeciesProfileExporter.ExportDominantLivingLineageRepresentative(sourceScenario, source.State, "Capacity sample");
+
+    var target = SimulationScenarioFactory.CreateSimulation(new SimulationScenario
+    {
+        Seed = 913,
+        PipelineKind = SimulationPipelineKind.Neural,
+        InitialCreatureCount = 0,
+        InitialResourcesPerMillionArea = 0f
+    });
+    var result = SpeciesProfileInjector.Inject(
+        target.State,
+        profile,
+        new SpeciesInjectionOptions(1));
+
+    var creature = target.State.Creatures.Single(creature => creature.Id == result.CreatureIds[0]);
+    var expectedCapacity = CreatureGrowth.NewbornEnergyCapacityCalories(profile.Genome);
+    AssertClose(expectedCapacity, creature.Energy, 0.000001, "Default injected founder energy should fit newborn capacity");
 }
 
 static void SpeciesProfileInjectionHonorsQuadrantSpawnRegion()

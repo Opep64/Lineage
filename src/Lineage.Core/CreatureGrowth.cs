@@ -27,10 +27,7 @@ public static class CreatureGrowth
     {
         var progress = MaturityProgress(creature, genome);
         var smoothed = progress * progress * (3f - 2f * progress);
-        var newbornScale = Math.Clamp(
-            MinimumJuvenileScale * OffspringDevelopment.JuvenileGrowthScale(creature.BirthInvestmentRatio),
-            0.18f,
-            0.7f);
+        var newbornScale = NewbornGrowthFactor(creature.BirthInvestmentRatio);
         return newbornScale + (1f - newbornScale) * smoothed;
     }
 
@@ -83,6 +80,27 @@ public static class CreatureGrowth
     {
         var baselineRadius = Math.Max(0.001f, CreatureGenome.Baseline.BodyRadius);
         var bodyScale = Math.Clamp(EffectiveBodyRadius(creature, genome) / baselineRadius, 0.25f, 4f);
+        return EnergyCapacityCalories(genome, bodyScale);
+    }
+
+    public static float NewbornEnergyCapacityCalories(CreatureGenome genome, float birthInvestmentRatio = 1f)
+    {
+        var baselineRadius = Math.Max(0.001f, CreatureGenome.Baseline.BodyRadius);
+        var newbornBodyRadius = genome.BodyRadius * NewbornGrowthFactor(birthInvestmentRatio);
+        var bodyScale = Math.Clamp(newbornBodyRadius / baselineRadius, 0.25f, 4f);
+        return EnergyCapacityCalories(genome, bodyScale);
+    }
+
+    private static float NewbornGrowthFactor(float birthInvestmentRatio)
+    {
+        return Math.Clamp(
+            MinimumJuvenileScale * OffspringDevelopment.JuvenileGrowthScale(birthInvestmentRatio),
+            0.18f,
+            0.7f);
+    }
+
+    private static float EnergyCapacityCalories(CreatureGenome genome, float bodyScale)
+    {
         var thresholdCapacity = Math.Max(1f, genome.ReproductionEnergyThreshold)
             * WorkingEnergyCapacityThresholdMultiplier
             * bodyScale;

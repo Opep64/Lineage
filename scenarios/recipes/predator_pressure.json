@@ -81,7 +81,7 @@
         "profilePath": "species/starter-predator.species.json",
         "count": 12,
         "spawnRegion": "uniform",
-        "energyOverride": 110,
+        "energyOverride": 79,
         "brainProfilePath": "brains/starter/starter-predator-hybrid.brain.json",
         "enabled": true
       }

@@ -240,6 +240,7 @@ public readonly record struct SpeciesInjectionOptions(
         var defaultEnergy = MathF.Max(
             profile.Genome.OffspringEnergyInvestment,
             profile.Genome.ReproductionEnergyThreshold * 0.75f);
+        defaultEnergy = MathF.Min(defaultEnergy, CreatureGrowth.NewbornEnergyCapacityCalories(profile.Genome));
         var energy = EnergyOverride ?? defaultEnergy;
         if (!float.IsFinite(energy) || energy <= 0f)
         {
