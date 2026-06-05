@@ -19,6 +19,12 @@ var tests = new (string Name, Action Body)[]
     ("Movement records search distance", MovementRecordsSearchDistance),
     ("Movement blocks obstacle collisions", MovementBlocksObstacleCollisions),
     ("Movement slides along obstacle edges", MovementSlidesAlongObstacleEdges),
+    ("Creature collision ignores self", CreatureCollisionIgnoresSelf),
+    ("Creature collision blocks gentle overlap without damage", CreatureCollisionBlocksGentleOverlapWithoutDamage),
+    ("Creature collision clears passive resting contact", CreatureCollisionClearsPassiveRestingContact),
+    ("Creature collision blocks fast head-on pass-through", CreatureCollisionBlocksFastHeadOnPassThrough),
+    ("Creature collision damages high-speed impacts", CreatureCollisionDamagesHighSpeedImpacts),
+    ("Creature collision unsticks sustained head-on contact", CreatureCollisionUnsticksSustainedHeadOnContact),
     ("Movement cost follows biome multiplier", MovementCostFollowsBiomeMultiplier),
     ("Movement speed follows biome multiplier", MovementSpeedFollowsBiomeMultiplier),
     ("Movement speed cost is nonlinear", MovementSpeedCostIsNonlinear),
@@ -894,6 +900,238 @@ static void MovementSlidesAlongObstacleEdges()
     AssertClose(25f, moved.Position.Y, 0.000001, "Sliding movement y");
     AssertClose(10f, moved.LastDistanceTraveled, 0.000001, "Sliding movement distance");
     AssertTrue(moved.LastMovementBlocked, "Sliding should still record a blocked component");
+}
+
+static void CreatureCollisionIgnoresSelf()
+{
+    var simulation = CreateCollisionSimulation(
+        new CreatureCollisionSystem(
+            enabled: true,
+            safeImpactSpeed: 1f,
+            damageScale: 1f));
+    var genomeId = simulation.State.AddGenome(CollisionTestGenome());
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 20f);
+    var creature = simulation.State.Creatures[0];
+    creature.Velocity = new SimVector2(100f, 0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    var after = simulation.State.Creatures[0];
+    AssertClose(1f, after.Health, 0.000001, "Self collision should not damage health");
+    AssertEqual(0, after.LastCreatureCollisionCount, "Self collision should not count");
+    AssertClose(0f, after.LastCreatureCollisionDamageTaken, 0.000001, "Self collision damage should stay zero");
+}
+
+static void CreatureCollisionBlocksGentleOverlapWithoutDamage()
+{
+    var simulation = CreateCollisionSimulation(
+        new CreatureCollisionSystem(
+            enabled: true,
+            safeImpactSpeed: 10f,
+            damageScale: 1f,
+            separationIterations: 2));
+    var genomeId = simulation.State.AddGenome(CollisionTestGenome());
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 20f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(55f, 50f), energy: 20f);
+
+    simulation.Step();
+
+    var first = simulation.State.Creatures[0];
+    var second = simulation.State.Creatures[1];
+    AssertTrue(SimVector2.Distance(first.Position, second.Position) >= 5.999f, "Gentle overlap should be separated");
+    AssertTrue(first.LastMovementBlocked, "First gentle collision should mark movement blocked");
+    AssertTrue(second.LastMovementBlocked, "Second gentle collision should mark movement blocked");
+    AssertEqual(1, first.LastCreatureCollisionCount, "First gentle collision count");
+    AssertEqual(1, second.LastCreatureCollisionCount, "Second gentle collision count");
+    AssertClose(1f, first.Health, 0.000001, "First gentle collision health");
+    AssertClose(1f, second.Health, 0.000001, "Second gentle collision health");
+    AssertClose(0f, first.LastCreatureCollisionDamageTaken, 0.000001, "First gentle collision damage");
+    AssertClose(0f, second.LastCreatureCollisionDamageTaken, 0.000001, "Second gentle collision damage");
+}
+
+static void CreatureCollisionClearsPassiveRestingContact()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 225,
+        systems:
+        [
+            new MovementSystem(),
+            new CreatureCollisionSystem(
+                enabled: true,
+                safeImpactSpeed: 10f,
+                damageScale: 1f,
+                separationIterations: 2)
+        ]);
+    var genomeId = simulation.State.AddGenome(CollisionTestGenome());
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 20f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(55.99995f, 50f), energy: 20f);
+
+    simulation.Step();
+    simulation.Step();
+
+    var first = simulation.State.Creatures[0];
+    var second = simulation.State.Creatures[1];
+    AssertTrue(
+        SimVector2.Distance(first.Position, second.Position) >= 6.2f,
+        "Passive resting contact should clear a small body gap");
+    AssertEqual(0, first.LastCreatureCollisionCount, "First passive contact should not stay collision-blocked");
+    AssertEqual(0, second.LastCreatureCollisionCount, "Second passive contact should not stay collision-blocked");
+    AssertTrue(!first.LastMovementBlocked, "First passive contact movement should clear after resting separation");
+    AssertTrue(!second.LastMovementBlocked, "Second passive contact movement should clear after resting separation");
+    AssertClose(1f, first.Health, 0.000001, "First passive contact health");
+    AssertClose(1f, second.Health, 0.000001, "Second passive contact health");
+}
+
+static void CreatureCollisionBlocksFastHeadOnPassThrough()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 224,
+        systems:
+        [
+            new MovementSystem(),
+            new CreatureCollisionSystem(
+                enabled: true,
+                safeImpactSpeed: 100f,
+                damageScale: 0f,
+                separationIterations: 2)
+        ]);
+    var genomeId = simulation.State.AddGenome(CollisionTestGenome() with { MaxSpeed = 10f });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(44f, 50f), energy: 20f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(56f, 50f), energy: 20f);
+    var first = simulation.State.Creatures[0];
+    var second = simulation.State.Creatures[1];
+    first.DesiredVelocity = new SimVector2(10f, 0f);
+    second.DesiredVelocity = new SimVector2(-10f, 0f);
+    simulation.State.Creatures[0] = first;
+    simulation.State.Creatures[1] = second;
+
+    simulation.Step();
+
+    first = simulation.State.Creatures[0];
+    second = simulation.State.Creatures[1];
+    AssertTrue(first.Position.X <= second.Position.X, "Fast head-on collision should not pass through on the same axis");
+    AssertTrue(first.LastCreatureCollisionCount > 0, "First fast head-on pass-through should be caught as collision");
+    AssertTrue(second.LastCreatureCollisionCount > 0, "Second fast head-on pass-through should be caught as collision");
+    AssertTrue(
+        SimVector2.Distance(first.Position, second.Position) >= 5.999f,
+        "Fast head-on collision should keep bodies separated");
+    AssertClose(1f, first.Health, 0.000001, "First fast head-on safe-speed collision health");
+    AssertClose(1f, second.Health, 0.000001, "Second fast head-on safe-speed collision health");
+}
+
+static void CreatureCollisionDamagesHighSpeedImpacts()
+{
+    var simulation = CreateCollisionSimulation(
+        new CreatureCollisionSystem(
+            enabled: true,
+            safeImpactSpeed: 10f,
+            damageScale: 0.0001f,
+            separationIterations: 2));
+    var genomeId = simulation.State.AddGenome(CollisionTestGenome());
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 50f), energy: 20f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(55f, 50f), energy: 20f);
+    var first = simulation.State.Creatures[0];
+    var second = simulation.State.Creatures[1];
+    first.Velocity = new SimVector2(30f, 0f);
+    second.Velocity = new SimVector2(-30f, 0f);
+    simulation.State.Creatures[0] = first;
+    simulation.State.Creatures[1] = second;
+
+    simulation.Step();
+
+    first = simulation.State.Creatures[0];
+    second = simulation.State.Creatures[1];
+    AssertTrue(first.Health < 1f, "First fast collision should take damage");
+    AssertTrue(second.Health < 1f, "Second fast collision should take damage");
+    AssertTrue(first.LastCreatureCollisionDamageTaken > 0f, "First fast collision damage should be recorded");
+    AssertTrue(second.LastCreatureCollisionDamageTaken > 0f, "Second fast collision damage should be recorded");
+    AssertClose(60f, first.LastCreatureCollisionImpactSpeed, 0.000001, "First impact speed");
+    AssertClose(60f, second.LastCreatureCollisionImpactSpeed, 0.000001, "Second impact speed");
+    AssertTrue(first.LastDamagingCreatureId == second.Id, "First damage source should be the other creature");
+    AssertTrue(second.LastDamagingCreatureId == first.Id, "Second damage source should be the other creature");
+}
+
+static void CreatureCollisionUnsticksSustainedHeadOnContact()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 223,
+        systems:
+        [
+            new MovementSystem(),
+            new CreatureCollisionSystem(
+                enabled: true,
+                safeImpactSpeed: 100f,
+                damageScale: 0f,
+                separationIterations: 2)
+        ]);
+    var genomeId = simulation.State.AddGenome(CollisionTestGenome() with { MaxSpeed = 5f });
+    simulation.State.SpawnCreature(genomeId, new SimVector2(44f, 50f), energy: 20f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(56f, 50f), energy: 20f);
+
+    for (var i = 0; i < 12; i++)
+    {
+        var first = simulation.State.Creatures[0];
+        var second = simulation.State.Creatures[1];
+        first.DesiredVelocity = new SimVector2(5f, 0f);
+        second.DesiredVelocity = new SimVector2(-5f, 0f);
+        simulation.State.Creatures[0] = first;
+        simulation.State.Creatures[1] = second;
+        simulation.Step();
+    }
+
+    var finalFirst = simulation.State.Creatures[0];
+    var finalSecond = simulation.State.Creatures[1];
+    AssertTrue(finalFirst.Position.X > finalSecond.Position.X, "Sustained head-on collision should let creatures get past each other");
+    AssertTrue(
+        MathF.Abs(finalFirst.Position.Y - finalSecond.Position.Y) > 0.5f,
+        "Sustained head-on collision should create enough lateral separation to avoid pinning");
+    AssertTrue(
+        SimVector2.Distance(finalFirst.Position, finalSecond.Position) >= 5.999f,
+        "Sustained head-on collision should keep bodies separated");
+    AssertClose(1f, finalFirst.Health, 0.000001, "First sustained gentle collision health");
+    AssertClose(1f, finalSecond.Health, 0.000001, "Second sustained gentle collision health");
+}
+
+static Simulation CreateCollisionSimulation(ISimulationSystem collisionSystem)
+{
+    return new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 222,
+        systems: [collisionSystem]);
+}
+
+static CreatureGenome CollisionTestGenome()
+{
+    return CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        DamageResistance = 1f,
+        MaturityAgeSeconds = 0f
+    };
 }
 
 static void MovementCostFollowsBiomeMultiplier()
@@ -13606,6 +13844,10 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         BiteDamagePerSecond = 0.4f,
         BiteEnergyCostPerSecond = 0.12f,
         BiteRangePadding = 1.5f,
+        EnableCreatureCollision = true,
+        CreatureCollisionSafeImpactSpeed = 12f,
+        CreatureCollisionDamageScale = 0.0005f,
+        CreatureCollisionSeparationIterations = 3,
         MutationStrength = 0.03f,
         TraitMutationRate = 0.3f,
         BrainMutationRate = 0.11f,
@@ -13659,6 +13901,10 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(0.4f, scenario.BiteDamagePerSecond, 0.000001, "Scenario bite damage");
     AssertClose(0.12f, scenario.BiteEnergyCostPerSecond, 0.000001, "Scenario bite energy cost");
     AssertClose(1.5f, scenario.BiteRangePadding, 0.000001, "Scenario bite reach");
+    AssertEqual(true, scenario.EnableCreatureCollision, "Scenario creature collision toggle");
+    AssertClose(12f, scenario.CreatureCollisionSafeImpactSpeed, 0.000001, "Scenario creature collision safe speed");
+    AssertClose(0.0005f, scenario.CreatureCollisionDamageScale, 0.000001, "Scenario creature collision damage scale");
+    AssertEqual(3, scenario.CreatureCollisionSeparationIterations, "Scenario creature collision separation iterations");
     AssertClose(0.03f, genome.MutationStrength, 0.000001, "Seeded mutation strength");
     AssertClose(0.3f, genome.TraitMutationRate, 0.000001, "Seeded trait mutation rate");
     AssertClose(0.11f, genome.BrainMutationRate, 0.000001, "Seeded brain mutation rate");
@@ -14058,6 +14304,10 @@ static void ScenarioJsonRoundTrips()
         BiteDamagePerSecond = 0.44f,
         BiteEnergyCostPerSecond = 0.13f,
         BiteRangePadding = 1.75f,
+        EnableCreatureCollision = true,
+        CreatureCollisionSafeImpactSpeed = 14f,
+        CreatureCollisionDamageScale = 0.00035f,
+        CreatureCollisionSeparationIterations = 4,
         RelocateDepletedResources = false,
         MutationStrength = 0.02f,
         TraitMutationRate = 0.12f,
@@ -14276,6 +14526,10 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.BiteDamagePerSecond, roundTripped.BiteDamagePerSecond, 0.000001, "Scenario bite damage");
     AssertClose(scenario.BiteEnergyCostPerSecond, roundTripped.BiteEnergyCostPerSecond, 0.000001, "Scenario bite energy cost");
     AssertClose(scenario.BiteRangePadding, roundTripped.BiteRangePadding, 0.000001, "Scenario bite reach");
+    AssertEqual(scenario.EnableCreatureCollision, roundTripped.EnableCreatureCollision, "Scenario creature collision toggle");
+    AssertClose(scenario.CreatureCollisionSafeImpactSpeed, roundTripped.CreatureCollisionSafeImpactSpeed, 0.000001, "Scenario creature collision safe speed");
+    AssertClose(scenario.CreatureCollisionDamageScale, roundTripped.CreatureCollisionDamageScale, 0.000001, "Scenario creature collision damage scale");
+    AssertEqual(scenario.CreatureCollisionSeparationIterations, roundTripped.CreatureCollisionSeparationIterations, "Scenario creature collision separation iterations");
     AssertEqual(scenario.RelocateDepletedResources, roundTripped.RelocateDepletedResources, "Scenario resource relocation");
     AssertClose(scenario.MutationStrength, roundTripped.MutationStrength, 0.000001, "Scenario mutation strength");
     AssertClose(scenario.TraitMutationRate, roundTripped.TraitMutationRate, 0.000001, "Scenario trait mutation rate");

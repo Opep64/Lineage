@@ -413,6 +413,15 @@ public sealed record SimulationScenario
 
     public float BiteRangePadding { get; init; } = 1f;
 
+    public bool EnableCreatureCollision { get; init; } = true;
+
+    public float CreatureCollisionSafeImpactSpeed { get; init; } = CreatureCollisionSystem.DefaultSafeImpactSpeed;
+
+    public float CreatureCollisionDamageScale { get; init; } = CreatureCollisionSystem.DefaultDamageScale;
+
+    public int CreatureCollisionSeparationIterations { get; init; } =
+        CreatureCollisionSystem.DefaultSeparationIterations;
+
     public float HealingDelaySeconds { get; init; } = CreatureHealingSystem.DefaultHealingDelaySeconds;
 
     public float HealingHealthFractionPerSecond { get; init; } =
@@ -620,6 +629,9 @@ public sealed record SimulationScenario
         EnsureNonNegative(BiteDamagePerSecond, nameof(BiteDamagePerSecond));
         EnsureNonNegative(BiteEnergyCostPerSecond, nameof(BiteEnergyCostPerSecond));
         EnsureNonNegative(BiteRangePadding, nameof(BiteRangePadding));
+        EnsureNonNegative(CreatureCollisionSafeImpactSpeed, nameof(CreatureCollisionSafeImpactSpeed));
+        EnsureNonNegative(CreatureCollisionDamageScale, nameof(CreatureCollisionDamageScale));
+        EnsurePositive(CreatureCollisionSeparationIterations, nameof(CreatureCollisionSeparationIterations));
         EnsureNonNegative(HealingDelaySeconds, nameof(HealingDelaySeconds));
         EnsureNonNegative(HealingHealthFractionPerSecond, nameof(HealingHealthFractionPerSecond));
         EnsureNonNegative(HealingEnergyCostPerHealth, nameof(HealingEnergyCostPerHealth));

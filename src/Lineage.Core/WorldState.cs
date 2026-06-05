@@ -261,6 +261,7 @@ public sealed class WorldState
             Id = id,
             ParentId = parentId,
             Position = clampedPosition,
+            PreviousPosition = clampedPosition,
             MaxXReached = clampedPosition.X,
             HeadingRadians = Random.NextSingle(0f, MathF.Tau),
             Senses = new CreatureSenseState { WorldSenseTick = -1 },

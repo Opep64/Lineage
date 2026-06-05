@@ -360,6 +360,11 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Damage-dealing this tick", FormatPercent(Share(snapshot.AttackingCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Attack damage", $"{snapshot.TotalAttackDamagePerSecond:0.###} health/s");
         WriteMetric(writer, "Damage per attacker", $"{attackDamagePerAttacker:0.###} health/s");
+        WriteMetric(writer, "Collision pairs", snapshot.CreatureCollisionPairCount.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Collision creatures", $"{FormatPercent(Share(snapshot.CreatureCollisionCreatureCount, snapshot.CreatureCount))} ({snapshot.CreatureCollisionCreatureCount})");
+        WriteMetric(writer, "Collision damaged", $"{FormatPercent(Share(snapshot.CreatureCollisionDamagedCreatureCount, snapshot.CreatureCount))} ({snapshot.CreatureCollisionDamagedCreatureCount})");
+        WriteMetric(writer, "Collision damage", $"{snapshot.TotalCreatureCollisionDamagePerSecond:0.###} health/s");
+        WriteMetric(writer, "Impact speed", $"avg {snapshot.AverageCreatureCollisionImpactSpeed:0.###} / max {snapshot.MaxCreatureCollisionImpactSpeed:0.###}");
         WriteMetric(writer, "Grab intent", FormatPercent(Share(snapshot.GrabIntentCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Can grab", FormatPercent(Share(snapshot.CanGrabCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Grab while touching", FormatPercent(Share(snapshot.GrabIntentWhileCanGrabCreatureCount, snapshot.CreatureCount)));
@@ -2713,7 +2718,8 @@ public static class ViewerReportWriter
             new ChartSeries("Avg touch attack", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageTouchingAttackOutput).ToArray()),
             new ChartSeries("Avg grab output", "#ff8a30", snapshots.Select(snapshot => snapshot.AverageGrabOutput).ToArray()),
             new ChartSeries("Avg touch grab", "#ffcc66", snapshots.Select(snapshot => snapshot.AverageCanGrabGrabOutput).ToArray()),
-            new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()));
+            new ChartSeries("Attack damage", "#9d3434", snapshots.Select(snapshot => snapshot.TotalAttackDamagePerSecond).ToArray()),
+            new ChartSeries("Collision damage", "#c24a8a", snapshots.Select(snapshot => snapshot.TotalCreatureCollisionDamagePerSecond).ToArray()));
         WriteLineChart(
             writer,
             "Digestion",

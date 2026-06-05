@@ -104,7 +104,7 @@ public sealed class DeathSystem : ISimulationSystem
 
         if (creature.Health <= 0f)
         {
-            return creature.LastAttackDamageTaken > 0f
+            return creature.LastAttackDamageTaken > 0f || creature.LastCreatureCollisionDamageTaken > 0f
                 ? CreatureDeathReason.Injury
                 : creature.LastRottenMeatDamage > 0f
                     ? CreatureDeathReason.RottenMeat

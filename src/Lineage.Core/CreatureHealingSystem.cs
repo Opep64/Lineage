@@ -49,7 +49,9 @@ public sealed class CreatureHealingSystem(
                 continue;
             }
 
-            if (creature.LastAttackDamageTaken > 0f || creature.LastRottenMeatDamage > 0f)
+            if (creature.LastAttackDamageTaken > 0f
+                || creature.LastCreatureCollisionDamageTaken > 0f
+                || creature.LastRottenMeatDamage > 0f)
             {
                 creature.SecondsSinceLastDamage = 0f;
                 state.Creatures[i] = creature;

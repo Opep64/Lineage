@@ -250,6 +250,8 @@ public sealed class NeuralControllerSystem(
             || creature.LastMovementBlocked
             || creature.LastAttackDamageDealt > 0f
             || creature.LastAttackDamageTaken > 0f
+            || creature.LastCreatureCollisionCount > 0
+            || creature.LastCreatureCollisionDamageTaken > 0f
             || creature.GrabbedByCreatureId != default
             || creature.HeldCreatureId != default
             || creature.LastRottenMeatDamage > 0f

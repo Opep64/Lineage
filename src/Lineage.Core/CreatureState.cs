@@ -15,6 +15,12 @@ public struct CreatureState
     public SimVector2 Position { get; set; }
 
     /// <summary>
+    /// Position before the latest movement resolution, used by collision systems
+    /// to catch bodies that crossed between ticks.
+    /// </summary>
+    public SimVector2 PreviousPosition { get; set; }
+
+    /// <summary>
     /// Farthest eastward world position this creature has reached.
     /// </summary>
     public float MaxXReached { get; set; }
@@ -217,6 +223,14 @@ public struct CreatureState
     public float LastAttackDamageDealt { get; set; }
 
     public float LastAttackDamageTaken { get; set; }
+
+    public int LastCreatureCollisionCount { get; set; }
+
+    public float LastCreatureCollisionImpactSpeed { get; set; }
+
+    public float LastCreatureCollisionDamageDealt { get; set; }
+
+    public float LastCreatureCollisionDamageTaken { get; set; }
 
     /// <summary>
     /// Most recent creature that damaged this one, used to attribute fresh-kill meat after injury deaths.

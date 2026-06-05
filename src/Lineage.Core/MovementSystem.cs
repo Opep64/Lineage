@@ -39,6 +39,7 @@ public sealed class MovementSystem(
                 out var wasBlocked);
             var distanceTraveled = SimVector2.Distance(previousPosition, nextPosition);
 
+            creature.PreviousPosition = previousPosition;
             creature.Position = nextPosition;
             creature.MaxXReached = Math.Max(creature.MaxXReached, nextPosition.X);
             creature.Velocity = (nextPosition - previousPosition) / deltaSeconds;

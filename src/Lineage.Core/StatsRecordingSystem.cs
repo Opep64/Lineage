@@ -93,6 +93,12 @@ public sealed class StatsRecordingSystem(
         var totalGutPlantShare = 0f;
         var totalGutMeatShare = 0f;
         var totalAttackDamage = 0f;
+        var totalCreatureCollisionContacts = 0;
+        var creatureCollisionCreatureCount = 0;
+        var creatureCollisionDamagedCreatureCount = 0;
+        var totalCreatureCollisionDamage = 0f;
+        var totalCreatureCollisionImpactSpeed = 0f;
+        var maxCreatureCollisionImpactSpeed = 0f;
         var totalHealthHealed = 0f;
         var totalHealingEnergySpent = 0f;
         var totalSecondsSinceLastMeal = 0f;
@@ -323,6 +329,22 @@ public sealed class StatsRecordingSystem(
                 ? creature.GutMeatCalories / gutTotal
                 : 0f;
             totalAttackDamage += creature.LastAttackDamageDealt;
+            if (creature.LastCreatureCollisionCount > 0)
+            {
+                totalCreatureCollisionContacts += creature.LastCreatureCollisionCount;
+                creatureCollisionCreatureCount++;
+                totalCreatureCollisionImpactSpeed += creature.LastCreatureCollisionImpactSpeed;
+                maxCreatureCollisionImpactSpeed = Math.Max(
+                    maxCreatureCollisionImpactSpeed,
+                    creature.LastCreatureCollisionImpactSpeed);
+            }
+
+            if (creature.LastCreatureCollisionDamageTaken > 0f)
+            {
+                creatureCollisionDamagedCreatureCount++;
+                totalCreatureCollisionDamage += creature.LastCreatureCollisionDamageTaken;
+            }
+
             totalHealthHealed += creature.LastHealingReceived;
             totalHealingEnergySpent += creature.LastHealingEnergySpent;
             if (creature.LastHealingReceived > 0f)
@@ -984,6 +1006,12 @@ public sealed class StatsRecordingSystem(
         var attackDamagePerSecond = deltaSeconds > 0f
             ? totalAttackDamage / deltaSeconds
             : 0f;
+        var creatureCollisionDamagePerSecond = deltaSeconds > 0f
+            ? totalCreatureCollisionDamage / deltaSeconds
+            : 0f;
+        var averageCreatureCollisionImpactSpeed = creatureCollisionCreatureCount > 0
+            ? totalCreatureCollisionImpactSpeed / creatureCollisionCreatureCount
+            : 0f;
         var healthHealedPerSecond = deltaSeconds > 0f
             ? totalHealthHealed / deltaSeconds
             : 0f;
@@ -1318,6 +1346,12 @@ public sealed class StatsRecordingSystem(
             totalAttackOutput / divisor,
             creatureContactCreatureCount > 0 ? totalTouchingAttackOutput / creatureContactCreatureCount : 0f,
             attackDamagePerSecond,
+            totalCreatureCollisionContacts / 2,
+            creatureCollisionCreatureCount,
+            creatureCollisionDamagedCreatureCount,
+            creatureCollisionDamagePerSecond,
+            averageCreatureCollisionImpactSpeed,
+            maxCreatureCollisionImpactSpeed,
             healthHealedPerSecond,
             healingCreatureCount,
             healingEnergySpentPerSecond,
