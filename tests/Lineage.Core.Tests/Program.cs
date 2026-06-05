@@ -127,6 +127,7 @@ var tests = new (string Name, Action Body)[]
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
     ("Behavior assay reports plant choice probes", BehaviorAssayReportsPlantChoiceProbes),
     ("Behavior assay reports plant preference bridge probes", BehaviorAssayReportsPlantPreferenceBridgeProbes),
+    ("Behavior assay reports lineage familiarity probes", BehaviorAssayReportsLineageFamiliarityProbes),
     ("Behavior assay detects fresh meat preference", BehaviorAssayDetectsFreshMeatPreference),
     ("Behavior assay detects rotten scent avoidance", BehaviorAssayDetectsRottenScentAvoidance),
     ("Brain input diagnostics summarize freshness wiring", BrainInputDiagnosticsSummarizeFreshnessWiring),
@@ -5589,7 +5590,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(47, summary.Results.Count, "Assay result count");
+    AssertEqual(54, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
@@ -5618,6 +5619,21 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     AssertClose(0f, summary.FreshMeatPreferenceScore, 0.000001, "Seed forager fresh meat score");
     AssertClose(0f, summary.RottenScentAvoidanceScore, 0.000001, "Seed forager rot scent score");
     AssertEqual("little freshness differentiation", summary.RottenMeatResponse, "Seed forager should not arrive with built-in rot response");
+    AssertClose(
+        summary.Baseline.MoveForward,
+        summary.LineageCreatureScentAhead.MoveForward,
+        0.000001,
+        "Seed forager should not have built-in lineage scent approach");
+    AssertClose(
+        summary.UnrelatedCreatureContact.AttackShare,
+        summary.LineageCreatureContact.AttackShare,
+        0.000001,
+        "Seed forager should not have built-in lineage contact attack differences");
+    AssertClose(
+        summary.UnrelatedEggContact.EatShare,
+        summary.LineageEggContact.EatShare,
+        0.000001,
+        "Seed forager should not have built-in lineage egg eating differences");
 }
 
 static void BehaviorAssayReportsPlantChoiceProbes()
@@ -5679,6 +5695,51 @@ static void BehaviorAssayReportsPlantPreferenceBridgeProbes()
     AssertTrue(
         summary.PlantPreferenceContact.EatShare > summary.RichPlantContact.EatShare,
         "Plant preference contact should expose contact preference wiring beyond ordinary plant contact");
+}
+
+static void BehaviorAssayReportsLineageFamiliarityProbes()
+{
+    var simulation = new Simulation(new SimulationConfig(), seed: 412, systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        MaturityAgeSeconds = 0f
+    });
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.5f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureSimilarityScentForwardInput] = 3.5f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureLineageScentForwardInput] = -3.5f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactInput] = 3.5f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactSimilarityInput] = -5f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactLineageSimilarityInput] = -5f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggFoodContactInput] = 3.5f;
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggContactLineageSimilarityInput] = -5f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+
+    var summary = BehaviorAssay.Analyze(simulation.State);
+
+    AssertTrue(
+        summary.SimilarCreatureScentAhead.MoveForward > summary.Baseline.MoveForward + 0.4f,
+        "Similarity scent probe should expose forward attraction wiring");
+    AssertTrue(
+        summary.LineageCreatureScentAhead.MoveForward < summary.Baseline.MoveForward - 0.3f,
+        "Lineage scent probe should expose forward avoidance wiring");
+    AssertTrue(
+        summary.UnrelatedCreatureContact.AttackShare > 0.9f,
+        "Unrelated creature contact should expose contact attack wiring");
+    AssertTrue(
+        summary.SimilarCreatureContact.AttackShare < summary.UnrelatedCreatureContact.AttackShare,
+        "Similar creature contact should expose contact attack suppression");
+    AssertTrue(
+        summary.LineageCreatureContact.AttackShare < summary.UnrelatedCreatureContact.AttackShare,
+        "Lineage creature contact should expose lineage attack suppression");
+    AssertTrue(
+        summary.UnrelatedEggContact.EatShare > 0.9f,
+        "Unrelated egg contact should expose egg eating wiring");
+    AssertTrue(
+        summary.LineageEggContact.EatShare < summary.UnrelatedEggContact.EatShare,
+        "Lineage egg contact should expose familiar egg eating suppression");
 }
 
 static void BehaviorAssayDetectsFreshMeatPreference()

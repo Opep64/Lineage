@@ -54,16 +54,23 @@ public static class BehaviorAssay
         var plantPreferenceContact = new BehaviorAssayAccumulator();
         var meatContact = new BehaviorAssayAccumulator();
         var eggContact = new BehaviorAssayAccumulator();
+        var unrelatedEggContact = new BehaviorAssayAccumulator();
+        var lineageEggContact = new BehaviorAssayAccumulator();
         var meatScentAhead = new BehaviorAssayAccumulator();
         var meatScentRight = new BehaviorAssayAccumulator();
         var rottenMeatScentAhead = new BehaviorAssayAccumulator();
         var rottenMeatScentRight = new BehaviorAssayAccumulator();
+        var similarCreatureScentAhead = new BehaviorAssayAccumulator();
+        var lineageCreatureScentAhead = new BehaviorAssayAccumulator();
         var creatureAhead = new BehaviorAssayAccumulator();
         var creatureRight = new BehaviorAssayAccumulator();
         var smallCreatureAhead = new BehaviorAssayAccumulator();
         var largeCreatureAhead = new BehaviorAssayAccumulator();
         var largeCreatureApproaching = new BehaviorAssayAccumulator();
         var largeCreatureFacingAway = new BehaviorAssayAccumulator();
+        var unrelatedCreatureContact = new BehaviorAssayAccumulator();
+        var similarCreatureContact = new BehaviorAssayAccumulator();
+        var lineageCreatureContact = new BehaviorAssayAccumulator();
         var slowTerrainHere = new BehaviorAssayAccumulator();
         var slowTerrainAhead = new BehaviorAssayAccumulator();
         var easierTerrainAhead = new BehaviorAssayAccumulator();
@@ -146,16 +153,23 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreatePlantPreferenceContactSenses(), inputs, outputs, ref plantPreferenceContact);
             Accumulate(brain, genome, CreateMeatContactSenses(), inputs, outputs, ref meatContact);
             Accumulate(brain, genome, CreateEggContactSenses(), inputs, outputs, ref eggContact);
+            Accumulate(brain, genome, CreateUnrelatedEggContactSenses(), inputs, outputs, ref unrelatedEggContact);
+            Accumulate(brain, genome, CreateLineageEggContactSenses(), inputs, outputs, ref lineageEggContact);
             Accumulate(brain, genome, CreateMeatScentAheadSenses(), inputs, outputs, ref meatScentAhead);
             Accumulate(brain, genome, CreateMeatScentRightSenses(), inputs, outputs, ref meatScentRight);
             Accumulate(brain, genome, CreateRottenMeatScentAheadSenses(), inputs, outputs, ref rottenMeatScentAhead);
             Accumulate(brain, genome, CreateRottenMeatScentRightSenses(), inputs, outputs, ref rottenMeatScentRight);
+            Accumulate(brain, genome, CreateSimilarCreatureScentAheadSenses(), inputs, outputs, ref similarCreatureScentAhead);
+            Accumulate(brain, genome, CreateLineageCreatureScentAheadSenses(), inputs, outputs, ref lineageCreatureScentAhead);
             Accumulate(brain, genome, CreateCreatureAheadSenses(), inputs, outputs, ref creatureAhead);
             Accumulate(brain, genome, CreateCreatureRightSenses(), inputs, outputs, ref creatureRight);
             Accumulate(brain, genome, CreateSmallCreatureAheadSenses(), inputs, outputs, ref smallCreatureAhead);
             Accumulate(brain, genome, CreateLargeCreatureAheadSenses(), inputs, outputs, ref largeCreatureAhead);
             Accumulate(brain, genome, CreateLargeCreatureApproachingSenses(), inputs, outputs, ref largeCreatureApproaching);
             Accumulate(brain, genome, CreateLargeCreatureFacingAwaySenses(), inputs, outputs, ref largeCreatureFacingAway);
+            Accumulate(brain, genome, CreateUnrelatedCreatureContactSenses(), inputs, outputs, ref unrelatedCreatureContact);
+            Accumulate(brain, genome, CreateSimilarCreatureContactSenses(), inputs, outputs, ref similarCreatureContact);
+            Accumulate(brain, genome, CreateLineageCreatureContactSenses(), inputs, outputs, ref lineageCreatureContact);
             Accumulate(brain, genome, CreateSlowTerrainHereSenses(), inputs, outputs, ref slowTerrainHere);
             Accumulate(brain, genome, CreateSlowTerrainAheadSenses(), inputs, outputs, ref slowTerrainAhead);
             Accumulate(brain, genome, CreateEasierTerrainAheadSenses(), inputs, outputs, ref easierTerrainAhead);
@@ -197,16 +211,23 @@ public static class BehaviorAssay
             plantPreferenceContact.ToResult("Plant preference contact"),
             meatContact.ToResult("Meat contact"),
             eggContact.ToResult("Egg contact"),
+            unrelatedEggContact.ToResult("Unrelated egg contact"),
+            lineageEggContact.ToResult("Lineage egg contact"),
             meatScentAhead.ToResult("Meat scent ahead"),
             meatScentRight.ToResult("Meat scent right"),
             rottenMeatScentAhead.ToResult("Rotten meat scent ahead"),
             rottenMeatScentRight.ToResult("Rotten meat scent right"),
+            similarCreatureScentAhead.ToResult("Similar creature scent ahead"),
+            lineageCreatureScentAhead.ToResult("Lineage creature scent ahead"),
             creatureAhead.ToResult("Creature sector ahead"),
             creatureRight.ToResult("Creature sector right"),
             smallCreatureAhead.ToResult("Small creature sector ahead"),
             largeCreatureAhead.ToResult("Large creature sector ahead"),
             largeCreatureApproaching.ToResult("Large creature sector approaching"),
             largeCreatureFacingAway.ToResult("Large creature sector facing away"),
+            unrelatedCreatureContact.ToResult("Unrelated creature contact"),
+            similarCreatureContact.ToResult("Similar creature contact"),
+            lineageCreatureContact.ToResult("Lineage creature contact"),
             slowTerrainHere.ToResult("Slow terrain here"),
             slowTerrainAhead.ToResult("Slow terrain ahead"),
             easierTerrainAhead.ToResult("Easier terrain ahead"),
@@ -639,6 +660,22 @@ public static class BehaviorAssay
         };
     }
 
+    private static CreatureSenseState CreateUnrelatedEggContactSenses()
+    {
+        return CreateEggContactSenses() with
+        {
+            EggContactLineageSimilarity = 0f
+        };
+    }
+
+    private static CreatureSenseState CreateLineageEggContactSenses()
+    {
+        return CreateEggContactSenses() with
+        {
+            EggContactLineageSimilarity = 1f
+        };
+    }
+
     private static CreatureSenseState CreateCreatureAheadSenses()
     {
         return WithCreatureSector(
@@ -657,6 +694,36 @@ public static class BehaviorAssay
             relativeBodySize: -0.15f,
             approachRate: 0.2f,
             facingAlignment: 0.15f);
+    }
+
+    private static CreatureSenseState CreateUnrelatedCreatureContactSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureContact = 1f,
+            CreatureContactSimilarity = 0.1f,
+            CreatureContactLineageSimilarity = 0f
+        };
+    }
+
+    private static CreatureSenseState CreateSimilarCreatureContactSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureContact = 1f,
+            CreatureContactSimilarity = 1f,
+            CreatureContactLineageSimilarity = 0f
+        };
+    }
+
+    private static CreatureSenseState CreateLineageCreatureContactSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureContact = 1f,
+            CreatureContactSimilarity = 0.1f,
+            CreatureContactLineageSimilarity = 1f
+        };
     }
 
     private static CreatureSenseState WithCreatureSector(
@@ -806,6 +873,26 @@ public static class BehaviorAssay
             RottenMeatScentDetected = true,
             RottenMeatScentDensity = 0.65f,
             RottenMeatScentDirectionRight = 0.65f
+        };
+    }
+
+    private static CreatureSenseState CreateSimilarCreatureScentAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureSimilarityScentDetected = true,
+            CreatureSimilarityScentDensity = 0.65f,
+            CreatureSimilarityScentDirectionForward = 0.65f
+        };
+    }
+
+    private static CreatureSenseState CreateLineageCreatureScentAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            CreatureLineageScentDetected = true,
+            CreatureLineageScentDensity = 0.65f,
+            CreatureLineageScentDirectionForward = 0.65f
         };
     }
 
@@ -1412,16 +1499,23 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult PlantPreferenceContact,
     BehaviorAssayResult MeatContact,
     BehaviorAssayResult EggContact,
+    BehaviorAssayResult UnrelatedEggContact,
+    BehaviorAssayResult LineageEggContact,
     BehaviorAssayResult MeatScentAhead,
     BehaviorAssayResult MeatScentRight,
     BehaviorAssayResult RottenMeatScentAhead,
     BehaviorAssayResult RottenMeatScentRight,
+    BehaviorAssayResult SimilarCreatureScentAhead,
+    BehaviorAssayResult LineageCreatureScentAhead,
     BehaviorAssayResult CreatureAhead,
     BehaviorAssayResult CreatureRight,
     BehaviorAssayResult SmallCreatureAhead,
     BehaviorAssayResult LargeCreatureAhead,
     BehaviorAssayResult LargeCreatureApproaching,
     BehaviorAssayResult LargeCreatureFacingAway,
+    BehaviorAssayResult UnrelatedCreatureContact,
+    BehaviorAssayResult SimilarCreatureContact,
+    BehaviorAssayResult LineageCreatureContact,
     BehaviorAssayResult SlowTerrainHere,
     BehaviorAssayResult SlowTerrainAhead,
     BehaviorAssayResult EasierTerrainAhead,
@@ -1484,16 +1578,23 @@ public readonly record struct BehaviorAssaySummary(
         PlantPreferenceContact,
         MeatContact,
         EggContact,
+        UnrelatedEggContact,
+        LineageEggContact,
         MeatScentAhead,
         MeatScentRight,
         RottenMeatScentAhead,
         RottenMeatScentRight,
+        SimilarCreatureScentAhead,
+        LineageCreatureScentAhead,
         CreatureAhead,
         CreatureRight,
         SmallCreatureAhead,
         LargeCreatureAhead,
         LargeCreatureApproaching,
         LargeCreatureFacingAway,
+        UnrelatedCreatureContact,
+        SimilarCreatureContact,
+        LineageCreatureContact,
         SlowTerrainHere,
         SlowTerrainAhead,
         EasierTerrainAhead,
