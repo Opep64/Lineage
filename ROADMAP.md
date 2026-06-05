@@ -1,6 +1,6 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-06-03
+Last reviewed: 2026-06-05
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
@@ -59,6 +59,7 @@ Status: partially implemented, future redesign likely
   - optional write/erase/decay gates;
   - explicit energy/brain/maturity costs.
 - Avoid perfect coordinate memory and hard-coded home vectors.
+- Add injury/fear memory later as an evolvable, decaying avoidance cue rather than hard-coded fear behavior. Useful signals could include recent damage, near-death stress, failed attacks, predator-like contact, dangerous scent/identity context, and the rough direction or area where the bad event happened.
 - Useful future memories might represent recent food, danger, failed target, successful eating, local depletion, egg-laying mode, or short-term movement tendency.
 
 ## Perception And Senses
@@ -70,6 +71,7 @@ Status: active design direction
 - Add creature and egg scent identity later for kin/species/familiarity experiments.
 - Scent identity should be an evolvable continuous value/domain, not a perfect species ID.
 - Add "own scent" or scent signature as an internal body signal so creatures can compare nearby signatures.
+- Add `internal.maturity_progress` as a smooth `0..1` body-state input so brains can distinguish juvenile, nearly adult, and adult states without relying only on the coarser reproduction-ready gate.
 - Add distance-dependent visual clarity later:
   - far objects appear as broad categories;
   - close objects reveal freshness, type, size, or identity details.
