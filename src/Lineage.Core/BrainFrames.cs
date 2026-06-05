@@ -76,7 +76,12 @@ public readonly record struct BrainInputFrame(
                     senses.CreatureLineageScentDetected,
                     senses.CreatureLineageScentDensity,
                     senses.CreatureLineageScentDirectionForward,
-                    senses.CreatureLineageScentDirectionRight)),
+                    senses.CreatureLineageScentDirectionRight),
+                new DirectionalGradientSignal(
+                    senses.EggLineageScentDetected,
+                    senses.EggLineageScentDensity,
+                    senses.EggLineageScentDirectionForward,
+                    senses.EggLineageScentDirectionRight)),
             new CommunicationInputFrame(
                 new DirectionalToneSignal(
                     senses.SoundDetected,
@@ -204,7 +209,8 @@ public readonly record struct ScentInputFrame(
     DirectionalGradientSignal Meat,
     DirectionalGradientSignal RottenMeat,
     DirectionalGradientSignal CreatureSimilarity,
-    DirectionalGradientSignal CreatureLineage);
+    DirectionalGradientSignal CreatureLineage,
+    DirectionalGradientSignal EggLineage);
 
 /// <summary>
 /// Intentional signals emitted by creature actions.

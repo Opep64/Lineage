@@ -67,6 +67,7 @@ public sealed class StatsRecordingSystem(
         var totalRottenMeatScentDensity = 0f;
         var totalCreatureSimilarityScentDensity = 0f;
         var totalCreatureLineageScentDensity = 0f;
+        var totalEggLineageScentDensity = 0f;
         var totalVisibleCreatureDensity = 0f;
         var totalCaloriesEaten = 0f;
         var totalPlantCaloriesEaten = 0f;
@@ -178,6 +179,7 @@ public sealed class StatsRecordingSystem(
         var rottenMeatScentDetectedCreatureCount = 0;
         var creatureSimilarityScentDetectedCreatureCount = 0;
         var creatureLineageScentDetectedCreatureCount = 0;
+        var eggLineageScentDetectedCreatureCount = 0;
         var foodContactCreatureCount = 0;
         var eggContactCreatureCount = 0;
         var eatingCreatureCount = 0;
@@ -274,6 +276,7 @@ public sealed class StatsRecordingSystem(
             totalRottenMeatScentDensity += creature.Senses.RottenMeatScentDensity;
             totalCreatureSimilarityScentDensity += creature.Senses.CreatureSimilarityScentDensity;
             totalCreatureLineageScentDensity += creature.Senses.CreatureLineageScentDensity;
+            totalEggLineageScentDensity += creature.Senses.EggLineageScentDensity;
             totalVisibleCreatureDensity += creature.Senses.VisibleCreatureDensity;
             totalCaloriesEaten += creature.LastCaloriesEaten;
             totalPlantCaloriesEaten += creature.LastPlantCaloriesEaten;
@@ -574,6 +577,11 @@ public sealed class StatsRecordingSystem(
             if (creature.Senses.CreatureLineageScentDetected)
             {
                 creatureLineageScentDetectedCreatureCount++;
+            }
+
+            if (creature.Senses.EggLineageScentDetected)
+            {
+                eggLineageScentDetectedCreatureCount++;
             }
 
             totalSoundAmplitude += creature.Actions.SoundAmplitude;
@@ -1228,6 +1236,8 @@ public sealed class StatsRecordingSystem(
             totalCreatureSimilarityScentDensity / divisor,
             creatureLineageScentDetectedCreatureCount,
             totalCreatureLineageScentDensity / divisor,
+            eggLineageScentDetectedCreatureCount,
+            totalEggLineageScentDensity / divisor,
             caloriesEatenPerSecond,
             plantCaloriesEatenPerSecond,
             tenderPlantCaloriesEatenPerSecond,

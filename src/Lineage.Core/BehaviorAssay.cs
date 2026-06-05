@@ -62,6 +62,8 @@ public static class BehaviorAssay
         var rottenMeatScentRight = new BehaviorAssayAccumulator();
         var similarCreatureScentAhead = new BehaviorAssayAccumulator();
         var lineageCreatureScentAhead = new BehaviorAssayAccumulator();
+        var lineageEggScentAhead = new BehaviorAssayAccumulator();
+        var lineageEggScentRight = new BehaviorAssayAccumulator();
         var creatureAhead = new BehaviorAssayAccumulator();
         var creatureRight = new BehaviorAssayAccumulator();
         var smallCreatureAhead = new BehaviorAssayAccumulator();
@@ -161,6 +163,8 @@ public static class BehaviorAssay
             Accumulate(brain, genome, CreateRottenMeatScentRightSenses(), inputs, outputs, ref rottenMeatScentRight);
             Accumulate(brain, genome, CreateSimilarCreatureScentAheadSenses(), inputs, outputs, ref similarCreatureScentAhead);
             Accumulate(brain, genome, CreateLineageCreatureScentAheadSenses(), inputs, outputs, ref lineageCreatureScentAhead);
+            Accumulate(brain, genome, CreateLineageEggScentAheadSenses(), inputs, outputs, ref lineageEggScentAhead);
+            Accumulate(brain, genome, CreateLineageEggScentRightSenses(), inputs, outputs, ref lineageEggScentRight);
             Accumulate(brain, genome, CreateCreatureAheadSenses(), inputs, outputs, ref creatureAhead);
             Accumulate(brain, genome, CreateCreatureRightSenses(), inputs, outputs, ref creatureRight);
             Accumulate(brain, genome, CreateSmallCreatureAheadSenses(), inputs, outputs, ref smallCreatureAhead);
@@ -219,6 +223,8 @@ public static class BehaviorAssay
             rottenMeatScentRight.ToResult("Rotten meat scent right"),
             similarCreatureScentAhead.ToResult("Similar creature scent ahead"),
             lineageCreatureScentAhead.ToResult("Lineage creature scent ahead"),
+            lineageEggScentAhead.ToResult("Lineage egg scent ahead"),
+            lineageEggScentRight.ToResult("Lineage egg scent right"),
             creatureAhead.ToResult("Creature sector ahead"),
             creatureRight.ToResult("Creature sector right"),
             smallCreatureAhead.ToResult("Small creature sector ahead"),
@@ -896,6 +902,26 @@ public static class BehaviorAssay
         };
     }
 
+    private static CreatureSenseState CreateLineageEggScentAheadSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            EggLineageScentDetected = true,
+            EggLineageScentDensity = 0.65f,
+            EggLineageScentDirectionForward = 0.65f
+        };
+    }
+
+    private static CreatureSenseState CreateLineageEggScentRightSenses()
+    {
+        return CreateBaselineSenses() with
+        {
+            EggLineageScentDetected = true,
+            EggLineageScentDensity = 0.65f,
+            EggLineageScentDirectionRight = 0.65f
+        };
+    }
+
     private static CreatureSenseState CreateCreatureRightSenses()
     {
         return WithCreatureSector(
@@ -1507,6 +1533,8 @@ public readonly record struct BehaviorAssaySummary(
     BehaviorAssayResult RottenMeatScentRight,
     BehaviorAssayResult SimilarCreatureScentAhead,
     BehaviorAssayResult LineageCreatureScentAhead,
+    BehaviorAssayResult LineageEggScentAhead,
+    BehaviorAssayResult LineageEggScentRight,
     BehaviorAssayResult CreatureAhead,
     BehaviorAssayResult CreatureRight,
     BehaviorAssayResult SmallCreatureAhead,
@@ -1586,6 +1614,8 @@ public readonly record struct BehaviorAssaySummary(
         RottenMeatScentRight,
         SimilarCreatureScentAhead,
         LineageCreatureScentAhead,
+        LineageEggScentAhead,
+        LineageEggScentRight,
         CreatureAhead,
         CreatureRight,
         SmallCreatureAhead,

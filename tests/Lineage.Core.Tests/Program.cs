@@ -89,6 +89,7 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing reports small prey as fresh meat", CreatureSensingReportsSmallPreyAsFreshMeat),
     ("Creature sensing smells similar creatures beyond vision", CreatureSensingSmellsSimilarCreaturesBeyondVision),
     ("Creature sensing smells same lineage creatures beyond vision", CreatureSensingSmellsSameLineageCreaturesBeyondVision),
+    ("Creature sensing smells same lineage eggs beyond vision", CreatureSensingSmellsSameLineageEggsBeyondVision),
     ("Creature sensing reports egg lineage contact", CreatureSensingReportsEggLineageContact),
     ("Creature sensing separates predator prey similarity", CreatureSensingSeparatesPredatorPreySimilarity),
     ("Creature sensing hears intentional sound beyond vision", CreatureSensingHearsIntentionalSoundBeyondVision),
@@ -163,6 +164,7 @@ var tests = new (string Name, Action Body)[]
     ("Neural brain migrates thermal sensing inputs", NeuralBrainMigratesThermalSensingInputs),
     ("Neural brain migrates fullness inputs", NeuralBrainMigratesFullnessInputs),
     ("Neural brain migrates lineage familiarity inputs", NeuralBrainMigratesLineageFamiliarityInputs),
+    ("Neural brain migrates egg lineage scent inputs", NeuralBrainMigratesEggLineageScentInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -3753,6 +3755,66 @@ static void CreatureSensingReportsEggLineageContact()
     AssertClose(0f, senses.EggContactLineageSimilarity, 0.000001, "Unrelated egg lineage contact similarity");
 }
 
+static void CreatureSensingSmellsSameLineageEggsBeyondVision()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 13073,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, worldSenseIntervalTicks: 1)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 60f,
+        VisionAngleRadians = MathF.PI / 3f,
+        MaturityAgeSeconds = 0f
+    });
+
+    var observerId = simulation.State.SpawnCreature(genomeId, new SimVector2(80f, 80f), energy: 25f);
+    var unrelatedParentId = simulation.State.SpawnCreature(genomeId, new SimVector2(200f, 80f), energy: 25f);
+    var observer = simulation.State.Creatures[0];
+    observer.HeadingRadians = 0f;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.State.SpawnEgg(
+        genomeId,
+        brainId: -1,
+        parentId: unrelatedParentId,
+        position: new SimVector2(72f, 80f),
+        energy: 10f,
+        incubationSeconds: 30f,
+        generation: 1);
+
+    simulation.Step();
+
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.FoodDetected, "Unrelated egg behind observer should not be visually detected");
+    AssertTrue(!senses.EggLineageScentDetected, "Unrelated egg should not trigger lineage egg scent");
+    AssertClose(0f, senses.EggLineageScentDensity, 0.000001, "Unrelated egg scent density");
+
+    simulation.State.SpawnEgg(
+        genomeId,
+        brainId: -1,
+        parentId: observerId,
+        position: new SimVector2(72f, 80f),
+        energy: 10f,
+        incubationSeconds: 30f,
+        generation: 1);
+
+    simulation.Step();
+
+    senses = simulation.State.Creatures[0].Senses;
+    AssertTrue(!senses.FoodDetected, "Own egg behind observer should remain hidden by the vision cone");
+    AssertTrue(senses.EggLineageScentDetected, "Own egg should trigger lineage egg scent beyond vision");
+    AssertTrue(senses.EggLineageScentDensity > 0.85f, "Nearby own egg should have strong lineage egg scent");
+    AssertTrue(senses.EggLineageScentDirectionForward < -0.85f, "Lineage egg scent should point behind");
+    AssertClose(0f, senses.EggLineageScentDirectionRight, 0.0001, "Lineage egg scent right direction");
+}
+
 static void CreatureSensingSeparatesPredatorPreySimilarity()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
@@ -4602,6 +4664,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var fatInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FatRatioInput);
     var climateInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CurrentTemperatureInput);
     var fullnessInput = BrainIoRegistry.GetInput(NeuralBrainSchema.EnergyFullnessInput);
+    var eggLineageScentInput = BrainIoRegistry.GetInput(NeuralBrainSchema.EggLineageScentDensityInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -4615,7 +4678,10 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(6, climateInput.IntroducedVersion, "Climate input introduced version");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, fullnessInput.Freshness, "Fullness input freshness");
     AssertEqual(7, fullnessInput.IntroducedVersion, "Fullness input introduced version");
+    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, eggLineageScentInput.Freshness, "Egg lineage scent input freshness");
+    AssertEqual(9, eggLineageScentInput.IntroducedVersion, "Egg lineage scent input introduced version");
     AssertEqual("internal.energy_fullness", fullnessInput.Key, "Fullness input key");
+    AssertEqual("scent.egg_lineage_density", eggLineageScentInput.Key, "Egg lineage scent input key");
     AssertEqual("climate.current_temperature", climateInput.Key, "Climate input key");
     AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
     AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
@@ -4683,6 +4749,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         CreatureLineageScentDensity = 0.23f,
         CreatureLineageScentDirectionForward = -0.33f,
         CreatureLineageScentDirectionRight = 0.44f,
+        EggLineageScentDensity = 0.53f,
+        EggLineageScentDirectionForward = -0.64f,
+        EggLineageScentDirectionRight = 0.74f,
         SoundDensity = 0.29f,
         SoundDirectionForward = 0.39f,
         SoundDirectionRight = -0.49f,
@@ -4763,6 +4832,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.23f, inputs[NeuralBrainSchema.CreatureLineageScentDensityInput], 0.000001, "Creature lineage scent density input");
     AssertClose(-0.33f, inputs[NeuralBrainSchema.CreatureLineageScentForwardInput], 0.000001, "Creature lineage scent forward input");
     AssertClose(0.44f, inputs[NeuralBrainSchema.CreatureLineageScentRightInput], 0.000001, "Creature lineage scent right input");
+    AssertClose(0.53f, inputs[NeuralBrainSchema.EggLineageScentDensityInput], 0.000001, "Egg lineage scent density input");
+    AssertClose(-0.64f, inputs[NeuralBrainSchema.EggLineageScentForwardInput], 0.000001, "Egg lineage scent forward input");
+    AssertClose(0.74f, inputs[NeuralBrainSchema.EggLineageScentRightInput], 0.000001, "Egg lineage scent right input");
     AssertClose(0.29f, inputs[NeuralBrainSchema.SoundDensityInput], 0.000001, "Sound density input");
     AssertClose(0.39f, inputs[NeuralBrainSchema.SoundDirectionForwardInput], 0.000001, "Sound forward input");
     AssertClose(-0.49f, inputs[NeuralBrainSchema.SoundDirectionRightInput], 0.000001, "Sound right input");
@@ -5590,7 +5662,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     var summary = BehaviorAssay.Analyze(simulation.State);
 
     AssertEqual(2, summary.EvaluatedCreatureCount, "Assayed creature count");
-    AssertEqual(54, summary.Results.Count, "Assay result count");
+    AssertEqual(56, summary.Results.Count, "Assay result count");
     AssertTrue(summary.PlantAhead.MoveForward > summary.Baseline.MoveForward, "Plant ahead should increase movement");
     AssertTrue(summary.PlantRight.Turn > 0.5f, "Plant right should turn right");
     AssertTrue(summary.PlantContact.EatShare > 0.9f, "Plant contact should trigger eating");
@@ -5624,6 +5696,16 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
         summary.LineageCreatureScentAhead.MoveForward,
         0.000001,
         "Seed forager should not have built-in lineage scent approach");
+    AssertClose(
+        summary.Baseline.MoveForward,
+        summary.LineageEggScentAhead.MoveForward,
+        0.000001,
+        "Seed forager should not have built-in lineage egg scent approach");
+    AssertClose(
+        summary.Baseline.Turn,
+        summary.LineageEggScentRight.Turn,
+        0.000001,
+        "Seed forager should not have built-in lineage egg scent turning");
     AssertClose(
         summary.UnrelatedCreatureContact.AttackShare,
         summary.LineageCreatureContact.AttackShare,
@@ -5708,6 +5790,8 @@ static void BehaviorAssayReportsLineageFamiliarityProbes()
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.BiasInput] = 0.5f;
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureSimilarityScentForwardInput] = 3.5f;
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureLineageScentForwardInput] = -3.5f;
+    weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggLineageScentForwardInput] = 3.5f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.EggLineageScentRightInput] = 3.5f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactInput] = 3.5f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactSimilarityInput] = -5f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactLineageSimilarityInput] = -5f;
@@ -5725,6 +5809,12 @@ static void BehaviorAssayReportsLineageFamiliarityProbes()
     AssertTrue(
         summary.LineageCreatureScentAhead.MoveForward < summary.Baseline.MoveForward - 0.3f,
         "Lineage scent probe should expose forward avoidance wiring");
+    AssertTrue(
+        summary.LineageEggScentAhead.MoveForward > summary.Baseline.MoveForward + 0.4f,
+        "Lineage egg scent ahead should expose forward egg familiarity wiring");
+    AssertTrue(
+        summary.LineageEggScentRight.Turn > summary.Baseline.Turn + 0.4f,
+        "Lineage egg scent right should expose lateral egg familiarity wiring");
     AssertTrue(
         summary.UnrelatedCreatureContact.AttackShare > 0.9f,
         "Unrelated creature contact should expose contact attack wiring");
@@ -7129,6 +7219,47 @@ static void NeuralBrainMigratesLineageFamiliarityInputs()
     AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureLineageScentRightInput), 0.000001, "New lineage scent right starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.CreatureContactLineageSimilarityInput), 0.000001, "New hidden creature lineage contact starts neutral");
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggContactLineageSimilarityInput), 0.000001, "New hidden egg lineage contact starts neutral");
+}
+
+static void NeuralBrainMigratesEggLineageScentInputs()
+{
+    const int legacyInputCount = 250;
+    const int legacyOutputCount = NeuralBrainSchema.OutputCount;
+    const int hiddenNodeCount = 1;
+    var legacyDirectWeightCount = legacyInputCount * legacyOutputCount;
+    var legacyHiddenInputOffset = legacyDirectWeightCount;
+    var legacyHiddenOutputOffset = legacyHiddenInputOffset + hiddenNodeCount * legacyInputCount;
+    var legacyWeights = new float[legacyDirectWeightCount + hiddenNodeCount * (legacyInputCount + legacyOutputCount)];
+
+    legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + NeuralBrainSchema.GutFullnessInput] = 0.7f;
+    legacyWeights[legacyHiddenInputOffset + NeuralBrainSchema.GutFullnessInput] = -0.4f;
+    legacyWeights[legacyHiddenOutputOffset + NeuralBrainSchema.MoveForwardOutput * hiddenNodeCount] = 0.9f;
+
+    var brain = new NeuralBrainGenome(legacyWeights);
+
+    AssertEqual(hiddenNodeCount, brain.HiddenNodeCount, "Egg lineage scent migration hidden node count");
+    AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Egg lineage scent migrated weight count");
+    AssertClose(
+        0.7f,
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.GutFullnessInput),
+        0.000001,
+        "Existing gut fullness direct input remains in place");
+    AssertClose(
+        -0.4f,
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.GutFullnessInput),
+        0.000001,
+        "Existing hidden gut fullness input remains in place");
+    AssertClose(
+        0.9f,
+        brain.GetHiddenOutputWeight(NeuralBrainSchema.MoveForwardOutput, 0),
+        0.000001,
+        "Existing hidden output remains in place");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.EggLineageScentDensityInput), 0.000001, "New egg lineage scent density starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.EggLineageScentForwardInput), 0.000001, "New egg lineage scent forward starts neutral");
+    AssertClose(0f, brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.EggLineageScentRightInput), 0.000001, "New egg lineage scent right starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentDensityInput), 0.000001, "New hidden egg lineage scent density starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentForwardInput), 0.000001, "New hidden egg lineage scent forward starts neutral");
+    AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.EggLineageScentRightInput), 0.000001, "New hidden egg lineage scent right starts neutral");
 }
 
 static void NeuralBrainSupportsHiddenNodes()
@@ -9432,6 +9563,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
         CreatureSimilarityScentDensity = 0.8f,
         CreatureLineageScentDetected = true,
         CreatureLineageScentDensity = 0.7f,
+        EggLineageScentDetected = true,
+        EggLineageScentDensity = 0.6f,
         SoundDetected = true,
         SoundDensity = 0.3f,
         SoundToneClarity = 0.6f,
@@ -9510,6 +9643,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
         CreatureSimilarityScentDensity = 0.4f,
         CreatureLineageScentDetected = true,
         CreatureLineageScentDensity = 0.3f,
+        EggLineageScentDetected = true,
+        EggLineageScentDensity = 0.2f,
         SoundDetected = false,
         SoundDensity = 0f,
         SoundToneClarity = 0f,
@@ -9665,6 +9800,8 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.6f, snapshot.AverageCreatureSimilarityScentDensity, 0.000001, "Average creature similarity scent density");
     AssertEqual(2, snapshot.CreatureLineageScentDetectedCreatureCount, "Creature lineage scent detected count");
     AssertClose(0.5f, snapshot.AverageCreatureLineageScentDensity, 0.000001, "Average creature lineage scent density");
+    AssertEqual(2, snapshot.EggLineageScentDetectedCreatureCount, "Egg lineage scent detected count");
+    AssertClose(0.4f, snapshot.AverageEggLineageScentDensity, 0.000001, "Average egg lineage scent density");
     AssertClose(4.25f, snapshot.TotalCaloriesEatenPerSecond, 0.000001, "Calories eaten per second");
     AssertClose(2.5f, snapshot.TotalPlantCaloriesEatenPerSecond, 0.000001, "Plant calories eaten per second");
     AssertClose(1f, snapshot.TotalCarcassCaloriesEatenPerSecond, 0.000001, "Carcass calories eaten per second");

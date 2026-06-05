@@ -105,6 +105,14 @@ public struct CreatureSenseState
 
     public float CreatureLineageScentDirectionRight { get; set; }
 
+    public bool EggLineageScentDetected { get; set; }
+
+    public float EggLineageScentDensity { get; set; }
+
+    public float EggLineageScentDirectionForward { get; set; }
+
+    public float EggLineageScentDirectionRight { get; set; }
+
     public bool SoundDetected { get; set; }
 
     public float SoundDensity { get; set; }

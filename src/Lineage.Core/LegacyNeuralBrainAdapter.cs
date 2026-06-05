@@ -67,6 +67,9 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.CreatureLineageScentDensityInput] = frame.Scent.CreatureLineage.Density;
         inputs[NeuralBrainSchema.CreatureLineageScentForwardInput] = frame.Scent.CreatureLineage.DirectionForward;
         inputs[NeuralBrainSchema.CreatureLineageScentRightInput] = frame.Scent.CreatureLineage.DirectionRight;
+        inputs[NeuralBrainSchema.EggLineageScentDensityInput] = frame.Scent.EggLineage.Density;
+        inputs[NeuralBrainSchema.EggLineageScentForwardInput] = frame.Scent.EggLineage.DirectionForward;
+        inputs[NeuralBrainSchema.EggLineageScentRightInput] = frame.Scent.EggLineage.DirectionRight;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;

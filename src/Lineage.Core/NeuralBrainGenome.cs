@@ -63,6 +63,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutThermalSensing = 235;
     private const int LegacyInputCountWithoutFullness = 243;
     private const int LegacyInputCountWithoutLineageFamiliarity = 245;
+    private const int LegacyInputCountWithoutEggLineageScent = 250;
     private const int LegacyLineageFamiliarityInsertionInput = 219;
     private const int LegacyCreatureContactSimilarityInput = 218;
     private const int LineageFamiliarityInsertedInputCount = 5;
@@ -1311,6 +1312,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutEggLineageScent,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutEggLineageScent,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutLineageFamiliarity,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -2036,6 +2052,11 @@ public sealed class NeuralBrainGenome
         if (input == oldReproductionReadinessInput)
         {
             return NeuralBrainSchema.ReproductionReadinessInput;
+        }
+
+        if (legacyInputCount == LegacyInputCountWithoutEggLineageScent)
+        {
+            return input;
         }
 
         if (legacyInputCount == LegacyInputCountWithoutLineageFamiliarity

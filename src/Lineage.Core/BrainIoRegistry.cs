@@ -206,7 +206,10 @@ public static class BrainIoRegistry
             Input("climate.left_thermal_mismatch", "Left thermal mismatch", NeuralBrainSchema.LeftThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the left.", introducedVersion: 6),
             Input("climate.right_thermal_mismatch", "Right thermal mismatch", NeuralBrainSchema.RightThermalMismatchInput, BrainIoSignalGroup.Climate, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Thermal mismatch sampled to the right.", introducedVersion: 6),
             Input("internal.energy_fullness", "Energy fullness", NeuralBrainSchema.EnergyFullnessInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current working energy divided by working energy capacity.", introducedVersion: 7),
-            Input("internal.gut_fullness", "Gut fullness", NeuralBrainSchema.GutFullnessInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current gut contents divided by gut capacity.", introducedVersion: 7)
+            Input("internal.gut_fullness", "Gut fullness", NeuralBrainSchema.GutFullnessInput, BrainIoSignalGroup.Internal, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Current gut contents divided by gut capacity.", introducedVersion: 7),
+            Input("scent.egg_lineage_density", "Egg lineage scent density", NeuralBrainSchema.EggLineageScentDensityInput, BrainIoSignalGroup.Scent, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Scent strength from same-founder eggs.", introducedVersion: 9),
+            Input("scent.egg_lineage_forward", "Egg lineage scent forward", NeuralBrainSchema.EggLineageScentForwardInput, BrainIoSignalGroup.Scent, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Egg lineage scent direction along the creature's forward axis.", introducedVersion: 9),
+            Input("scent.egg_lineage_right", "Egg lineage scent right", NeuralBrainSchema.EggLineageScentRightInput, BrainIoSignalGroup.Scent, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Egg lineage scent direction along the creature's right axis.", introducedVersion: 9)
         });
 
         return ValidateInputs(inputs);

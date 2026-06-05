@@ -19,6 +19,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private const float MinimumExpectedPlantDigestiveYield = 0.001f;
     private const float MinimumPlantQualityClarity = 0.04f;
     public const float CreatureSimilarityScentRangeMultiplier = 1.5f;
+    public const float EggLineageScentRangeMultiplier = CreatureSimilarityScentRangeMultiplier;
     private const float CreatureSimilarityScentDensitySaturation = 1f;
     public const int DefaultWorldSenseIntervalTicks = 10;
     public const float DefaultSoundRangeMultiplier = 2.5f;
@@ -213,6 +214,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var freshMeatFoodEfficiency = CreatureDigestion.FreshMeatEnergyEfficiency(genome);
         var meatScentRadius = effectiveSenseRadius * _meatScentRangeMultiplier;
         var creatureSimilarityScentRadius = effectiveSenseRadius * CreatureSimilarityScentRangeMultiplier;
+        var eggLineageScentRadius = effectiveSenseRadius * EggLineageScentRangeMultiplier;
         var soundRadius = effectiveSenseRadius * _soundRangeMultiplier;
         sensingProfile?.RecordCreatureSetup(Stopwatch.GetTimestamp() - creatureSetupStartedAt);
 
@@ -317,7 +319,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         _spatialIndex.AddEggCandidatesWithEnergy(
             state,
             creature.Position,
-            effectiveVisionRadius,
+            MathF.Max(effectiveVisionRadius, eggLineageScentRadius),
             minimumEnergy: 0f,
             scratch.EggCandidates,
             scratch.SeenEggCandidates);
@@ -389,6 +391,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var meatScentVector = SimVector2.Zero;
         var totalRottenMeatScentStrength = 0f;
         var rottenMeatScentVector = SimVector2.Zero;
+        var totalEggLineageScentStrength = 0f;
+        var eggLineageScentVector = SimVector2.Zero;
         var bestVisibleFoodKind = FoodContactKind.None;
         var bestVisibleFoodIndex = -1;
         var bestVisibleFoodScore = float.NegativeInfinity;
@@ -567,15 +571,32 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var eggRadius = EggPredation.ContactRadius(egg);
             var toEgg = egg.Position - creature.Position;
             var distanceSquared = toEgg.LengthSquared;
+            var centerDistance = MathF.Sqrt(distanceSquared);
+            var edgeDistance = Math.Max(0f, centerDistance - eggRadius);
+
+            if (edgeDistance <= eggLineageScentRadius)
+            {
+                var lineageWeight = LineageFamiliarity.ScentWeight(LineageFamiliarity.EggSimilarity(state, creature.Id, egg));
+                if (lineageWeight > 0f)
+                {
+                    var distanceFactor = 1f - Math.Clamp(edgeDistance / eggLineageScentRadius, 0f, 1f);
+                    var lineageScentStrength = lineageWeight * distanceFactor * distanceFactor;
+                    if (lineageScentStrength > MinimumScentStrength)
+                    {
+                        var scentDirection = centerDistance > 0.0001f
+                            ? toEgg / centerDistance
+                            : forward;
+                        totalEggLineageScentStrength += lineageScentStrength;
+                        eggLineageScentVector += scentDirection * lineageScentStrength;
+                    }
+                }
+            }
 
             if (!IsWithinEdgeRange(distanceSquared, eggRadius, effectiveVisionRadius)
                 || !IsInsideVisionCone(toEgg, distanceSquared, forward, hasLimitedVision, visionCosThreshold))
             {
                 continue;
             }
-
-            var centerDistance = MathF.Sqrt(distanceSquared);
-            var edgeDistance = Math.Max(0f, centerDistance - eggRadius);
 
             visibleFoodCount++;
             visibleMeatCount++;
@@ -709,6 +730,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             ref senses,
             creatureAmbientSense.LineageScentVector,
             creatureAmbientSense.TotalLineageScentStrength,
+            forward,
+            right);
+        ApplyEggLineageScentSense(
+            ref senses,
+            eggLineageScentVector,
+            totalEggLineageScentStrength,
             forward,
             right);
         ApplySoundSense(
@@ -1353,6 +1380,37 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.CreatureLineageScentDirectionForward =
             Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
         senses.CreatureLineageScentDirectionRight =
+            Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
+    }
+
+    private void ApplyEggLineageScentSense(
+        ref CreatureSenseState senses,
+        SimVector2 scentVector,
+        float totalScentStrength,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        if (totalScentStrength <= MinimumScentStrength)
+        {
+            return;
+        }
+
+        var density = Math.Clamp(totalScentStrength / CreatureSimilarityScentDensitySaturation, 0f, 1f);
+        senses.EggLineageScentDetected = true;
+        senses.EggLineageScentDensity = density;
+
+        if (scentVector.LengthSquared <= 0.000001f)
+        {
+            senses.EggLineageScentDirectionForward = 0f;
+            senses.EggLineageScentDirectionRight = 0f;
+            return;
+        }
+
+        var direction = scentVector.Normalized();
+        var directionalConfidence = Math.Clamp(scentVector.Length / totalScentStrength, 0f, 1f) * density;
+        senses.EggLineageScentDirectionForward =
+            Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
+        senses.EggLineageScentDirectionRight =
             Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 

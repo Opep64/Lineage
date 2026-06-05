@@ -120,6 +120,8 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageCreatureSimilarityScentDensity,
     int CreatureLineageScentDetectedCreatureCount,
     float AverageCreatureLineageScentDensity,
+    int EggLineageScentDetectedCreatureCount,
+    float AverageEggLineageScentDensity,
     float TotalCaloriesEatenPerSecond,
     float TotalPlantCaloriesEatenPerSecond,
     float TenderPlantCaloriesEatenPerSecond,
