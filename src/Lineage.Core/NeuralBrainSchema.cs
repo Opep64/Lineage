@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 7;
+    public const int InputSchemaVersion = 8;
 
     public const int OutputSchemaVersion = 3;
 
@@ -80,7 +80,17 @@ public static class NeuralBrainSchema
 
     public const int CreatureContactSimilarityInput = CreatureSimilarityScentRightInput + 1;
 
-    public const int CurrentHabitatQualityInput = CreatureContactSimilarityInput + 1;
+    public const int CreatureLineageScentDensityInput = CreatureContactSimilarityInput + 1;
+
+    public const int CreatureLineageScentForwardInput = CreatureLineageScentDensityInput + 1;
+
+    public const int CreatureLineageScentRightInput = CreatureLineageScentForwardInput + 1;
+
+    public const int CreatureContactLineageSimilarityInput = CreatureLineageScentRightInput + 1;
+
+    public const int EggContactLineageSimilarityInput = CreatureContactLineageSimilarityInput + 1;
+
+    public const int CurrentHabitatQualityInput = EggContactLineageSimilarityInput + 1;
 
     public const int ForwardHabitatQualityInput = CurrentHabitatQualityInput + 1;
 

@@ -64,8 +64,12 @@ public static class RosterLineageAnalyzer
             profile.TelemetryFoodContactSeconds += record.TelemetryFoodContactSeconds;
             profile.TelemetryCreatureContactSeconds += record.TelemetryCreatureContactSeconds;
             profile.TelemetrySimilarCreatureContactSeconds += record.TelemetrySimilarCreatureContactSeconds;
+            profile.TelemetryLineageCreatureContactSeconds += record.TelemetryLineageCreatureContactSeconds;
+            profile.TelemetryEggLineageContactSeconds += record.TelemetryEggLineageContactSeconds;
             profile.TelemetryAttackIntentSeconds += record.TelemetryAttackIntentSeconds;
             profile.TelemetryAttackIntentTouchingSeconds += record.TelemetryAttackIntentTouchingSeconds;
+            profile.TelemetryAttackIntentLineageTouchingSeconds += record.TelemetryAttackIntentLineageTouchingSeconds;
+            profile.TelemetryAttackIntentUnrelatedTouchingSeconds += record.TelemetryAttackIntentUnrelatedTouchingSeconds;
             profile.TelemetryAttackDamageDealingSeconds += record.TelemetryAttackDamageDealingSeconds;
             profile.TelemetryMeatDetectedSeconds += record.TelemetryMeatDetectedSeconds;
             profile.TelemetryFreshMeatDetectedSeconds += record.TelemetryFreshMeatDetectedSeconds;
@@ -218,8 +222,12 @@ public static class RosterLineageAnalyzer
         public float TelemetryFoodContactSeconds;
         public float TelemetryCreatureContactSeconds;
         public float TelemetrySimilarCreatureContactSeconds;
+        public float TelemetryLineageCreatureContactSeconds;
+        public float TelemetryEggLineageContactSeconds;
         public float TelemetryAttackIntentSeconds;
         public float TelemetryAttackIntentTouchingSeconds;
+        public float TelemetryAttackIntentLineageTouchingSeconds;
+        public float TelemetryAttackIntentUnrelatedTouchingSeconds;
         public float TelemetryAttackDamageDealingSeconds;
         public float TelemetryMeatDetectedSeconds;
         public float TelemetryFreshMeatDetectedSeconds;
@@ -291,8 +299,12 @@ public static class RosterLineageAnalyzer
                 Share(TelemetryRottenMeatScentDetectedSeconds, TelemetryLivingSeconds),
                 Share(TelemetryCreatureContactSeconds, TelemetryLivingSeconds),
                 Share(TelemetrySimilarCreatureContactSeconds, TelemetryLivingSeconds),
+                Share(TelemetryLineageCreatureContactSeconds, TelemetryLivingSeconds),
+                Share(TelemetryEggLineageContactSeconds, TelemetryLivingSeconds),
                 Share(TelemetryAttackIntentSeconds, TelemetryLivingSeconds),
                 Share(TelemetryAttackIntentTouchingSeconds, TelemetryLivingSeconds),
+                Share(TelemetryAttackIntentLineageTouchingSeconds, TelemetryLivingSeconds),
+                Share(TelemetryAttackIntentUnrelatedTouchingSeconds, TelemetryLivingSeconds),
                 Share(TelemetryAttackDamageDealingSeconds, TelemetryLivingSeconds),
                 GenomeIds.OrderBy(id => id).ToArray(),
                 BrainIds.OrderBy(id => id).ToArray());
@@ -360,8 +372,12 @@ public readonly record struct RosterLineageSummary(
     float RottenMeatScentDetectedShare,
     float CreatureContactShare,
     float SimilarCreatureContactShare,
+    float LineageCreatureContactShare,
+    float EggLineageContactShare,
     float AttackIntentShare,
     float AttackIntentTouchingShare,
+    float AttackIntentLineageTouchingShare,
+    float AttackIntentUnrelatedTouchingShare,
     float AttackDamageDealingShare,
     IReadOnlyList<int> GenomeIds,
     IReadOnlyList<int> BrainIds);

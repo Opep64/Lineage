@@ -251,10 +251,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.EggFoodContact = creature.IsTouchingFood && creature.FoodContactKind == FoodContactKind.Egg
             ? 1f
             : 0f;
+        senses.EggContactLineageSimilarity = senses.EggFoodContact > 0f
+            ? CalculateEggContactLineageSimilarity(state, creature)
+            : 0f;
         senses.CreatureContact = creature.IsTouchingCreature ? 1f : 0f;
         if (!creature.IsTouchingCreature)
         {
             senses.CreatureContactSimilarity = 0f;
+            senses.CreatureContactLineageSimilarity = 0f;
         }
 
         senses.GrabPressure = Math.Clamp(creature.GrabPressure, 0f, 1f);
@@ -701,6 +705,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creatureAmbientSense.TotalScentStrength,
             forward,
             right);
+        ApplyCreatureLineageScentSense(
+            ref senses,
+            creatureAmbientSense.LineageScentVector,
+            creatureAmbientSense.TotalLineageScentStrength,
+            forward,
+            right);
         ApplySoundSense(
             ref senses,
             creatureAmbientSense.SoundVector,
@@ -710,6 +720,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             forward,
             right);
         senses.CreatureContactSimilarity = creatureAmbientSense.ContactSimilarity;
+        senses.CreatureContactLineageSimilarity = creatureAmbientSense.ContactLineageSimilarity;
 
         if (bestVisibleFoodKind == FoodContactKind.Resource && bestVisibleFoodIndex >= 0)
         {
@@ -1314,6 +1325,58 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 
+    private void ApplyCreatureLineageScentSense(
+        ref CreatureSenseState senses,
+        SimVector2 scentVector,
+        float totalScentStrength,
+        SimVector2 forward,
+        SimVector2 right)
+    {
+        if (totalScentStrength <= MinimumScentStrength)
+        {
+            return;
+        }
+
+        var density = Math.Clamp(totalScentStrength / CreatureSimilarityScentDensitySaturation, 0f, 1f);
+        senses.CreatureLineageScentDetected = true;
+        senses.CreatureLineageScentDensity = density;
+
+        if (scentVector.LengthSquared <= 0.000001f)
+        {
+            senses.CreatureLineageScentDirectionForward = 0f;
+            senses.CreatureLineageScentDirectionRight = 0f;
+            return;
+        }
+
+        var direction = scentVector.Normalized();
+        var directionalConfidence = Math.Clamp(scentVector.Length / totalScentStrength, 0f, 1f) * density;
+        senses.CreatureLineageScentDirectionForward =
+            Math.Clamp(SimVector2.Dot(direction, forward), -1f, 1f) * directionalConfidence;
+        senses.CreatureLineageScentDirectionRight =
+            Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
+    }
+
+    private static float CalculateEggContactLineageSimilarity(WorldState state, CreatureState creature)
+    {
+        if (!creature.IsTouchingFood
+            || creature.FoodContactKind != FoodContactKind.Egg
+            || creature.FoodContactResourceId == default)
+        {
+            return 0f;
+        }
+
+        for (var eggIndex = 0; eggIndex < state.Eggs.Count; eggIndex++)
+        {
+            var egg = state.Eggs[eggIndex];
+            if (egg.Id == creature.FoodContactResourceId)
+            {
+                return LineageFamiliarity.EggSimilarity(state, creature.Id, egg);
+            }
+        }
+
+        return 0f;
+    }
+
     private void ApplySoundSense(
         ref CreatureSenseState senses,
         SimVector2 soundVector,
@@ -1375,11 +1438,14 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         var totalScentStrength = 0f;
         var scentVector = SimVector2.Zero;
+        var totalLineageScentStrength = 0f;
+        var lineageScentVector = SimVector2.Zero;
         var totalSoundStrength = 0f;
         var soundVector = SimVector2.Zero;
         var soundToneWeightedTotal = 0f;
         var soundToneSquaredWeightedTotal = 0f;
         var contactSimilarity = 0f;
+        var contactLineageSimilarity = 0f;
         var hasContact = creature.IsTouchingCreature && creature.CreatureContactId != default;
 
         foreach (var otherCreatureIndex in creatureCandidates)
@@ -1399,9 +1465,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             var otherTraits = GetCreatureTraits(state, otherCreatureIndex);
             var similarity = CreatureSimilarity.GeneticSimilarity(creatureTraits.Genome, otherTraits.Genome);
+            var lineageSimilarity = LineageFamiliarity.CreatureSimilarity(state, creature.Id, otherCreature.Id);
             if (hasContact && otherCreature.Id == creature.CreatureContactId)
             {
                 contactSimilarity = similarity;
+                contactLineageSimilarity = lineageSimilarity;
             }
 
             var toOther = otherCreature.Position - creature.Position;
@@ -1421,6 +1489,21 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                             : forward;
                         totalScentStrength += scentStrength;
                         scentVector += scentDirection * scentStrength;
+                    }
+                }
+
+                var lineageWeight = LineageFamiliarity.ScentWeight(lineageSimilarity);
+                if (lineageWeight > 0f)
+                {
+                    var distanceFactor = 1f - Math.Clamp(edgeDistance / scentRadius, 0f, 1f);
+                    var lineageScentStrength = lineageWeight * distanceFactor * distanceFactor;
+                    if (lineageScentStrength > MinimumScentStrength)
+                    {
+                        var scentDirection = centerDistance > 0.0001f
+                            ? toOther / centerDistance
+                            : forward;
+                        totalLineageScentStrength += lineageScentStrength;
+                        lineageScentVector += scentDirection * lineageScentStrength;
                     }
                 }
             }
@@ -1452,6 +1535,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             totalScentStrength,
             scentVector,
             contactSimilarity,
+            totalLineageScentStrength,
+            lineageScentVector,
+            contactLineageSimilarity,
             totalSoundStrength,
             soundVector,
             soundToneWeightedTotal,
@@ -1813,6 +1899,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         float TotalScentStrength,
         SimVector2 ScentVector,
         float ContactSimilarity,
+        float TotalLineageScentStrength,
+        SimVector2 LineageScentVector,
+        float ContactLineageSimilarity,
         float TotalSoundStrength,
         SimVector2 SoundVector,
         float SoundToneWeightedTotal,

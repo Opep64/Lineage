@@ -336,11 +336,16 @@ public static class ViewerReportWriter
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Seeing creatures", FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Similarity scent", $"{FormatPercent(Share(snapshot.CreatureSimilarityScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageCreatureSimilarityScentDensity:0.###}");
+        WriteMetric(writer, "Lineage scent", $"{FormatPercent(Share(snapshot.CreatureLineageScentDetectedCreatureCount, snapshot.CreatureCount))} @ {snapshot.AverageCreatureLineageScentDensity:0.###}");
         WriteMetric(writer, "Creature contact", FormatPercent(Share(snapshot.CreatureContactCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Similar contact", $"{FormatPercent(Share(snapshot.SimilarCreatureContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageCreatureContactSimilarity:0.###}");
+        WriteMetric(writer, "Lineage contact", $"{FormatPercent(Share(snapshot.LineageCreatureContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageCreatureContactLineageSimilarity:0.###}");
+        WriteMetric(writer, "Lineage egg touch", $"{FormatPercent(Share(snapshot.EggLineageContactCreatureCount, snapshot.CreatureCount))} avg {snapshot.AverageEggContactLineageSimilarity:0.###}");
         WriteMetric(writer, "Attack intent", FormatPercent(Share(snapshot.AttackIntentCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Intent while touching", FormatPercent(Share(snapshot.AttackIntentWhileTouchingCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Intent on similar touch", FormatPercent(Share(snapshot.AttackIntentWhileTouchingSimilarCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Intent on lineage touch", FormatPercent(Share(snapshot.AttackIntentWhileTouchingLineageCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Intent on unrelated touch", FormatPercent(Share(snapshot.AttackIntentWhileTouchingUnrelatedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Touch no intent", FormatPercent(Share(snapshot.AttackNoIntentContactCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Raw attack > 0", FormatPercent(Share(snapshot.RawAttackPositiveCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Raw attack near gate", FormatPercent(Share(snapshot.RawAttackNearGateCreatureCount, snapshot.CreatureCount)));

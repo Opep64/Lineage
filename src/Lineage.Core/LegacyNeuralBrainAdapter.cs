@@ -64,6 +64,9 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.CreatureSimilarityScentDensityInput] = frame.Scent.CreatureSimilarity.Density;
         inputs[NeuralBrainSchema.CreatureSimilarityScentForwardInput] = frame.Scent.CreatureSimilarity.DirectionForward;
         inputs[NeuralBrainSchema.CreatureSimilarityScentRightInput] = frame.Scent.CreatureSimilarity.DirectionRight;
+        inputs[NeuralBrainSchema.CreatureLineageScentDensityInput] = frame.Scent.CreatureLineage.Density;
+        inputs[NeuralBrainSchema.CreatureLineageScentForwardInput] = frame.Scent.CreatureLineage.DirectionForward;
+        inputs[NeuralBrainSchema.CreatureLineageScentRightInput] = frame.Scent.CreatureLineage.DirectionRight;
         inputs[NeuralBrainSchema.MemoryForwardInput] = memory.DirectionForward;
         inputs[NeuralBrainSchema.MemoryRightInput] = memory.DirectionRight;
         inputs[NeuralBrainSchema.MemoryStrengthInput] = memory.Strength;
@@ -83,6 +86,8 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.EggFoodContactInput] = frame.Body.EggFoodContact;
         inputs[NeuralBrainSchema.CreatureContactInput] = frame.Body.CreatureContact;
         inputs[NeuralBrainSchema.CreatureContactSimilarityInput] = frame.Body.CreatureContactSimilarity;
+        inputs[NeuralBrainSchema.CreatureContactLineageSimilarityInput] = frame.Body.CreatureContactLineageSimilarity;
+        inputs[NeuralBrainSchema.EggContactLineageSimilarityInput] = frame.Body.EggContactLineageSimilarity;
         inputs[NeuralBrainSchema.GrabPressureInput] = frame.Body.GrabPressure;
         inputs[NeuralBrainSchema.GrabDirectionForwardInput] = frame.Body.GrabDirectionForward;
         inputs[NeuralBrainSchema.GrabDirectionRightInput] = frame.Body.GrabDirectionRight;

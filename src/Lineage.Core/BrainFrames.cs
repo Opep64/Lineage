@@ -71,7 +71,12 @@ public readonly record struct BrainInputFrame(
                     senses.CreatureSimilarityScentDetected,
                     senses.CreatureSimilarityScentDensity,
                     senses.CreatureSimilarityScentDirectionForward,
-                    senses.CreatureSimilarityScentDirectionRight)),
+                    senses.CreatureSimilarityScentDirectionRight),
+                new DirectionalGradientSignal(
+                    senses.CreatureLineageScentDetected,
+                    senses.CreatureLineageScentDensity,
+                    senses.CreatureLineageScentDirectionForward,
+                    senses.CreatureLineageScentDirectionRight)),
             new CommunicationInputFrame(
                 new DirectionalToneSignal(
                     senses.SoundDetected,
@@ -110,6 +115,8 @@ public readonly record struct BrainInputFrame(
                 senses.EggFoodContact,
                 senses.CreatureContact,
                 senses.CreatureContactSimilarity,
+                senses.CreatureContactLineageSimilarity,
+                senses.EggContactLineageSimilarity,
                 senses.GrabPressure,
                 senses.GrabDirectionForward,
                 senses.GrabDirectionRight,
@@ -196,7 +203,8 @@ public readonly record struct VisionInputFrame(
 public readonly record struct ScentInputFrame(
     DirectionalGradientSignal Meat,
     DirectionalGradientSignal RottenMeat,
-    DirectionalGradientSignal CreatureSimilarity);
+    DirectionalGradientSignal CreatureSimilarity,
+    DirectionalGradientSignal CreatureLineage);
 
 /// <summary>
 /// Intentional signals emitted by creature actions.
@@ -237,6 +245,8 @@ public readonly record struct BodyInputFrame(
     float EggFoodContact,
     float CreatureContact,
     float CreatureContactSimilarity,
+    float CreatureContactLineageSimilarity,
+    float EggContactLineageSimilarity,
     float GrabPressure,
     float GrabDirectionForward,
     float GrabDirectionRight,

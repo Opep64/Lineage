@@ -78,9 +78,17 @@ public struct CreatureLineageRecord
 
     public float TelemetrySimilarCreatureContactSeconds { get; set; }
 
+    public float TelemetryLineageCreatureContactSeconds { get; set; }
+
+    public float TelemetryEggLineageContactSeconds { get; set; }
+
     public float TelemetryAttackIntentSeconds { get; set; }
 
     public float TelemetryAttackIntentTouchingSeconds { get; set; }
+
+    public float TelemetryAttackIntentLineageTouchingSeconds { get; set; }
+
+    public float TelemetryAttackIntentUnrelatedTouchingSeconds { get; set; }
 
     public float TelemetryAttackDamageDealingSeconds { get; set; }
 

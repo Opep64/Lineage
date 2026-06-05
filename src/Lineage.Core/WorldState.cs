@@ -495,6 +495,16 @@ public sealed class WorldState
             seconds,
             creature.IsTouchingCreature
                 && creature.Senses.CreatureContactSimilarity >= CreatureSimilarity.SimilarContactThreshold);
+        record.TelemetryLineageCreatureContactSeconds = AddTelemetrySeconds(
+            record.TelemetryLineageCreatureContactSeconds,
+            seconds,
+            creature.IsTouchingCreature
+                && creature.Senses.CreatureContactLineageSimilarity >= LineageFamiliarity.SameLineageThreshold);
+        record.TelemetryEggLineageContactSeconds = AddTelemetrySeconds(
+            record.TelemetryEggLineageContactSeconds,
+            seconds,
+            creature.Senses.EggFoodContact > 0f
+                && creature.Senses.EggContactLineageSimilarity >= LineageFamiliarity.SameLineageThreshold);
         record.TelemetryAttackIntentSeconds = AddTelemetrySeconds(
             record.TelemetryAttackIntentSeconds,
             seconds,
@@ -503,6 +513,18 @@ public sealed class WorldState
             record.TelemetryAttackIntentTouchingSeconds,
             seconds,
             creature.Actions.WantsAttack && creature.IsTouchingCreature);
+        record.TelemetryAttackIntentLineageTouchingSeconds = AddTelemetrySeconds(
+            record.TelemetryAttackIntentLineageTouchingSeconds,
+            seconds,
+            creature.Actions.WantsAttack
+                && creature.IsTouchingCreature
+                && creature.Senses.CreatureContactLineageSimilarity >= LineageFamiliarity.SameLineageThreshold);
+        record.TelemetryAttackIntentUnrelatedTouchingSeconds = AddTelemetrySeconds(
+            record.TelemetryAttackIntentUnrelatedTouchingSeconds,
+            seconds,
+            creature.Actions.WantsAttack
+                && creature.IsTouchingCreature
+                && creature.Senses.CreatureContactLineageSimilarity < LineageFamiliarity.SameLineageThreshold);
         record.TelemetryAttackDamageDealingSeconds = AddTelemetrySeconds(
             record.TelemetryAttackDamageDealingSeconds,
             seconds,

@@ -66,6 +66,7 @@ public sealed class StatsRecordingSystem(
         var totalMeatScentDensity = 0f;
         var totalRottenMeatScentDensity = 0f;
         var totalCreatureSimilarityScentDensity = 0f;
+        var totalCreatureLineageScentDensity = 0f;
         var totalVisibleCreatureDensity = 0f;
         var totalCaloriesEaten = 0f;
         var totalPlantCaloriesEaten = 0f;
@@ -176,15 +177,21 @@ public sealed class StatsRecordingSystem(
         var meatScentDetectedCreatureCount = 0;
         var rottenMeatScentDetectedCreatureCount = 0;
         var creatureSimilarityScentDetectedCreatureCount = 0;
+        var creatureLineageScentDetectedCreatureCount = 0;
         var foodContactCreatureCount = 0;
+        var eggContactCreatureCount = 0;
         var eatingCreatureCount = 0;
         var rottenMeatDamagedCreatureCount = 0;
         var attackingCreatureCount = 0;
         var creatureContactCreatureCount = 0;
         var similarCreatureContactCreatureCount = 0;
+        var lineageCreatureContactCreatureCount = 0;
+        var eggLineageContactCreatureCount = 0;
         var attackIntentCreatureCount = 0;
         var attackIntentWhileTouchingCreatureCount = 0;
         var attackIntentWhileTouchingSimilarCreatureCount = 0;
+        var attackIntentWhileTouchingLineageCreatureCount = 0;
+        var attackIntentWhileTouchingUnrelatedCreatureCount = 0;
         var attackNoIntentContactCreatureCount = 0;
         var healingCreatureCount = 0;
         var rawAttackPositiveCreatureCount = 0;
@@ -214,6 +221,8 @@ public sealed class StatsRecordingSystem(
         var totalAttackOutput = 0f;
         var totalTouchingAttackOutput = 0f;
         var totalCreatureContactSimilarity = 0f;
+        var totalCreatureContactLineageSimilarity = 0f;
+        var totalEggContactLineageSimilarity = 0f;
         var totalGrabOutput = 0f;
         var totalCanGrabGrabOutput = 0f;
         var totalGrabPressure = 0f;
@@ -264,6 +273,7 @@ public sealed class StatsRecordingSystem(
             totalMeatScentDensity += creature.Senses.MeatScentDensity;
             totalRottenMeatScentDensity += creature.Senses.RottenMeatScentDensity;
             totalCreatureSimilarityScentDensity += creature.Senses.CreatureSimilarityScentDensity;
+            totalCreatureLineageScentDensity += creature.Senses.CreatureLineageScentDensity;
             totalVisibleCreatureDensity += creature.Senses.VisibleCreatureDensity;
             totalCaloriesEaten += creature.LastCaloriesEaten;
             totalPlantCaloriesEaten += creature.LastPlantCaloriesEaten;
@@ -561,6 +571,11 @@ public sealed class StatsRecordingSystem(
                 creatureSimilarityScentDetectedCreatureCount++;
             }
 
+            if (creature.Senses.CreatureLineageScentDetected)
+            {
+                creatureLineageScentDetectedCreatureCount++;
+            }
+
             totalSoundAmplitude += creature.Actions.SoundAmplitude;
             totalSoundDensity += creature.Senses.SoundDensity;
             totalSoundToneClarity += creature.Senses.SoundToneClarity;
@@ -577,6 +592,16 @@ public sealed class StatsRecordingSystem(
             if (creature.IsTouchingFood)
             {
                 foodContactCreatureCount++;
+                if (creature.Senses.EggFoodContact > 0f)
+                {
+                    eggContactCreatureCount++;
+                    var eggLineageSimilarity = Math.Clamp(creature.Senses.EggContactLineageSimilarity, 0f, 1f);
+                    totalEggContactLineageSimilarity += eggLineageSimilarity;
+                    if (eggLineageSimilarity >= LineageFamiliarity.SameLineageThreshold)
+                    {
+                        eggLineageContactCreatureCount++;
+                    }
+                }
             }
 
             if (creature.LastCaloriesEaten > 0f)
@@ -638,9 +663,17 @@ public sealed class StatsRecordingSystem(
                 var contactSimilarity = Math.Clamp(creature.Senses.CreatureContactSimilarity, 0f, 1f);
                 totalCreatureContactSimilarity += contactSimilarity;
                 var isSimilarCreatureContact = contactSimilarity >= CreatureSimilarity.SimilarContactThreshold;
+                var contactLineageSimilarity = Math.Clamp(creature.Senses.CreatureContactLineageSimilarity, 0f, 1f);
+                totalCreatureContactLineageSimilarity += contactLineageSimilarity;
+                var isLineageCreatureContact = contactLineageSimilarity >= LineageFamiliarity.SameLineageThreshold;
                 if (isSimilarCreatureContact)
                 {
                     similarCreatureContactCreatureCount++;
+                }
+
+                if (isLineageCreatureContact)
+                {
+                    lineageCreatureContactCreatureCount++;
                 }
 
                 if (creature.Actions.WantsAttack)
@@ -649,6 +682,15 @@ public sealed class StatsRecordingSystem(
                     if (isSimilarCreatureContact)
                     {
                         attackIntentWhileTouchingSimilarCreatureCount++;
+                    }
+
+                    if (isLineageCreatureContact)
+                    {
+                        attackIntentWhileTouchingLineageCreatureCount++;
+                    }
+                    else
+                    {
+                        attackIntentWhileTouchingUnrelatedCreatureCount++;
                     }
                 }
                 else
@@ -1184,6 +1226,8 @@ public sealed class StatsRecordingSystem(
             totalVisibleCreatureDensity / divisor,
             creatureSimilarityScentDetectedCreatureCount,
             totalCreatureSimilarityScentDensity / divisor,
+            creatureLineageScentDetectedCreatureCount,
+            totalCreatureLineageScentDensity / divisor,
             caloriesEatenPerSecond,
             plantCaloriesEatenPerSecond,
             tenderPlantCaloriesEatenPerSecond,
@@ -1205,9 +1249,15 @@ public sealed class StatsRecordingSystem(
             creatureContactCreatureCount,
             similarCreatureContactCreatureCount,
             creatureContactCreatureCount > 0 ? totalCreatureContactSimilarity / creatureContactCreatureCount : 0f,
+            lineageCreatureContactCreatureCount,
+            creatureContactCreatureCount > 0 ? totalCreatureContactLineageSimilarity / creatureContactCreatureCount : 0f,
+            eggLineageContactCreatureCount,
+            eggContactCreatureCount > 0 ? totalEggContactLineageSimilarity / eggContactCreatureCount : 0f,
             attackIntentCreatureCount,
             attackIntentWhileTouchingCreatureCount,
             attackIntentWhileTouchingSimilarCreatureCount,
+            attackIntentWhileTouchingLineageCreatureCount,
+            attackIntentWhileTouchingUnrelatedCreatureCount,
             attackNoIntentContactCreatureCount,
             rawAttackPositiveCreatureCount,
             rawAttackNearGateCreatureCount,

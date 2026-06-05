@@ -97,6 +97,14 @@ public struct CreatureSenseState
 
     public float CreatureSimilarityScentDirectionRight { get; set; }
 
+    public bool CreatureLineageScentDetected { get; set; }
+
+    public float CreatureLineageScentDensity { get; set; }
+
+    public float CreatureLineageScentDirectionForward { get; set; }
+
+    public float CreatureLineageScentDirectionRight { get; set; }
+
     public bool SoundDetected { get; set; }
 
     public float SoundDensity { get; set; }
@@ -275,6 +283,16 @@ public struct CreatureSenseState
     /// Fuzzy trait similarity of the contacted creature when touch/contact is available.
     /// </summary>
     public float CreatureContactSimilarity { get; set; }
+
+    /// <summary>
+    /// Founder-lineage match of the contacted creature when touch/contact is available.
+    /// </summary>
+    public float CreatureContactLineageSimilarity { get; set; }
+
+    /// <summary>
+    /// Founder-lineage match of the contacted egg's parent when egg touch/contact is available.
+    /// </summary>
+    public float EggContactLineageSimilarity { get; set; }
 
     /// <summary>
     /// Strength of another creature's current hold on this creature, clamped to [0, 1].

@@ -57,11 +57,15 @@ public sealed class NeuralBrainGenome
     private const int LegacyInputCountWithoutHabitatQuality = 235;
     private const int LegacyInputCountWithoutPlantPayoffTrace = 224;
     private const int LegacyInputCountWithoutTypedPlantEnergyYield = 221;
-    private const int LegacyInputCountWithoutGrab = NeuralBrainSchema.RightHabitatQualityInput + 1;
-    private const int LegacyInputCountWithoutSound = NeuralBrainSchema.IsHoldingCreatureInput + 1;
-    private const int LegacyInputCountWithoutFat = NeuralBrainSchema.SoundToneClarityInput + 1;
-    private const int LegacyInputCountWithoutThermalSensing = NeuralBrainSchema.MassBurdenInput + 1;
-    private const int LegacyInputCountWithoutFullness = NeuralBrainSchema.RightThermalMismatchInput + 1;
+    private const int LegacyInputCountWithoutGrab = 223;
+    private const int LegacyInputCountWithoutSound = 228;
+    private const int LegacyInputCountWithoutFat = 233;
+    private const int LegacyInputCountWithoutThermalSensing = 235;
+    private const int LegacyInputCountWithoutFullness = 243;
+    private const int LegacyInputCountWithoutLineageFamiliarity = 245;
+    private const int LegacyLineageFamiliarityInsertionInput = 219;
+    private const int LegacyCreatureContactSimilarityInput = 218;
+    private const int LineageFamiliarityInsertedInputCount = 5;
     private const int LegacyOutputCountWithoutAttack = 4;
     private const int LegacyOutputCountWithoutMemory = 5;
     private const int LegacyOutputCountWithoutGrab = 7;
@@ -1307,6 +1311,21 @@ public sealed class NeuralBrainGenome
 
         if (TryInferLegacyWeightLayout(
             weights.Length,
+            LegacyInputCountWithoutLineageFamiliarity,
+            NeuralBrainSchema.OutputCount,
+            out hiddenNodeCount))
+        {
+            return (NormalizeLegacyWeights(
+                weights,
+                LegacyInputCountWithoutLineageFamiliarity,
+                NeuralBrainSchema.OutputCount,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
+                hiddenNodeCount), hiddenNodeCount);
+        }
+
+        if (TryInferLegacyWeightLayout(
+            weights.Length,
             LegacyInputCountWithoutFullness,
             NeuralBrainSchema.OutputCount,
             out hiddenNodeCount))
@@ -1315,8 +1334,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutFullness,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: LegacyNearestEggReserveInput,
-                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1330,8 +1349,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutThermalSensing,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: LegacyNearestEggReserveInput,
-                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1345,8 +1364,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutFat,
                 NeuralBrainSchema.OutputCount,
-                oldEggReserveInput: LegacyNearestEggReserveInput,
-                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1360,8 +1379,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutSound,
                 LegacyOutputCountWithoutSound,
-                oldEggReserveInput: LegacyNearestEggReserveInput,
-                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1375,8 +1394,8 @@ public sealed class NeuralBrainGenome
                 weights,
                 LegacyInputCountWithoutGrab,
                 LegacyOutputCountWithoutGrab,
-                oldEggReserveInput: LegacyNearestEggReserveInput,
-                oldReproductionReadinessInput: LegacyNearestReproductionReadinessInput,
+                oldEggReserveInput: -1,
+                oldReproductionReadinessInput: -1,
                 hiddenNodeCount), hiddenNodeCount);
         }
 
@@ -1831,11 +1850,31 @@ public sealed class NeuralBrainGenome
         }
 
         normalizedWeights = new float[GetExpectedWeightCount(hiddenNodeCount)];
+        var useCurrentLayout = inputSchemaVersion == NeuralBrainSchema.InputSchemaVersion
+            && inputCount == NeuralBrainSchema.InputCount;
         for (var output = 0; output < outputCount; output++)
         {
             var sourceOffset = output * inputCount;
             var targetOffset = output * NeuralBrainSchema.InputCount;
-            Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, inputCount);
+            if (useCurrentLayout)
+            {
+                Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, inputCount);
+                continue;
+            }
+
+            for (var input = 0; input < inputCount; input++)
+            {
+                var targetInput = MapLegacyInput(
+                    input,
+                    inputCount,
+                    outputCount,
+                    oldEggReserveInput: -1,
+                    oldReproductionReadinessInput: -1);
+                if (targetInput >= 0)
+                {
+                    normalizedWeights[targetOffset + targetInput] = weights[sourceOffset + input];
+                }
+            }
         }
 
         if (hiddenNodeCount <= 0)
@@ -1849,7 +1888,25 @@ public sealed class NeuralBrainGenome
         {
             var sourceOffset = sourceHiddenInputOffset + hidden * inputCount;
             var targetOffset = targetHiddenInputOffset + hidden * NeuralBrainSchema.InputCount;
-            Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, inputCount);
+            if (useCurrentLayout)
+            {
+                Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, inputCount);
+                continue;
+            }
+
+            for (var input = 0; input < inputCount; input++)
+            {
+                var targetInput = MapLegacyInput(
+                    input,
+                    inputCount,
+                    outputCount,
+                    oldEggReserveInput: -1,
+                    oldReproductionReadinessInput: -1);
+                if (targetInput >= 0)
+                {
+                    normalizedWeights[targetOffset + targetInput] = weights[sourceOffset + input];
+                }
+            }
         }
 
         var sourceHiddenOutputOffset = sourceHiddenInputOffset + hiddenNodeCount * inputCount;
@@ -1981,14 +2038,15 @@ public sealed class NeuralBrainGenome
             return NeuralBrainSchema.ReproductionReadinessInput;
         }
 
-        if (legacyInputCount == LegacyInputCountWithoutFullness
+        if (legacyInputCount == LegacyInputCountWithoutLineageFamiliarity
+            || legacyInputCount == LegacyInputCountWithoutFullness
             || legacyInputCount == LegacyInputCountWithoutFat
             || (legacyInputCount == LegacyInputCountWithoutThermalSensing
                 && legacyOutputCount == NeuralBrainSchema.OutputCount)
             || legacyInputCount == LegacyInputCountWithoutSound
             || legacyInputCount == LegacyInputCountWithoutGrab)
         {
-            return input;
+            return MapInputAcrossLineageFamiliarityInsertion(input);
         }
 
         if (legacyInputCount >= LegacyInputCountWithoutTypedPlantEnergyYield)
@@ -2007,7 +2065,7 @@ public sealed class NeuralBrainGenome
 
             if (input >= foodContactInput)
             {
-                return NeuralBrainSchema.FoodContactInput + input - foodContactInput;
+                return MapTrailingFoodContactInputAcrossLineageFamiliarityInsertion(input - foodContactInput);
             }
         }
 
@@ -2030,7 +2088,7 @@ public sealed class NeuralBrainGenome
                     return NeuralBrainSchema.HealthRatioInput;
                 }
 
-                return NeuralBrainSchema.FoodContactInput + trailingOffset;
+                return MapTrailingFoodContactInputAcrossLineageFamiliarityInsertion(trailingOffset);
             }
         }
 
@@ -2112,6 +2170,21 @@ public sealed class NeuralBrainGenome
         }
 
         return MapLegacyPrefixInput(input);
+    }
+
+    private static int MapInputAcrossLineageFamiliarityInsertion(int input)
+    {
+        return input >= LegacyLineageFamiliarityInsertionInput
+            ? input + LineageFamiliarityInsertedInputCount
+            : input;
+    }
+
+    private static int MapTrailingFoodContactInputAcrossLineageFamiliarityInsertion(int trailingOffset)
+    {
+        var targetInput = NeuralBrainSchema.FoodContactInput + trailingOffset;
+        return targetInput > LegacyCreatureContactSimilarityInput
+            ? targetInput + LineageFamiliarityInsertedInputCount
+            : targetInput;
     }
 
     private static int MapLegacyPrefixInput(int input)
