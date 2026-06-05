@@ -6263,6 +6263,7 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     AssertEqual("little freshness differentiation", summary.RottenMeatResponse, "Seed forager should not arrive with built-in rot response");
     AssertEqual("little injury-memory differentiation", summary.InjuryMemoryResponse, "Seed forager should not arrive with built-in injury memory response");
     AssertEqual("little maturity differentiation", summary.MaturityResponse, "Seed forager should not arrive with built-in maturity response");
+    AssertEqual("little familiar-egg differentiation", summary.EggFamiliarityResponse, "Seed forager should not arrive with built-in familiar egg response");
     AssertClose(
         summary.Baseline.MoveForward,
         summary.LineageCreatureScentAhead.MoveForward,
@@ -6542,6 +6543,10 @@ static void BehaviorAssayReportsLineageFamiliarityProbes()
     AssertTrue(
         summary.IdentityEggContact.EatShare < summary.UnrelatedEggContact.EatShare,
         "Identity egg contact should expose familiar egg eating suppression");
+    AssertEqual(
+        "familiar egg eating restraint",
+        summary.EggFamiliarityResponse,
+        "Egg familiarity response classifier");
 }
 
 static void BehaviorAssayDetectsFreshMeatPreference()

@@ -285,6 +285,7 @@ public static class BehaviorAssay
             CollisionResponse = ClassifyCollisionResponse(summary),
             InjuryMemoryResponse = ClassifyInjuryMemoryResponse(summary),
             MaturityResponse = ClassifyMaturityResponse(summary),
+            EggFamiliarityResponse = ClassifyEggFamiliarityResponse(summary),
             ReproductionTendency = ClassifyReproductionTendency(summary),
             FreshMeatPreferenceScore = CalculateFreshMeatPreferenceScore(summary),
             RottenScentAvoidanceScore = CalculateRottenScentAvoidanceScore(summary),
@@ -1538,6 +1539,52 @@ public static class BehaviorAssay
         return "little maturity differentiation";
     }
 
+    private static string ClassifyEggFamiliarityResponse(BehaviorAssaySummary summary)
+    {
+        var unrelatedEat = summary.UnrelatedEggContact.EatShare;
+        var lineageEatDelta = summary.LineageEggContact.EatShare - unrelatedEat;
+        var identityEatDelta = summary.IdentityEggContact.EatShare - unrelatedEat;
+        var familiarEatDelta = MathF.Min(lineageEatDelta, identityEatDelta);
+        var familiarPreferentialEatDelta = MathF.Max(lineageEatDelta, identityEatDelta);
+        var familiarAheadMove = MathF.Max(summary.LineageEggScentAhead.MoveForward, summary.IdentityEggScentAhead.MoveForward);
+        var familiarRightTurn = MathF.Max(summary.LineageEggScentRight.Turn, summary.IdentityEggScentRight.Turn);
+        var strongestAvoidanceMove = MathF.Min(summary.LineageEggScentAhead.MoveForward, summary.IdentityEggScentAhead.MoveForward);
+        var strongestAvoidanceTurn = MathF.Min(summary.LineageEggScentRight.Turn, summary.IdentityEggScentRight.Turn);
+        var baselineMove = summary.Baseline.MoveForward;
+        var baselineTurn = summary.Baseline.Turn;
+
+        if (familiarEatDelta < -0.25f)
+        {
+            return "familiar egg eating restraint";
+        }
+
+        if (familiarPreferentialEatDelta > 0.25f)
+        {
+            return "familiar egg eating preference";
+        }
+
+        if (familiarAheadMove > baselineMove + 0.15f || familiarRightTurn > baselineTurn + 0.15f)
+        {
+            return "follows familiar egg scent";
+        }
+
+        if (strongestAvoidanceMove < baselineMove - 0.15f || strongestAvoidanceTurn < baselineTurn - 0.15f)
+        {
+            return "avoids familiar egg scent";
+        }
+
+        var familiarMoveDiffers = MathF.Abs(summary.LineageEggScentAhead.MoveForward - baselineMove) > 0.15f
+            || MathF.Abs(summary.IdentityEggScentAhead.MoveForward - baselineMove) > 0.15f;
+        var familiarTurnDiffers = MathF.Abs(summary.LineageEggScentRight.Turn - baselineTurn) > 0.15f
+            || MathF.Abs(summary.IdentityEggScentRight.Turn - baselineTurn) > 0.15f;
+        var familiarContactDiffers = MathF.Abs(lineageEatDelta) > 0.15f
+            || MathF.Abs(identityEatDelta) > 0.15f;
+
+        return familiarMoveDiffers || familiarTurnDiffers || familiarContactDiffers
+            ? "familiar egg behavior differs"
+            : "little familiar-egg differentiation";
+    }
+
     private static string ClassifyEcotype(BehaviorAssaySummary summary)
     {
         if (summary.EvaluatedCreatureCount == 0)
@@ -1845,6 +1892,8 @@ public readonly record struct BehaviorAssaySummary(
     public string InjuryMemoryResponse { get; init; } = "not evaluated";
 
     public string MaturityResponse { get; init; } = "not evaluated";
+
+    public string EggFamiliarityResponse { get; init; } = "not evaluated";
 
     public string ReproductionTendency { get; init; } = "not evaluated";
 

@@ -3112,6 +3112,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Collision response", summary.CollisionResponse);
         WriteMetric(writer, "Injury memory response", summary.InjuryMemoryResponse);
         WriteMetric(writer, "Maturity response", summary.MaturityResponse);
+        WriteMetric(writer, "Egg familiarity response", summary.EggFamiliarityResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
         WriteMetric(writer, "Fresh meat preference", summary.FreshMeatPreferenceScore.ToString("0.###", CultureInfo.InvariantCulture));
@@ -3252,7 +3253,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Collision</th><th>Attack</th><th>Movement</th><th>Search</th><th>Egg Laying</th><th>Plant Move</th><th>Meat Move</th><th>Rot Scent Move</th><th>Body Block Move</th><th>Body Block Attack</th><th>Small Attack</th><th>Large Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Rank</th><th>Name</th><th>Living</th><th>Evaluated</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Egg Familiarity</th><th>Risk</th><th>Terrain</th><th>Collision</th><th>Attack</th><th>Movement</th><th>Search</th><th>Egg Laying</th><th>Plant Move</th><th>Meat Move</th><th>Rot Scent Move</th><th>Body Block Move</th><th>Body Block Attack</th><th>Small Attack</th><th>Large Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var fingerprint in fingerprints)
         {
@@ -3265,6 +3266,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(fingerprint.Ecotype)}</td>" +
                 $"<td>{Html(fingerprint.ForagingBias)}</td>" +
                 $"<td>{Html(fingerprint.RottenMeatResponse)}</td>" +
+                $"<td>{Html(fingerprint.EggFamiliarityResponse)}</td>" +
                 $"<td>{Html(fingerprint.RiskResponse)}</td>" +
                 $"<td>{Html(fingerprint.TerrainResponse)}</td>" +
                 $"<td>{Html(fingerprint.CollisionResponse)}</td>" +
@@ -3562,7 +3564,7 @@ public static class ViewerReportWriter
         }
 
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Risk</th><th>Terrain</th><th>Collision</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Body Block Move</th><th>Body Block Attack</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Living</th><th>Share</th><th>Ecotype</th><th>Food</th><th>Rotten Meat</th><th>Egg Familiarity</th><th>Risk</th><th>Terrain</th><th>Collision</th><th>Attack</th><th>Movement</th><th>Egg Laying</th><th>Body Block Move</th><th>Body Block Attack</th><th>Small Attack</th><th>Large Approach Attack</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in summaries)
         {
@@ -3575,6 +3577,7 @@ public static class ViewerReportWriter
                 $"<td>{Html(behavior.Ecotype)}</td>" +
                 $"<td>{Html(behavior.ForagingBias)}</td>" +
                 $"<td>{Html(behavior.RottenMeatResponse)}</td>" +
+                $"<td>{Html(behavior.EggFamiliarityResponse)}</td>" +
                 $"<td>{Html(behavior.RiskResponse)}</td>" +
                 $"<td>{Html(behavior.TerrainResponse)}</td>" +
                 $"<td>{Html(behavior.CollisionResponse)}</td>" +
