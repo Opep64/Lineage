@@ -239,6 +239,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain profile JSON round trips neural controllers", BrainProfileJsonRoundTripsNeuralControllers),
     ("Brain profile JSON round trips rtNEAT graph controllers", BrainProfileJsonRoundTripsRtNeatGraphControllers),
     ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
+    ("Starter catalog hybrid brains reproduce when ready", StarterCatalogHybridBrainsReproduceWhenReady),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
     ("Species profile default injection energy fits newborn capacity", SpeciesProfileDefaultInjectionEnergyFitsNewbornCapacity),
@@ -11292,6 +11293,41 @@ static void BrainProfileCompatibilityReportsSchemaStatus()
     AssertTrue(
         futureSchema.Status.Contains("newer than supported", StringComparison.OrdinalIgnoreCase),
         "Future brain schema warning should explain the version mismatch");
+}
+
+static void StarterCatalogHybridBrainsReproduceWhenReady()
+{
+    AssertCatalogBrainReproducesWhenReady("brains/starter/starter-forager-hybrid.brain.json");
+    AssertCatalogBrainReproducesWhenReady("brains/starter/starter-predator-hybrid.brain.json");
+}
+
+static void AssertCatalogBrainReproducesWhenReady(string path)
+{
+    var profile = BrainProfileJson.Load(path);
+    var brain = profile.CreateBrain();
+    Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
+    Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
+    var senses = new CreatureSenseState
+    {
+        EnergyRatio = 1f,
+        HealthRatio = 1f,
+        EggReserveRatio = 1f,
+        EnergySurplusRatio = 0.55f,
+        EnergyFullnessRatio = 0.7f,
+        ReproductionReadiness = 1f,
+        RecentFoodSuccess = 0f,
+        VisibleCreatureDensity = 0.01f
+    };
+
+    var result = brain.Evaluate(
+        BrainInputFrame.FromSenses(senses, CreatureGenome.Baseline),
+        default,
+        inputs,
+        outputs);
+
+    AssertTrue(
+        result.Actions.Reproduce > 0.25f,
+        $"{path} should emit reproduce intent for a ready, surplus-energy creature; output was {result.Actions.Reproduce:0.###}");
 }
 
 static void SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains()

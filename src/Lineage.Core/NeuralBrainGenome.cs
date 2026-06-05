@@ -66,6 +66,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyOutputCountWithoutMemory = 5;
     private const int LegacyOutputCountWithoutGrab = 7;
     private const int LegacyOutputCountWithoutSound = 8;
+    private const int StableProfileInputSchemaVersion = 5;
 
     public NeuralBrainGenome(IEnumerable<float> weights)
     {
@@ -162,6 +163,30 @@ public sealed class NeuralBrainGenome
     public static NeuralBrainGenome CreateZero(int hiddenNodeCount = 0)
     {
         return new NeuralBrainGenome(new float[GetExpectedWeightCount(hiddenNodeCount)], hiddenNodeCount, trusted: true);
+    }
+
+    public static NeuralBrainGenome FromProfileWeights(
+        IEnumerable<float> weights,
+        int inputSchemaVersion,
+        int outputSchemaVersion,
+        int inputCount,
+        int outputCount,
+        int hiddenNodeCount)
+    {
+        var source = weights.ToArray();
+        if (TryNormalizeStableProfileWeights(
+            source,
+            inputSchemaVersion,
+            outputSchemaVersion,
+            inputCount,
+            outputCount,
+            hiddenNodeCount,
+            out var normalizedWeights))
+        {
+            return new NeuralBrainGenome(normalizedWeights, hiddenNodeCount, trusted: false);
+        }
+
+        return new NeuralBrainGenome(source);
     }
 
     public static NeuralBrainGenome CreateHybridDeep8x8Zero()
@@ -1775,6 +1800,67 @@ public sealed class NeuralBrainGenome
 
         hiddenNodeCount = hiddenWeightCount / weightsPerHiddenNode;
         ValidateHiddenNodeCount(hiddenNodeCount);
+        return true;
+    }
+
+    private static bool TryNormalizeStableProfileWeights(
+        float[] weights,
+        int inputSchemaVersion,
+        int outputSchemaVersion,
+        int inputCount,
+        int outputCount,
+        int hiddenNodeCount,
+        out float[] normalizedWeights)
+    {
+        normalizedWeights = Array.Empty<float>();
+        if (inputSchemaVersion < StableProfileInputSchemaVersion
+            || outputSchemaVersion != NeuralBrainSchema.OutputSchemaVersion
+            || outputCount != NeuralBrainSchema.OutputCount
+            || inputCount <= 0
+            || inputCount > NeuralBrainSchema.InputCount)
+        {
+            return false;
+        }
+
+        ValidateHiddenNodeCount(hiddenNodeCount);
+        var expectedWeightCount = inputCount * outputCount
+            + hiddenNodeCount * (inputCount + outputCount);
+        if (weights.Length != expectedWeightCount)
+        {
+            return false;
+        }
+
+        normalizedWeights = new float[GetExpectedWeightCount(hiddenNodeCount)];
+        for (var output = 0; output < outputCount; output++)
+        {
+            var sourceOffset = output * inputCount;
+            var targetOffset = output * NeuralBrainSchema.InputCount;
+            Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, inputCount);
+        }
+
+        if (hiddenNodeCount <= 0)
+        {
+            return true;
+        }
+
+        var sourceHiddenInputOffset = inputCount * outputCount;
+        var targetHiddenInputOffset = DirectWeightCount;
+        for (var hidden = 0; hidden < hiddenNodeCount; hidden++)
+        {
+            var sourceOffset = sourceHiddenInputOffset + hidden * inputCount;
+            var targetOffset = targetHiddenInputOffset + hidden * NeuralBrainSchema.InputCount;
+            Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, inputCount);
+        }
+
+        var sourceHiddenOutputOffset = sourceHiddenInputOffset + hiddenNodeCount * inputCount;
+        var targetHiddenOutputOffset = DirectWeightCount + hiddenNodeCount * NeuralBrainSchema.InputCount;
+        for (var output = 0; output < outputCount; output++)
+        {
+            var sourceOffset = sourceHiddenOutputOffset + output * hiddenNodeCount;
+            var targetOffset = targetHiddenOutputOffset + output * hiddenNodeCount;
+            Array.Copy(weights, sourceOffset, normalizedWeights, targetOffset, hiddenNodeCount);
+        }
+
         return true;
     }
 

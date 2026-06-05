@@ -40,7 +40,15 @@ public sealed record BrainProfile
         _ = BrainFactory.Describe(BrainArchitectureKind);
         return BrainArchitectureKind == BrainArchitectureKind.RtNeatGraph
             ? BrainGenome.FromRtNeat(RtNeatBrain ?? throw new InvalidOperationException("rtNEAT brain profile must include graph payload."))
-            : BrainGenome.FromNeural(BrainArchitectureKind, new NeuralBrainGenome(Weights));
+            : BrainGenome.FromNeural(
+                BrainArchitectureKind,
+                NeuralBrainGenome.FromProfileWeights(
+                    Weights,
+                    InputSchemaVersion,
+                    OutputSchemaVersion,
+                    InputCount,
+                    OutputCount,
+                    HiddenNodeCount));
     }
 
     public BrainProfile Validated()
@@ -95,7 +103,13 @@ public sealed record BrainProfile
 
         // NeuralBrainGenome normalizes older dense layouts into the current input/output schema,
         // leaving newly added senses or outputs neutral when possible.
-        var brain = new NeuralBrainGenome(Weights);
+        var brain = NeuralBrainGenome.FromProfileWeights(
+            Weights,
+            InputSchemaVersion,
+            OutputSchemaVersion,
+            InputCount,
+            OutputCount,
+            HiddenNodeCount);
         _ = BrainGenome.FromNeural(BrainArchitectureKind, brain);
         return this with
         {

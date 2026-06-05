@@ -1,7 +1,7 @@
 {
   "schemaVersion": "lineage.runner.scenario-recipe.v1",
   "name": "Migration Pressure",
-  "description": "Large-world migration pressure with edge ladder bands, left-side founders, slow seasonal cycles, and top-vs-bottom opposed seasons.",
+  "description": "Large-world migration pressure with edge ladder bands, left-side founders, slow seasonal cycles, opposed seasons, and enough plant support to keep migration lineages viable.",
   "tags": [
     "ecology",
     "migration",
@@ -18,13 +18,13 @@
     "initialCreatureSpawnRegion": "leftThird",
     "initialMaxSpeed": 28,
     "initialSenseRadius": 135,
-    "initialResourcesPerMillionArea": 16,
-    "initialCreatureEnergyMin": 70,
-    "initialCreatureEnergyMax": 72,
-    "resourceRegrowthMin": 0.22,
-    "resourceRegrowthMax": 1.15,
-    "plantRespawnDelaySecondsMin": 110,
-    "plantRespawnDelaySecondsMax": 360,
+    "initialResourcesPerMillionArea": 20,
+    "initialCreatureEnergyMin": 74,
+    "initialCreatureEnergyMax": 78,
+    "resourceRegrowthMin": 0.28,
+    "resourceRegrowthMax": 1.25,
+    "plantRespawnDelaySecondsMin": 90,
+    "plantRespawnDelaySecondsMax": 300,
     "seasonLengthSeconds": 1800,
     "seasonFertilityAmplitude": 0.65,
     "seasonPhaseMode": "verticalOpposed",
@@ -53,5 +53,5 @@
     "reproductiveSenescenceAgeSeconds": 1500
   },
   "createdAtUtc": "2026-06-02T00:00:00Z",
-  "updatedAtUtc": "2026-06-02T00:00:00Z"
+  "updatedAtUtc": "2026-06-05T00:00:00Z"
 }

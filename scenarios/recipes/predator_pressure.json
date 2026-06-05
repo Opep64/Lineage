@@ -1,7 +1,7 @@
 {
   "schemaVersion": "lineage.runner.scenario-recipe.v1",
   "name": "Predator Pressure",
-  "description": "Predator-dominant mixed-roster pressure with stronger bites, richer carcasses, and a high enough plant floor to keep the overall ecology viable.",
+  "description": "Mixed predator-prey pressure with stronger bites, richer carcasses, and a stronger plant floor so prey persist long enough for sustained predation.",
   "tags": [
     "ecology",
     "meat",
@@ -17,19 +17,20 @@
     "initialCreatureCount": 0,
     "initialMaxSpeed": 29,
     "initialSenseRadius": 135,
-    "initialResourcesPerMillionArea": 34,
+    "initialResourcesPerMillionArea": 38,
     "resourceCaloriesMin": 45,
     "resourceCaloriesMax": 110,
     "resourceMaxCalories": 110,
-    "resourceRegrowthMin": 0.35,
-    "resourceRegrowthMax": 1.5,
-    "plantRespawnDelaySecondsMin": 50,
-    "plantRespawnDelaySecondsMax": 180,
+    "resourceRegrowthMin": 0.45,
+    "resourceRegrowthMax": 1.7,
+    "plantRespawnDelaySecondsMin": 45,
+    "plantRespawnDelaySecondsMax": 160,
     "resourceClusterStrength": 0.45,
     "resourceClusterRadius": 600,
     "plantLocalDispersalChance": 0.35,
     "plantLocalDispersalRadius": 640,
     "localFertilityMinimumMultiplier": 0.6,
+    "localFertilityDepletionPerPlant": 0.09,
     "barrenBiomeMovementCostMultiplier": 1.3,
     "sparseBiomeMovementCostMultiplier": 1.12,
     "richBiomeMovementCostMultiplier": 0.92,
@@ -79,7 +80,7 @@
       {
         "label": "Starter Predator",
         "profilePath": "species/starter-predator.species.json",
-        "count": 12,
+        "count": 8,
         "spawnRegion": "uniform",
         "energyOverride": 79,
         "brainProfilePath": "brains/starter/starter-predator-hybrid.brain.json",
@@ -88,5 +89,5 @@
     ]
   },
   "createdAtUtc": "2026-06-02T00:00:00Z",
-  "updatedAtUtc": "2026-06-02T00:00:00Z"
+  "updatedAtUtc": "2026-06-05T00:00:00Z"
 }
