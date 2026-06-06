@@ -451,7 +451,7 @@ public sealed class StatsRecordingSystem(
             totalBiomeMovementCostMultiplier += _biomeMovementCostProfile.For(biome);
             totalBiomeBasalCostMultiplier += _biomeBasalCostProfile.For(biome);
             totalBiomeSpeedMultiplier += _biomeSpeedProfile.For(biome);
-            var creatureTemperature = state.Temperature.GetTemperatureAt(creature.Position);
+            var creatureTemperature = state.GetTemperatureAt(creature.Position);
             var thermalMismatch = CreatureThermal.ThermalMismatch(creatureTemperature, genome);
             var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
             var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
@@ -898,7 +898,7 @@ public sealed class StatsRecordingSystem(
             {
                 plantResourceCount++;
                 totalPlantCalories += resource.Calories;
-                var plantTemperature = state.Temperature.GetTemperatureAt(resource.Position);
+                var plantTemperature = state.GetTemperatureAt(resource.Position);
                 totalPlantTemperature += plantTemperature;
                 AddTemperatureBandValue(
                     plantTemperature,
@@ -1074,7 +1074,7 @@ public sealed class StatsRecordingSystem(
 
             liveSmallPreyCount++;
             totalSmallPreyCalories += prey.Calories;
-            totalSmallPreyTemperature += state.Temperature.GetTemperatureAt(prey.Position);
+            totalSmallPreyTemperature += state.GetTemperatureAt(prey.Position);
         }
         var meatDigestedEnergyShare = totalCaloriesDigested > 0f
             ? totalMeatDigestedEnergy / totalCaloriesDigested
@@ -1196,8 +1196,8 @@ public sealed class StatsRecordingSystem(
             _seasonFertilityAmplitude,
             _seasonPhaseOffsetSeconds);
         var localFertilitySummary = state.LocalFertility.Summarize();
-        var temperatureSummary = state.Temperature.Summarize();
-        var temperatureEventBands = CalculateTemperatureEventBands(state.Stats.SpatialHeatmaps, state.Temperature);
+        var temperatureSummary = state.SummarizeEffectiveTemperature();
+        var temperatureEventBands = CalculateTemperatureEventBands(state.LineageRecords);
         var leftRegionSeason = CalculateRegionSeason(state, 1f / 6f);
         var middleRegionSeason = CalculateRegionSeason(state, 0.5f);
         var rightRegionSeason = CalculateRegionSeason(state, 5f / 6f);
@@ -1678,47 +1678,28 @@ public sealed class StatsRecordingSystem(
     }
 
     private static TemperatureEventBands CalculateTemperatureEventBands(
-        SimulationSpatialHeatmaps heatmaps,
-        TemperatureMap temperature)
+        IReadOnlyList<CreatureLineageRecord> lineageRecords)
     {
-        if (heatmaps.CellCountX <= 0
-            || heatmaps.CellCountY <= 0
-            || heatmaps.WorldWidth <= 0f
-            || heatmaps.WorldHeight <= 0f)
-        {
-            return default;
-        }
-
-        var expectedLength = heatmaps.CellCountX * heatmaps.CellCountY;
-        if (heatmaps.Births.Count < expectedLength || heatmaps.Deaths.Count < expectedLength)
-        {
-            return default;
-        }
-
         var coldBirths = 0f;
         var temperateBirths = 0f;
         var hotBirths = 0f;
         var coldDeaths = 0f;
         var temperateDeaths = 0f;
         var hotDeaths = 0f;
-        for (var y = 0; y < heatmaps.CellCountY; y++)
+        for (var i = 0; i < lineageRecords.Count; i++)
         {
-            for (var x = 0; x < heatmaps.CellCountX; x++)
+            var record = lineageRecords[i];
+            AddTemperatureBandValue(
+                record.BirthTemperature,
+                1f,
+                ref coldBirths,
+                ref temperateBirths,
+                ref hotBirths);
+            if (record.DeathTick is not null)
             {
-                var index = y * heatmaps.CellCountX + x;
-                var position = new SimVector2(
-                    (x + 0.5f) / heatmaps.CellCountX * heatmaps.WorldWidth,
-                    (y + 0.5f) / heatmaps.CellCountY * heatmaps.WorldHeight);
-                var bandTemperature = temperature.GetTemperatureAt(position);
                 AddTemperatureBandValue(
-                    bandTemperature,
-                    heatmaps.Births[index],
-                    ref coldBirths,
-                    ref temperateBirths,
-                    ref hotBirths);
-                AddTemperatureBandValue(
-                    bandTemperature,
-                    heatmaps.Deaths[index],
+                    record.DeathTemperature,
+                    1f,
                     ref coldDeaths,
                     ref temperateDeaths,
                     ref hotDeaths);

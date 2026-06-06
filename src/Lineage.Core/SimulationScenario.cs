@@ -183,6 +183,8 @@ public sealed record SimulationScenario
 
     public float HighlandBiomeSeasonalAmplitudeMultiplier { get; init; } = 0.8f;
 
+    public EcologicalEventDefinition[] EcologicalEvents { get; init; } = [];
+
     public float BarrenBiomeMovementCostMultiplier { get; init; } = 1.4f;
 
     public float SparseBiomeMovementCostMultiplier { get; init; } = 1.12f;
@@ -550,6 +552,15 @@ public sealed record SimulationScenario
         _ = BiomePressureProfile.Validate(CreateBiomeVisionRangeProfile(), "BiomeVisionRangeProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeBasalCostProfile(), "BiomeBasalCostProfile");
         _ = BiomePressureProfile.Validate(CreateBiomeSeasonalAmplitudeProfile(), "BiomeSeasonalAmplitudeProfile");
+        var ecologicalEvents = (EcologicalEvents ?? []).Select(ecologicalEvent =>
+        {
+            if (ecologicalEvent is null)
+            {
+                throw new InvalidOperationException("Ecological event entries cannot be null.");
+            }
+
+            return ecologicalEvent.Validated();
+        }).ToArray();
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
         EnsureRange(MetabolicPace, CreatureMetabolism.MinimumPace, CreatureMetabolism.MaximumPace, nameof(MetabolicPace));
         EnsureNonNegative(ThermalMismatchBasalCostMultiplier, nameof(ThermalMismatchBasalCostMultiplier));
@@ -682,7 +693,8 @@ public sealed record SimulationScenario
             ManualObstacleMapPath = normalizedWorldMapPath is not null || string.IsNullOrWhiteSpace(ManualObstacleMapPath)
                 ? null
                 : ManualObstacleMapPath.Trim(),
-            SpeciesSeeds = speciesSeeds
+            SpeciesSeeds = speciesSeeds,
+            EcologicalEvents = ecologicalEvents
         };
     }
 

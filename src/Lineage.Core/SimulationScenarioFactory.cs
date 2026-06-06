@@ -26,6 +26,7 @@ public static class SimulationScenarioFactory
         simulation.State.SetTemperature(CreateTemperatureMap(scenario, biomeMap));
         simulation.State.SetObstacles(CreateObstacleMap(scenario, scenarioDirectory));
         simulation.State.SetLocalFertility(CreateLocalFertilityMap(scenario));
+        simulation.State.SetEcologicalEvents(scenario.EcologicalEvents);
         SeedWorld(simulation, scenario);
         return simulation;
     }

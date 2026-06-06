@@ -156,7 +156,7 @@ public static class ResourcePlacement
             return false;
         }
 
-        var localFertility = state.LocalFertility.GetMultiplierAt(position);
+        var localFertility = state.GetEffectiveLocalFertilityMultiplierAt(position);
         return localFertility >= 0.999f || state.Random.NextSingle() <= localFertility;
     }
 

@@ -249,6 +249,7 @@ public static class SimulationScenarioMetadata
             "HealingMinimumEnergy" => "Passive healing stops at or below this energy reserve.",
             "EnableTemperature" => "Builds a cached temperature map for climate visualization, telemetry, thermal sensing, and optional thermal stress costs.",
             "ThermalMismatchBasalCostMultiplier" => "Extra basal upkeep applied at full thermal mismatch. Zero keeps temperature sensory and observational only.",
+            "EcologicalEvents" => "Optional scheduled regional shocks. Fertility pulse/crash events multiply plant fertility; heat waves and cold snaps temporarily shift effective temperature.",
             "ThermalOptimum" => "Starting creature thermal optimum on the normalized 0 cold, 0.5 temperate, 1 hot scale.",
             "ThermalTolerance" => "Starting creature thermal tolerance. Larger values make temperature mismatch cues ramp up more slowly.",
             "EnableCreatureCollision" => "Prevents living creatures from passing through one another and records creature body collisions.",
@@ -371,6 +372,7 @@ public static class SimulationScenarioMetadata
             || name.Contains("Obstacle", StringComparison.Ordinal)
             || name.Contains("Tree", StringComparison.Ordinal)
             || name.Contains("Terrain", StringComparison.Ordinal)
+            || name.Contains("Ecological", StringComparison.Ordinal)
             || name.Contains("Temperature", StringComparison.Ordinal)
             || name.Contains("Spatial", StringComparison.Ordinal)
             || name is "FixedDeltaSeconds")

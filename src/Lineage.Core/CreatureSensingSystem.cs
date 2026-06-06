@@ -1190,10 +1190,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         SimVector2 leftPosition,
         SimVector2 rightPosition)
     {
-        senses.CurrentTemperature = state.Temperature.GetTemperatureAt(currentPosition);
-        senses.ForwardTemperature = state.Temperature.GetTemperatureAt(forwardPosition);
-        senses.LeftTemperature = state.Temperature.GetTemperatureAt(leftPosition);
-        senses.RightTemperature = state.Temperature.GetTemperatureAt(rightPosition);
+        senses.CurrentTemperature = state.GetTemperatureAt(currentPosition);
+        senses.ForwardTemperature = state.GetTemperatureAt(forwardPosition);
+        senses.LeftTemperature = state.GetTemperatureAt(leftPosition);
+        senses.RightTemperature = state.GetTemperatureAt(rightPosition);
         senses.CurrentThermalMismatch = CreatureThermal.ThermalMismatch(senses.CurrentTemperature, genome);
         senses.ForwardThermalMismatch = CreatureThermal.ThermalMismatch(senses.ForwardTemperature, genome);
         senses.LeftThermalMismatch = CreatureThermal.ThermalMismatch(senses.LeftTemperature, genome);
@@ -1209,7 +1209,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             ? state.Biomes.GetResourceRegrowthMultiplierAt(position) / MaximumHabitatRegrowthMultiplier
             : 0f;
         var longTermQuality = densityQuality * 0.65f + regrowthQuality * 0.35f;
-        return Math.Clamp(longTermQuality * state.LocalFertility.GetMultiplierAt(position), 0f, 1f);
+        return Math.Clamp(longTermQuality * state.GetEffectiveLocalFertilityMultiplierAt(position), 0f, 1f);
     }
 
     private static void ApplyObstacleSense(

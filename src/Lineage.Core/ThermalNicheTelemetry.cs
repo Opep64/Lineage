@@ -105,7 +105,7 @@ public static class ThermalNicheTelemetry
         {
             count++;
             var genome = state.GetGenome(creature.GenomeId);
-            var temperature = state.Temperature.GetTemperatureAt(creature.Position);
+            var temperature = state.GetTemperatureAt(creature.Position);
             var mismatch = CreatureThermal.ThermalMismatch(temperature, genome);
             var optimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
 

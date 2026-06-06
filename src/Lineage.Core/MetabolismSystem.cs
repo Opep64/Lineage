@@ -86,7 +86,7 @@ public sealed class MetabolismSystem(
                 + BrainTopologyUpkeep(state, creature.BrainId);
             var biomeBasalCostMultiplier = _biomeBasalCostProfile.For(state.Biomes.GetKindAt(creature.Position));
             var thermalMismatch = _thermalMismatchBasalCostMultiplier > 0f
-                ? CreatureThermal.ThermalMismatch(state.Temperature.GetTemperatureAt(creature.Position), genome)
+                ? CreatureThermal.ThermalMismatch(state.GetTemperatureAt(creature.Position), genome)
                 : 0f;
             var thermalBasalCostMultiplier = 1f + thermalMismatch * _thermalMismatchBasalCostMultiplier;
             creature.Energy -= (

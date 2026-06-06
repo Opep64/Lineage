@@ -1277,7 +1277,7 @@ public partial class Main : Node2D
         var worldArea = MathF.Max(1f, state.Bounds.Width * state.Bounds.Height);
         var resourceDensity = activeResourceCount / worldArea * 1_000_000f;
         var centerBiome = state.Biomes.GetKindAt(_viewCenter);
-        var centerTemperature = state.Temperature.GetTemperatureAt(_viewCenter);
+        var centerTemperature = state.GetTemperatureAt(_viewCenter);
         var season = SeasonalFertility.CalculateAt(
             _scenario.EnableSeasons,
             state.ElapsedSeconds,
@@ -1301,6 +1301,7 @@ public partial class Main : Node2D
         var seasonText = _scenario.EnableSeasons
             ? $"Season {season.Phase * 100f:0}%  Here {season.FertilityMultiplier:0.00}x  Biome {biomeSeason:0.00}x\n"
             : string.Empty;
+        var activeEventText = FormatActiveEcologicalEvents(state);
         var centerVoidText = state.Biomes.IsInResourceVoid(_viewCenter) ? " void" : string.Empty;
         var grabStats = CalculateLiveGrabStats(state.Creatures);
 
@@ -1321,7 +1322,8 @@ public partial class Main : Node2D
             $"Energy full {FormatPercent(snapshot.AverageEnergyFullnessRatio)}  Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
             $"Visual {FormatVisualRenderMode()}\n" +
-            (seasonText.Length > 0 ? seasonText.TrimEnd() : "Season off");
+            (seasonText.Length > 0 ? seasonText.TrimEnd() : "Season off") + "\n" +
+            $"Events {activeEventText}";
 
         _runtimeStatsLabel.Text =
             $"Lineage\n" +
@@ -1334,6 +1336,7 @@ public partial class Main : Node2D
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}  Prey {snapshot.SmallPreyCount}\n" +
             $"Resources/M {resourceDensity:0.00}\n" +
             seasonText +
+            $"Events {activeEventText}\n" +
             $"Births {state.Stats.CreatureBirthCount}  Eggs laid {state.Stats.EggLaidCount}\n" +
             $"Repro attempts {state.Stats.ReproductionAttemptCount}  success {FormatPercent(Share(state.Stats.EggLaidCount, state.Stats.ReproductionAttemptCount))}\n" +
             $"Hatched {state.Stats.EggHatchedCount}  Egg deaths {state.Stats.EggDeathCount}  Pred {state.Stats.EggPredationDeathCount}\n" +
@@ -1768,7 +1771,7 @@ public partial class Main : Node2D
         var memoryOutput = MathF.Max(
             MathF.Abs(creature.Actions.MemoryForward),
             MathF.Abs(creature.Actions.MemoryRight));
-        var currentTemperature = _simulation.State.Temperature.GetTemperatureAt(creature.Position);
+        var currentTemperature = _simulation.State.GetTemperatureAt(creature.Position);
         var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
         var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
         var thermalMismatch = CreatureThermal.ThermalMismatch(currentTemperature, genome);
@@ -1870,7 +1873,7 @@ public partial class Main : Node2D
         var basalCostMultiplier = _scenario.CreateBiomeBasalCostProfile().For(biome);
         var speedMultiplier = _scenario.CreateBiomeSpeedProfile().For(biome);
         var visionMultiplier = _scenario.CreateBiomeVisionRangeProfile().For(biome);
-        var currentTemperature = _simulation.State.Temperature.GetTemperatureAt(creature.Position);
+        var currentTemperature = _simulation.State.GetTemperatureAt(creature.Position);
         var thermalMismatch = CreatureThermal.ThermalMismatch(currentTemperature, genome);
         var thermalBasalCostMultiplier = 1f + thermalMismatch * _scenario.ThermalMismatchBasalCostMultiplier;
         var fatCapacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
@@ -1940,7 +1943,7 @@ public partial class Main : Node2D
         var fatRatio = CreatureGrowth.FatStorageRatio(creature, genome);
         var fatBurden = CreatureGrowth.FatMassBurdenRatio(creature, genome);
         var fatSpeedMultiplier = CreatureGrowth.FatSpeedMultiplier(creature, genome);
-        var currentTemperature = _simulation.State.Temperature.GetTemperatureAt(creature.Position);
+        var currentTemperature = _simulation.State.GetTemperatureAt(creature.Position);
         var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
         var thermalTolerance = CreatureThermal.NormalizeTolerance(genome.ThermalTolerance);
         var thermalMismatch = CreatureThermal.ThermalMismatch(currentTemperature, genome);
@@ -6059,6 +6062,36 @@ public partial class Main : Node2D
         }
 
         return _spriteThemes[Math.Clamp(_spriteThemeIndex, 0, _spriteThemes.Count - 1)].Name;
+    }
+
+    private static string FormatActiveEcologicalEvents(WorldState state)
+    {
+        if (state.EcologicalEvents.Count == 0)
+        {
+            return "none";
+        }
+
+        var activeEvents = state.EcologicalEvents
+            .Where(ecologicalEvent => ecologicalEvent.IsActive(state.ElapsedSeconds))
+            .OrderBy(ecologicalEvent => ecologicalEvent.EndSeconds)
+            .Take(3)
+            .Select(ecologicalEvent => $"{ecologicalEvent.Name} {Math.Max(0d, ecologicalEvent.EndSeconds - state.ElapsedSeconds):0}s")
+            .ToArray();
+        if (activeEvents.Length == 0)
+        {
+            var nextEvent = state.EcologicalEvents
+                .Where(ecologicalEvent => state.ElapsedSeconds < ecologicalEvent.StartSeconds)
+                .OrderBy(ecologicalEvent => ecologicalEvent.StartSeconds)
+                .FirstOrDefault();
+            return nextEvent is null
+                ? "done"
+                : $"next {nextEvent.Name} in {Math.Max(0d, nextEvent.StartSeconds - state.ElapsedSeconds):0}s";
+        }
+
+        var extra = state.EcologicalEvents.Count(ecologicalEvent => ecologicalEvent.IsActive(state.ElapsedSeconds)) - activeEvents.Length;
+        return extra > 0
+            ? $"{string.Join(", ", activeEvents)} +{extra}"
+            : string.Join(", ", activeEvents);
     }
 
     private static string FormatResourceRenderMode(ResourceRenderMode mode)

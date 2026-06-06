@@ -14,6 +14,7 @@ public sealed class WorldState
     private int _nextEntityId = 1;
     private readonly List<CreatureLineageRecord> _lineageRecords = [];
     private readonly Dictionary<EntityId, int> _lineageRecordByEntityId = [];
+    private EcologicalEventDefinition[] _ecologicalEvents = [];
 
     internal WorldState(WorldBounds bounds, ulong seed)
     {
@@ -40,6 +41,8 @@ public sealed class WorldState
     public LocalFertilityMap LocalFertility { get; internal set; }
 
     public TemperatureMap Temperature { get; internal set; }
+
+    public IReadOnlyList<EcologicalEventDefinition> EcologicalEvents => _ecologicalEvents;
 
     public SimulationStats Stats { get; } = new();
 
@@ -221,6 +224,93 @@ public sealed class WorldState
         Temperature = temperature;
     }
 
+    public void SetEcologicalEvents(IEnumerable<EcologicalEventDefinition>? ecologicalEvents)
+    {
+        _ecologicalEvents = (ecologicalEvents ?? [])
+            .Select(ecologicalEvent =>
+            {
+                if (ecologicalEvent is null)
+                {
+                    throw new InvalidOperationException("Ecological event entries cannot be null.");
+                }
+
+                return ecologicalEvent.Validated();
+            })
+            .ToArray();
+    }
+
+    public float GetTemperatureAt(SimVector2 position)
+    {
+        var temperature = Temperature.GetTemperatureAt(position);
+        for (var i = 0; i < _ecologicalEvents.Length; i++)
+        {
+            temperature += _ecologicalEvents[i].TemperatureDeltaAt(ElapsedSeconds, Bounds, position);
+        }
+
+        return Math.Clamp(temperature, 0f, 1f);
+    }
+
+    public TemperatureMapSummary SummarizeEffectiveTemperature()
+    {
+        var hasActiveTemperatureEvent = false;
+        for (var i = 0; i < _ecologicalEvents.Length; i++)
+        {
+            if (_ecologicalEvents[i].AffectsTemperature && _ecologicalEvents[i].IsActive(ElapsedSeconds))
+            {
+                hasActiveTemperatureEvent = true;
+                break;
+            }
+        }
+
+        if (!hasActiveTemperatureEvent)
+        {
+            return Temperature.Summarize();
+        }
+
+        var total = 0f;
+        var minimum = 1f;
+        var maximum = 0f;
+        var count = Temperature.CellCountX * Temperature.CellCountY;
+        if (count <= 0)
+        {
+            return Temperature.Summarize();
+        }
+
+        for (var y = 0; y < Temperature.CellCountY; y++)
+        {
+            for (var x = 0; x < Temperature.CellCountX; x++)
+            {
+                var cell = Temperature.GetCellBounds(x, y);
+                var position = new SimVector2(cell.X + cell.Width * 0.5f, cell.Y + cell.Height * 0.5f);
+                var temperature = GetTemperatureAt(position);
+                total += temperature;
+                minimum = Math.Min(minimum, temperature);
+                maximum = Math.Max(maximum, temperature);
+            }
+        }
+
+        return new TemperatureMapSummary(count, total / count, minimum, maximum);
+    }
+
+    public float GetEcologicalFertilityMultiplierAt(SimVector2 position)
+    {
+        var multiplier = 1f;
+        for (var i = 0; i < _ecologicalEvents.Length; i++)
+        {
+            multiplier *= _ecologicalEvents[i].FertilityMultiplierAt(ElapsedSeconds, Bounds, position);
+        }
+
+        return Math.Clamp(multiplier, 0f, 10f);
+    }
+
+    public float GetEffectiveLocalFertilityMultiplierAt(SimVector2 position)
+    {
+        return Math.Clamp(
+            LocalFertility.GetMultiplierAt(position) * GetEcologicalFertilityMultiplierAt(position),
+            0f,
+            10f);
+    }
+
     public EntityId SpawnCreature(
         int genomeId,
         SimVector2 position,
@@ -281,7 +371,7 @@ public sealed class WorldState
             BirthTick = Tick,
             BirthElapsedSeconds = ElapsedSeconds,
             BirthPosition = clampedPosition,
-            BirthTemperature = Temperature.GetTemperatureAt(clampedPosition),
+            BirthTemperature = GetTemperatureAt(clampedPosition),
             Generation = generation,
             GenomeId = genomeId,
             BrainId = brainId,
@@ -392,7 +482,7 @@ public sealed class WorldState
         record.DeathTick = Tick;
         record.DeathElapsedSeconds = ElapsedSeconds;
         record.DeathPosition = Bounds.Clamp(deathPosition);
-        record.DeathTemperature = Temperature.GetTemperatureAt(record.DeathPosition.Value);
+        record.DeathTemperature = GetTemperatureAt(record.DeathPosition.Value);
         record.DeathReason = reason;
         record.DeathAttackerId = attackerId;
         record.MaxXReached = Math.Max(record.MaxXReached, maxXReached);
@@ -443,7 +533,7 @@ public sealed class WorldState
         record.TelemetryLivingSeconds = AddTelemetry(record.TelemetryLivingSeconds, seconds);
         if (seconds > 0f && TryGetGenome(creature.GenomeId, out var genome))
         {
-            var temperature = Temperature.GetTemperatureAt(creature.Position);
+            var temperature = GetTemperatureAt(creature.Position);
             var thermalMismatch = CreatureThermal.ThermalMismatch(temperature, genome);
             var thermalOptimum = CreatureThermal.NormalizeOptimum(genome.ThermalOptimum);
             record.TelemetryTemperatureExposure = AddTelemetry(record.TelemetryTemperatureExposure, temperature * seconds);

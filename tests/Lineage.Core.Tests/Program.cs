@@ -259,6 +259,8 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
     ("Scenario factory honors reproduction intent toggle", ScenarioFactoryHonorsReproductionIntentToggle),
+    ("Ecological fertility events scale plant regrowth", EcologicalFertilityEventsScalePlantRegrowth),
+    ("Ecological temperature events shift effective temperature", EcologicalTemperatureEventsShiftEffectiveTemperature),
     ("Brain profile JSON round trips neural controllers", BrainProfileJsonRoundTripsNeuralControllers),
     ("Brain profile JSON round trips rtNEAT graph controllers", BrainProfileJsonRoundTripsRtNeatGraphControllers),
     ("rtNEAT catalog starter brains migrate semantic IO", RtNeatCatalogStarterBrainsMigrateSemanticIo),
@@ -1491,6 +1493,96 @@ static void LocalFertilitySlowsPlantDormancy()
 
     simulation.Step();
     AssertClose(4f, simulation.State.Resources[0].Calories, 0.000001, "Plant eventually respawns once slowed countdown completes");
+}
+
+static void EcologicalFertilityEventsScalePlantRegrowth()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 812,
+        systems: [new ResourceRegrowthSystem()]);
+    simulation.State.SetEcologicalEvents(
+    [
+        new EcologicalEventDefinition
+        {
+            Name = "left pulse",
+            Kind = EcologicalEventKind.RegionalFertilityPulse,
+            StartSeconds = 0f,
+            DurationSeconds = 10f,
+            RegionX = 0f,
+            RegionY = 0f,
+            RegionWidth = 0.5f,
+            RegionHeight = 1f,
+            Strength = 2f
+        }
+    ]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(25f, 50f),
+        Radius = 2f,
+        Calories = 1f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 1f
+    });
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(75f, 50f),
+        Radius = 2f,
+        Calories = 1f,
+        MaxCalories = 10f,
+        RegrowthCaloriesPerSecond = 1f
+    });
+
+    simulation.Step();
+
+    AssertClose(3f, simulation.State.Resources[0].Calories, 0.000001, "Pulse-region plant regrowth");
+    AssertClose(2f, simulation.State.Resources[1].Calories, 0.000001, "Outside-region plant regrowth");
+}
+
+static void EcologicalTemperatureEventsShiftEffectiveTemperature()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 813);
+    simulation.State.SetTemperature(TemperatureMap.CreateFromCells(
+        simulation.State.Bounds,
+        enabled: true,
+        cellSize: 100f,
+        cellCountX: 1,
+        cellCountY: 1,
+        temperatures: [0.5f]));
+    simulation.State.SetEcologicalEvents(
+    [
+        new EcologicalEventDefinition
+        {
+            Name = "brief heat",
+            Kind = EcologicalEventKind.HeatWave,
+            StartSeconds = 0f,
+            DurationSeconds = 10f,
+            Strength = 0.2f
+        }
+    ]);
+
+    AssertClose(0.7f, simulation.State.GetTemperatureAt(new SimVector2(50f, 50f)), 0.000001, "Active heat wave temperature");
+    AssertClose(0.7f, simulation.State.SummarizeEffectiveTemperature().AverageTemperature, 0.000001, "Active heat wave summary");
+
+    simulation.Step(11f);
+
+    AssertClose(0.5f, simulation.State.GetTemperatureAt(new SimVector2(50f, 50f)), 0.000001, "Expired heat wave temperature");
+    AssertClose(0.5f, simulation.State.SummarizeEffectiveTemperature().AverageTemperature, 0.000001, "Expired heat wave summary");
 }
 
 static void DepletedResourcesCanRelocateBeforeRegrowing()
@@ -14530,6 +14622,31 @@ static void ScenarioJsonRoundTrips()
         RichBiomeSeasonalAmplitudeMultiplier = 1.4f,
         ForestBiomeSeasonalAmplitudeMultiplier = 1.05f,
         WetlandBiomeSeasonalAmplitudeMultiplier = 1.15f,
+        EcologicalEvents =
+        [
+            new EcologicalEventDefinition
+            {
+                Name = "spring flush",
+                Kind = EcologicalEventKind.RegionalFertilityPulse,
+                StartSeconds = 90f,
+                DurationSeconds = 45f,
+                RegionX = 0.1f,
+                RegionY = 0.2f,
+                RegionWidth = 0.35f,
+                RegionHeight = 0.4f,
+                Strength = 2.25f
+            },
+            new EcologicalEventDefinition
+            {
+                Name = "southern heat wave",
+                Kind = EcologicalEventKind.HeatWave,
+                StartSeconds = 180f,
+                DurationSeconds = 60f,
+                RegionY = 0.55f,
+                RegionHeight = 0.45f,
+                Strength = 0.18f
+            }
+        ],
         ResourceClusterStrength = 0.33f,
         ResourceClusterRadius = 123f,
         BarrenBiomeMovementCostMultiplier = 1.4f,
@@ -14671,6 +14788,9 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"seasonFertilityAmplitude\""), "JSON should serialize season fertility");
     AssertTrue(json.Contains("\"seasonPhaseMode\": \"horizontalOpposed\""), "JSON should serialize season phase mode");
     AssertTrue(json.Contains("\"barrenBiomeSeasonalAmplitudeMultiplier\""), "JSON should serialize biome seasonal response");
+    AssertTrue(json.Contains("\"ecologicalEvents\""), "JSON should serialize ecological events");
+    AssertTrue(json.Contains("\"kind\": \"regionalFertilityPulse\""), "JSON should serialize fertility event kind");
+    AssertTrue(json.Contains("\"kind\": \"heatWave\""), "JSON should serialize temperature event kind");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
@@ -14756,6 +14876,19 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.RichBiomeSeasonalAmplitudeMultiplier, roundTripped.RichBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario rich biome seasonal response");
     AssertClose(scenario.ForestBiomeSeasonalAmplitudeMultiplier, roundTripped.ForestBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario forest biome seasonal response");
     AssertClose(scenario.WetlandBiomeSeasonalAmplitudeMultiplier, roundTripped.WetlandBiomeSeasonalAmplitudeMultiplier, 0.000001, "Scenario wetland biome seasonal response");
+    AssertEqual(2, roundTripped.EcologicalEvents.Length, "Scenario ecological event count");
+    AssertEqual("spring flush", roundTripped.EcologicalEvents[0].Name, "Scenario ecological event name");
+    AssertEqual(EcologicalEventKind.RegionalFertilityPulse, roundTripped.EcologicalEvents[0].Kind, "Scenario ecological fertility event kind");
+    AssertClose(90f, roundTripped.EcologicalEvents[0].StartSeconds, 0.000001, "Scenario ecological fertility event start");
+    AssertClose(45f, roundTripped.EcologicalEvents[0].DurationSeconds, 0.000001, "Scenario ecological fertility event duration");
+    AssertClose(0.1f, roundTripped.EcologicalEvents[0].RegionX, 0.000001, "Scenario ecological fertility event region x");
+    AssertClose(0.2f, roundTripped.EcologicalEvents[0].RegionY, 0.000001, "Scenario ecological fertility event region y");
+    AssertClose(0.35f, roundTripped.EcologicalEvents[0].RegionWidth, 0.000001, "Scenario ecological fertility event region width");
+    AssertClose(0.4f, roundTripped.EcologicalEvents[0].RegionHeight, 0.000001, "Scenario ecological fertility event region height");
+    AssertClose(2.25f, roundTripped.EcologicalEvents[0].Strength, 0.000001, "Scenario ecological fertility event strength");
+    AssertEqual("southern heat wave", roundTripped.EcologicalEvents[1].Name, "Scenario ecological temperature event name");
+    AssertEqual(EcologicalEventKind.HeatWave, roundTripped.EcologicalEvents[1].Kind, "Scenario ecological temperature event kind");
+    AssertClose(0.18f, roundTripped.EcologicalEvents[1].Strength, 0.000001, "Scenario ecological temperature event strength");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");

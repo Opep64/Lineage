@@ -273,7 +273,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             position,
             biome,
             _biomeSeasonalAmplitudeProfile);
-        return seasonalMultiplier * state.LocalFertility.GetMultiplierAt(position);
+        return seasonalMultiplier * state.GetEffectiveLocalFertilityMultiplierAt(position);
     }
 
     private bool HasPlantRespawnDelay => _plantRespawnDelaySecondsMax > 0f;

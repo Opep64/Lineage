@@ -62,6 +62,7 @@ public static class SimulationSnapshotJson
             SimulationScenarioFactory.CreatePipeline(scenario));
 
         RestoreState(simulation.State, snapshot);
+        simulation.State.SetEcologicalEvents(scenario.EcologicalEvents);
         return new RestoredSimulation(scenario, simulation);
     }
 

@@ -642,6 +642,66 @@ button.scenario-tab.is-active {
   resize: vertical;
 }
 
+.ecological-event-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.ecological-event-toolbar,
+.ecological-event-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ecological-event-toolbar span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ecological-event-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.ecological-event-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(150px, 0.8fr) repeat(7, minmax(92px, 0.55fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.ecological-event-row-header,
+.ecological-event-summary {
+  grid-column: 1 / -1;
+}
+
+.ecological-event-row-header strong {
+  font-size: 14px;
+}
+
+.ecological-event-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ecological-event-row input,
+.ecological-event-row select {
+  min-width: 0;
+}
+
+.ecological-event-summary {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .scenario-options-empty {
   grid-column: 1 / -1;
   padding: 16px;

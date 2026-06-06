@@ -131,6 +131,13 @@ const speciesSeedCountInput = document.querySelector("#speciesSeedCount");
 const speciesSeedRegionSelect = document.querySelector("#speciesSeedRegion");
 const speciesSeedEnergyInput = document.querySelector("#speciesSeedEnergy");
 
+const ecologicalEventKinds = [
+  ["regionalFertilityPulse", "Fertility pulse"],
+  ["regionalFertilityCrash", "Fertility crash"],
+  ["heatWave", "Heat wave"],
+  ["coldSnap", "Cold snap"]
+];
+
 let refreshTimer = null;
 let allRuns = [];
 let scenarioOptions = [];
@@ -7133,7 +7140,7 @@ function resetScenarioOptionFilters() {
 }
 
 function createScenarioField(field) {
-  const wrapper = document.createElement("label");
+  const wrapper = document.createElement(field.jsonName === "ecologicalEvents" ? "div" : "label");
   wrapper.className = [
     "scenario-field",
     `scenario-field-${field.type}`,
@@ -7168,7 +7175,9 @@ function createScenarioControl(field) {
   const value = scenarioEditor.scenario?.[field.jsonName];
   let control;
 
-  if (field.type === "boolean") {
+  if (field.jsonName === "ecologicalEvents") {
+    control = createEcologicalEventsControl(field, value);
+  } else if (field.type === "boolean") {
     control = document.createElement("input");
     control.type = "checkbox";
     control.checked = Boolean(value);
@@ -7204,10 +7213,272 @@ function createScenarioControl(field) {
     control.value = value ?? "";
   }
 
-  control.className = "scenario-control";
+  control.classList.add("scenario-control");
   control.dataset.jsonName = field.jsonName;
   control.dataset.type = field.type;
   return control;
+}
+
+function createEcologicalEventsControl(field, value) {
+  const events = Array.isArray(value) ? value : [];
+  const control = document.createElement("div");
+  control.className = "ecological-event-editor";
+  control.dataset.ecologicalEventEditor = "true";
+  control.innerHTML = `
+    <div class="ecological-event-toolbar">
+      <span>${events.length === 0 ? "No events scheduled" : `${formatNumber(events.length)} scheduled`}</span>
+      <button class="secondary" type="button" data-ecological-event-action="add">Add Event</button>
+    </div>
+    ${events.length === 0 ? "" : `
+      <div class="ecological-event-rows">
+        ${events.map((ecologicalEvent, index) => renderEcologicalEventRow(ecologicalEvent, index)).join("")}
+      </div>
+    `}
+  `;
+  return control;
+}
+
+function renderEcologicalEventRow(ecologicalEvent, index) {
+  const event = normalizeEcologicalEvent(ecologicalEvent);
+  return `
+    <div class="ecological-event-row" data-index="${index}">
+      <div class="ecological-event-row-header">
+        <strong>${escapeHtml(event.name || ecologicalEventKindLabel(event.kind))}</strong>
+        <div class="ecological-event-row-actions">
+          <button class="secondary" type="button" data-ecological-event-action="duplicate" data-index="${index}">Duplicate</button>
+          <button class="danger" type="button" data-ecological-event-action="remove" data-index="${index}">Remove</button>
+        </div>
+      </div>
+      <label>
+        Name
+        <input type="text" value="${escapeHtml(event.name)}" data-ecological-event-field="name" data-index="${index}">
+      </label>
+      <label>
+        Kind
+        <select data-ecological-event-field="kind" data-index="${index}">
+          ${ecologicalEventKinds.map(([value, label]) =>
+            `<option value="${escapeHtml(value)}"${value === event.kind ? " selected" : ""}>${escapeHtml(label)}</option>`
+          ).join("")}
+        </select>
+      </label>
+      <label>
+        Start (seconds)
+        <input type="number" min="0" step="1" value="${escapeHtml(formatScenarioControlNumber(event.startSeconds))}" data-ecological-event-field="startSeconds" data-index="${index}">
+      </label>
+      <label>
+        Duration (seconds)
+        <input type="number" min="0.001" step="1" value="${escapeHtml(formatScenarioControlNumber(event.durationSeconds))}" data-ecological-event-field="durationSeconds" data-index="${index}">
+      </label>
+      <label>
+        Strength
+        <input type="number" min="0" step="0.01" value="${escapeHtml(formatScenarioControlNumber(event.strength))}" data-ecological-event-field="strength" data-index="${index}">
+      </label>
+      <label>
+        X
+        <input type="number" min="0" max="1" step="0.01" value="${escapeHtml(formatScenarioControlNumber(event.regionX))}" data-ecological-event-field="regionX" data-index="${index}">
+      </label>
+      <label>
+        Y
+        <input type="number" min="0" max="1" step="0.01" value="${escapeHtml(formatScenarioControlNumber(event.regionY))}" data-ecological-event-field="regionY" data-index="${index}">
+      </label>
+      <label>
+        Width
+        <input type="number" min="0.0001" max="1" step="0.01" value="${escapeHtml(formatScenarioControlNumber(event.regionWidth))}" data-ecological-event-field="regionWidth" data-index="${index}">
+      </label>
+      <label>
+        Height
+        <input type="number" min="0.0001" max="1" step="0.01" value="${escapeHtml(formatScenarioControlNumber(event.regionHeight))}" data-ecological-event-field="regionHeight" data-index="${index}">
+      </label>
+      <div class="ecological-event-summary">${escapeHtml(formatEcologicalEventSummary(event))}</div>
+    </div>
+  `;
+}
+
+function defaultEcologicalEvent(kind = "regionalFertilityPulse") {
+  return {
+    name: ecologicalEventKindLabel(kind),
+    kind,
+    startSeconds: 0,
+    durationSeconds: 300,
+    regionX: 0,
+    regionY: 0,
+    regionWidth: 1,
+    regionHeight: 1,
+    strength: defaultEcologicalEventStrength(kind)
+  };
+}
+
+function normalizeEcologicalEvent(event) {
+  const kind = ecologicalEventKinds.some(([value]) => value === event?.kind)
+    ? event.kind
+    : "regionalFertilityPulse";
+  return {
+    name: String(event?.name ?? "").trim(),
+    kind,
+    startSeconds: finiteNumberOrDefault(event?.startSeconds, 0),
+    durationSeconds: finiteNumberOrDefault(event?.durationSeconds, 300),
+    regionX: finiteNumberOrDefault(event?.regionX, 0),
+    regionY: finiteNumberOrDefault(event?.regionY, 0),
+    regionWidth: finiteNumberOrDefault(event?.regionWidth, 1),
+    regionHeight: finiteNumberOrDefault(event?.regionHeight, 1),
+    strength: finiteNumberOrDefault(event?.strength, defaultEcologicalEventStrength(kind))
+  };
+}
+
+function finiteNumberOrDefault(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function formatScenarioControlNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? String(number) : "";
+}
+
+function ecologicalEventKindLabel(kind) {
+  return ecologicalEventKinds.find(([value]) => value === kind)?.[1] || "Ecological event";
+}
+
+function defaultEcologicalEventStrength(kind) {
+  if (kind === "regionalFertilityPulse") {
+    return 2;
+  }
+
+  if (kind === "regionalFertilityCrash") {
+    return 0.35;
+  }
+
+  return 0.2;
+}
+
+function formatEcologicalEventSummary(event) {
+  const start = Number(event.startSeconds);
+  const end = start + Number(event.durationSeconds);
+  const strength = event.kind === "regionalFertilityPulse" || event.kind === "regionalFertilityCrash"
+    ? `${formatDecimal(event.strength)}x fertility`
+    : `${event.kind === "coldSnap" ? "-" : "+"}${formatDecimal(event.strength * 100)} temperature index`;
+  return `${ecologicalEventKindLabel(event.kind)} from ${formatDecimal(start)}s to ${formatDecimal(end)}s, ${strength}, region ${formatPercent(event.regionX)}-${formatPercent(event.regionX + event.regionWidth)} x ${formatPercent(event.regionY)}-${formatPercent(event.regionY + event.regionHeight)}`;
+}
+
+function updateEcologicalEvents(action, index) {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  const events = Array.isArray(scenarioEditor.scenario.ecologicalEvents)
+    ? cloneJson(scenarioEditor.scenario.ecologicalEvents).map(normalizeEcologicalEvent)
+    : [];
+  if (action === "add") {
+    const last = events.at(-1);
+    const next = defaultEcologicalEvent();
+    if (last) {
+      next.startSeconds = Number(last.startSeconds || 0) + Number(last.durationSeconds || 0);
+    }
+
+    events.push(next);
+    formMessage.textContent = "Added ecological event.";
+  } else if (action === "duplicate" && index >= 0 && index < events.length) {
+    const copy = cloneJson(events[index]);
+    copy.name = `${copy.name || ecologicalEventKindLabel(copy.kind)} copy`;
+    copy.startSeconds = Number(copy.startSeconds || 0) + Number(copy.durationSeconds || 0);
+    events.splice(index + 1, 0, copy);
+    formMessage.textContent = "Duplicated ecological event.";
+  } else if (action === "remove" && index >= 0 && index < events.length) {
+    const [removed] = events.splice(index, 1);
+    formMessage.textContent = `Removed ${removed.name || ecologicalEventKindLabel(removed.kind)}.`;
+  }
+
+  scenarioEditor.scenario.ecologicalEvents = events;
+  renderScenarioEditor();
+  updateScenarioManagementButtons();
+}
+
+function resetEcologicalEventStrengthOnKindChange(target) {
+  const kindControl = target?.closest?.("[data-ecological-event-field='kind']");
+  if (!kindControl) {
+    return;
+  }
+
+  const row = kindControl.closest(".ecological-event-row");
+  const strengthControl = row?.querySelector("[data-ecological-event-field='strength']");
+  if (strengthControl) {
+    strengthControl.value = String(defaultEcologicalEventStrength(kindControl.value));
+  }
+}
+
+function readEcologicalEventsControlValue(control) {
+  const rows = [...control.querySelectorAll(".ecological-event-row")];
+  return rows.map((row, rowIndex) => {
+    const event = {};
+    for (const fieldControl of row.querySelectorAll("[data-ecological-event-field]")) {
+      const field = fieldControl.dataset.ecologicalEventField;
+      if (field === "name" || field === "kind") {
+        event[field] = String(fieldControl.value ?? "").trim();
+      } else {
+        const raw = String(fieldControl.value ?? "").trim();
+        if (raw === "") {
+          throw new Error(`Ecological event ${rowIndex + 1} ${field} needs a numeric value.`);
+        }
+
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+          throw new Error(`Ecological event ${rowIndex + 1} ${field} needs a numeric value.`);
+        }
+
+        event[field] = parsed;
+      }
+    }
+
+    return validateEcologicalEventForEditor(event, rowIndex);
+  });
+}
+
+function validateEcologicalEventForEditor(event, rowIndex) {
+  const indexLabel = `Ecological event ${rowIndex + 1}`;
+  if (!ecologicalEventKinds.some(([value]) => value === event.kind)) {
+    throw new Error(`${indexLabel} needs an event kind.`);
+  }
+
+  requireNumberRange(event.startSeconds, 0, Number.POSITIVE_INFINITY, `${indexLabel} start`);
+  requireNumberRange(event.durationSeconds, 0.001, Number.POSITIVE_INFINITY, `${indexLabel} duration`);
+  requireNumberRange(event.regionX, 0, 1, `${indexLabel} X`);
+  requireNumberRange(event.regionY, 0, 1, `${indexLabel} Y`);
+  requireNumberRange(event.regionWidth, 0.0001, 1, `${indexLabel} width`);
+  requireNumberRange(event.regionHeight, 0.0001, 1, `${indexLabel} height`);
+  if (event.regionX + event.regionWidth > 1.000001) {
+    throw new Error(`${indexLabel} X plus width must not exceed 1.`);
+  }
+
+  if (event.regionY + event.regionHeight > 1.000001) {
+    throw new Error(`${indexLabel} Y plus height must not exceed 1.`);
+  }
+
+  const fertilityEvent = event.kind === "regionalFertilityPulse" || event.kind === "regionalFertilityCrash";
+  requireNumberRange(event.strength, 0, fertilityEvent && event.kind === "regionalFertilityPulse" ? 10 : 1, `${indexLabel} strength`);
+  return {
+    name: event.name,
+    kind: event.kind,
+    startSeconds: event.startSeconds,
+    durationSeconds: event.durationSeconds,
+    regionX: event.regionX,
+    regionY: event.regionY,
+    regionWidth: event.regionWidth,
+    regionHeight: event.regionHeight,
+    strength: event.strength
+  };
+}
+
+function requireNumberRange(value, minimum, maximum, label) {
+  if (!Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new Error(`${label} must be between ${formatDecimal(minimum)} and ${maximum === Number.POSITIVE_INFINITY ? "infinity" : formatDecimal(maximum)}.`);
+  }
 }
 
 function collectScenarioOptions() {
@@ -7437,6 +7708,10 @@ function canonicalizeJson(value) {
 }
 
 function readScenarioControlValue(control, field) {
+  if (field.jsonName === "ecologicalEvents") {
+    return readEcologicalEventsControlValue(control);
+  }
+
   if (field.type === "boolean") {
     return control.checked;
   }
@@ -8606,8 +8881,18 @@ scenarioTabs.addEventListener("click", (event) => {
   renderScenarioEditor();
 });
 
-scenarioFields.addEventListener("change", () => {
+scenarioFields.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-ecological-event-action]");
+  if (!button) {
+    return;
+  }
+
+  updateEcologicalEvents(button.dataset.ecologicalEventAction, Number(button.dataset.index));
+});
+
+scenarioFields.addEventListener("change", (event) => {
   try {
+    resetEcologicalEventStrengthOnKindChange(event.target);
     storeVisibleScenarioValues();
     updateScenarioFieldChangeMarkers();
     renderMapArtifactDetails();

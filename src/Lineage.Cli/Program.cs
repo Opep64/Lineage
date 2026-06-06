@@ -5938,6 +5938,8 @@ internal static class RunReportWriter
         writer.WriteLine("</div>");
         writer.WriteLine("</section>");
 
+        WriteEcologicalEventsSection(writer, state);
+
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Outcome</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
@@ -6209,7 +6211,7 @@ internal static class RunReportWriter
         WriteCollisionDiagnosticsSection(writer, snapshots, finalSnapshot);
 
         WriteBiomeMapSection(writer, state.Biomes);
-        WriteTemperatureMapSection(writer, state.Temperature);
+        WriteTemperatureMapSection(writer, state);
 
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Biomes</h2>");
@@ -7176,6 +7178,78 @@ internal static class RunReportWriter
         writer.WriteLine("</div>");
     }
 
+    private static void WriteEcologicalEventsSection(StreamWriter writer, WorldState state)
+    {
+        var events = state.EcologicalEvents;
+        var activeCount = events.Count(ecologicalEvent => ecologicalEvent.IsActive(state.ElapsedSeconds));
+
+        writer.WriteLine("<section>");
+        writer.WriteLine("<h2>Ecological Events</h2>");
+        writer.WriteLine("<div class=\"metric-grid\">");
+        WriteMetric(writer, "Scheduled events", events.Count.ToString(CultureInfo.InvariantCulture));
+        WriteMetric(writer, "Active now", activeCount.ToString(CultureInfo.InvariantCulture));
+        writer.WriteLine("</div>");
+
+        if (events.Count == 0)
+        {
+            writer.WriteLine("<p>No ecological events scheduled.</p>");
+            writer.WriteLine("</section>");
+            return;
+        }
+
+        writer.WriteLine("<table>");
+        writer.WriteLine("<thead><tr><th>Name</th><th>Kind</th><th>Status</th><th>Start</th><th>Duration</th><th>Region</th><th>Strength</th></tr></thead>");
+        writer.WriteLine("<tbody>");
+        foreach (var ecologicalEvent in events.OrderBy(ecologicalEvent => ecologicalEvent.StartSeconds).ThenBy(ecologicalEvent => ecologicalEvent.Name, StringComparer.Ordinal))
+        {
+            writer.WriteLine(
+                "<tr>" +
+                $"<td>{Html(ecologicalEvent.Name)}</td>" +
+                $"<td>{Html(ecologicalEvent.Kind)}</td>" +
+                $"<td>{Html(FormatEcologicalEventStatus(ecologicalEvent, state.ElapsedSeconds))}</td>" +
+                $"<td>{Html($"{ecologicalEvent.StartSeconds:0.###} s")}</td>" +
+                $"<td>{Html($"{ecologicalEvent.DurationSeconds:0.###} s")}</td>" +
+                $"<td>{Html(FormatEcologicalEventRegion(ecologicalEvent))}</td>" +
+                $"<td>{Html(FormatEcologicalEventStrength(ecologicalEvent))}</td>" +
+                "</tr>");
+        }
+
+        writer.WriteLine("</tbody>");
+        writer.WriteLine("</table>");
+        writer.WriteLine("</section>");
+    }
+
+    private static string FormatEcologicalEventStatus(EcologicalEventDefinition ecologicalEvent, double elapsedSeconds)
+    {
+        if (ecologicalEvent.IsActive(elapsedSeconds))
+        {
+            return $"active ({Math.Max(0d, ecologicalEvent.EndSeconds - elapsedSeconds):0.#} s left)";
+        }
+
+        if (elapsedSeconds < ecologicalEvent.StartSeconds)
+        {
+            return $"pending ({ecologicalEvent.StartSeconds - elapsedSeconds:0.#} s)";
+        }
+
+        return "completed";
+    }
+
+    private static string FormatEcologicalEventRegion(EcologicalEventDefinition ecologicalEvent)
+    {
+        return $"x {FormatPercent(ecologicalEvent.RegionX)}-{FormatPercent(ecologicalEvent.RegionX + ecologicalEvent.RegionWidth)}, y {FormatPercent(ecologicalEvent.RegionY)}-{FormatPercent(ecologicalEvent.RegionY + ecologicalEvent.RegionHeight)}";
+    }
+
+    private static string FormatEcologicalEventStrength(EcologicalEventDefinition ecologicalEvent)
+    {
+        if (ecologicalEvent.AffectsFertility)
+        {
+            return $"{ecologicalEvent.Strength:0.###}x fertility";
+        }
+
+        var sign = ecologicalEvent.Kind == EcologicalEventKind.ColdSnap ? "-" : "+";
+        return $"{sign}{ecologicalEvent.Strength * 100f:0.#} temperature index";
+    }
+
     private static void WriteBiomeMapSection(TextWriter writer, BiomeMap map)
     {
         var width = MathF.Max(1f, map.Bounds.Width);
@@ -7224,15 +7298,16 @@ internal static class RunReportWriter
         writer.WriteLine("</section>");
     }
 
-    private static void WriteTemperatureMapSection(TextWriter writer, TemperatureMap map)
+    private static void WriteTemperatureMapSection(TextWriter writer, WorldState state)
     {
+        var map = state.Temperature;
         var width = MathF.Max(1f, map.Bounds.Width);
         var height = MathF.Max(1f, map.Bounds.Height);
-        var summary = map.Summarize();
+        var summary = state.SummarizeEffectiveTemperature();
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Temperature Layout</h2>");
         writer.WriteLine(
-            $"<p class=\"biome-map-note\">{Html(map.CellCountX)} x {Html(map.CellCountY)} cells at {Html(map.CellSize.ToString("0.###", CultureInfo.InvariantCulture))} world units per cell. Temperature index runs 0 cold, 50 temperate, 100 hot. Average {Html(FormatTemperatureIndex(summary.AverageTemperature))}, range {Html(FormatTemperatureIndex(summary.MinimumTemperature))} - {Html(FormatTemperatureIndex(summary.MaximumTemperature))}.</p>");
+            $"<p class=\"biome-map-note\">{Html(map.CellCountX)} x {Html(map.CellCountY)} cells at {Html(map.CellSize.ToString("0.###", CultureInfo.InvariantCulture))} world units per cell. Temperature index runs 0 cold, 50 temperate, 100 hot. Values include currently active ecological temperature events. Average {Html(FormatTemperatureIndex(summary.AverageTemperature))}, range {Html(FormatTemperatureIndex(summary.MinimumTemperature))} - {Html(FormatTemperatureIndex(summary.MaximumTemperature))}.</p>");
         writer.WriteLine("<div class=\"biome-map-frame\">");
         writer.WriteLine($"<svg class=\"biome-map\" viewBox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" role=\"img\" aria-label=\"Temperature map layout\" preserveAspectRatio=\"xMidYMid meet\" shape-rendering=\"crispEdges\">");
         for (var y = 0; y < map.CellCountY; y++)
@@ -7245,8 +7320,9 @@ internal static class RunReportWriter
                     continue;
                 }
 
+                var position = new SimVector2(cell.X + cell.Width * 0.5f, cell.Y + cell.Height * 0.5f);
                 writer.WriteLine(
-                    $"<rect x=\"{SvgNumber(cell.X)}\" y=\"{SvgNumber(cell.Y)}\" width=\"{SvgNumber(cell.Width)}\" height=\"{SvgNumber(cell.Height)}\" fill=\"{Html(TemperatureColor(map.GetTemperature(x, y)))}\" />");
+                    $"<rect x=\"{SvgNumber(cell.X)}\" y=\"{SvgNumber(cell.Y)}\" width=\"{SvgNumber(cell.Width)}\" height=\"{SvgNumber(cell.Height)}\" fill=\"{Html(TemperatureColor(state.GetTemperatureAt(position)))}\" />");
             }
         }
 
