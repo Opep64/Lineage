@@ -53,6 +53,8 @@ var tests = new (string Name, Action Body)[]
     ("Eating transfers small prey calories as fresh meat", EatingTransfersSmallPreyCaloriesAsFreshMeat),
     ("Eating fills gut before digestion", EatingFillsGutBeforeDigestion),
     ("Gut capacity limits additional eating", GutCapacityLimitsAdditionalEating),
+    ("Full energy and fat prevent additional eating", FullEnergyAndFatPreventAdditionalEating),
+    ("Remaining storage capacity limits eating", RemainingStorageCapacityLimitsEating),
     ("Plant type controls eating transfer rate", PlantTypeControlsEatingTransferRate),
     ("Plant type controls digestion payoff", PlantTypeControlsDigestionPayoff),
     ("Plant adaptation controls digestion payoff", PlantAdaptationControlsDigestionPayoff),
@@ -2300,6 +2302,99 @@ static void GutCapacityLimitsAdditionalEating()
     AssertClose(2f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Plant gut calories are capacity-limited");
     AssertClose(8f, simulation.State.Creatures[0].GutMeatCalories, 0.000001, "Existing meat gut calories remain");
     AssertClose(28f, simulation.State.Resources[0].Calories, 0.000001, "Resource loses only capacity-limited calories");
+}
+
+static void FullEnergyAndFatPreventAdditionalEating()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 228,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex)
+        ]);
+
+    var genome = CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 20f,
+        GutCapacityCalories = 50f,
+        DietaryAdaptation = 0f,
+        FatStorageCapacityCalories = 10f,
+        FatStorageEfficiency = 1f,
+        MaturityAgeSeconds = 0f
+    };
+    var genomeId = simulation.State.AddGenome(genome);
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 1f);
+    var creature = simulation.State.Creatures[0];
+    creature.Energy = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome);
+    creature.FatCalories = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    AssertTrue(simulation.State.Creatures[0].IsTouchingFood, "Full creature should still sense food contact");
+    AssertClose(0f, simulation.State.Creatures[0].LastCaloriesEaten, 0.000001, "Full creature should not eat more raw calories");
+    AssertClose(0f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Full creature should not add plant calories to gut");
+    AssertClose(30f, simulation.State.Resources[0].Calories, 0.000001, "Full creature should not deplete plant calories");
+}
+
+static void RemainingStorageCapacityLimitsEating()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 229,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new EatingSystem(spatialIndex)
+        ]);
+
+    var genome = CreatureGenome.Baseline with
+    {
+        BodyRadius = 3f,
+        EatCaloriesPerSecond = 20f,
+        GutCapacityCalories = 50f,
+        DietaryAdaptation = 0f,
+        FatStorageCapacityCalories = 10f,
+        FatStorageEfficiency = 1f,
+        MaturityAgeSeconds = 0f
+    };
+    var genomeId = simulation.State.AddGenome(genome);
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 1f);
+    var creature = simulation.State.Creatures[0];
+    creature.Energy = CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome) - 3f;
+    creature.FatCalories = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Position = new SimVector2(22f, 20f),
+        Radius = 2f,
+        Calories = 30f,
+        MaxCalories = 30f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    AssertClose(3f, simulation.State.Creatures[0].LastCaloriesEaten, 0.000001, "Eating should be limited by remaining storage room");
+    AssertClose(3f, simulation.State.Creatures[0].GutPlantCalories, 0.000001, "Only storage-limited plant calories enter gut");
+    AssertClose(27f, simulation.State.Resources[0].Calories, 0.000001, "Plant loses only storage-limited calories");
 }
 
 static void PlantTypeControlsEatingTransferRate()

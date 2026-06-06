@@ -246,11 +246,18 @@ public sealed class EatingSystem(
         var eatRateMultiplier = resource.Kind == ResourceKind.Plant
             ? PlantResourceTraits.EatingRateMultiplier(resource.PlantKind)
             : 1f;
+        var meatFreshness = resource.Kind == ResourceKind.Meat
+            ? MeatQuality.Freshness(resource)
+            : 1f;
+        var intakeCapacity = AvailableRawIntakeCapacity(
+            creature,
+            genome,
+            SourceEnergyEfficiency(genome, resource.Kind, resource.PlantKind, meatFreshness));
         var amount = Math.Min(
             resource.Calories,
             Math.Min(
                 CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * eatRateMultiplier * deltaSeconds,
-                AvailableGutCapacity(creature, genome)));
+                intakeCapacity));
 
         if (amount <= 0f)
         {
@@ -258,9 +265,6 @@ public sealed class EatingSystem(
         }
 
         resource.Calories -= amount;
-        var meatFreshness = resource.Kind == ResourceKind.Meat
-            ? MeatQuality.Freshness(resource)
-            : 1f;
         state.Stats.RecordFoodEaten(state.Bounds, resource.Position, resource.Kind, amount);
         AddToGut(ref creature, resource.Kind, resource.PlantKind, amount, meatFreshness);
         creature.LastCaloriesEaten = amount;
@@ -321,11 +325,15 @@ public sealed class EatingSystem(
         float deltaSeconds)
     {
         var egg = state.Eggs[eggIndex];
+        var intakeCapacity = AvailableRawIntakeCapacity(
+            creature,
+            genome,
+            CreatureDigestion.FreshMeatEnergyEfficiency(genome));
         var amount = Math.Min(
             egg.Energy,
             Math.Min(
                 CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds,
-                AvailableGutCapacity(creature, genome)));
+                intakeCapacity));
 
         if (amount <= 0f)
         {
@@ -358,11 +366,15 @@ public sealed class EatingSystem(
         float deltaSeconds)
     {
         var prey = state.SmallPrey[preyIndex];
+        var intakeCapacity = AvailableRawIntakeCapacity(
+            creature,
+            genome,
+            CreatureDigestion.FreshMeatEnergyEfficiency(genome));
         var amount = Math.Min(
             prey.Calories,
             Math.Min(
                 CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * deltaSeconds,
-                AvailableGutCapacity(creature, genome)));
+                intakeCapacity));
 
         if (amount <= 0f)
         {
@@ -394,6 +406,84 @@ public sealed class EatingSystem(
     {
         var capacity = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome);
         return Math.Max(0f, capacity - creature.GutPlantCalories - creature.GutMeatCalories);
+    }
+
+    private static float AvailableRawIntakeCapacity(
+        CreatureState creature,
+        CreatureGenome genome,
+        float sourceEnergyEfficiency)
+    {
+        var gutCapacity = AvailableGutCapacity(creature, genome);
+        if (gutCapacity <= 0f)
+        {
+            return 0f;
+        }
+
+        var sourceEfficiency = Math.Max(0.0001f, sourceEnergyEfficiency);
+        var usableRoom = AvailableUsableEnergyCapacity(creature, genome) - PendingGutEnergy(creature, genome);
+        if (usableRoom <= 0f)
+        {
+            return 0f;
+        }
+
+        return Math.Min(gutCapacity, usableRoom / sourceEfficiency);
+    }
+
+    private static float AvailableUsableEnergyCapacity(CreatureState creature, CreatureGenome genome)
+    {
+        var energyRoom = Math.Max(0f, CreatureGrowth.EffectiveEnergyCapacityCalories(creature, genome) - creature.Energy);
+        var fatCapacity = CreatureGrowth.EffectiveFatStorageCapacityCalories(creature, genome);
+        if (fatCapacity <= 0f)
+        {
+            return energyRoom;
+        }
+
+        var clampedFat = Math.Clamp(creature.FatCalories, 0f, fatCapacity);
+        var fatRoom = Math.Max(0f, fatCapacity - clampedFat);
+        var fatEfficiency = Math.Clamp(genome.FatStorageEfficiency, 0.05f, 1f);
+        return energyRoom + fatRoom / fatEfficiency;
+    }
+
+    private static float PendingGutEnergy(CreatureState creature, CreatureGenome genome)
+    {
+        var plantCalories = Math.Max(0f, creature.GutPlantCalories);
+        var tenderPlantCalories = Math.Clamp(creature.GutTenderPlantCalories, 0f, plantCalories);
+        var richPlantCalories = Math.Clamp(creature.GutRichPlantCalories, 0f, plantCalories);
+        var toughPlantCalories = Math.Clamp(creature.GutToughPlantCalories, 0f, plantCalories);
+        var typedPlantCalories = tenderPlantCalories + richPlantCalories + toughPlantCalories;
+        if (typedPlantCalories > plantCalories && typedPlantCalories > 0f)
+        {
+            var scale = plantCalories / typedPlantCalories;
+            tenderPlantCalories *= scale;
+            richPlantCalories *= scale;
+            toughPlantCalories *= scale;
+            typedPlantCalories = plantCalories;
+        }
+
+        var genericPlantCalories = Math.Max(0f, plantCalories - typedPlantCalories);
+        var plantEnergy = genericPlantCalories * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Generic)
+            + tenderPlantCalories * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tender)
+            + richPlantCalories * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Rich)
+            + toughPlantCalories * CreatureDigestion.PlantTypeEnergyEfficiency(genome, PlantResourceKind.Tough);
+
+        var meatCalories = Math.Max(0f, creature.GutMeatCalories);
+        var meatFreshness = meatCalories > 0f
+            ? Math.Clamp(creature.GutMeatQualityCalories / meatCalories, MeatQuality.MinimumFreshness, 1f)
+            : 1f;
+        var meatEnergy = meatCalories * CreatureDigestion.MeatEnergyEfficiency(genome, meatFreshness);
+
+        return plantEnergy + meatEnergy;
+    }
+
+    private static float SourceEnergyEfficiency(
+        CreatureGenome genome,
+        ResourceKind kind,
+        PlantResourceKind plantKind,
+        float meatFreshness)
+    {
+        return kind == ResourceKind.Meat
+            ? CreatureDigestion.MeatEnergyEfficiency(genome, meatFreshness)
+            : CreatureDigestion.PlantTypeEnergyEfficiency(genome, plantKind);
     }
 
     private static void AddToGut(
