@@ -99,6 +99,7 @@ public partial class Main : Node2D
     private const float AggregateCreatureTargetPixels = 24f;
     private const float FarZoomVisibleWorldWidth = 3_000f;
     private const ulong CreatureCacheRefreshMilliseconds = 100UL;
+    private const float ScaleAccurateMinimumVisibleScreenRadius = 0.75f;
     private const float MaxResourceDensityAlpha = 0.34f;
     private const float MaxCreatureDensityAlpha = 0.42f;
     private const float MinSpeedMultiplier = 0.125f;
@@ -189,6 +190,7 @@ public partial class Main : Node2D
     private bool _showVisionSectorDebug = true;
     private VisualRenderMode _visualRenderMode = VisualRenderMode.SpriteTheme;
     private int _spriteThemeIndex;
+    private BodyScaleRenderMode _bodyScaleRenderMode = BodyScaleRenderMode.Readable;
     private readonly List<SpriteTheme> _spriteThemes = [];
     private Vector2 _lastPanPosition;
     private ResourceRenderCache _resourceRenderCache = new();
@@ -707,6 +709,9 @@ public partial class Main : Node2D
                 case Key.T:
                     CycleVisualRenderMode();
                     break;
+                case Key.Z:
+                    ToggleBodyScaleRenderMode();
+                    break;
                 case Key.Equal:
                 case Key.Plus:
                 case Key.KpAdd:
@@ -844,6 +849,13 @@ public partial class Main : Node2D
             _spriteThemeIndex = 0;
             _visualRenderMode = VisualRenderMode.LegacyShapes;
         }
+    }
+
+    private void ToggleBodyScaleRenderMode()
+    {
+        _bodyScaleRenderMode = _bodyScaleRenderMode == BodyScaleRenderMode.Readable
+            ? BodyScaleRenderMode.ScaleAccurate
+            : BodyScaleRenderMode.Readable;
     }
 
     private void ClearMapRenderStats()
@@ -1321,7 +1333,7 @@ public partial class Main : Node2D
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}  Prey {snapshot.SmallPreyCount}\n" +
             $"Energy full {FormatPercent(snapshot.AverageEnergyFullnessRatio)}  Fat {snapshot.TotalFatCalories:0} kcal  reserve {FormatPercent(snapshot.AverageFatRatio)}\n" +
             $"Deaths {state.Stats.CreatureDeathCount}  Starved {state.Stats.StarvationDeathCount}\n" +
-            $"Visual {FormatVisualRenderMode()}\n" +
+            $"Visual {FormatVisualRenderMode()}  Bodies {FormatBodyScaleRenderMode(_bodyScaleRenderMode)}\n" +
             (seasonText.Length > 0 ? seasonText.TrimEnd() : "Season off") + "\n" +
             $"Events {activeEventText}";
 
@@ -1384,7 +1396,7 @@ public partial class Main : Node2D
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Population)}\n" +
             $"{FormatGraphTickSpan(state.Stats.Snapshots, GraphMetric.Season)}\n" +
             "Keys: Space/P pause  +/- speed  N seed  S scenario\n" +
-            $"Move: Arrows/Wheel/Drag  Click select  G follow  T visual  B overlay  C/V/M toggles";
+            $"Move: Arrows/Wheel/Drag  Click select  G follow  T visual  Z scale  B overlay  C/V/M toggles";
 
         _miniGraphLabels[0].Text = $"Population {state.Creatures.Count}";
         _miniGraphLabels[0].AddThemeColorOverride("font_color", _graphPopulationColor);
@@ -2461,10 +2473,15 @@ public partial class Main : Node2D
         }
 
         var slot = SpriteSlotForResource(resource, fullness);
-        var sizePixels = resource.Kind == ResourceKind.Meat
-            ? SpriteSizeFromScreenRadius(radius, MeatSpriteScalePixels, MinResourceSpriteSizePixels, MaxMeatSpriteSizePixels)
-            : SpriteSizeFromScreenRadius(radius, PlantSpriteScalePixels, MinResourceSpriteSizePixels, MaxPlantSpriteSizePixels);
-        var animation = resource.Kind == ResourceKind.Plant
+        var scaleAccurateResource = UseScaleAccurateResourceRendering(resource);
+        var sizePixels = scaleAccurateResource
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius * 2f, radius * 2f)
+            : resource.Kind == ResourceKind.Meat
+                ? SpriteSizeFromScreenRadius(radius, MeatSpriteScalePixels, MinResourceSpriteSizePixels, MaxMeatSpriteSizePixels)
+                : SpriteSizeFromScreenRadius(radius, PlantSpriteScalePixels, MinResourceSpriteSizePixels, MaxPlantSpriteSizePixels);
+        var animation = scaleAccurateResource
+            ? (Offset: Vector2.Zero, Scale: Vector2.One, Rotation: 0f, IsEating: false)
+            : resource.Kind == ResourceKind.Plant
             ? PlantSpriteAnimation(resource, fullness, sizePixels)
             : FoodSpriteEatingAnimation(resource.Id, _drawEatingMeatResourceIds, sizePixels);
         var animatedCenter = screenPosition + animation.Offset;
@@ -2557,8 +2574,13 @@ public partial class Main : Node2D
         var slot = egg.Id.Value % 2 == 0
             ? SpriteAtlasSlot.EggA
             : SpriteAtlasSlot.EggB;
-        var sizePixels = SpriteSizeFromScreenRadius(radius, EggSpriteScalePixels, MinEggSpriteSizePixels, MaxEggSpriteSizePixels);
-        var animation = FoodSpriteEatingAnimation(egg.Id, _drawEatingEggIds, sizePixels);
+        var scaleAccurateEgg = UseScaleAccurateEggRendering();
+        var sizePixels = scaleAccurateEgg
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius * 2f, radius * 2f)
+            : SpriteSizeFromScreenRadius(radius, EggSpriteScalePixels, MinEggSpriteSizePixels, MaxEggSpriteSizePixels);
+        var animation = scaleAccurateEgg
+            ? (Offset: Vector2.Zero, Scale: Vector2.One, Rotation: 0f, IsEating: false)
+            : FoodSpriteEatingAnimation(egg.Id, _drawEatingEggIds, sizePixels);
         var animatedCenter = screenPosition + animation.Offset;
         var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = Colors.White.Lerp(color, 0.10f);
@@ -2583,12 +2605,17 @@ public partial class Main : Node2D
             return false;
         }
 
-        var sizePixels = SpriteSizeFromScreenRadius(
-            radius,
-            SmallPreySpriteScalePixels,
-            MinSmallPreySpriteSizePixels,
-            MaxSmallPreySpriteSizePixels);
-        var animation = FoodSpriteEatingAnimation(prey.Id, _drawEatingSmallPreyIds, sizePixels);
+        var scaleAccurateSmallPrey = UseScaleAccurateSmallPreyRendering();
+        var sizePixels = scaleAccurateSmallPrey
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius * 2f, radius * 2f)
+            : SpriteSizeFromScreenRadius(
+                radius,
+                SmallPreySpriteScalePixels,
+                MinSmallPreySpriteSizePixels,
+                MaxSmallPreySpriteSizePixels);
+        var animation = scaleAccurateSmallPrey
+            ? (Offset: Vector2.Zero, Scale: Vector2.One, Rotation: 0f, IsEating: false)
+            : FoodSpriteEatingAnimation(prey.Id, _drawEatingSmallPreyIds, sizePixels);
         var animatedCenter = screenPosition + animation.Offset;
         var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = prey.HeldByCreatureId == default
@@ -2616,8 +2643,13 @@ public partial class Main : Node2D
         }
 
         var slot = SpriteSlotForCreature(genome);
-        var sizePixels = SpriteSizeFromScreenRadius(radius, CreatureSpriteScalePixels, MinCreatureSpriteSizePixels, MaxCreatureSpriteSizePixels);
-        var animationScale = CreatureSpriteAnimationScale(creature, genome);
+        var scaleAccurateCreature = UseScaleAccurateCreatureRendering();
+        var sizePixels = scaleAccurateCreature
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius * 2f, radius * 2f)
+            : SpriteSizeFromScreenRadius(radius, CreatureSpriteScalePixels, MinCreatureSpriteSizePixels, MaxCreatureSpriteSizePixels);
+        var animationScale = scaleAccurateCreature
+            ? Vector2.One
+            : CreatureSpriteAnimationScale(creature, genome);
         var animatedSize = new Vector2(sizePixels * animationScale.X, sizePixels * animationScale.Y);
         var selected = creature.Id == _selectedCreatureId;
         var colorModeEnabled = _colorMode != CreatureColorMode.Off;
@@ -2903,7 +2935,10 @@ public partial class Main : Node2D
                     : 0f;
                 var color = ColorForResource(resource, fullness);
                 var screenPosition = ToScreen(resource.Position);
-                var radius = MathF.Max(2f, resource.Radius * _worldScale);
+                var scaleAccurate = UseScaleAccurateResourceRendering(resource);
+                var radius = scaleAccurate
+                    ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius, resource.Radius * _worldScale)
+                    : MathF.Max(2f, resource.Radius * _worldScale);
                 if (!TryDrawSpriteResource(resource, screenPosition, radius, color, fullness))
                 {
                     DrawCircle(screenPosition, radius, color);
@@ -2990,13 +3025,18 @@ public partial class Main : Node2D
         for (var i = 0; i < _simulation.State.Eggs.Count; i++)
         {
             var egg = _simulation.State.Eggs[i];
-            if (!WorldRectIntersectsCircle(visibleWorldRect, egg.Position, 4f))
+            var worldRadius = EggPredation.ContactRadius(egg);
+            if (!WorldRectIntersectsCircle(visibleWorldRect, egg.Position, worldRadius))
             {
                 continue;
             }
 
             var screenPosition = ToScreen(egg.Position);
-            if (!IsVisibleInWorldRect(screenPosition, 5f))
+            var scaleAccurate = UseScaleAccurateEggRendering();
+            var radius = scaleAccurate
+                ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius, worldRadius * _worldScale)
+                : Math.Clamp(worldRadius * _worldScale, 2f, 7f);
+            if (!IsVisibleInWorldRect(screenPosition, radius + 2f))
             {
                 continue;
             }
@@ -3004,7 +3044,6 @@ public partial class Main : Node2D
             var hatchProgress = EggHatchProgress(egg);
             var healthRatio = EggHealthRatio(egg);
             var isSelected = egg.Id == _selectedEggId;
-            var radius = Math.Clamp(2f + MathF.Sqrt(MathF.Max(0f, egg.MaxHealth)) * 1.2f * _worldScale, 2f, 7f);
             var color = _eggColor.Lerp(new Color(0.98f, 0.96f, 0.72f), hatchProgress * 0.45f)
                 .Lerp(new Color(0.95f, 0.35f, 0.28f), 1f - healthRatio);
             if (isSelected)
@@ -3035,7 +3074,10 @@ public partial class Main : Node2D
             }
 
             var screenPosition = ToScreen(prey.Position);
-            var radius = MathF.Max(2f, prey.Radius * _worldScale);
+            var scaleAccurate = UseScaleAccurateSmallPreyRendering();
+            var radius = scaleAccurate
+                ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius, prey.Radius * _worldScale)
+                : MathF.Max(2f, prey.Radius * _worldScale);
             if (!IsVisibleInWorldRect(screenPosition, radius + 4f))
             {
                 continue;
@@ -3323,7 +3365,10 @@ public partial class Main : Node2D
     {
         var genome = _simulation.State.GetGenome(creature.GenomeId);
         var screenPosition = ToScreen(creature.Position);
-        var radius = MathF.Max(2.5f, CreatureGrowth.EffectiveBodyRadius(creature, genome) * _worldScale);
+        var scaleAccurate = UseScaleAccurateCreatureRendering();
+        var radius = scaleAccurate
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius, CreatureGrowth.EffectiveBodyRadius(creature, genome) * _worldScale)
+            : MathF.Max(2.5f, CreatureGrowth.EffectiveBodyRadius(creature, genome) * _worldScale);
         if (!IsVisibleInWorldRect(screenPosition, radius + 2f))
         {
             return false;
@@ -3359,7 +3404,10 @@ public partial class Main : Node2D
 
         var genome = _simulation.State.GetGenome(selected.GenomeId);
         var screenPosition = ToScreen(selected.Position);
-        var radius = MathF.Max(4f, CreatureGrowth.EffectiveBodyRadius(selected, genome) * _worldScale);
+        var scaleAccurate = UseScaleAccurateCreatureRendering();
+        var radius = scaleAccurate
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius, CreatureGrowth.EffectiveBodyRadius(selected, genome) * _worldScale)
+            : MathF.Max(4f, CreatureGrowth.EffectiveBodyRadius(selected, genome) * _worldScale);
         var senseRadius = CreatureGrowth.EffectiveSenseRadius(selected, genome);
         var maxRangeRadius = senseRadius * MathF.Max(
             _scenario.SoundRangeMultiplier,
@@ -3394,6 +3442,27 @@ public partial class Main : Node2D
         DrawSelectedFoodContact(creature, screenPosition);
         DrawSelectedCreatureContact(creature, screenPosition);
         DrawSelectedGrabLinks(creature, screenPosition);
+    }
+
+    private bool UseScaleAccurateResourceRendering(ResourcePatchState resource)
+    {
+        return _bodyScaleRenderMode == BodyScaleRenderMode.ScaleAccurate
+            && (resource.Kind == ResourceKind.Plant || resource.Kind == ResourceKind.Meat);
+    }
+
+    private bool UseScaleAccurateEggRendering()
+    {
+        return _bodyScaleRenderMode == BodyScaleRenderMode.ScaleAccurate;
+    }
+
+    private bool UseScaleAccurateSmallPreyRendering()
+    {
+        return _bodyScaleRenderMode == BodyScaleRenderMode.ScaleAccurate;
+    }
+
+    private bool UseScaleAccurateCreatureRendering()
+    {
+        return _bodyScaleRenderMode == BodyScaleRenderMode.ScaleAccurate;
     }
 
     private void DrawSelectedSenseRangeRings(CreatureState creature, CreatureGenome genome, Vector2 screenPosition)
@@ -3547,7 +3616,10 @@ public partial class Main : Node2D
             return;
         }
 
-        var radius = Math.Clamp(3f + MathF.Sqrt(MathF.Max(0f, egg.MaxHealth)) * 1.3f * _worldScale, 4f, 10f);
+        var scaleAccurate = UseScaleAccurateEggRendering();
+        var radius = scaleAccurate
+            ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius, EggPredation.ContactRadius(egg) * _worldScale)
+            : Math.Clamp(3f + EggPredation.ContactRadius(egg) * _worldScale, 4f, 10f);
         var exposure = EggEnvironmentalDamageSystem.GetExposureMultiplier(_simulation.State.Biomes, egg.Position);
         var exposureColor = exposure > 0f
             ? new Color(1f, 0.48f, 0.28f)
@@ -6083,6 +6155,15 @@ public partial class Main : Node2D
         return _spriteThemes[Math.Clamp(_spriteThemeIndex, 0, _spriteThemes.Count - 1)].Name;
     }
 
+    private static string FormatBodyScaleRenderMode(BodyScaleRenderMode mode)
+    {
+        return mode switch
+        {
+            BodyScaleRenderMode.ScaleAccurate => "to scale",
+            _ => "readable"
+        };
+    }
+
     private static string FormatActiveEcologicalEvents(WorldState state)
     {
         if (state.EcologicalEvents.Count == 0)
@@ -6650,6 +6731,12 @@ public partial class Main : Node2D
     {
         LegacyShapes,
         SpriteTheme
+    }
+
+    private enum BodyScaleRenderMode
+    {
+        Readable,
+        ScaleAccurate
     }
 
     private enum MapOverlayMode
