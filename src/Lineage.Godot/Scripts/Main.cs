@@ -1310,7 +1310,7 @@ public partial class Main : Node2D
             $"{(_paused ? "Paused" : "Running")}  {FormatSpeed(_speedMultiplier)}\n" +
             $"TPS {_measuredTicksPerSecond:0.0}  Frame {_measuredFrameMilliseconds:0.0}ms\n" +
             $"Seed {_currentSeed}\n" +
-            $"Tick {state.Tick}  Time {state.ElapsedSeconds:0.0}s\n" +
+            $"Tick {state.Tick}  Time {FormatWallClockDuration(state.ElapsedSeconds)}\n" +
             $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}\n" +
             $"Color {FormatColorMode(_colorMode)}";
 
@@ -1330,7 +1330,7 @@ public partial class Main : Node2D
             $"{(_paused ? "Paused" : "Running")}  {FormatSpeed(_speedMultiplier)}\n" +
             $"TPS {_measuredTicksPerSecond:0.0}  Frame {_measuredFrameMilliseconds:0.0}ms\n" +
             $"Seed {_currentSeed}\n" +
-            $"Tick {state.Tick}  Time {state.ElapsedSeconds:0.0}s\n" +
+            $"Tick {state.Tick}  Time {FormatWallClockDuration(state.ElapsedSeconds)}\n" +
             $"World {state.Bounds.Width:0}x{state.Bounds.Height:0}\n" +
             $"Creatures {state.Creatures.Count}  Eggs {state.Eggs.Count}  Food {activeResourceCount}\n" +
             $"Plants {snapshot.PlantResourceCount}  Meat {snapshot.MeatResourceCount}  Prey {snapshot.SmallPreyCount}\n" +
@@ -6043,6 +6043,25 @@ public partial class Main : Node2D
     private static string FormatSpeed(float speed)
     {
         return speed >= 1f ? $"{speed:0}x" : $"{speed:0.###}x";
+    }
+
+    private static string FormatWallClockDuration(double elapsedSeconds)
+    {
+        if (!double.IsFinite(elapsedSeconds) || elapsedSeconds <= 0d)
+        {
+            return "0d 00h 00m 00s";
+        }
+
+        var totalSeconds = (long)Math.Round(elapsedSeconds, MidpointRounding.AwayFromZero);
+        var days = totalSeconds / 86_400L;
+        totalSeconds %= 86_400L;
+        var hours = totalSeconds / 3_600L;
+        totalSeconds %= 3_600L;
+        var minutes = totalSeconds / 60L;
+        var seconds = totalSeconds % 60L;
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{days}d {hours:00}h {minutes:00}m {seconds:00}s");
     }
 
     private static string FormatColorMode(CreatureColorMode colorMode)
