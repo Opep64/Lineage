@@ -182,6 +182,8 @@ let pendingRecipeSave = null;
 let selectedRunIds = new Set();
 
 const brainLabProfileComparisonBatchSize = 100;
+const brainLabProfileComparisonSampleSize = 100;
+const brainLabProfileComparisonSampleBatchSize = 25;
 
 const brainLabBiomeColors = {
   Desert: "#c7b56f",
@@ -3804,19 +3806,68 @@ async function compareBrainLabProfiles() {
 }
 
 async function compareSampleBrainLabProfiles(path, inputOverrides, worldProbeEnvironment) {
-  brainLabStatus.textContent = "Comparing behavior profiles";
-  const result = await fetchBrainLabProfileComparisonBatch(
-    path,
-    inputOverrides,
-    worldProbeEnvironment,
-    0,
-    brainLabProfileComparisonBatchSize);
-  brainLabProfileComparisonResult = {
-    ...result,
-    profileScope: "sample",
-    isRunning: false
-  };
+  brainLabStatus.textContent = "Comparing behavior profile sample";
+  let offset = 0;
+  let template = null;
+  let totalCreatureCount = Number(brainLabSnapshot?.creatureCount ?? brainLabProfileComparisonSampleSize);
+  const initialSampleTotal = Math.min(brainLabProfileComparisonSampleSize, totalCreatureCount);
+  const rows = [];
+  brainLabProfileComparisonResult = buildBrainLabProfileComparisonSampleResult(
+    { snapshotPath: path, totalCreatureCount },
+    rows,
+    totalCreatureCount,
+    initialSampleTotal,
+    true,
+    `Loading snapshot and evaluating first ${formatNumber(Math.min(brainLabProfileComparisonSampleBatchSize, initialSampleTotal))} creatures`);
   renderBrainLabProfileComparison();
+
+  while (rows.length < brainLabProfileComparisonSampleSize) {
+    const batchSize = Math.min(
+      brainLabProfileComparisonSampleBatchSize,
+      brainLabProfileComparisonSampleSize - rows.length);
+    const result = await fetchBrainLabProfileComparisonBatch(
+      path,
+      inputOverrides,
+      worldProbeEnvironment,
+      offset,
+      batchSize);
+    template ??= result;
+    totalCreatureCount = Number(result.totalCreatureCount || totalCreatureCount);
+    const sampleTotal = Math.min(brainLabProfileComparisonSampleSize, totalCreatureCount);
+    const batchRows = result.rows || [];
+    rows.push(...batchRows);
+    offset += batchRows.length;
+
+    brainLabProfileComparisonResult = buildBrainLabProfileComparisonSampleResult(
+      template,
+      rows,
+      totalCreatureCount,
+      sampleTotal,
+      true);
+    renderBrainLabProfileComparison();
+    brainLabStatus.textContent = [
+      "Comparing behavior profile sample",
+      `${formatNumber(rows.length)} / ${formatNumber(sampleTotal)} creatures`,
+      `${formatPercent(rows.length / Math.max(1, sampleTotal))}`
+    ].join(" | ");
+
+    if (batchRows.length === 0 || rows.length >= sampleTotal) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  if (template) {
+    brainLabProfileComparisonResult = buildBrainLabProfileComparisonSampleResult(
+      template,
+      rows,
+      totalCreatureCount,
+      Math.min(brainLabProfileComparisonSampleSize, totalCreatureCount),
+      false);
+    renderBrainLabProfileComparison();
+  }
+
   brainLabStatus.textContent = [
     "Profile comparison complete",
     `${formatNumber(brainLabProfileComparisonResult.evaluatedCreatureCount)} creatures`,
@@ -3829,6 +3880,26 @@ async function compareAllBrainLabProfiles(path, inputOverrides, worldProbeEnviro
   let offset = 0;
   let template = null;
   const rows = [];
+  brainLabProfileComparisonResult = {
+    snapshotPath: path,
+    totalCreatureCount: 0,
+    creatureOffset: 0,
+    maxCreatures: 0,
+    evaluatedCreatureCount: 0,
+    skippedCreatureCount: 0,
+    totalFixtureCount: 0,
+    evaluatedFixtureCount: 0,
+    skippedFixtureCount: 0,
+    cohorts: [],
+    rows: [],
+    profileScope: "all",
+    isRunning: true,
+    progressCreatureCount: 0,
+    progressTotalCreatureCount: 1,
+    progressLabel: `Loading snapshot and evaluating first ${formatNumber(brainLabProfileComparisonBatchSize)} creatures`
+  };
+  renderBrainLabProfileComparison();
+
   while (true) {
     const result = await fetchBrainLabProfileComparisonBatch(
       path,
@@ -3919,7 +3990,38 @@ function buildBrainLabProfileComparisonResult(template, rows, totalCreatureCount
     rows: [...rows],
     profileScope: "all",
     isRunning,
+    progressCreatureCount: rows.length,
+    progressTotalCreatureCount: total,
     progressLabel: `${formatNumber(rows.length)} / ${formatNumber(total)} creatures`
+  };
+}
+
+function buildBrainLabProfileComparisonSampleResult(
+  template,
+  rows,
+  totalCreatureCount,
+  sampleLimit,
+  isRunning,
+  progressLabel = null) {
+  const total = Number(totalCreatureCount || template?.totalCreatureCount || rows.length);
+  const cap = Math.min(Number(sampleLimit || brainLabProfileComparisonSampleSize), Math.max(1, total || sampleLimit || rows.length || 1));
+  return {
+    snapshotPath: template?.snapshotPath || brainLabSelectedPath(),
+    totalCreatureCount: total,
+    creatureOffset: 0,
+    maxCreatures: cap,
+    evaluatedCreatureCount: rows.length,
+    skippedCreatureCount: Math.max(0, (isRunning ? cap : total) - rows.length),
+    totalFixtureCount: template?.totalFixtureCount || 0,
+    evaluatedFixtureCount: template?.evaluatedFixtureCount || 0,
+    skippedFixtureCount: template?.skippedFixtureCount || 0,
+    cohorts: buildBrainLabProfileComparisonCohorts(rows),
+    rows: [...rows],
+    profileScope: "sample",
+    isRunning,
+    progressCreatureCount: rows.length,
+    progressTotalCreatureCount: cap,
+    progressLabel: progressLabel || `${formatNumber(rows.length)} / ${formatNumber(cap)} sample creatures`
   };
 }
 
@@ -4062,8 +4164,9 @@ function renderBrainLabProfileComparisonProgress(result) {
     return "";
   }
 
-  const total = Math.max(1, Number(result.totalCreatureCount || 0));
-  const value = Math.max(0, Math.min(total, Number(result.evaluatedCreatureCount || 0)));
+  const total = Math.max(1, Number(result.progressTotalCreatureCount || result.totalCreatureCount || 0));
+  const progressValue = result.progressCreatureCount ?? result.evaluatedCreatureCount;
+  const value = Math.max(0, Math.min(total, Number(progressValue || 0)));
   const label = result.progressLabel || `${formatNumber(value)} / ${formatNumber(total)} creatures`;
   return `
     <div class="brain-lab-profile-progress">

@@ -2221,16 +2221,7 @@ public sealed partial class LineageRunManager
         var editedState = editedSimulation.State;
         ApplyBrainLabWorldProbeEnvironment(editedState, sourceState, focus, environment);
 
-        foreach (var genome in sourceState.Genomes)
-        {
-            editedState.AddGenome(genome);
-        }
-
-        foreach (var brain in sourceState.Brains)
-        {
-            editedState.AddBrain(brain);
-        }
-
+        focus.GenomeId = editedState.AddGenome(sourceState.GetGenome(focus.GenomeId));
         editedState.Creatures.Add(focus);
         var center = focus.Position;
 
