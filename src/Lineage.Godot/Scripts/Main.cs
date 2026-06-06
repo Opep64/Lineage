@@ -100,6 +100,9 @@ public partial class Main : Node2D
     private const float FarZoomVisibleWorldWidth = 3_000f;
     private const ulong CreatureCacheRefreshMilliseconds = 100UL;
     private const float ScaleAccurateMinimumVisibleScreenRadius = 0.75f;
+    private const float ScaleAccurateIdleAnimationAmount = 0.28f;
+    private const float ScaleAccurateEatingAnimationAmount = 0.42f;
+    private const float ScaleAccurateCreatureAnimationAmount = 0.32f;
     private const float MaxResourceDensityAlpha = 0.34f;
     private const float MaxCreatureDensityAlpha = 0.42f;
     private const float MinSpeedMultiplier = 0.125f;
@@ -2479,11 +2482,16 @@ public partial class Main : Node2D
             : resource.Kind == ResourceKind.Meat
                 ? SpriteSizeFromScreenRadius(radius, MeatSpriteScalePixels, MinResourceSpriteSizePixels, MaxMeatSpriteSizePixels)
                 : SpriteSizeFromScreenRadius(radius, PlantSpriteScalePixels, MinResourceSpriteSizePixels, MaxPlantSpriteSizePixels);
-        var animation = scaleAccurateResource
-            ? (Offset: Vector2.Zero, Scale: Vector2.One, Rotation: 0f, IsEating: false)
-            : resource.Kind == ResourceKind.Plant
+        var animation = resource.Kind == ResourceKind.Plant
             ? PlantSpriteAnimation(resource, fullness, sizePixels)
             : FoodSpriteEatingAnimation(resource.Id, _drawEatingMeatResourceIds, sizePixels);
+        if (scaleAccurateResource)
+        {
+            animation = DampenSpriteAnimation(
+                animation,
+                animation.IsEating ? ScaleAccurateEatingAnimationAmount : ScaleAccurateIdleAnimationAmount);
+        }
+
         var animatedCenter = screenPosition + animation.Offset;
         var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = ResourceSpriteTint(resource, color, fullness);
@@ -2564,6 +2572,24 @@ public partial class Main : Node2D
             true);
     }
 
+    private static (Vector2 Offset, Vector2 Scale, float Rotation, bool IsEating) DampenSpriteAnimation(
+        (Vector2 Offset, Vector2 Scale, float Rotation, bool IsEating) animation,
+        float amount)
+    {
+        var clamped = Math.Clamp(amount, 0f, 1f);
+        return (
+            animation.Offset * clamped,
+            DampenSpriteScale(animation.Scale, clamped),
+            animation.Rotation * clamped,
+            animation.IsEating);
+    }
+
+    private static Vector2 DampenSpriteScale(Vector2 scale, float amount)
+    {
+        var clamped = Math.Clamp(amount, 0f, 1f);
+        return Vector2.One + (scale - Vector2.One) * clamped;
+    }
+
     private bool TryDrawSpriteEgg(EggState egg, Vector2 screenPosition, float radius, Color color)
     {
         if (!TryGetSpriteTheme(out var theme) || radius < MinResourceSpriteRadiusPixels)
@@ -2578,9 +2604,12 @@ public partial class Main : Node2D
         var sizePixels = scaleAccurateEgg
             ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius * 2f, radius * 2f)
             : SpriteSizeFromScreenRadius(radius, EggSpriteScalePixels, MinEggSpriteSizePixels, MaxEggSpriteSizePixels);
-        var animation = scaleAccurateEgg
-            ? (Offset: Vector2.Zero, Scale: Vector2.One, Rotation: 0f, IsEating: false)
-            : FoodSpriteEatingAnimation(egg.Id, _drawEatingEggIds, sizePixels);
+        var animation = FoodSpriteEatingAnimation(egg.Id, _drawEatingEggIds, sizePixels);
+        if (scaleAccurateEgg)
+        {
+            animation = DampenSpriteAnimation(animation, ScaleAccurateEatingAnimationAmount);
+        }
+
         var animatedCenter = screenPosition + animation.Offset;
         var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = Colors.White.Lerp(color, 0.10f);
@@ -2613,9 +2642,12 @@ public partial class Main : Node2D
                 SmallPreySpriteScalePixels,
                 MinSmallPreySpriteSizePixels,
                 MaxSmallPreySpriteSizePixels);
-        var animation = scaleAccurateSmallPrey
-            ? (Offset: Vector2.Zero, Scale: Vector2.One, Rotation: 0f, IsEating: false)
-            : FoodSpriteEatingAnimation(prey.Id, _drawEatingSmallPreyIds, sizePixels);
+        var animation = FoodSpriteEatingAnimation(prey.Id, _drawEatingSmallPreyIds, sizePixels);
+        if (scaleAccurateSmallPrey)
+        {
+            animation = DampenSpriteAnimation(animation, ScaleAccurateEatingAnimationAmount);
+        }
+
         var animatedCenter = screenPosition + animation.Offset;
         var animatedSize = new Vector2(sizePixels * animation.Scale.X, sizePixels * animation.Scale.Y);
         var modulate = prey.HeldByCreatureId == default
@@ -2648,7 +2680,7 @@ public partial class Main : Node2D
             ? MathF.Max(ScaleAccurateMinimumVisibleScreenRadius * 2f, radius * 2f)
             : SpriteSizeFromScreenRadius(radius, CreatureSpriteScalePixels, MinCreatureSpriteSizePixels, MaxCreatureSpriteSizePixels);
         var animationScale = scaleAccurateCreature
-            ? Vector2.One
+            ? DampenSpriteScale(CreatureSpriteAnimationScale(creature, genome), ScaleAccurateCreatureAnimationAmount)
             : CreatureSpriteAnimationScale(creature, genome);
         var animatedSize = new Vector2(sizePixels * animationScale.X, sizePixels * animationScale.Y);
         var selected = creature.Id == _selectedCreatureId;
