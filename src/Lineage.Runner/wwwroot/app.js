@@ -1546,6 +1546,9 @@ function brainLabVisionTraceCategories(signal) {
   if (signal.includes("meat")) {
     return ["meat"];
   }
+  if (signal.includes("small_prey")) {
+    return ["smallPrey"];
+  }
   if (signal.includes("egg")) {
     return ["egg"];
   }
@@ -1553,7 +1556,7 @@ function brainLabVisionTraceCategories(signal) {
     return ["creature"];
   }
   if (signal.includes("food")) {
-    return ["plant", "meat", "egg"];
+    return ["plant", "meat", "egg", "smallPrey"];
   }
   return [];
 }
@@ -1578,7 +1581,7 @@ function brainLabWorldProbeVisionContributors(scene, spec) {
     }
   }
 
-  if (spec.categories.includes("meat") && toggles.smallPrey) {
+  if ((spec.categories.includes("meat") || spec.categories.includes("smallPrey")) && toggles.smallPrey) {
     for (const prey of scene.smallPrey || []) {
       if (isBrainLabWorldProbeSmallPreyVisible(prey)) {
         brainLabWorldProbeAddVisionContributor(contributors, scene, spec, "smallPrey", "Small prey", prey);
@@ -3300,12 +3303,18 @@ function setBrainLabWorldProbeOnlyPlants(inputs) {
   for (const input of inputs.filter(isBrainLabMeatOrEggInput)) {
     setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
   }
+  for (const input of inputs.filter(isBrainLabSmallPreyInput)) {
+    setBrainLabWorldProbeOverride(input.key, input.neutralValue, inputs);
+  }
   setBrainLabWorldProbeOverride("vision.food_density", plantDensity, inputs);
   setBrainLabWorldProbeOverride("contact.food", plantContact, inputs);
 }
 
 function setBrainLabWorldProbeOnlyMeatEggs(inputs) {
-  const meatDensity = findBrainLabInput("vision.meat_density", inputs)?.baselineValue ?? 0;
+  const meatDensity = Math.max(
+    findBrainLabInput("vision.meat_density", inputs)?.baselineValue ?? 0,
+    findBrainLabInput("vision.egg_density", inputs)?.baselineValue ?? 0,
+    findBrainLabInput("vision.small_prey_density", inputs)?.baselineValue ?? 0);
   const meatContact = Math.max(
     findBrainLabInput("contact.meat_food", inputs)?.baselineValue ?? 0,
     findBrainLabInput("contact.egg_food", inputs)?.baselineValue ?? 0);
@@ -4889,12 +4898,18 @@ function setBrainLabOnlyPlants(inputs) {
   for (const input of inputs.filter(isBrainLabMeatOrEggInput)) {
     setBrainLabOverride(input.key, input.neutralValue, inputs);
   }
+  for (const input of inputs.filter(isBrainLabSmallPreyInput)) {
+    setBrainLabOverride(input.key, input.neutralValue, inputs);
+  }
   setBrainLabOverride("vision.food_density", plantDensity, inputs);
   setBrainLabOverride("contact.food", plantContact, inputs);
 }
 
 function setBrainLabOnlyMeatEggs(inputs) {
-  const meatDensity = findBrainLabInput("vision.meat_density", inputs)?.baselineValue ?? 0;
+  const meatDensity = Math.max(
+    findBrainLabInput("vision.meat_density", inputs)?.baselineValue ?? 0,
+    findBrainLabInput("vision.egg_density", inputs)?.baselineValue ?? 0,
+    findBrainLabInput("vision.small_prey_density", inputs)?.baselineValue ?? 0);
   const meatContact = Math.max(
     findBrainLabInput("contact.meat_food", inputs)?.baselineValue ?? 0,
     findBrainLabInput("contact.egg_food", inputs)?.baselineValue ?? 0);
@@ -4927,6 +4942,7 @@ function isBrainLabFoodInput(input) {
   return input.key === "vision.food_density"
     || isBrainLabPlantInput(input)
     || isBrainLabMeatOrEggInput(input)
+    || isBrainLabSmallPreyInput(input)
     || input.key.startsWith("contact.food")
     || input.key.startsWith("contact.plant_")
     || input.key.startsWith("contact.meat_")
@@ -4939,6 +4955,10 @@ function isBrainLabPlantInput(input) {
   return input.key.startsWith("vision.plant")
     || input.key.includes(".plant_")
     || input.key.startsWith("contact.plant");
+}
+
+function isBrainLabSmallPreyInput(input) {
+  return input.key.startsWith("vision.small_prey");
 }
 
 function isBrainLabMeatOrEggInput(input) {

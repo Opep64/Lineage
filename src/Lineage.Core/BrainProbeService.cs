@@ -440,7 +440,7 @@ public sealed class BrainProbeService
 
     private static bool OnlyPlants(BrainInputDefinition input, float[] baselineInputs, out float overrideValue)
     {
-        if (IsMeatOrEggInput(input))
+        if (IsMeatOrEggInput(input) || IsSmallPreyInput(input))
         {
             overrideValue = input.NeutralValue;
             return true;
@@ -472,7 +472,11 @@ public sealed class BrainProbeService
 
         if (string.Equals(input.Key, "vision.food_density", StringComparison.Ordinal))
         {
-            overrideValue = BaselineValue("vision.meat_density", baselineInputs);
+            overrideValue = Math.Max(
+                Math.Max(
+                    BaselineValue("vision.meat_density", baselineInputs),
+                    BaselineValue("vision.egg_density", baselineInputs)),
+                BaselineValue("vision.small_prey_density", baselineInputs));
             return true;
         }
 
@@ -506,12 +510,18 @@ public sealed class BrainProbeService
         return string.Equals(input.Key, "vision.food_density", StringComparison.Ordinal)
             || IsPlantInput(input)
             || IsMeatOrEggInput(input)
+            || IsSmallPreyInput(input)
             || input.Key.StartsWith("contact.food", StringComparison.Ordinal)
             || input.Key.StartsWith("contact.plant_", StringComparison.Ordinal)
             || input.Key.StartsWith("contact.meat_", StringComparison.Ordinal)
             || input.Key.StartsWith("contact.egg_", StringComparison.Ordinal)
             || input.Key.StartsWith("scent.meat", StringComparison.Ordinal)
             || input.Key.StartsWith("scent.rotten_meat", StringComparison.Ordinal);
+    }
+
+    private static bool IsSmallPreyInput(BrainInputDefinition input)
+    {
+        return input.Key.StartsWith("vision.small_prey", StringComparison.Ordinal);
     }
 
     private static bool IsPlantInput(BrainInputDefinition input)

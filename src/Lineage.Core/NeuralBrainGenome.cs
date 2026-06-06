@@ -37,6 +37,7 @@ public sealed class NeuralBrainGenome
     private const int LegacyNearestReproductionReadinessInput = 17;
     private const int LegacyNearestVisionSectorInputStart = 46;
     private const int LegacyVisionSectorChannelCount = 8;
+    private const int LegacyFullVisionSectorChannelCount = 18;
     private const int LegacyInputCountWithoutFoodContact = 118;
     private const int LegacyInputCountWithoutFoodContactKinds = 119;
     private const int LegacyInputCountWithoutHealthRatio = 122;
@@ -411,7 +412,7 @@ public sealed class NeuralBrainGenome
     }
 
     /// <summary>
-    /// Probe controller that steers from visual sector channels instead of the legacy nearest-food direction.
+    /// Probe controller that steers from compact semantic visual direction channels.
     /// </summary>
     public static NeuralBrainGenome CreateSectorForager(int hiddenNodeCount = 0)
     {
@@ -511,25 +512,8 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            var side = (sectorIndex - VisionSectorSet.CenterSectorIndex) / (float)VisionSectorSet.CenterSectorIndex;
-            var centerBias = 1f - Math.Abs(side);
-            var plantDensityInput = NeuralBrainSchema.VisionSectorPlantDensityInput(sectorIndex);
-            var plantProximityInput = NeuralBrainSchema.VisionSectorPlantProximityInput(sectorIndex);
-            var meatDensityInput = NeuralBrainSchema.VisionSectorMeatDensityInput(sectorIndex);
-            var meatProximityInput = NeuralBrainSchema.VisionSectorMeatProximityInput(sectorIndex);
-
-            Set(weights, NeuralBrainSchema.TurnOutput, plantDensityInput, side * 2.0f);
-            Set(weights, NeuralBrainSchema.TurnOutput, plantProximityInput, side * 3.2f);
-            Set(weights, NeuralBrainSchema.TurnOutput, meatDensityInput, side * 0.8f);
-            Set(weights, NeuralBrainSchema.TurnOutput, meatProximityInput, side * 1.2f);
-
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantDensityInput, centerBias * 0.35f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantProximityInput, centerBias * 1.1f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatDensityInput, centerBias * 0.1f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatProximityInput, centerBias * 0.35f);
-        }
+        SeedPlantForagingWeights(weights);
+        SeedMeatForagingWeights(weights, turnScale: 1.2f, forwardScale: 0.35f);
 
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.BiasInput, -2f);
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput, 2.75f);
@@ -557,7 +541,7 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
-        SeedSectorPlantForagingWeights(weights);
+        SeedPlantForagingWeights(weights);
 
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.BiasInput, -2f);
         Set(weights, NeuralBrainSchema.ReproduceOutput, NeuralBrainSchema.ReproductionReadinessInput, 2.75f);
@@ -581,7 +565,7 @@ public sealed class NeuralBrainGenome
 
     private static void SeedScavengerForagerWeights(float[] weights)
     {
-        SeedSectorMeatForagingWeights(weights);
+        SeedMeatForagingWeights(weights);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 5.0f);
 
@@ -594,73 +578,36 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
     }
 
-    private static void SeedSectorPlantForagingWeights(float[] weights)
+    private static void SeedPlantForagingWeights(float[] weights)
     {
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            var side = (sectorIndex - VisionSectorSet.CenterSectorIndex) / (float)VisionSectorSet.CenterSectorIndex;
-            var centerBias = 1f - Math.Abs(side);
-            var plantDensityInput = NeuralBrainSchema.VisionSectorPlantDensityInput(sectorIndex);
-            var plantProximityInput = NeuralBrainSchema.VisionSectorPlantProximityInput(sectorIndex);
-
-            Set(weights, NeuralBrainSchema.TurnOutput, plantDensityInput, side * 1.4f);
-            Set(weights, NeuralBrainSchema.TurnOutput, plantProximityInput, side * 2.4f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantDensityInput, centerBias * 11.0f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, plantProximityInput, -centerBias * 1.1f);
-        }
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.PlantDirectionRightInput, 3.2f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.PlantDirectionForwardInput, 1.4f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisiblePlantDensityInput, 0.5f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.PlantProximityInput, -1.2f);
     }
 
-    private static void SeedSectorMeatForagingWeights(float[] weights)
+    private static void SeedMeatForagingWeights(float[] weights, float turnScale = 2.5f, float forwardScale = 0.8f)
     {
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            var side = (sectorIndex - VisionSectorSet.CenterSectorIndex) / (float)VisionSectorSet.CenterSectorIndex;
-            var centerBias = 1f - Math.Abs(side);
-            var meatDensityInput = NeuralBrainSchema.VisionSectorMeatDensityInput(sectorIndex);
-            var meatProximityInput = NeuralBrainSchema.VisionSectorMeatProximityInput(sectorIndex);
-
-            Set(weights, NeuralBrainSchema.TurnOutput, meatDensityInput, side * 1.2f);
-            Set(weights, NeuralBrainSchema.TurnOutput, meatProximityInput, side * 2.1f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatDensityInput, 0.15f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, meatProximityInput, 0.25f + centerBias * 0.45f);
-        }
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatDirectionRightInput, turnScale);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatDirectionForwardInput, forwardScale);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisibleMeatDensityInput, 0.15f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MeatProximityInput, -0.3f);
     }
 
     private static void SeedSectorCreatureHuntingWeights(float[] weights)
     {
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            var side = (sectorIndex - VisionSectorSet.CenterSectorIndex) / (float)VisionSectorSet.CenterSectorIndex;
-            var centerBias = 1f - Math.Abs(side);
-            var smallerDensityInput = NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(sectorIndex);
-            var smallerProximityInput = NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(sectorIndex);
-            var similarDensityInput = NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(sectorIndex);
-            var similarProximityInput = NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(sectorIndex);
-            var largerDensityInput = NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(sectorIndex);
-            var largerProximityInput = NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(sectorIndex);
-            var approachInput = NeuralBrainSchema.VisionSectorCreatureApproachRateInput(sectorIndex);
-            var facingInput = NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(sectorIndex);
+        Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.CreatureDirectionRightInput, 1.8f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureDirectionForwardInput, 0.45f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureProximityInput, -0.25f);
+        Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -0.35f);
 
-            Set(weights, NeuralBrainSchema.TurnOutput, smallerDensityInput, side * 1.4f);
-            Set(weights, NeuralBrainSchema.TurnOutput, smallerProximityInput, side * 2.8f);
-            Set(weights, NeuralBrainSchema.TurnOutput, similarDensityInput, side * 0.8f);
-            Set(weights, NeuralBrainSchema.TurnOutput, similarProximityInput, side * 1.4f);
-            Set(weights, NeuralBrainSchema.TurnOutput, largerDensityInput, side * 0.4f);
-            Set(weights, NeuralBrainSchema.TurnOutput, largerProximityInput, side * 0.7f);
-
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, smallerDensityInput, centerBias * 0.2f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, smallerProximityInput, centerBias * 0.9f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, similarProximityInput, centerBias * 0.35f);
-            Set(weights, NeuralBrainSchema.MoveForwardOutput, largerProximityInput, -centerBias * 0.45f);
-
-            var smallerAttackBias = 0.65f + centerBias * 0.35f;
-            Set(weights, NeuralBrainSchema.AttackOutput, smallerDensityInput, smallerAttackBias * 1.6f);
-            Set(weights, NeuralBrainSchema.AttackOutput, smallerProximityInput, smallerAttackBias * 4.2f);
-            Set(weights, NeuralBrainSchema.AttackOutput, similarProximityInput, centerBias * 1.2f);
-            Set(weights, NeuralBrainSchema.AttackOutput, largerProximityInput, -centerBias * 2.2f);
-            Set(weights, NeuralBrainSchema.AttackOutput, approachInput, -centerBias * 0.8f);
-            Set(weights, NeuralBrainSchema.AttackOutput, facingInput, -centerBias * 0.45f);
-        }
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.VisibleCreatureDensityInput, 0.8f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureProximityInput, 3.5f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureRelativeBodySizeInput, -2.6f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureApproachRateInput, -0.8f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureFacingAlignmentInput, -0.45f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureVisualTraitSimilarityInput, -2.4f);
+        Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.CreatureVisualLineageSimilarityInput, -1.8f);
     }
 
     private static void SeedHiddenConceptInputs(float[] weights, int hiddenNodeCount)
@@ -674,7 +621,7 @@ public sealed class NeuralBrainGenome
                 weights,
                 hiddenNodeCount,
                 SeedFoodOpportunityHiddenNode,
-                NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex),
+                NeuralBrainSchema.PlantProximityInput,
                 0.8f);
         }
 
@@ -695,14 +642,14 @@ public sealed class NeuralBrainGenome
                 weights,
                 hiddenNodeCount,
                 SeedCreatureCueHiddenNode,
-                NeuralBrainSchema.VisionSectorCreatureProximityInput(VisionSectorSet.CenterSectorIndex),
+                NeuralBrainSchema.CreatureProximityInput,
                 1.1f);
             SetHiddenInput(weights, hiddenNodeCount, SeedCreatureCueHiddenNode, NeuralBrainSchema.CreatureContactInput, 1.0f);
             SetHiddenInput(
                 weights,
                 hiddenNodeCount,
                 SeedCreatureCueHiddenNode,
-                NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex),
+                NeuralBrainSchema.CreatureApproachRateInput,
                 0.4f);
         }
 
@@ -2125,8 +2072,6 @@ public sealed class NeuralBrainGenome
         if (legacyInputCount == LegacyInputCountWithoutLineageFamiliarity
             || legacyInputCount == LegacyInputCountWithoutFullness
             || legacyInputCount == LegacyInputCountWithoutFat
-            || (legacyInputCount == LegacyInputCountWithoutThermalSensing
-                && legacyOutputCount == NeuralBrainSchema.OutputCount)
             || legacyInputCount == LegacyInputCountWithoutSound
             || legacyInputCount == LegacyInputCountWithoutGrab)
         {
@@ -2136,15 +2081,14 @@ public sealed class NeuralBrainGenome
         if (legacyInputCount >= LegacyInputCountWithoutTypedPlantEnergyYield)
         {
             var foodContactInput = LegacyNearestVisionSectorInputStart
-                + VisionSectorSet.SectorCount * NeuralBrainSchema.VisionSectorChannelCount;
+                + VisionSectorSet.SectorCount * LegacyFullVisionSectorChannelCount;
 
             if (input >= LegacyNearestVisionSectorInputStart
                 && input < foodContactInput)
             {
                 var sectorOffset = input - LegacyNearestVisionSectorInputStart;
-                var sectorIndex = sectorOffset / NeuralBrainSchema.VisionSectorChannelCount;
-                var channelOffset = sectorOffset % NeuralBrainSchema.VisionSectorChannelCount;
-                return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, channelOffset);
+                var channelOffset = sectorOffset % LegacyFullVisionSectorChannelCount;
+                return MapLegacySectorChannelOffset(channelOffset);
             }
 
             if (input >= foodContactInput)
@@ -2159,9 +2103,8 @@ public sealed class NeuralBrainGenome
                 && input < LegacySectorPlantQualityFoodContactInput)
             {
                 var sectorOffset = input - LegacyNearestVisionSectorInputStart;
-                var sectorIndex = sectorOffset / LegacyVisionSectorChannelCountWithoutPlantQuality;
                 var channelOffset = sectorOffset % LegacyVisionSectorChannelCountWithoutPlantQuality;
-                return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, MapLegacySectorChannelOffset(channelOffset));
+                return MapLegacySectorChannelOffset(channelOffset);
             }
 
             if (input >= LegacySectorPlantQualityFoodContactInput)
@@ -2182,9 +2125,8 @@ public sealed class NeuralBrainGenome
                 && input < LegacyCreatureSectorMotionFoodContactInput)
             {
                 var sectorOffset = input - LegacyNearestVisionSectorInputStart;
-                var sectorIndex = sectorOffset / LegacyCreatureSectorSizeChannelCount;
                 var channelOffset = sectorOffset % LegacyCreatureSectorSizeChannelCount;
-                return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, MapLegacySectorChannelOffset(channelOffset));
+                return MapLegacySectorChannelOffset(channelOffset);
             }
 
             if (input == LegacyCreatureSectorMotionFoodContactInput)
@@ -2218,9 +2160,8 @@ public sealed class NeuralBrainGenome
             && input < LegacyInputCountWithoutFoodContact)
         {
             var sectorOffset = input - LegacyNearestVisionSectorInputStart;
-            var sectorIndex = sectorOffset / LegacyVisionSectorChannelCount;
             var channelOffset = sectorOffset % LegacyVisionSectorChannelCount;
-            return NeuralBrainSchema.GetVisionSectorInput(sectorIndex, MapLegacySectorChannelOffset(channelOffset));
+            return MapLegacySectorChannelOffset(channelOffset);
         }
 
         if (legacyInputCount > LegacyInputCountWithoutFoodContact
@@ -2266,9 +2207,7 @@ public sealed class NeuralBrainGenome
     private static int MapTrailingFoodContactInputAcrossLineageFamiliarityInsertion(int trailingOffset)
     {
         var targetInput = NeuralBrainSchema.FoodContactInput + trailingOffset;
-        return targetInput > LegacyCreatureContactSimilarityInput
-            ? targetInput + LineageFamiliarityInsertedInputCount
-            : targetInput;
+        return targetInput < NeuralBrainSchema.InputCount ? targetInput : -1;
     }
 
     private static int MapLegacyPrefixInput(int input)
@@ -2300,8 +2239,27 @@ public sealed class NeuralBrainGenome
 
     private static int MapLegacySectorChannelOffset(int channelOffset)
     {
-        return channelOffset <= NeuralBrainSchema.VisionSectorPlantProximityOffset
-            ? channelOffset
-            : channelOffset + 2;
+        return channelOffset switch
+        {
+            0 => NeuralBrainSchema.VisiblePlantDensityInput,
+            1 => NeuralBrainSchema.PlantProximityInput,
+            2 => NeuralBrainSchema.VisiblePlantEnergyQualityInput,
+            3 => NeuralBrainSchema.VisiblePlantBiteEaseInput,
+            4 => NeuralBrainSchema.VisibleMeatDensityInput,
+            5 => NeuralBrainSchema.MeatProximityInput,
+            6 => NeuralBrainSchema.VisibleEggDensityInput,
+            7 => NeuralBrainSchema.EggProximityInput,
+            8 => NeuralBrainSchema.VisibleCreatureDensityInput,
+            9 => NeuralBrainSchema.CreatureProximityInput,
+            10 => NeuralBrainSchema.VisibleCreatureDensityInput,
+            11 => NeuralBrainSchema.CreatureProximityInput,
+            12 => NeuralBrainSchema.VisibleCreatureDensityInput,
+            13 => NeuralBrainSchema.CreatureProximityInput,
+            14 => NeuralBrainSchema.VisibleCreatureDensityInput,
+            15 => NeuralBrainSchema.CreatureProximityInput,
+            16 => NeuralBrainSchema.CreatureApproachRateInput,
+            17 => NeuralBrainSchema.CreatureFacingAlignmentInput,
+            _ => -1
+        };
     }
 }

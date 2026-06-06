@@ -392,6 +392,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var visiblePlantCount = 0;
         var visibleMeatCount = 0;
         var visibleCreatureCount = creatureVisibility.VisibleCount;
+        var visibleSmallPreyCount = 0;
         var totalMeatScentStrength = 0f;
         var meatScentVector = SimVector2.Zero;
         var totalRottenMeatScentStrength = 0f;
@@ -410,6 +411,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var nearestVisibleMeatIndex = -1;
         var nearestVisibleMeatDistanceSquared = float.PositiveInfinity;
         var nearestVisibleMeatFreshness = 0f;
+        var nearestVisibleEggIndex = -1;
+        var nearestVisibleEggDistanceSquared = float.PositiveInfinity;
+        var nearestVisibleSmallPreyIndex = -1;
+        var nearestVisibleSmallPreyDistanceSquared = float.PositiveInfinity;
         var nearestVisibleCreatureIndex = creatureVisibility.NearestIndex;
         var visiblePlantQualityWeight = 0f;
         var visiblePlantEnergyQualityTotal = 0f;
@@ -628,6 +633,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             visibleMeatCount++;
             visibleEggCandidates++;
 
+            if (distanceSquared < nearestVisibleEggDistanceSquared)
+            {
+                nearestVisibleEggDistanceSquared = distanceSquared;
+                nearestVisibleEggIndex = eggIndex;
+            }
+
             if (distanceSquared < nearestVisibleMeatDistanceSquared)
             {
                 nearestVisibleMeatDistanceSquared = distanceSquared;
@@ -695,6 +706,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             visibleFoodCount++;
             visibleMeatCount++;
+            visibleSmallPreyCount++;
+
+            if (distanceSquared < nearestVisibleSmallPreyDistanceSquared)
+            {
+                nearestVisibleSmallPreyDistanceSquared = distanceSquared;
+                nearestVisibleSmallPreyIndex = preyIndex;
+            }
 
             if (distanceSquared < nearestVisibleMeatDistanceSquared)
             {
@@ -741,8 +759,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             ? visiblePlantBiteEaseTotal / visiblePlantQualityWeight
             : 0f;
         senses.VisibleMeatDensity = Math.Clamp(visibleMeatCount / DensitySaturationFoodCount, 0f, 1f);
+        senses.VisibleEggDensity = Math.Clamp(visibleEggCandidates / DensitySaturationFoodCount, 0f, 1f);
+        senses.VisibleSmallPreyDensity = Math.Clamp(visibleSmallPreyCount / DensitySaturationFoodCount, 0f, 1f);
         senses.VisibleCreatureDensity = Math.Clamp(visibleCreatureCount / DensitySaturationFoodCount, 0f, 1f);
-        senses.VisiblePreyDensity = senses.VisibleCreatureDensity;
+        senses.VisiblePreyDensity = senses.VisibleSmallPreyDensity;
         senses.VisionSectors = visionSectors;
         ApplyMeatScentSense(ref senses, meatScentVector, totalMeatScentStrength, forward, right);
         ApplyRottenMeatScentSense(ref senses, rottenMeatScentVector, totalRottenMeatScentStrength, forward, right);
@@ -862,10 +882,35 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 right,
                 effectiveVisionRadius);
         }
+        if (nearestVisibleEggIndex >= 0)
+        {
+            ApplyEggSense(
+                ref senses,
+                state,
+                state.Eggs[nearestVisibleEggIndex],
+                genome,
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+
+        if (nearestVisibleSmallPreyIndex >= 0)
+        {
+            ApplySmallPreySense(
+                ref senses,
+                state.SmallPrey[nearestVisibleSmallPreyIndex],
+                creature,
+                forward,
+                right,
+                effectiveVisionRadius);
+        }
+
         if (nearestVisibleCreatureIndex >= 0)
         {
             ApplyCreatureSense(
                 ref senses,
+                state,
                 state.Creatures[nearestVisibleCreatureIndex],
                 GetCreatureTraits(state, nearestVisibleCreatureIndex),
                 creatureTraits,
@@ -917,6 +962,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         return senses.FoodProximity >= _closeSenseRefreshProximity
             || senses.PlantProximity >= _closeSenseRefreshProximity
             || senses.MeatProximity >= _closeSenseRefreshProximity
+            || senses.EggProximity >= _closeSenseRefreshProximity
+            || senses.SmallPreyProximity >= _closeSenseRefreshProximity
             || senses.CreatureProximity >= _closeSenseRefreshProximity
             || senses.PreyProximity >= _closeSenseRefreshProximity
             || senses.ForwardObstacle >= _closeSenseRefreshProximity
@@ -1880,8 +1927,49 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.MeatDirectionRight = sense.DirectionRight;
     }
 
+    private static void ApplyEggSense(
+        ref CreatureSenseState senses,
+        WorldState state,
+        EggState egg,
+        CreatureGenome genome,
+        CreatureState creature,
+        SimVector2 forward,
+        SimVector2 right,
+        float effectiveSenseRadius)
+    {
+        var sense = CalculateFoodSense(egg.Position, EggPredation.ContactRadius(egg), creature, forward, right, effectiveSenseRadius);
+        senses.EggDetected = true;
+        senses.EggProximity = sense.Proximity;
+        senses.EggDirectionForward = sense.DirectionForward;
+        senses.EggDirectionRight = sense.DirectionRight;
+        senses.EggVisualLineageSimilarity = LineageFamiliarity.EggSimilarity(state, creature.Id, egg);
+        senses.EggVisualIdentitySimilarity = ScentIdentity.SignatureSimilarity(genome, state.GetGenome(egg.GenomeId));
+    }
+
+    private static void ApplySmallPreySense(
+        ref CreatureSenseState senses,
+        SmallPreyState prey,
+        CreatureState creature,
+        SimVector2 forward,
+        SimVector2 right,
+        float effectiveSenseRadius)
+    {
+        var sense = CalculateFoodSense(prey.Position, prey.Radius, creature, forward, right, effectiveSenseRadius);
+        senses.SmallPreyDetected = true;
+        senses.SmallPreyProximity = sense.Proximity;
+        senses.SmallPreyDirectionForward = sense.DirectionForward;
+        senses.SmallPreyDirectionRight = sense.DirectionRight;
+        senses.SmallPreyGrabOpportunity = Math.Clamp((sense.Proximity - 0.75f) / 0.25f, 0f, 1f);
+
+        senses.PreyDetected = true;
+        senses.PreyProximity = sense.Proximity;
+        senses.PreyDirectionForward = sense.DirectionForward;
+        senses.PreyDirectionRight = sense.DirectionRight;
+    }
+
     private static void ApplyCreatureSense(
         ref CreatureSenseState senses,
+        WorldState state,
         CreatureState visibleCreature,
         CreatureSensingTraits visibleTraits,
         CreatureSensingTraits creatureTraits,
@@ -1906,10 +1994,16 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.CreatureRelativeSpeed = sense.RelativeSpeed;
         senses.CreatureApproachRate = sense.ApproachRate;
         senses.CreatureFacingAlignment = sense.FacingAlignment;
-        senses.PreyDetected = true;
-        senses.PreyProximity = sense.Proximity;
-        senses.PreyDirectionForward = sense.DirectionForward;
-        senses.PreyDirectionRight = sense.DirectionRight;
+        senses.CreatureVisualTraitSimilarity = CreatureSimilarity.GeneticSimilarity(
+            creatureTraits.Genome,
+            visibleTraits.Genome);
+        senses.CreatureVisualLineageSimilarity = LineageFamiliarity.CreatureSimilarity(
+            state,
+            creature.Id,
+            visibleCreature.Id);
+        senses.CreatureVisualIdentitySimilarity = ScentIdentity.SignatureSimilarity(
+            creatureTraits.Genome,
+            visibleTraits.Genome);
     }
 
     private static ResourceSense CalculateResourceSense(

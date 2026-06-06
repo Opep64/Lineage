@@ -87,6 +87,36 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.LeftObstacleInput] = frame.Body.LeftObstacle;
         inputs[NeuralBrainSchema.RightObstacleInput] = frame.Body.RightObstacle;
         inputs[NeuralBrainSchema.MovementBlockedInput] = frame.Body.MovementBlocked;
+        inputs[NeuralBrainSchema.FoodProximityInput] = frame.Vision.Food.Proximity;
+        inputs[NeuralBrainSchema.FoodDirectionForwardInput] = frame.Vision.Food.DirectionForward;
+        inputs[NeuralBrainSchema.FoodDirectionRightInput] = frame.Vision.Food.DirectionRight;
+        inputs[NeuralBrainSchema.PlantProximityInput] = frame.Vision.Plant.Proximity;
+        inputs[NeuralBrainSchema.PlantDirectionForwardInput] = frame.Vision.Plant.DirectionForward;
+        inputs[NeuralBrainSchema.PlantDirectionRightInput] = frame.Vision.Plant.DirectionRight;
+        inputs[NeuralBrainSchema.MeatProximityInput] = frame.Vision.Meat.Proximity;
+        inputs[NeuralBrainSchema.MeatDirectionForwardInput] = frame.Vision.Meat.DirectionForward;
+        inputs[NeuralBrainSchema.MeatDirectionRightInput] = frame.Vision.Meat.DirectionRight;
+        inputs[NeuralBrainSchema.VisibleEggDensityInput] = frame.Vision.Egg.Density;
+        inputs[NeuralBrainSchema.EggProximityInput] = frame.Vision.Egg.Proximity;
+        inputs[NeuralBrainSchema.EggDirectionForwardInput] = frame.Vision.Egg.DirectionForward;
+        inputs[NeuralBrainSchema.EggDirectionRightInput] = frame.Vision.Egg.DirectionRight;
+        inputs[NeuralBrainSchema.EggVisualLineageSimilarityInput] = frame.Vision.EggLineageSimilarity;
+        inputs[NeuralBrainSchema.EggVisualIdentitySimilarityInput] = frame.Vision.EggIdentitySimilarity;
+        inputs[NeuralBrainSchema.VisibleSmallPreyDensityInput] = frame.Vision.SmallPrey.Density;
+        inputs[NeuralBrainSchema.SmallPreyProximityInput] = frame.Vision.SmallPrey.Proximity;
+        inputs[NeuralBrainSchema.SmallPreyDirectionForwardInput] = frame.Vision.SmallPrey.DirectionForward;
+        inputs[NeuralBrainSchema.SmallPreyDirectionRightInput] = frame.Vision.SmallPrey.DirectionRight;
+        inputs[NeuralBrainSchema.SmallPreyGrabOpportunityInput] = frame.Vision.SmallPreyGrabOpportunity;
+        inputs[NeuralBrainSchema.CreatureProximityInput] = frame.Vision.Creature.Proximity;
+        inputs[NeuralBrainSchema.CreatureDirectionForwardInput] = frame.Vision.Creature.DirectionForward;
+        inputs[NeuralBrainSchema.CreatureDirectionRightInput] = frame.Vision.Creature.DirectionRight;
+        inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput] = frame.Vision.CreatureRelativeBodySize;
+        inputs[NeuralBrainSchema.CreatureRelativeSpeedInput] = frame.Vision.CreatureRelativeSpeed;
+        inputs[NeuralBrainSchema.CreatureApproachRateInput] = frame.Vision.CreatureApproachRate;
+        inputs[NeuralBrainSchema.CreatureFacingAlignmentInput] = frame.Vision.CreatureFacingAlignment;
+        inputs[NeuralBrainSchema.CreatureVisualTraitSimilarityInput] = frame.Vision.CreatureTraitSimilarity;
+        inputs[NeuralBrainSchema.CreatureVisualLineageSimilarityInput] = frame.Vision.CreatureLineageSimilarity;
+        inputs[NeuralBrainSchema.CreatureVisualIdentitySimilarityInput] = frame.Vision.CreatureIdentitySimilarity;
         inputs[NeuralBrainSchema.FoodContactInput] = frame.Body.FoodContact;
         inputs[NeuralBrainSchema.PlantFoodContactInput] = frame.Body.PlantFoodContact;
         inputs[NeuralBrainSchema.PlantFoodContactEnergyQualityInput] = frame.Body.PlantFoodContactEnergyQuality;
@@ -125,34 +155,6 @@ public static class LegacyNeuralBrainAdapter
         inputs[NeuralBrainSchema.InjuryMemoryRightInput] = frame.Internal.InjuryMemoryDirectionRight;
         inputs[NeuralBrainSchema.InjuryMemoryStrengthInput] = frame.Internal.InjuryMemoryStrength;
         inputs[NeuralBrainSchema.MaturityProgressInput] = frame.Internal.MaturityProgress;
-
-        if (!frame.Vision.Sectors.HasAnySignal)
-        {
-            return;
-        }
-
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            var sector = frame.Vision.Sectors.Get(sectorIndex);
-            inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(sectorIndex)] = sector.PlantDensity;
-            inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(sectorIndex)] = sector.PlantProximity;
-            inputs[NeuralBrainSchema.VisionSectorPlantEnergyQualityInput(sectorIndex)] = sector.PlantEnergyQuality;
-            inputs[NeuralBrainSchema.VisionSectorPlantBiteEaseInput(sectorIndex)] = sector.PlantBiteEase;
-            inputs[NeuralBrainSchema.VisionSectorMeatDensityInput(sectorIndex)] = sector.MeatDensity;
-            inputs[NeuralBrainSchema.VisionSectorMeatProximityInput(sectorIndex)] = sector.MeatProximity;
-            inputs[NeuralBrainSchema.VisionSectorEggDensityInput(sectorIndex)] = sector.EggDensity;
-            inputs[NeuralBrainSchema.VisionSectorEggProximityInput(sectorIndex)] = sector.EggProximity;
-            inputs[NeuralBrainSchema.VisionSectorCreatureDensityInput(sectorIndex)] = sector.CreatureDensity;
-            inputs[NeuralBrainSchema.VisionSectorCreatureProximityInput(sectorIndex)] = sector.CreatureProximity;
-            inputs[NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(sectorIndex)] = sector.SmallerCreatureDensity;
-            inputs[NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(sectorIndex)] = sector.SmallerCreatureProximity;
-            inputs[NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(sectorIndex)] = sector.SimilarCreatureDensity;
-            inputs[NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(sectorIndex)] = sector.SimilarCreatureProximity;
-            inputs[NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(sectorIndex)] = sector.LargerCreatureDensity;
-            inputs[NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(sectorIndex)] = sector.LargerCreatureProximity;
-            inputs[NeuralBrainSchema.VisionSectorCreatureApproachRateInput(sectorIndex)] = sector.CreatureApproachRate;
-            inputs[NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(sectorIndex)] = sector.CreatureFacingAlignment;
-        }
     }
 
     public static BrainOutputFrame ReadStandardOutputs(ReadOnlySpan<float> outputs)

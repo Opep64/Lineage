@@ -45,6 +45,21 @@ public readonly record struct BrainInputFrame(
                     senses.MeatDirectionRight,
                     senses.VisibleMeatDensity),
                 senses.VisibleMeatFreshness,
+                new DirectionalObjectSignal(
+                    senses.EggDetected,
+                    senses.EggProximity,
+                    senses.EggDirectionForward,
+                    senses.EggDirectionRight,
+                    senses.VisibleEggDensity),
+                senses.EggVisualLineageSimilarity,
+                senses.EggVisualIdentitySimilarity,
+                new DirectionalObjectSignal(
+                    senses.SmallPreyDetected,
+                    senses.SmallPreyProximity,
+                    senses.SmallPreyDirectionForward,
+                    senses.SmallPreyDirectionRight,
+                    senses.VisibleSmallPreyDensity),
+                senses.SmallPreyGrabOpportunity,
                 senses.VisionSectors,
                 new DirectionalObjectSignal(
                     senses.CreatureDetected,
@@ -55,7 +70,10 @@ public readonly record struct BrainInputFrame(
                 senses.CreatureRelativeBodySize,
                 senses.CreatureRelativeSpeed,
                 senses.CreatureApproachRate,
-                senses.CreatureFacingAlignment),
+                senses.CreatureFacingAlignment,
+                senses.CreatureVisualTraitSimilarity,
+                senses.CreatureVisualLineageSimilarity,
+                senses.CreatureVisualIdentitySimilarity),
             new ScentInputFrame(
                 new DirectionalGradientSignal(
                     senses.MeatScentDetected,
@@ -211,12 +229,20 @@ public readonly record struct VisionInputFrame(
     float PlantPreferenceDirectionRight,
     DirectionalObjectSignal Meat,
     float MeatFreshness,
+    DirectionalObjectSignal Egg,
+    float EggLineageSimilarity,
+    float EggIdentitySimilarity,
+    DirectionalObjectSignal SmallPrey,
+    float SmallPreyGrabOpportunity,
     VisionSectorSet Sectors,
     DirectionalObjectSignal Creature,
     float CreatureRelativeBodySize,
     float CreatureRelativeSpeed,
     float CreatureApproachRate,
-    float CreatureFacingAlignment);
+    float CreatureFacingAlignment,
+    float CreatureTraitSimilarity,
+    float CreatureLineageSimilarity,
+    float CreatureIdentitySimilarity);
 
 /// <summary>
 /// Chemical cues. These should remain lower-resolution than vision.

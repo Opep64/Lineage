@@ -73,6 +73,32 @@ public struct CreatureSenseState
     /// </summary>
     public float VisibleMeatFreshness { get; set; }
 
+    public bool EggDetected { get; set; }
+
+    public float EggProximity { get; set; }
+
+    public float EggDirectionForward { get; set; }
+
+    public float EggDirectionRight { get; set; }
+
+    public float VisibleEggDensity { get; set; }
+
+    public float EggVisualLineageSimilarity { get; set; }
+
+    public float EggVisualIdentitySimilarity { get; set; }
+
+    public bool SmallPreyDetected { get; set; }
+
+    public float SmallPreyProximity { get; set; }
+
+    public float SmallPreyDirectionForward { get; set; }
+
+    public float SmallPreyDirectionRight { get; set; }
+
+    public float VisibleSmallPreyDensity { get; set; }
+
+    public float SmallPreyGrabOpportunity { get; set; }
+
     public bool MeatScentDetected { get; set; }
 
     public float MeatScentDensity { get; set; }
@@ -176,6 +202,12 @@ public struct CreatureSenseState
     /// Facing alignment of the nearest visible creature. Positive means it is pointed toward this creature.
     /// </summary>
     public float CreatureFacingAlignment { get; set; }
+
+    public float CreatureVisualTraitSimilarity { get; set; }
+
+    public float CreatureVisualLineageSimilarity { get; set; }
+
+    public float CreatureVisualIdentitySimilarity { get; set; }
 
     /// <summary>
     /// Local traversal drag at the creature's current body position. Neutral terrain is 0, slower terrain is positive.

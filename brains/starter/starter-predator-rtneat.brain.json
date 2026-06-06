@@ -3,8 +3,8 @@
   "name": "Starter Predator rtNEAT Brain",
   "notes": "Sparse topology-evolving graph controller for predator starters.",
   "source": {
-    "scenarioName": "Starter Brain Catalog",
-    "seed": 20260519,
+    "scenarioName": "Starter Catalog",
+    "seed": 20260606,
     "tick": 0,
     "elapsedSeconds": 0,
     "initialBrainKind": "sparseGraphPredator",
@@ -13,12 +13,12 @@
     "parentId": 0,
     "generation": 0,
     "brainId": 0,
-    "exportedAtUtc": "2026-06-01T00:00:00+00:00"
+    "exportedAtUtc": "2026-06-06T00:00:00+00:00"
   },
   "brainArchitectureKind": "rtNeatGraph",
-  "inputSchemaVersion": 5,
+  "inputSchemaVersion": 13,
   "outputSchemaVersion": 3,
-  "inputCount": 235,
+  "inputCount": 133,
   "outputCount": 10,
   "hiddenNodeCount": 0,
   "weights": [
@@ -59,7 +59,7 @@
   ],
   "rtNeatBrain": {
     "version": 1,
-    "inputSchemaVersion": 5,
+    "inputSchemaVersion": 13,
     "outputSchemaVersion": 3,
     "nodes": [
       {
@@ -281,7 +281,7 @@
       {
         "id": 27,
         "kind": "input",
-        "key": "vision.sector.0.plant_density",
+        "key": "vision.food.proximity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -289,7 +289,7 @@
       {
         "id": 28,
         "kind": "input",
-        "key": "vision.sector.0.plant_proximity",
+        "key": "vision.food.direction_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -297,7 +297,7 @@
       {
         "id": 29,
         "kind": "input",
-        "key": "vision.sector.0.plant_energy_quality",
+        "key": "vision.food.direction_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -305,7 +305,7 @@
       {
         "id": 30,
         "kind": "input",
-        "key": "vision.sector.0.plant_bite_ease",
+        "key": "vision.plant.proximity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -313,7 +313,7 @@
       {
         "id": 31,
         "kind": "input",
-        "key": "vision.sector.0.meat_density",
+        "key": "vision.plant.direction_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -321,7 +321,7 @@
       {
         "id": 32,
         "kind": "input",
-        "key": "vision.sector.0.meat_proximity",
+        "key": "vision.plant.direction_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -329,7 +329,7 @@
       {
         "id": 33,
         "kind": "input",
-        "key": "vision.sector.0.egg_density",
+        "key": "vision.meat.proximity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -337,7 +337,7 @@
       {
         "id": 34,
         "kind": "input",
-        "key": "vision.sector.0.egg_proximity",
+        "key": "vision.meat.direction_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -345,7 +345,7 @@
       {
         "id": 35,
         "kind": "input",
-        "key": "vision.sector.0.creature_density",
+        "key": "vision.meat.direction_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -353,7 +353,7 @@
       {
         "id": 36,
         "kind": "input",
-        "key": "vision.sector.0.creature_proximity",
+        "key": "vision.egg_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -361,7 +361,7 @@
       {
         "id": 37,
         "kind": "input",
-        "key": "vision.sector.0.smaller_creature_density",
+        "key": "vision.egg.proximity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -369,7 +369,7 @@
       {
         "id": 38,
         "kind": "input",
-        "key": "vision.sector.0.smaller_creature_proximity",
+        "key": "vision.egg.direction_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -377,7 +377,7 @@
       {
         "id": 39,
         "kind": "input",
-        "key": "vision.sector.0.similar_creature_density",
+        "key": "vision.egg.direction_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -385,7 +385,7 @@
       {
         "id": 40,
         "kind": "input",
-        "key": "vision.sector.0.similar_creature_proximity",
+        "key": "vision.egg.lineage_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -393,7 +393,7 @@
       {
         "id": 41,
         "kind": "input",
-        "key": "vision.sector.0.larger_creature_density",
+        "key": "vision.egg.identity_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -401,7 +401,7 @@
       {
         "id": 42,
         "kind": "input",
-        "key": "vision.sector.0.larger_creature_proximity",
+        "key": "vision.small_prey_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -409,7 +409,7 @@
       {
         "id": 43,
         "kind": "input",
-        "key": "vision.sector.0.creature_approach_rate",
+        "key": "vision.small_prey.proximity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -417,7 +417,7 @@
       {
         "id": 44,
         "kind": "input",
-        "key": "vision.sector.0.creature_facing_alignment",
+        "key": "vision.small_prey.direction_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -425,7 +425,7 @@
       {
         "id": 45,
         "kind": "input",
-        "key": "vision.sector.1.plant_density",
+        "key": "vision.small_prey.direction_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -433,7 +433,7 @@
       {
         "id": 46,
         "kind": "input",
-        "key": "vision.sector.1.plant_proximity",
+        "key": "vision.small_prey.grab_opportunity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -441,7 +441,7 @@
       {
         "id": 47,
         "kind": "input",
-        "key": "vision.sector.1.plant_energy_quality",
+        "key": "vision.creature.proximity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -449,7 +449,7 @@
       {
         "id": 48,
         "kind": "input",
-        "key": "vision.sector.1.plant_bite_ease",
+        "key": "vision.creature.direction_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -457,7 +457,7 @@
       {
         "id": 49,
         "kind": "input",
-        "key": "vision.sector.1.meat_density",
+        "key": "vision.creature.direction_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -465,7 +465,7 @@
       {
         "id": 50,
         "kind": "input",
-        "key": "vision.sector.1.meat_proximity",
+        "key": "vision.creature.relative_body_size",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -473,7 +473,7 @@
       {
         "id": 51,
         "kind": "input",
-        "key": "vision.sector.1.egg_density",
+        "key": "vision.creature.relative_speed",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -481,7 +481,7 @@
       {
         "id": 52,
         "kind": "input",
-        "key": "vision.sector.1.egg_proximity",
+        "key": "vision.creature.approach_rate",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -489,7 +489,7 @@
       {
         "id": 53,
         "kind": "input",
-        "key": "vision.sector.1.creature_density",
+        "key": "vision.creature.facing_alignment",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -497,7 +497,7 @@
       {
         "id": 54,
         "kind": "input",
-        "key": "vision.sector.1.creature_proximity",
+        "key": "vision.creature.trait_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -505,7 +505,7 @@
       {
         "id": 55,
         "kind": "input",
-        "key": "vision.sector.1.smaller_creature_density",
+        "key": "vision.creature.lineage_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -513,7 +513,7 @@
       {
         "id": 56,
         "kind": "input",
-        "key": "vision.sector.1.smaller_creature_proximity",
+        "key": "vision.creature.identity_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -521,7 +521,7 @@
       {
         "id": 57,
         "kind": "input",
-        "key": "vision.sector.1.similar_creature_density",
+        "key": "contact.food",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -529,7 +529,7 @@
       {
         "id": 58,
         "kind": "input",
-        "key": "vision.sector.1.similar_creature_proximity",
+        "key": "contact.plant_food",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -537,7 +537,7 @@
       {
         "id": 59,
         "kind": "input",
-        "key": "vision.sector.1.larger_creature_density",
+        "key": "contact.meat_food",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -545,7 +545,7 @@
       {
         "id": 60,
         "kind": "input",
-        "key": "vision.sector.1.larger_creature_proximity",
+        "key": "contact.egg_food",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -553,7 +553,7 @@
       {
         "id": 61,
         "kind": "input",
-        "key": "vision.sector.1.creature_approach_rate",
+        "key": "contact.creature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -561,7 +561,7 @@
       {
         "id": 62,
         "kind": "input",
-        "key": "vision.sector.1.creature_facing_alignment",
+        "key": "internal.health_ratio",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -569,7 +569,7 @@
       {
         "id": 63,
         "kind": "input",
-        "key": "vision.sector.2.plant_density",
+        "key": "vision.plant_energy_quality",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -577,7 +577,7 @@
       {
         "id": 64,
         "kind": "input",
-        "key": "vision.sector.2.plant_proximity",
+        "key": "vision.plant_bite_ease",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -585,7 +585,7 @@
       {
         "id": 65,
         "kind": "input",
-        "key": "vision.sector.2.plant_energy_quality",
+        "key": "contact.plant_energy_quality",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -593,7 +593,7 @@
       {
         "id": 66,
         "kind": "input",
-        "key": "vision.sector.2.plant_bite_ease",
+        "key": "contact.plant_bite_ease",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -601,7 +601,7 @@
       {
         "id": 67,
         "kind": "input",
-        "key": "vision.sector.2.meat_density",
+        "key": "internal.recent_plant_raw_yield",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -609,7 +609,7 @@
       {
         "id": 68,
         "kind": "input",
-        "key": "vision.sector.2.meat_proximity",
+        "key": "internal.recent_plant_energy_yield",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -617,7 +617,7 @@
       {
         "id": 69,
         "kind": "input",
-        "key": "vision.sector.2.egg_density",
+        "key": "internal.recent_food_energy_yield",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -625,7 +625,7 @@
       {
         "id": 70,
         "kind": "input",
-        "key": "vision.sector.2.egg_proximity",
+        "key": "internal.recent_tender_plant_energy_yield",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -633,7 +633,7 @@
       {
         "id": 71,
         "kind": "input",
-        "key": "vision.sector.2.creature_density",
+        "key": "internal.recent_rich_plant_energy_yield",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -641,7 +641,7 @@
       {
         "id": 72,
         "kind": "input",
-        "key": "vision.sector.2.creature_proximity",
+        "key": "internal.recent_tough_plant_energy_yield",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -649,7 +649,7 @@
       {
         "id": 73,
         "kind": "input",
-        "key": "vision.sector.2.smaller_creature_density",
+        "key": "internal.tender_plant_payoff_trace",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -657,7 +657,7 @@
       {
         "id": 74,
         "kind": "input",
-        "key": "vision.sector.2.smaller_creature_proximity",
+        "key": "internal.rich_plant_payoff_trace",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -665,7 +665,7 @@
       {
         "id": 75,
         "kind": "input",
-        "key": "vision.sector.2.similar_creature_density",
+        "key": "internal.tough_plant_payoff_trace",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -673,7 +673,7 @@
       {
         "id": 76,
         "kind": "input",
-        "key": "vision.sector.2.similar_creature_proximity",
+        "key": "vision.plant_preference_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -681,7 +681,7 @@
       {
         "id": 77,
         "kind": "input",
-        "key": "vision.sector.2.larger_creature_density",
+        "key": "vision.plant_preference_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -689,7 +689,7 @@
       {
         "id": 78,
         "kind": "input",
-        "key": "vision.sector.2.larger_creature_proximity",
+        "key": "vision.plant_preference_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -697,7 +697,7 @@
       {
         "id": 79,
         "kind": "input",
-        "key": "vision.sector.2.creature_approach_rate",
+        "key": "contact.plant_preference",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -705,7 +705,7 @@
       {
         "id": 80,
         "kind": "input",
-        "key": "vision.sector.2.creature_facing_alignment",
+        "key": "scent.creature_similarity_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -713,7 +713,7 @@
       {
         "id": 81,
         "kind": "input",
-        "key": "vision.sector.3.plant_density",
+        "key": "scent.creature_similarity_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -721,7 +721,7 @@
       {
         "id": 82,
         "kind": "input",
-        "key": "vision.sector.3.plant_proximity",
+        "key": "scent.creature_similarity_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -729,7 +729,7 @@
       {
         "id": 83,
         "kind": "input",
-        "key": "vision.sector.3.plant_energy_quality",
+        "key": "contact.creature_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -737,7 +737,7 @@
       {
         "id": 84,
         "kind": "input",
-        "key": "vision.sector.3.plant_bite_ease",
+        "key": "scent.creature_lineage_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -745,7 +745,7 @@
       {
         "id": 85,
         "kind": "input",
-        "key": "vision.sector.3.meat_density",
+        "key": "scent.creature_lineage_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -753,7 +753,7 @@
       {
         "id": 86,
         "kind": "input",
-        "key": "vision.sector.3.meat_proximity",
+        "key": "scent.creature_lineage_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -761,7 +761,7 @@
       {
         "id": 87,
         "kind": "input",
-        "key": "vision.sector.3.egg_density",
+        "key": "contact.creature_lineage_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -769,7 +769,7 @@
       {
         "id": 88,
         "kind": "input",
-        "key": "vision.sector.3.egg_proximity",
+        "key": "contact.egg_lineage_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -777,7 +777,7 @@
       {
         "id": 89,
         "kind": "input",
-        "key": "vision.sector.3.creature_density",
+        "key": "habitat.current_quality",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -785,7 +785,7 @@
       {
         "id": 90,
         "kind": "input",
-        "key": "vision.sector.3.creature_proximity",
+        "key": "habitat.forward_quality",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -793,7 +793,7 @@
       {
         "id": 91,
         "kind": "input",
-        "key": "vision.sector.3.smaller_creature_density",
+        "key": "habitat.left_quality",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -801,7 +801,7 @@
       {
         "id": 92,
         "kind": "input",
-        "key": "vision.sector.3.smaller_creature_proximity",
+        "key": "habitat.right_quality",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -809,7 +809,7 @@
       {
         "id": 93,
         "kind": "input",
-        "key": "vision.sector.3.similar_creature_density",
+        "key": "contact.grab_pressure",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -817,7 +817,7 @@
       {
         "id": 94,
         "kind": "input",
-        "key": "vision.sector.3.similar_creature_proximity",
+        "key": "contact.grab_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -825,7 +825,7 @@
       {
         "id": 95,
         "kind": "input",
-        "key": "vision.sector.3.larger_creature_density",
+        "key": "contact.grab_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -833,7 +833,7 @@
       {
         "id": 96,
         "kind": "input",
-        "key": "vision.sector.3.larger_creature_proximity",
+        "key": "contact.can_grab_creature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -841,7 +841,7 @@
       {
         "id": 97,
         "kind": "input",
-        "key": "vision.sector.3.creature_approach_rate",
+        "key": "contact.is_holding_creature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -849,7 +849,7 @@
       {
         "id": 98,
         "kind": "input",
-        "key": "vision.sector.3.creature_facing_alignment",
+        "key": "sound.density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -857,7 +857,7 @@
       {
         "id": 99,
         "kind": "input",
-        "key": "vision.sector.4.plant_density",
+        "key": "sound.forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -865,7 +865,7 @@
       {
         "id": 100,
         "kind": "input",
-        "key": "vision.sector.4.plant_proximity",
+        "key": "sound.right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -873,7 +873,7 @@
       {
         "id": 101,
         "kind": "input",
-        "key": "vision.sector.4.plant_energy_quality",
+        "key": "sound.tone",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -881,7 +881,7 @@
       {
         "id": 102,
         "kind": "input",
-        "key": "vision.sector.4.plant_bite_ease",
+        "key": "sound.tone_clarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -889,7 +889,7 @@
       {
         "id": 103,
         "kind": "input",
-        "key": "vision.sector.4.meat_density",
+        "key": "internal.fat_ratio",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -897,7 +897,7 @@
       {
         "id": 104,
         "kind": "input",
-        "key": "vision.sector.4.meat_proximity",
+        "key": "internal.mass_burden",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -905,7 +905,7 @@
       {
         "id": 105,
         "kind": "input",
-        "key": "vision.sector.4.egg_density",
+        "key": "climate.current_temperature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -913,7 +913,7 @@
       {
         "id": 106,
         "kind": "input",
-        "key": "vision.sector.4.egg_proximity",
+        "key": "climate.forward_temperature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -921,7 +921,7 @@
       {
         "id": 107,
         "kind": "input",
-        "key": "vision.sector.4.creature_density",
+        "key": "climate.left_temperature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -929,7 +929,7 @@
       {
         "id": 108,
         "kind": "input",
-        "key": "vision.sector.4.creature_proximity",
+        "key": "climate.right_temperature",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -937,7 +937,7 @@
       {
         "id": 109,
         "kind": "input",
-        "key": "vision.sector.4.smaller_creature_density",
+        "key": "climate.current_thermal_mismatch",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -945,7 +945,7 @@
       {
         "id": 110,
         "kind": "input",
-        "key": "vision.sector.4.smaller_creature_proximity",
+        "key": "climate.forward_thermal_mismatch",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -953,7 +953,7 @@
       {
         "id": 111,
         "kind": "input",
-        "key": "vision.sector.4.similar_creature_density",
+        "key": "climate.left_thermal_mismatch",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -961,7 +961,7 @@
       {
         "id": 112,
         "kind": "input",
-        "key": "vision.sector.4.similar_creature_proximity",
+        "key": "climate.right_thermal_mismatch",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -969,7 +969,7 @@
       {
         "id": 113,
         "kind": "input",
-        "key": "vision.sector.4.larger_creature_density",
+        "key": "internal.energy_fullness",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -977,7 +977,7 @@
       {
         "id": 114,
         "kind": "input",
-        "key": "vision.sector.4.larger_creature_proximity",
+        "key": "internal.gut_fullness",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -985,7 +985,7 @@
       {
         "id": 115,
         "kind": "input",
-        "key": "vision.sector.4.creature_approach_rate",
+        "key": "scent.egg_lineage_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -993,7 +993,7 @@
       {
         "id": 116,
         "kind": "input",
-        "key": "vision.sector.4.creature_facing_alignment",
+        "key": "scent.egg_lineage_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1001,7 +1001,7 @@
       {
         "id": 117,
         "kind": "input",
-        "key": "vision.sector.5.plant_density",
+        "key": "scent.egg_lineage_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1009,7 +1009,7 @@
       {
         "id": 118,
         "kind": "input",
-        "key": "vision.sector.5.plant_proximity",
+        "key": "scent.creature_identity_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1017,7 +1017,7 @@
       {
         "id": 119,
         "kind": "input",
-        "key": "vision.sector.5.plant_energy_quality",
+        "key": "scent.creature_identity_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1025,7 +1025,7 @@
       {
         "id": 120,
         "kind": "input",
-        "key": "vision.sector.5.plant_bite_ease",
+        "key": "scent.creature_identity_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1033,7 +1033,7 @@
       {
         "id": 121,
         "kind": "input",
-        "key": "vision.sector.5.meat_density",
+        "key": "scent.egg_identity_density",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1041,7 +1041,7 @@
       {
         "id": 122,
         "kind": "input",
-        "key": "vision.sector.5.meat_proximity",
+        "key": "scent.egg_identity_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1049,7 +1049,7 @@
       {
         "id": 123,
         "kind": "input",
-        "key": "vision.sector.5.egg_density",
+        "key": "scent.egg_identity_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1057,7 +1057,7 @@
       {
         "id": 124,
         "kind": "input",
-        "key": "vision.sector.5.egg_proximity",
+        "key": "contact.creature_identity_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1065,7 +1065,7 @@
       {
         "id": 125,
         "kind": "input",
-        "key": "vision.sector.5.creature_density",
+        "key": "contact.egg_identity_similarity",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1073,7 +1073,7 @@
       {
         "id": 126,
         "kind": "input",
-        "key": "vision.sector.5.creature_proximity",
+        "key": "internal.injury_memory_forward",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1081,7 +1081,7 @@
       {
         "id": 127,
         "kind": "input",
-        "key": "vision.sector.5.smaller_creature_density",
+        "key": "internal.injury_memory_right",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1089,7 +1089,7 @@
       {
         "id": 128,
         "kind": "input",
-        "key": "vision.sector.5.smaller_creature_proximity",
+        "key": "internal.injury_memory_strength",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -1097,919 +1097,7 @@
       {
         "id": 129,
         "kind": "input",
-        "key": "vision.sector.5.similar_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 130,
-        "kind": "input",
-        "key": "vision.sector.5.similar_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 131,
-        "kind": "input",
-        "key": "vision.sector.5.larger_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 132,
-        "kind": "input",
-        "key": "vision.sector.5.larger_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 133,
-        "kind": "input",
-        "key": "vision.sector.5.creature_approach_rate",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 134,
-        "kind": "input",
-        "key": "vision.sector.5.creature_facing_alignment",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 135,
-        "kind": "input",
-        "key": "vision.sector.6.plant_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 136,
-        "kind": "input",
-        "key": "vision.sector.6.plant_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 137,
-        "kind": "input",
-        "key": "vision.sector.6.plant_energy_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 138,
-        "kind": "input",
-        "key": "vision.sector.6.plant_bite_ease",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 139,
-        "kind": "input",
-        "key": "vision.sector.6.meat_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 140,
-        "kind": "input",
-        "key": "vision.sector.6.meat_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 141,
-        "kind": "input",
-        "key": "vision.sector.6.egg_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 142,
-        "kind": "input",
-        "key": "vision.sector.6.egg_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 143,
-        "kind": "input",
-        "key": "vision.sector.6.creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 144,
-        "kind": "input",
-        "key": "vision.sector.6.creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 145,
-        "kind": "input",
-        "key": "vision.sector.6.smaller_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 146,
-        "kind": "input",
-        "key": "vision.sector.6.smaller_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 147,
-        "kind": "input",
-        "key": "vision.sector.6.similar_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 148,
-        "kind": "input",
-        "key": "vision.sector.6.similar_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 149,
-        "kind": "input",
-        "key": "vision.sector.6.larger_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 150,
-        "kind": "input",
-        "key": "vision.sector.6.larger_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 151,
-        "kind": "input",
-        "key": "vision.sector.6.creature_approach_rate",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 152,
-        "kind": "input",
-        "key": "vision.sector.6.creature_facing_alignment",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 153,
-        "kind": "input",
-        "key": "vision.sector.7.plant_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 154,
-        "kind": "input",
-        "key": "vision.sector.7.plant_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 155,
-        "kind": "input",
-        "key": "vision.sector.7.plant_energy_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 156,
-        "kind": "input",
-        "key": "vision.sector.7.plant_bite_ease",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 157,
-        "kind": "input",
-        "key": "vision.sector.7.meat_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 158,
-        "kind": "input",
-        "key": "vision.sector.7.meat_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 159,
-        "kind": "input",
-        "key": "vision.sector.7.egg_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 160,
-        "kind": "input",
-        "key": "vision.sector.7.egg_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 161,
-        "kind": "input",
-        "key": "vision.sector.7.creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 162,
-        "kind": "input",
-        "key": "vision.sector.7.creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 163,
-        "kind": "input",
-        "key": "vision.sector.7.smaller_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 164,
-        "kind": "input",
-        "key": "vision.sector.7.smaller_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 165,
-        "kind": "input",
-        "key": "vision.sector.7.similar_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 166,
-        "kind": "input",
-        "key": "vision.sector.7.similar_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 167,
-        "kind": "input",
-        "key": "vision.sector.7.larger_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 168,
-        "kind": "input",
-        "key": "vision.sector.7.larger_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 169,
-        "kind": "input",
-        "key": "vision.sector.7.creature_approach_rate",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 170,
-        "kind": "input",
-        "key": "vision.sector.7.creature_facing_alignment",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 171,
-        "kind": "input",
-        "key": "vision.sector.8.plant_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 172,
-        "kind": "input",
-        "key": "vision.sector.8.plant_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 173,
-        "kind": "input",
-        "key": "vision.sector.8.plant_energy_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 174,
-        "kind": "input",
-        "key": "vision.sector.8.plant_bite_ease",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 175,
-        "kind": "input",
-        "key": "vision.sector.8.meat_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 176,
-        "kind": "input",
-        "key": "vision.sector.8.meat_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 177,
-        "kind": "input",
-        "key": "vision.sector.8.egg_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 178,
-        "kind": "input",
-        "key": "vision.sector.8.egg_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 179,
-        "kind": "input",
-        "key": "vision.sector.8.creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 180,
-        "kind": "input",
-        "key": "vision.sector.8.creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 181,
-        "kind": "input",
-        "key": "vision.sector.8.smaller_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 182,
-        "kind": "input",
-        "key": "vision.sector.8.smaller_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 183,
-        "kind": "input",
-        "key": "vision.sector.8.similar_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 184,
-        "kind": "input",
-        "key": "vision.sector.8.similar_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 185,
-        "kind": "input",
-        "key": "vision.sector.8.larger_creature_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 186,
-        "kind": "input",
-        "key": "vision.sector.8.larger_creature_proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 187,
-        "kind": "input",
-        "key": "vision.sector.8.creature_approach_rate",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 188,
-        "kind": "input",
-        "key": "vision.sector.8.creature_facing_alignment",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 189,
-        "kind": "input",
-        "key": "contact.food",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 190,
-        "kind": "input",
-        "key": "contact.plant_food",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 191,
-        "kind": "input",
-        "key": "contact.meat_food",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 192,
-        "kind": "input",
-        "key": "contact.egg_food",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 193,
-        "kind": "input",
-        "key": "contact.creature",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 194,
-        "kind": "input",
-        "key": "internal.health_ratio",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 195,
-        "kind": "input",
-        "key": "vision.plant_energy_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 196,
-        "kind": "input",
-        "key": "vision.plant_bite_ease",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 197,
-        "kind": "input",
-        "key": "contact.plant_energy_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 198,
-        "kind": "input",
-        "key": "contact.plant_bite_ease",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 199,
-        "kind": "input",
-        "key": "internal.recent_plant_raw_yield",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 200,
-        "kind": "input",
-        "key": "internal.recent_plant_energy_yield",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 201,
-        "kind": "input",
-        "key": "internal.recent_food_energy_yield",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 202,
-        "kind": "input",
-        "key": "internal.recent_tender_plant_energy_yield",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 203,
-        "kind": "input",
-        "key": "internal.recent_rich_plant_energy_yield",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 204,
-        "kind": "input",
-        "key": "internal.recent_tough_plant_energy_yield",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 205,
-        "kind": "input",
-        "key": "internal.tender_plant_payoff_trace",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 206,
-        "kind": "input",
-        "key": "internal.rich_plant_payoff_trace",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 207,
-        "kind": "input",
-        "key": "internal.tough_plant_payoff_trace",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 208,
-        "kind": "input",
-        "key": "vision.plant_preference_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 209,
-        "kind": "input",
-        "key": "vision.plant_preference_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 210,
-        "kind": "input",
-        "key": "vision.plant_preference_right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 211,
-        "kind": "input",
-        "key": "contact.plant_preference",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 212,
-        "kind": "input",
-        "key": "scent.creature_similarity_density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 213,
-        "kind": "input",
-        "key": "scent.creature_similarity_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 214,
-        "kind": "input",
-        "key": "scent.creature_similarity_right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 215,
-        "kind": "input",
-        "key": "contact.creature_similarity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 216,
-        "kind": "input",
-        "key": "habitat.current_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 217,
-        "kind": "input",
-        "key": "habitat.forward_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 218,
-        "kind": "input",
-        "key": "habitat.left_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 219,
-        "kind": "input",
-        "key": "habitat.right_quality",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 220,
-        "kind": "input",
-        "key": "contact.grab_pressure",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 221,
-        "kind": "input",
-        "key": "contact.grab_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 222,
-        "kind": "input",
-        "key": "contact.grab_right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 223,
-        "kind": "input",
-        "key": "contact.can_grab_creature",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 224,
-        "kind": "input",
-        "key": "contact.is_holding_creature",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 225,
-        "kind": "input",
-        "key": "sound.density",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 226,
-        "kind": "input",
-        "key": "sound.forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 227,
-        "kind": "input",
-        "key": "sound.right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 228,
-        "kind": "input",
-        "key": "sound.tone",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 229,
-        "kind": "input",
-        "key": "sound.tone_clarity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 230,
-        "kind": "input",
-        "key": "internal.fat_ratio",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 231,
-        "kind": "input",
-        "key": "internal.mass_burden",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 232,
-        "kind": "input",
-        "key": "vision.food.proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 233,
-        "kind": "input",
-        "key": "vision.food.direction_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 234,
-        "kind": "input",
-        "key": "vision.food.direction_right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 235,
-        "kind": "input",
-        "key": "vision.plant.proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 236,
-        "kind": "input",
-        "key": "vision.plant.direction_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 237,
-        "kind": "input",
-        "key": "vision.plant.direction_right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 238,
-        "kind": "input",
-        "key": "vision.meat.proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 239,
-        "kind": "input",
-        "key": "vision.meat.direction_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 240,
-        "kind": "input",
-        "key": "vision.meat.direction_right",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 241,
-        "kind": "input",
-        "key": "vision.creature.proximity",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 242,
-        "kind": "input",
-        "key": "vision.creature.direction_forward",
-        "activation": "linear",
-        "bias": 0,
-        "depth": 0
-      },
-      {
-        "id": 243,
-        "kind": "input",
-        "key": "vision.creature.direction_right",
+        "key": "internal.maturity_progress",
         "activation": "linear",
         "bias": 0,
         "depth": 0
@@ -2082,70 +1170,70 @@
     "connections": [
       {
         "innovationId": 1,
-        "sourceNodeId": 237,
+        "sourceNodeId": 32,
         "targetNodeId": 10001,
         "weight": 3.4,
         "enabled": true
       },
       {
         "innovationId": 2,
-        "sourceNodeId": 236,
+        "sourceNodeId": 31,
         "targetNodeId": 10000,
         "weight": 0.55,
         "enabled": true
       },
       {
         "innovationId": 3,
-        "sourceNodeId": 235,
+        "sourceNodeId": 30,
         "targetNodeId": 10000,
         "weight": -0.45,
         "enabled": true
       },
       {
         "innovationId": 4,
-        "sourceNodeId": 190,
+        "sourceNodeId": 58,
         "targetNodeId": 10000,
         "weight": -1.6,
         "enabled": true
       },
       {
         "innovationId": 5,
-        "sourceNodeId": 190,
+        "sourceNodeId": 58,
         "targetNodeId": 10002,
         "weight": 4.8,
         "enabled": true
       },
       {
         "innovationId": 6,
-        "sourceNodeId": 192,
+        "sourceNodeId": 60,
         "targetNodeId": 10002,
         "weight": -3,
         "enabled": true
       },
       {
         "innovationId": 7,
-        "sourceNodeId": 243,
+        "sourceNodeId": 49,
         "targetNodeId": 10001,
         "weight": 1.8,
         "enabled": true
       },
       {
         "innovationId": 8,
-        "sourceNodeId": 242,
+        "sourceNodeId": 48,
         "targetNodeId": 10000,
         "weight": 0.35,
         "enabled": true
       },
       {
         "innovationId": 9,
-        "sourceNodeId": 240,
+        "sourceNodeId": 35,
         "targetNodeId": 10001,
         "weight": 3.8,
         "enabled": true
       },
       {
         "innovationId": 10,
-        "sourceNodeId": 239,
+        "sourceNodeId": 34,
         "targetNodeId": 10000,
         "weight": 0.85,
         "enabled": true
@@ -2166,21 +1254,21 @@
       },
       {
         "innovationId": 13,
-        "sourceNodeId": 238,
+        "sourceNodeId": 33,
         "targetNodeId": 10000,
         "weight": -0.45,
         "enabled": true
       },
       {
         "innovationId": 14,
-        "sourceNodeId": 191,
+        "sourceNodeId": 59,
         "targetNodeId": 10000,
         "weight": -1.5,
         "enabled": true
       },
       {
         "innovationId": 15,
-        "sourceNodeId": 191,
+        "sourceNodeId": 59,
         "targetNodeId": 10002,
         "weight": 5.2,
         "enabled": true
@@ -2201,21 +1289,21 @@
       },
       {
         "innovationId": 18,
-        "sourceNodeId": 193,
+        "sourceNodeId": 61,
         "targetNodeId": 10000,
         "weight": -1,
         "enabled": true
       },
       {
         "innovationId": 19,
-        "sourceNodeId": 193,
+        "sourceNodeId": 61,
         "targetNodeId": 10004,
         "weight": 5,
         "enabled": true
       },
       {
         "innovationId": 20,
-        "sourceNodeId": 193,
+        "sourceNodeId": 61,
         "targetNodeId": 10005,
         "weight": 2.7,
         "enabled": true
@@ -2250,14 +1338,14 @@
       },
       {
         "innovationId": 25,
-        "sourceNodeId": 215,
+        "sourceNodeId": 83,
         "targetNodeId": 10004,
         "weight": -2.4,
         "enabled": true
       },
       {
         "innovationId": 26,
-        "sourceNodeId": 215,
+        "sourceNodeId": 83,
         "targetNodeId": 10005,
         "weight": -1.1,
         "enabled": true

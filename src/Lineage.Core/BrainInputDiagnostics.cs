@@ -19,23 +19,35 @@ public static class BrainInputDiagnostics
         NeuralBrainSchema.RottenMeatScentRightInput
     ];
 
-    private static readonly int[] SmallerCreatureSectorInputs = CreateVisionSectorInputs(
-        NeuralBrainSchema.VisionSectorSmallerCreatureDensityOffset,
-        NeuralBrainSchema.VisionSectorSmallerCreatureProximityOffset);
+    private static readonly int[] SmallerCreatureSectorInputs =
+    [
+        NeuralBrainSchema.VisibleCreatureDensityInput,
+        NeuralBrainSchema.CreatureProximityInput,
+        NeuralBrainSchema.CreatureRelativeBodySizeInput
+    ];
 
-    private static readonly int[] SimilarCreatureSectorInputs = CreateVisionSectorInputs(
-        NeuralBrainSchema.VisionSectorSimilarCreatureDensityOffset,
-        NeuralBrainSchema.VisionSectorSimilarCreatureProximityOffset);
+    private static readonly int[] SimilarCreatureSectorInputs =
+    [
+        NeuralBrainSchema.CreatureVisualTraitSimilarityInput,
+        NeuralBrainSchema.CreatureVisualLineageSimilarityInput,
+        NeuralBrainSchema.CreatureVisualIdentitySimilarityInput
+    ];
 
-    private static readonly int[] LargerCreatureSectorInputs = CreateVisionSectorInputs(
-        NeuralBrainSchema.VisionSectorLargerCreatureDensityOffset,
-        NeuralBrainSchema.VisionSectorLargerCreatureProximityOffset);
+    private static readonly int[] LargerCreatureSectorInputs =
+    [
+        NeuralBrainSchema.CreatureProximityInput,
+        NeuralBrainSchema.CreatureRelativeBodySizeInput
+    ];
 
-    private static readonly int[] CreatureApproachSectorInputs = CreateVisionSectorInputs(
-        NeuralBrainSchema.VisionSectorCreatureApproachRateOffset);
+    private static readonly int[] CreatureApproachSectorInputs =
+    [
+        NeuralBrainSchema.CreatureApproachRateInput
+    ];
 
-    private static readonly int[] CreatureFacingSectorInputs = CreateVisionSectorInputs(
-        NeuralBrainSchema.VisionSectorCreatureFacingAlignmentOffset);
+    private static readonly int[] CreatureFacingSectorInputs =
+    [
+        NeuralBrainSchema.CreatureFacingAlignmentInput
+    ];
 
     public static BrainInputDiagnosticSummary Analyze(WorldState state)
     {
@@ -210,21 +222,6 @@ public static class BrainInputDiagnostics
         }
 
         return sum / inputs.Count;
-    }
-
-    private static int[] CreateVisionSectorInputs(params int[] channelOffsets)
-    {
-        var inputs = new int[VisionSectorSet.SectorCount * channelOffsets.Length];
-        var writeIndex = 0;
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            for (var offsetIndex = 0; offsetIndex < channelOffsets.Length; offsetIndex++)
-            {
-                inputs[writeIndex++] = NeuralBrainSchema.GetVisionSectorInput(sectorIndex, channelOffsets[offsetIndex]);
-            }
-        }
-
-        return inputs;
     }
 
     private struct LineageBrainInputAccumulator

@@ -139,13 +139,38 @@ public static class BrainIoRegistry
             Input("obstacle.forward", "Forward obstacle", NeuralBrainSchema.ForwardObstacleInput, BrainIoSignalGroup.Obstacle, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Obstacle proximity sampled ahead."),
             Input("obstacle.left", "Left obstacle", NeuralBrainSchema.LeftObstacleInput, BrainIoSignalGroup.Obstacle, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Obstacle proximity sampled to the left."),
             Input("obstacle.right", "Right obstacle", NeuralBrainSchema.RightObstacleInput, BrainIoSignalGroup.Obstacle, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Obstacle proximity sampled to the right."),
-            Input("contact.movement_blocked", "Movement blocked", NeuralBrainSchema.MovementBlockedInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Recent hard movement block contact cue.")
+            Input("contact.movement_blocked", "Movement blocked", NeuralBrainSchema.MovementBlockedInput, BrainIoSignalGroup.Contact, 0f, 1f, 0f, BrainInputFreshnessPolicy.InternalOrContactFresh, "Recent hard movement block contact cue."),
+            Input("vision.food.proximity", "Food proximity", NeuralBrainSchema.FoodProximityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest or best visible food-like target proximity.", introducedVersion: 13),
+            Input("vision.food.direction_forward", "Food direction forward", NeuralBrainSchema.FoodDirectionForwardInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Food direction projected onto the creature's forward axis.", introducedVersion: 13),
+            Input("vision.food.direction_right", "Food direction right", NeuralBrainSchema.FoodDirectionRightInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Food direction projected onto the creature's right axis.", introducedVersion: 13),
+            Input("vision.plant.proximity", "Plant proximity", NeuralBrainSchema.PlantProximityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible plant proximity.", introducedVersion: 13),
+            Input("vision.plant.direction_forward", "Plant direction forward", NeuralBrainSchema.PlantDirectionForwardInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Plant direction projected onto the creature's forward axis.", introducedVersion: 13),
+            Input("vision.plant.direction_right", "Plant direction right", NeuralBrainSchema.PlantDirectionRightInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Plant direction projected onto the creature's right axis.", introducedVersion: 13),
+            Input("vision.meat.proximity", "Meat proximity", NeuralBrainSchema.MeatProximityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible meat-like target proximity.", introducedVersion: 13),
+            Input("vision.meat.direction_forward", "Meat direction forward", NeuralBrainSchema.MeatDirectionForwardInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Meat direction projected onto the creature's forward axis.", introducedVersion: 13),
+            Input("vision.meat.direction_right", "Meat direction right", NeuralBrainSchema.MeatDirectionRightInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Meat direction projected onto the creature's right axis.", introducedVersion: 13),
+            Input("vision.egg_density", "Visible egg density", NeuralBrainSchema.VisibleEggDensityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Visible egg mass.", introducedVersion: 13),
+            Input("vision.egg.proximity", "Egg proximity", NeuralBrainSchema.EggProximityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible egg proximity.", introducedVersion: 13),
+            Input("vision.egg.direction_forward", "Egg direction forward", NeuralBrainSchema.EggDirectionForwardInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Egg direction projected onto the creature's forward axis.", introducedVersion: 13),
+            Input("vision.egg.direction_right", "Egg direction right", NeuralBrainSchema.EggDirectionRightInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Egg direction projected onto the creature's right axis.", introducedVersion: 13),
+            Input("vision.egg.lineage_similarity", "Egg lineage similarity", NeuralBrainSchema.EggVisualLineageSimilarityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Founder-lineage match of the nearest visible egg.", introducedVersion: 13),
+            Input("vision.egg.identity_similarity", "Egg identity similarity", NeuralBrainSchema.EggVisualIdentitySimilarityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Heritable scent-signature match of the nearest visible egg.", introducedVersion: 13),
+            Input("vision.small_prey_density", "Visible small prey density", NeuralBrainSchema.VisibleSmallPreyDensityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Visible small mobile prey mass.", introducedVersion: 13),
+            Input("vision.small_prey.proximity", "Small prey proximity", NeuralBrainSchema.SmallPreyProximityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible small prey proximity.", introducedVersion: 13),
+            Input("vision.small_prey.direction_forward", "Small prey direction forward", NeuralBrainSchema.SmallPreyDirectionForwardInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Small prey direction projected onto the creature's forward axis.", introducedVersion: 13),
+            Input("vision.small_prey.direction_right", "Small prey direction right", NeuralBrainSchema.SmallPreyDirectionRightInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Small prey direction projected onto the creature's right axis.", introducedVersion: 13),
+            Input("vision.small_prey.grab_opportunity", "Small prey grab opportunity", NeuralBrainSchema.SmallPreyGrabOpportunityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Close-range opportunity to grab or pin visible small prey.", introducedVersion: 13),
+            Input("vision.creature.proximity", "Creature proximity", NeuralBrainSchema.CreatureProximityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible creature proximity.", introducedVersion: 13),
+            Input("vision.creature.direction_forward", "Creature direction forward", NeuralBrainSchema.CreatureDirectionForwardInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Creature direction projected onto the creature's forward axis.", introducedVersion: 13),
+            Input("vision.creature.direction_right", "Creature direction right", NeuralBrainSchema.CreatureDirectionRightInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Creature direction projected onto the creature's right axis.", introducedVersion: 13),
+            Input("vision.creature.relative_body_size", "Creature relative body size", NeuralBrainSchema.CreatureRelativeBodySizeInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible creature body size relative to self.", introducedVersion: 13),
+            Input("vision.creature.relative_speed", "Creature relative speed", NeuralBrainSchema.CreatureRelativeSpeedInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Nearest visible creature speed relative to self.", introducedVersion: 13),
+            Input("vision.creature.approach_rate", "Creature approach rate", NeuralBrainSchema.CreatureApproachRateInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Closing rate of the nearest visible creature.", introducedVersion: 13),
+            Input("vision.creature.facing_alignment", "Creature facing alignment", NeuralBrainSchema.CreatureFacingAlignmentInput, BrainIoSignalGroup.Vision, -1f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Facing alignment of the nearest visible creature.", introducedVersion: 13),
+            Input("vision.creature.trait_similarity", "Creature trait similarity", NeuralBrainSchema.CreatureVisualTraitSimilarityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Trait similarity of the nearest visible creature.", introducedVersion: 13),
+            Input("vision.creature.lineage_similarity", "Creature lineage similarity", NeuralBrainSchema.CreatureVisualLineageSimilarityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Founder-lineage match of the nearest visible creature.", introducedVersion: 13),
+            Input("vision.creature.identity_similarity", "Creature identity similarity", NeuralBrainSchema.CreatureVisualIdentitySimilarityInput, BrainIoSignalGroup.Vision, 0f, 1f, 0f, BrainInputFreshnessPolicy.WorldSenseStale, "Heritable scent-signature match of the nearest visible creature.", introducedVersion: 13)
         };
-
-        for (var sectorIndex = 0; sectorIndex < VisionSectorSet.SectorCount; sectorIndex++)
-        {
-            AddVisionSectorInputs(inputs, sectorIndex);
-        }
 
         inputs.AddRange(new[]
         {
@@ -227,29 +252,6 @@ public static class BrainIoRegistry
         return ValidateInputs(inputs);
     }
 
-    private static void AddVisionSectorInputs(List<BrainInputDefinition> inputs, int sectorIndex)
-    {
-        var x = SectorSubstrateX(sectorIndex);
-        inputs.Add(SectorInput("plant_density", "plant density", sectorIndex, NeuralBrainSchema.VisionSectorPlantDensityOffset, 0f, 1f, "Plant mass visible in the sector.", x));
-        inputs.Add(SectorInput("plant_proximity", "plant proximity", sectorIndex, NeuralBrainSchema.VisionSectorPlantProximityOffset, 0f, 1f, "Nearest plant proximity in the sector.", x));
-        inputs.Add(SectorInput("plant_energy_quality", "plant energy quality", sectorIndex, NeuralBrainSchema.VisionSectorPlantEnergyQualityOffset, 0f, 1f, "Visible plant energy payoff in the sector.", x));
-        inputs.Add(SectorInput("plant_bite_ease", "plant bite ease", sectorIndex, NeuralBrainSchema.VisionSectorPlantBiteEaseOffset, 0f, 1f, "Visible plant bite ease in the sector.", x));
-        inputs.Add(SectorInput("meat_density", "meat density", sectorIndex, NeuralBrainSchema.VisionSectorMeatDensityOffset, 0f, 1f, "Meat-like mass visible in the sector.", x));
-        inputs.Add(SectorInput("meat_proximity", "meat proximity", sectorIndex, NeuralBrainSchema.VisionSectorMeatProximityOffset, 0f, 1f, "Nearest meat-like food proximity in the sector.", x));
-        inputs.Add(SectorInput("egg_density", "egg density", sectorIndex, NeuralBrainSchema.VisionSectorEggDensityOffset, 0f, 1f, "Egg mass visible in the sector.", x));
-        inputs.Add(SectorInput("egg_proximity", "egg proximity", sectorIndex, NeuralBrainSchema.VisionSectorEggProximityOffset, 0f, 1f, "Nearest egg proximity in the sector.", x));
-        inputs.Add(SectorInput("creature_density", "creature density", sectorIndex, NeuralBrainSchema.VisionSectorCreatureDensityOffset, 0f, 1f, "Creature mass visible in the sector.", x));
-        inputs.Add(SectorInput("creature_proximity", "creature proximity", sectorIndex, NeuralBrainSchema.VisionSectorCreatureProximityOffset, 0f, 1f, "Nearest creature proximity in the sector.", x));
-        inputs.Add(SectorInput("smaller_creature_density", "smaller creature density", sectorIndex, NeuralBrainSchema.VisionSectorSmallerCreatureDensityOffset, 0f, 1f, "Smaller creature mass visible in the sector.", x));
-        inputs.Add(SectorInput("smaller_creature_proximity", "smaller creature proximity", sectorIndex, NeuralBrainSchema.VisionSectorSmallerCreatureProximityOffset, 0f, 1f, "Nearest smaller creature proximity in the sector.", x));
-        inputs.Add(SectorInput("similar_creature_density", "similar creature density", sectorIndex, NeuralBrainSchema.VisionSectorSimilarCreatureDensityOffset, 0f, 1f, "Similar-sized creature mass visible in the sector.", x));
-        inputs.Add(SectorInput("similar_creature_proximity", "similar creature proximity", sectorIndex, NeuralBrainSchema.VisionSectorSimilarCreatureProximityOffset, 0f, 1f, "Nearest similar-sized creature proximity in the sector.", x));
-        inputs.Add(SectorInput("larger_creature_density", "larger creature density", sectorIndex, NeuralBrainSchema.VisionSectorLargerCreatureDensityOffset, 0f, 1f, "Larger creature mass visible in the sector.", x));
-        inputs.Add(SectorInput("larger_creature_proximity", "larger creature proximity", sectorIndex, NeuralBrainSchema.VisionSectorLargerCreatureProximityOffset, 0f, 1f, "Nearest larger creature proximity in the sector.", x));
-        inputs.Add(SectorInput("creature_approach_rate", "creature approach rate", sectorIndex, NeuralBrainSchema.VisionSectorCreatureApproachRateOffset, -1f, 1f, "Closing rate of the nearest creature in the sector.", x));
-        inputs.Add(SectorInput("creature_facing_alignment", "creature facing alignment", sectorIndex, NeuralBrainSchema.VisionSectorCreatureFacingAlignmentOffset, -1f, 1f, "Facing alignment of the nearest creature in the sector.", x));
-    }
-
     private static BrainOutputDefinition[] BuildOutputs()
     {
         var outputs = new[]
@@ -292,31 +294,6 @@ public static class BrainIoRegistry
             introducedVersion,
             freshness,
             meaning);
-    }
-
-    private static BrainInputDefinition SectorInput(
-        string keySuffix,
-        string nameSuffix,
-        int sectorIndex,
-        int channelOffset,
-        float minimum,
-        float maximum,
-        string meaning,
-        float substrateX)
-    {
-        return new BrainInputDefinition(
-            $"vision.sector.{sectorIndex}.{keySuffix}",
-            $"Vision sector {sectorIndex} {nameSuffix}",
-            NeuralBrainSchema.GetVisionSectorInput(sectorIndex, channelOffset),
-            BrainIoSignalGroup.Vision,
-            minimum,
-            maximum,
-            0f,
-            1,
-            BrainInputFreshnessPolicy.WorldSenseStale,
-            meaning,
-            substrateX,
-            0f);
     }
 
     private static BrainOutputDefinition Output(
@@ -408,8 +385,4 @@ public static class BrainIoRegistry
         }
     }
 
-    private static float SectorSubstrateX(int sectorIndex)
-    {
-        return (sectorIndex - VisionSectorSet.CenterSectorIndex) / (float)VisionSectorSet.CenterSectorIndex;
-    }
 }

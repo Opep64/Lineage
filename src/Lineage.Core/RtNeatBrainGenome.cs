@@ -242,10 +242,28 @@ public static class RtNeatBrainIoRegistry
             "vision.meat.direction_forward" => frame.Vision.Meat.DirectionForward,
             "vision.meat.direction_right" => frame.Vision.Meat.DirectionRight,
             "vision.meat_freshness" => frame.Vision.MeatFreshness,
+            "vision.egg_density" => frame.Vision.Egg.Density,
+            "vision.egg.proximity" => frame.Vision.Egg.Proximity,
+            "vision.egg.direction_forward" => frame.Vision.Egg.DirectionForward,
+            "vision.egg.direction_right" => frame.Vision.Egg.DirectionRight,
+            "vision.egg.lineage_similarity" => frame.Vision.EggLineageSimilarity,
+            "vision.egg.identity_similarity" => frame.Vision.EggIdentitySimilarity,
+            "vision.small_prey_density" => frame.Vision.SmallPrey.Density,
+            "vision.small_prey.proximity" => frame.Vision.SmallPrey.Proximity,
+            "vision.small_prey.direction_forward" => frame.Vision.SmallPrey.DirectionForward,
+            "vision.small_prey.direction_right" => frame.Vision.SmallPrey.DirectionRight,
+            "vision.small_prey.grab_opportunity" => frame.Vision.SmallPreyGrabOpportunity,
             "vision.creature_density" => frame.Vision.Creature.Density,
             "vision.creature.proximity" => frame.Vision.Creature.Proximity,
             "vision.creature.direction_forward" => frame.Vision.Creature.DirectionForward,
             "vision.creature.direction_right" => frame.Vision.Creature.DirectionRight,
+            "vision.creature.relative_body_size" => frame.Vision.CreatureRelativeBodySize,
+            "vision.creature.relative_speed" => frame.Vision.CreatureRelativeSpeed,
+            "vision.creature.approach_rate" => frame.Vision.CreatureApproachRate,
+            "vision.creature.facing_alignment" => frame.Vision.CreatureFacingAlignment,
+            "vision.creature.trait_similarity" => frame.Vision.CreatureTraitSimilarity,
+            "vision.creature.lineage_similarity" => frame.Vision.CreatureLineageSimilarity,
+            "vision.creature.identity_similarity" => frame.Vision.CreatureIdentitySimilarity,
             "terrain.current_drag" => frame.Body.CurrentTerrainDrag,
             "terrain.forward_drag" => frame.Body.ForwardTerrainDrag,
             "terrain.left_drag" => frame.Body.LeftTerrainDrag,
@@ -313,54 +331,8 @@ public static class RtNeatBrainIoRegistry
             "dense_memory.forward" => memory.DirectionForward,
             "dense_memory.right" => memory.DirectionRight,
             "dense_memory.strength" => memory.Strength,
-            _ when TryReadVisionSectorInput(key, frame.Vision.Sectors, out var value) => value,
             _ => 0f
         };
-    }
-
-    private static bool TryReadVisionSectorInput(string key, VisionSectorSet sectors, out float value)
-    {
-        value = 0f;
-        if (!key.StartsWith("vision.sector.", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var parts = key.Split('.');
-        if (parts.Length != 4 || !int.TryParse(parts[2], out var sectorIndex))
-        {
-            return false;
-        }
-
-        if ((uint)sectorIndex >= VisionSectorSet.SectorCount)
-        {
-            return false;
-        }
-
-        var sector = sectors.Get(sectorIndex);
-        value = parts[3] switch
-        {
-            "plant_density" => sector.PlantDensity,
-            "plant_proximity" => sector.PlantProximity,
-            "plant_energy_quality" => sector.PlantEnergyQuality,
-            "plant_bite_ease" => sector.PlantBiteEase,
-            "meat_density" => sector.MeatDensity,
-            "meat_proximity" => sector.MeatProximity,
-            "egg_density" => sector.EggDensity,
-            "egg_proximity" => sector.EggProximity,
-            "creature_density" => sector.CreatureDensity,
-            "creature_proximity" => sector.CreatureProximity,
-            "smaller_creature_density" => sector.SmallerCreatureDensity,
-            "smaller_creature_proximity" => sector.SmallerCreatureProximity,
-            "similar_creature_density" => sector.SimilarCreatureDensity,
-            "similar_creature_proximity" => sector.SimilarCreatureProximity,
-            "larger_creature_density" => sector.LargerCreatureDensity,
-            "larger_creature_proximity" => sector.LargerCreatureProximity,
-            "creature_approach_rate" => sector.CreatureApproachRate,
-            "creature_facing_alignment" => sector.CreatureFacingAlignment,
-            _ => 0f
-        };
-        return true;
     }
 }
 

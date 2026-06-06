@@ -126,16 +126,16 @@ var tests = new (string Name, Action Body)[]
     ("Neural controller reuses actions on skipped world senses", NeuralControllerReusesActionsOnSkippedWorldSenses),
     ("Neural controller forces decisions on stale contact", NeuralControllerForcesDecisionsOnStaleContact),
     ("Neural controller parallel path matches single-threaded path", NeuralControllerParallelPathMatchesSingleThreadedPath),
-    ("Neural controller consumes sector vision inputs", NeuralControllerConsumesSectorVisionInputs),
+    ("Neural controller consumes semantic vision inputs", NeuralControllerConsumesSemanticVisionInputs),
     ("Neural controller writes spatial memory", NeuralControllerWritesSpatialMemory),
     ("Neural controller honors memory tuning", NeuralControllerHonorsMemoryTuning),
     ("Forager predator turns creature proximity into attack intent", ForagerPredatorTurnsCreatureProximityIntoAttackIntent),
     ("Forager predator turns creature contact into attack intent", ForagerPredatorTurnsCreatureContactIntoAttackIntent),
     ("Forager predator suppresses similar creature contact attack", ForagerPredatorSuppressesSimilarCreatureContactAttack),
     ("Forager predator steers away from similar creature scent", ForagerPredatorSteersAwayFromSimilarCreatureScent),
-    ("Sector forager starter follows sector plant cues", SectorForagerStarterFollowsSectorPlantCues),
-    ("Scavenger starter follows sector meat cues", ScavengerStarterFollowsSectorMeatCues),
-    ("Predator starter follows sector creature cues", PredatorStarterFollowsSectorCreatureCues),
+    ("Sector forager starter follows semantic plant cues", SectorForagerStarterFollowsSemanticPlantCues),
+    ("Scavenger starter follows semantic meat cues", ScavengerStarterFollowsSemanticMeatCues),
+    ("Predator starter follows semantic creature cues", PredatorStarterFollowsSemanticCreatureCues),
     ("Opportunistic forager samples meat on contact", OpportunisticForagerSamplesMeatOnContact),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
@@ -156,34 +156,6 @@ var tests = new (string Name, Action Body)[]
     ("Freshness-aware scavenger starter brain avoids rot cues", FreshnessAwareScavengerStarterBrainAvoidsRotCues),
     ("Forager predator starter brain hunts creature cues", ForagerPredatorStarterBrainHuntsCreatureCues),
     ("Meat-oriented starters eat meat on contact", MeatOrientedStartersEatMeatOnContact),
-    ("Neural brain migrates reproductive context inputs", NeuralBrainMigratesReproductiveContextInputs),
-    ("Neural brain migrates memory inputs and outputs", NeuralBrainMigratesMemoryInputsAndOutputs),
-    ("Neural brain migrates rotten meat sensing inputs", NeuralBrainMigratesRottenMeatSensingInputs),
-    ("Neural brain migrates obstacle sensing inputs", NeuralBrainMigratesObstacleSensingInputs),
-    ("Neural brain migrates sector vision inputs", NeuralBrainMigratesSectorVisionInputs),
-    ("Neural brain migrates nearest aggregate schema", NeuralBrainMigratesNearestAggregateSchema),
-    ("Neural brain migrates food contact input", NeuralBrainMigratesFoodContactInput),
-    ("Neural brain migrates health ratio input", NeuralBrainMigratesHealthRatioInput),
-    ("Neural brain migrates creature sector motion inputs", NeuralBrainMigratesCreatureSectorMotionInputs),
-    ("Neural brain migrates creature contact input", NeuralBrainMigratesCreatureContactInput),
-    ("Neural brain migrates plant quality inputs", NeuralBrainMigratesPlantQualityInputs),
-    ("Neural brain migrates recent food energy yield input", NeuralBrainMigratesRecentFoodEnergyYieldInput),
-    ("Neural brain migrates sector plant quality inputs", NeuralBrainMigratesSectorPlantQualityInputs),
-    ("Neural brain migrates typed plant energy yield inputs", NeuralBrainMigratesTypedPlantEnergyYieldInputs),
-    ("Neural brain migrates plant payoff trace inputs", NeuralBrainMigratesPlantPayoffTraceInputs),
-    ("Neural brain migrates plant preference bridge inputs", NeuralBrainMigratesPlantPreferenceBridgeInputs),
-    ("Neural brain migrates creature similarity inputs", NeuralBrainMigratesCreatureSimilarityInputs),
-    ("Neural brain migrates habitat quality inputs", NeuralBrainMigratesHabitatQualityInputs),
-    ("Neural brain migrates grab output and inputs", NeuralBrainMigratesGrabOutputAndInputs),
-    ("Neural brain migrates sound output and inputs", NeuralBrainMigratesSoundOutputAndInputs),
-    ("Neural brain migrates fat inputs", NeuralBrainMigratesFatInputs),
-    ("Neural brain migrates thermal sensing inputs", NeuralBrainMigratesThermalSensingInputs),
-    ("Neural brain migrates fullness inputs", NeuralBrainMigratesFullnessInputs),
-    ("Neural brain migrates lineage familiarity inputs", NeuralBrainMigratesLineageFamiliarityInputs),
-    ("Neural brain migrates injury memory inputs", NeuralBrainMigratesInjuryMemoryInputs),
-    ("Neural brain migrates maturity progress input", NeuralBrainMigratesMaturityProgressInput),
-    ("Neural brain migrates egg lineage scent inputs", NeuralBrainMigratesEggLineageScentInputs),
-    ("Neural brain migrates identity scent inputs", NeuralBrainMigratesIdentityScentInputs),
     ("Neural brain supports hidden nodes", NeuralBrainSupportsHiddenNodes),
     ("Brain factory describes hybrid neural architecture", BrainFactoryDescribesHybridNeuralArchitecture),
     ("Brain factory preserves hybrid starter brains", BrainFactoryPreservesHybridStarterBrains),
@@ -193,6 +165,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory supports hidden deep 8x8 neural architecture", BrainFactorySupportsHiddenDeep8x8NeuralArchitecture),
     ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
     ("Brain probe edits rtNEAT graph inputs", BrainProbeEditsRtNeatGraphInputs),
+    ("Brain probe food presets include small prey inputs", BrainProbeFoodPresetsIncludeSmallPreyInputs),
     ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
     ("rtNEAT mutation can remove graph structure", RtNeatMutationCanRemoveGraphStructure),
     ("rtNEAT mutation prunes inactive hidden nodes", RtNeatMutationPrunesInactiveHiddenNodes),
@@ -267,6 +240,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain profile JSON round trips rtNEAT graph controllers", BrainProfileJsonRoundTripsRtNeatGraphControllers),
     ("rtNEAT catalog starter brains migrate semantic IO", RtNeatCatalogStarterBrainsMigrateSemanticIo),
     ("Brain profile compatibility reports schema status", BrainProfileCompatibilityReportsSchemaStatus),
+    ("Checked-in species catalog profiles load", CheckedInSpeciesCatalogProfilesLoad),
     ("Starter catalog hybrid brains reproduce when ready", StarterCatalogHybridBrainsReproduceWhenReady),
     ("Species profile JSON round trips representative genomes and brains", SpeciesProfileJsonRoundTripsRepresentativeGenomesAndBrains),
     ("Species profile injection creates founder creatures", SpeciesProfileInjectionCreatesFounderCreatures),
@@ -5373,8 +5347,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual(BrainOutputScope.ArchitectureInternal, memoryOutput.Scope, "Memory output scope");
 
     var memoryInput = BrainIoRegistry.GetInput(NeuralBrainSchema.MemoryForwardInput);
-    var sectorInput = BrainIoRegistry.GetInput(
-        NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex));
+    var creatureApproachInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CreatureApproachRateInput);
     var contactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.FoodContactInput);
     var grabInput = BrainIoRegistry.GetInput(NeuralBrainSchema.GrabPressureInput);
     var soundInput = BrainIoRegistry.GetInput(NeuralBrainSchema.SoundToneInput);
@@ -5387,7 +5360,7 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var injuryMemoryInput = BrainIoRegistry.GetInput(NeuralBrainSchema.InjuryMemoryStrengthInput);
     var maturityProgressInput = BrainIoRegistry.GetInput(NeuralBrainSchema.MaturityProgressInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
-    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, sectorInput.Freshness, "Sector input freshness");
+    AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, creatureApproachInput.Freshness, "Creature approach input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, grabInput.Freshness, "Grab input freshness");
     AssertEqual(3, grabInput.IntroducedVersion, "Grab input introduced version");
@@ -5416,8 +5389,8 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual("contact.creature_identity_similarity", identityContactInput.Key, "Identity contact input key");
     AssertEqual("internal.injury_memory_strength", injuryMemoryInput.Key, "Injury memory input key");
     AssertEqual("climate.current_temperature", climateInput.Key, "Climate input key");
-    AssertEqual("vision.sector.4.creature_approach_rate", sectorInput.Key, "Sector input key");
-    AssertClose(0f, sectorInput.SubstrateX ?? float.NaN, 0.000001, "Center sector substrate x");
+    AssertEqual("vision.creature.approach_rate", creatureApproachInput.Key, "Creature approach input key");
+    AssertEqual(13, creatureApproachInput.IntroducedVersion, "Creature approach input introduced version");
 }
 
 static void LegacyNeuralAdapterMapsGroupedBrainInputs()
@@ -5444,6 +5417,17 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         MeatDirectionRight = 0.9f,
         VisibleMeatDensity = 0.33f,
         VisibleMeatFreshness = 0.55f,
+        VisibleEggDensity = 0.26f,
+        EggProximity = 0.36f,
+        EggDirectionForward = -0.46f,
+        EggDirectionRight = 0.56f,
+        EggVisualLineageSimilarity = 0.66f,
+        EggVisualIdentitySimilarity = 0.76f,
+        VisibleSmallPreyDensity = 0.86f,
+        SmallPreyProximity = 0.96f,
+        SmallPreyDirectionForward = 0.16f,
+        SmallPreyDirectionRight = -0.26f,
+        SmallPreyGrabOpportunity = 0.36f,
         EggReserveRatio = 0.12f,
         ReproductionReadiness = 0.22f,
         EnergySurplusRatio = 0.32f,
@@ -5471,6 +5455,9 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         CreatureRelativeSpeed = 0.28f,
         CreatureApproachRate = 0.38f,
         CreatureFacingAlignment = -0.48f,
+        CreatureVisualTraitSimilarity = 0.58f,
+        CreatureVisualLineageSimilarity = 0.68f,
+        CreatureVisualIdentitySimilarity = 0.78f,
         MeatScentDensity = 0.58f,
         MeatScentDirectionForward = 0.68f,
         MeatScentDirectionRight = -0.78f,
@@ -5543,15 +5530,6 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         MemoryDirectionRight = -0.21f,
         MemoryStrength = 0.31f
     };
-    var sectors = default(VisionSectorSet);
-    sectors.AddPlant(0, 0.5f, energyQuality: 0.61f, biteEase: 0.71f, qualityWeight: 1f);
-    sectors.AddMeat(4, 0.7f);
-    sectors.AddEgg(6, 0.8f);
-    sectors.AddCreature(8, 0.9f, relativeBodySize: -0.5f);
-    sectors.AddCreature(5, 0.4f, relativeBodySize: 0f);
-    sectors.AddCreature(2, 0.6f, relativeBodySize: 0.5f, approachRate: 0.7f, facingAlignment: -0.35f);
-    senses.VisionSectors = sectors;
-
     var frame = BrainInputFrame.FromSenses(senses, genome);
     var memory = LegacyNeuralMemoryInputFrame.FromSenses(senses);
     Span<float> inputs = stackalloc float[NeuralBrainSchema.InputCount];
@@ -5566,10 +5544,40 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.4f, inputs[NeuralBrainSchema.VisibleFoodDensityInput], 0.000001, "Food density input");
     AssertClose(0.45f, inputs[NeuralBrainSchema.VisiblePlantDensityInput], 0.000001, "Plant density input");
     AssertClose(0.33f, inputs[NeuralBrainSchema.VisibleMeatDensityInput], 0.000001, "Meat density input");
+    AssertClose(0.7f, inputs[NeuralBrainSchema.FoodProximityInput], 0.000001, "Food proximity input");
+    AssertClose(0.6f, inputs[NeuralBrainSchema.FoodDirectionForwardInput], 0.000001, "Food forward input");
+    AssertClose(-0.3f, inputs[NeuralBrainSchema.FoodDirectionRightInput], 0.000001, "Food right input");
+    AssertClose(0.5f, inputs[NeuralBrainSchema.PlantProximityInput], 0.000001, "Plant proximity input");
+    AssertClose(0.25f, inputs[NeuralBrainSchema.PlantDirectionForwardInput], 0.000001, "Plant forward input");
+    AssertClose(0.75f, inputs[NeuralBrainSchema.PlantDirectionRightInput], 0.000001, "Plant right input");
+    AssertClose(0.65f, inputs[NeuralBrainSchema.MeatProximityInput], 0.000001, "Meat proximity input");
+    AssertClose(-0.2f, inputs[NeuralBrainSchema.MeatDirectionForwardInput], 0.000001, "Meat forward input");
+    AssertClose(0.9f, inputs[NeuralBrainSchema.MeatDirectionRightInput], 0.000001, "Meat right input");
+    AssertClose(0.26f, inputs[NeuralBrainSchema.VisibleEggDensityInput], 0.000001, "Egg density input");
+    AssertClose(0.36f, inputs[NeuralBrainSchema.EggProximityInput], 0.000001, "Egg proximity input");
+    AssertClose(-0.46f, inputs[NeuralBrainSchema.EggDirectionForwardInput], 0.000001, "Egg forward input");
+    AssertClose(0.56f, inputs[NeuralBrainSchema.EggDirectionRightInput], 0.000001, "Egg right input");
+    AssertClose(0.66f, inputs[NeuralBrainSchema.EggVisualLineageSimilarityInput], 0.000001, "Egg visual lineage similarity input");
+    AssertClose(0.76f, inputs[NeuralBrainSchema.EggVisualIdentitySimilarityInput], 0.000001, "Egg visual identity similarity input");
+    AssertClose(0.86f, inputs[NeuralBrainSchema.VisibleSmallPreyDensityInput], 0.000001, "Small prey density input");
+    AssertClose(0.96f, inputs[NeuralBrainSchema.SmallPreyProximityInput], 0.000001, "Small prey proximity input");
+    AssertClose(0.16f, inputs[NeuralBrainSchema.SmallPreyDirectionForwardInput], 0.000001, "Small prey forward input");
+    AssertClose(-0.26f, inputs[NeuralBrainSchema.SmallPreyDirectionRightInput], 0.000001, "Small prey right input");
+    AssertClose(0.36f, inputs[NeuralBrainSchema.SmallPreyGrabOpportunityInput], 0.000001, "Small prey grab opportunity input");
     AssertClose(0.57f, inputs[NeuralBrainSchema.VisiblePlantEnergyQualityInput], 0.000001, "Plant energy quality input");
     AssertClose(0.67f, inputs[NeuralBrainSchema.VisiblePlantBiteEaseInput], 0.000001, "Plant bite ease input");
     AssertClose(0.55f, inputs[NeuralBrainSchema.VisibleMeatFreshnessInput], 0.000001, "Meat freshness input");
     AssertClose(0.82f, inputs[NeuralBrainSchema.VisibleCreatureDensityInput], 0.000001, "Creature density input");
+    AssertClose(0.52f, inputs[NeuralBrainSchema.CreatureProximityInput], 0.000001, "Creature proximity input");
+    AssertClose(-0.62f, inputs[NeuralBrainSchema.CreatureDirectionForwardInput], 0.000001, "Creature forward input");
+    AssertClose(0.72f, inputs[NeuralBrainSchema.CreatureDirectionRightInput], 0.000001, "Creature right input");
+    AssertClose(-0.18f, inputs[NeuralBrainSchema.CreatureRelativeBodySizeInput], 0.000001, "Creature relative body size input");
+    AssertClose(0.28f, inputs[NeuralBrainSchema.CreatureRelativeSpeedInput], 0.000001, "Creature relative speed input");
+    AssertClose(0.38f, inputs[NeuralBrainSchema.CreatureApproachRateInput], 0.000001, "Creature approach input");
+    AssertClose(-0.48f, inputs[NeuralBrainSchema.CreatureFacingAlignmentInput], 0.000001, "Creature facing input");
+    AssertClose(0.58f, inputs[NeuralBrainSchema.CreatureVisualTraitSimilarityInput], 0.000001, "Creature visual trait similarity input");
+    AssertClose(0.68f, inputs[NeuralBrainSchema.CreatureVisualLineageSimilarityInput], 0.000001, "Creature visual lineage similarity input");
+    AssertClose(0.78f, inputs[NeuralBrainSchema.CreatureVisualIdentitySimilarityInput], 0.000001, "Creature visual identity similarity input");
     AssertClose(0.68f, inputs[NeuralBrainSchema.MeatScentForwardInput], 0.000001, "Meat scent forward input");
     AssertClose(0.34f, inputs[NeuralBrainSchema.RottenMeatScentRightInput], 0.000001, "Rot scent right input");
     AssertClose(0.43f, inputs[NeuralBrainSchema.CreatureSimilarityScentDensityInput], 0.000001, "Creature similarity scent density input");
@@ -5645,25 +5653,6 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(0.37f, inputs[NeuralBrainSchema.InjuryMemoryStrengthInput], 0.000001, "Injury memory strength input");
     AssertClose(0.11f, inputs[NeuralBrainSchema.MemoryForwardInput], 0.000001, "Legacy memory forward input");
     AssertClose(-0.21f, inputs[NeuralBrainSchema.MemoryRightInput], 0.000001, "Legacy memory right input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorPlantDensityInput(0)], 0.000001, "Sector plant density input");
-    AssertClose(0.5f, inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(0)], 0.000001, "Sector plant proximity input");
-    AssertClose(0.61f, inputs[NeuralBrainSchema.VisionSectorPlantEnergyQualityInput(0)], 0.000001, "Sector plant energy quality input");
-    AssertClose(0.71f, inputs[NeuralBrainSchema.VisionSectorPlantBiteEaseInput(0)], 0.000001, "Sector plant bite ease input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorMeatDensityInput(4)], 0.000001, "Sector meat density input");
-    AssertClose(0.7f, inputs[NeuralBrainSchema.VisionSectorMeatProximityInput(4)], 0.000001, "Sector meat proximity input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorEggDensityInput(6)], 0.000001, "Sector egg density input");
-    AssertClose(0.8f, inputs[NeuralBrainSchema.VisionSectorEggProximityInput(6)], 0.000001, "Sector egg proximity input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorCreatureDensityInput(8)], 0.000001, "Sector creature density input");
-    AssertClose(0.9f, inputs[NeuralBrainSchema.VisionSectorCreatureProximityInput(8)], 0.000001, "Sector creature proximity input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(8)], 0.000001, "Sector smaller creature density input");
-    AssertClose(0.9f, inputs[NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(8)], 0.000001, "Sector smaller creature proximity input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(5)], 0.000001, "Sector similar creature density input");
-    AssertClose(0.4f, inputs[NeuralBrainSchema.VisionSectorSimilarCreatureProximityInput(5)], 0.000001, "Sector similar creature proximity input");
-    AssertClose(0.125f, inputs[NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(2)], 0.000001, "Sector larger creature density input");
-    AssertClose(0.6f, inputs[NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(2)], 0.000001, "Sector larger creature proximity input");
-    AssertClose(0.7f, inputs[NeuralBrainSchema.VisionSectorCreatureApproachRateInput(2)], 0.000001, "Sector creature approach rate input");
-    AssertClose(-0.35f, inputs[NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(2)], 0.000001, "Sector creature facing alignment input");
-
     Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
     outputs[NeuralBrainSchema.MoveForwardOutput] = 2f;
     outputs[NeuralBrainSchema.TurnOutput] = -2f;
@@ -5941,14 +5930,14 @@ static Simulation CreateNeuralControllerParallelProbe(int threadCount)
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleFoodDensityInput] = 2.2f;
     weights[
         NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount
-        + NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex + 1)] = 1.7f;
+        + NeuralBrainSchema.FoodDirectionRightInput] = 1.7f;
     weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.FoodContactInput] = 2.4f;
     weights[NeuralBrainSchema.ReproduceOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.ReproductionReadinessInput] = 1.9f;
     weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureContactInput] = 1.5f;
     weights[NeuralBrainSchema.MemoryForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleFoodDensityInput] = 1.1f;
     weights[
         NeuralBrainSchema.MemoryRightOutput * NeuralBrainSchema.InputCount
-        + NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex + 1)] = 1.1f;
+        + NeuralBrainSchema.FoodDirectionRightInput] = 1.1f;
     var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
 
     for (var i = 0; i < 48; i++)
@@ -5981,7 +5970,7 @@ static Simulation CreateNeuralControllerParallelProbe(int threadCount)
     return simulation;
 }
 
-static void NeuralControllerConsumesSectorVisionInputs()
+static void NeuralControllerConsumesSemanticVisionInputs()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 32f);
     var simulation = new Simulation(
@@ -6006,7 +5995,7 @@ static void NeuralControllerConsumesSectorVisionInputs()
     var weights = new float[NeuralBrainGenome.DirectWeightCount];
     weights[
         NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount
-        + NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex)] = 4f;
+        + NeuralBrainSchema.PlantProximityInput] = 4f;
     var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
@@ -6027,10 +6016,10 @@ static void NeuralControllerConsumesSectorVisionInputs()
 
     creature = simulation.State.Creatures[0];
     AssertTrue(
-        creature.Senses.VisionSectors.Get(VisionSectorSet.CenterSectorIndex).PlantProximity > 0.75f,
-        "Center sector should contain the visible plant");
-    AssertTrue(creature.Actions.MoveForward > 0.9f, "Sector plant proximity should drive forward movement");
-    AssertTrue(creature.DesiredVelocity.X > 0f, "Sector-driven desired velocity should face forward");
+        creature.Senses.PlantProximity > 0.75f,
+        "Semantic plant proximity should contain the visible plant");
+    AssertTrue(creature.Actions.MoveForward > 0.9f, "Plant proximity should drive forward movement");
+    AssertTrue(creature.DesiredVelocity.X > 0f, "Semantic vision-driven desired velocity should face forward");
 }
 
 static void NeuralControllerWritesSpatialMemory()
@@ -6127,6 +6116,9 @@ static void ForagerPredatorTurnsCreatureProximityIntoAttackIntent()
         Hunger = 1f,
         CreatureDetected = true,
         VisibleCreatureDensity = 0.125f,
+        CreatureProximity = 1f,
+        CreatureDirectionForward = 1f,
+        CreatureRelativeBodySize = -0.35f,
         VisionSectors = sectors
     };
     simulation.State.Creatures[0] = creature;
@@ -6242,7 +6234,7 @@ static CreatureActionState MeasureForagerPredatorActions(CreatureSenseState sens
     return simulation.State.Creatures[0].Actions;
 }
 
-static void SectorForagerStarterFollowsSectorPlantCues()
+static void SectorForagerStarterFollowsSemanticPlantCues()
 {
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
@@ -6255,39 +6247,42 @@ static void SectorForagerStarterFollowsSectorPlantCues()
     });
     var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateSectorForager());
 
-    var rightSectors = default(VisionSectorSet);
-    rightSectors.AddPlant(8, 0.8f);
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
     var creature = simulation.State.Creatures[0];
     creature.Senses = new CreatureSenseState
     {
         Hunger = 1f,
-        VisionSectors = rightSectors
+        PlantDetected = true,
+        VisiblePlantDensity = 0.125f,
+        PlantProximity = 0.2f,
+        PlantDirectionForward = 0.8f,
+        PlantDirectionRight = 1f
     };
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
     creature = simulation.State.Creatures[0];
-    AssertTrue(creature.Actions.Turn > 0.9f, "Sector forager should turn toward plants in right-side sectors");
-    AssertTrue(creature.Actions.MoveForward > 0.55f, "Sector forager should keep searching while hungry");
-    AssertTrue(!creature.Actions.WantsEat, "Right-side plant proximity alone should not trigger strong eating");
+    AssertTrue(creature.Actions.Turn > 0.9f, "Forager should turn toward right-side plant cues");
+    AssertTrue(creature.Actions.MoveForward > 0.55f, "Forager should keep searching while hungry");
+    AssertTrue(!creature.Actions.WantsEat, "Visual plant proximity alone should not trigger strong eating");
 
-    var centerSectors = default(VisionSectorSet);
-    centerSectors.AddPlant(VisionSectorSet.CenterSectorIndex, 1f);
     creature.Senses = new CreatureSenseState
     {
         Hunger = 1f,
-        VisionSectors = centerSectors
+        PlantDetected = true,
+        VisiblePlantDensity = 0.125f,
+        PlantProximity = 0.5f,
+        PlantDirectionForward = 1f
     };
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
     creature = simulation.State.Creatures[0];
-    AssertTrue(Math.Abs(creature.Actions.Turn) < 0.1f, "Centered sector plant should not produce a lateral turn");
-    AssertTrue(creature.Actions.MoveForward > 0.85f, "Sector forager should drive toward centered plant-sector cues until body contact");
-    AssertTrue(!creature.Actions.WantsEat, "Sector forager should use visual sectors for approach, not generic eating");
+    AssertTrue(Math.Abs(creature.Actions.Turn) < 0.1f, "Centered plant should not produce a lateral turn");
+    AssertTrue(creature.Actions.MoveForward > 0.85f, "Forager should drive toward centered plant cues until body contact");
+    AssertTrue(!creature.Actions.WantsEat, "Forager should use visual cues for approach, not generic eating");
 
     creature.Senses = new CreatureSenseState
     {
@@ -6300,8 +6295,8 @@ static void SectorForagerStarterFollowsSectorPlantCues()
     simulation.Step();
 
     creature = simulation.State.Creatures[0];
-    AssertTrue(creature.Actions.WantsEat, "Sector forager should keep eating when body contact says it has arrived");
-    AssertTrue(creature.Actions.MoveForward < 0.1f, "Sector forager should pause when body contact says it has arrived");
+    AssertTrue(creature.Actions.WantsEat, "Forager should keep eating when body contact says it has arrived");
+    AssertTrue(creature.Actions.MoveForward < 0.1f, "Forager should pause when body contact says it has arrived");
 
     creature.Senses = new CreatureSenseState
     {
@@ -6314,10 +6309,10 @@ static void SectorForagerStarterFollowsSectorPlantCues()
     simulation.Step();
 
     creature = simulation.State.Creatures[0];
-    AssertTrue(!creature.Actions.WantsEat, "Sector forager should not treat egg contact like plant contact");
+    AssertTrue(!creature.Actions.WantsEat, "Forager should not treat egg contact like plant contact");
 }
 
-static void ScavengerStarterFollowsSectorMeatCues()
+static void ScavengerStarterFollowsSemanticMeatCues()
 {
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
@@ -6332,25 +6327,27 @@ static void ScavengerStarterFollowsSectorMeatCues()
     });
     var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateScavengerForager());
 
-    var rightSectors = default(VisionSectorSet);
-    rightSectors.AddMeat(8, 0.8f);
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
     var creature = simulation.State.Creatures[0];
     creature.Senses = new CreatureSenseState
     {
         Hunger = 1f,
-        VisionSectors = rightSectors
+        MeatDetected = true,
+        VisibleMeatDensity = 0.125f,
+        MeatProximity = 0.2f,
+        MeatDirectionForward = 0.9f,
+        MeatDirectionRight = 1f
     };
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
     creature = simulation.State.Creatures[0];
-    AssertTrue(creature.Actions.Turn > 0.6f, "Scavenger starter should turn toward meat in right-side sectors");
-    AssertTrue(creature.Actions.MoveForward > 0.7f, "Scavenger starter should move toward sector meat cues");
+    AssertTrue(creature.Actions.Turn > 0.6f, "Scavenger starter should turn toward right-side meat cues");
+    AssertTrue(creature.Actions.MoveForward > 0.7f, "Scavenger starter should move toward meat cues");
 }
 
-static void PredatorStarterFollowsSectorCreatureCues()
+static void PredatorStarterFollowsSemanticCreatureCues()
 {
     var simulation = new Simulation(
         new SimulationConfig { FixedDeltaSeconds = 0.1f },
@@ -6364,23 +6361,26 @@ static void PredatorStarterFollowsSectorCreatureCues()
     });
     var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateForagerPredator());
 
-    var rightSectors = default(VisionSectorSet);
-    rightSectors.AddCreature(8, 0.9f, relativeBodySize: -0.5f);
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
     var creature = simulation.State.Creatures[0];
     creature.Senses = new CreatureSenseState
     {
         Hunger = 1f,
-        VisionSectors = rightSectors
+        CreatureDetected = true,
+        VisibleCreatureDensity = 0.125f,
+        CreatureProximity = 0.9f,
+        CreatureDirectionForward = 0.9f,
+        CreatureDirectionRight = 1f,
+        CreatureRelativeBodySize = -0.5f
     };
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
     creature = simulation.State.Creatures[0];
-    AssertTrue(creature.Actions.Turn > 0.6f, "Predator starter should turn toward smaller creatures in right-side sectors");
-    AssertTrue(creature.Actions.MoveForward > 0.6f, "Predator starter should move toward smaller creature sector cues");
-    AssertTrue(creature.Actions.WantsAttack, "Predator starter should attack smaller creatures in strong right-side sector cues");
+    AssertTrue(creature.Actions.Turn > 0.6f, "Predator starter should turn toward smaller right-side creatures");
+    AssertTrue(creature.Actions.MoveForward > 0.6f, "Predator starter should move toward smaller creature cues");
+    AssertTrue(creature.Actions.WantsAttack, "Predator starter should attack smaller creatures in strong visual cues");
 }
 
 static void OpportunisticForagerSamplesMeatOnContact()
@@ -6787,50 +6787,54 @@ static void BrainInputDiagnosticsSummarizeFreshnessWiring()
     weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = -1f;
     weights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentForwardInput] = -4f;
     weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentRightInput] = -3f;
-    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = 3f;
-    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 1.8f;
-    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = -2.4f;
-    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 2.7f;
-    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -1.5f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleCreatureDensityInput] = 3f;
+    weights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureVisualTraitSimilarityInput] = 1.8f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureRelativeBodySizeInput] = -2.4f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureApproachRateInput] = 2.7f;
+    weights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureFacingAlignmentInput] = -1.5f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 0.5f;
     weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.RottenMeatScentDensityInput] = -0.75f;
-    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.9f;
-    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.6f;
-    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = -1.2f;
-    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 0.8f;
-    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -0.4f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleCreatureDensityInput] = 0.9f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureVisualTraitSimilarityInput] = 0.6f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureRelativeBodySizeInput] = -1.2f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureApproachRateInput] = 0.8f;
+    weights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureFacingAlignmentInput] = -0.4f;
     var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
 
     var founderId = simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
 
     var summary = BrainInputDiagnostics.Analyze(simulation.State);
     var lineages = BrainInputDiagnostics.AnalyzeTopFounderLineages(simulation.State, 10);
-    const int CreatureSizeSectorInputCount = VisionSectorSet.SectorCount * 2;
+    const int CreatureSizeSectorInputCount = 3;
     const int DirectCreatureSizeSectorDivisor = NeuralBrainSchema.OutputCount * CreatureSizeSectorInputCount;
-    const int CreatureMotionSectorInputCount = VisionSectorSet.SectorCount;
+    const int SimilarCreatureSectorInputCount = 3;
+    const int LargerCreatureSectorInputCount = 2;
+    const int DirectSimilarCreatureSectorDivisor = NeuralBrainSchema.OutputCount * SimilarCreatureSectorInputCount;
+    const int DirectLargerCreatureSectorDivisor = NeuralBrainSchema.OutputCount * LargerCreatureSectorInputCount;
+    const int CreatureMotionSectorInputCount = 1;
     const int DirectCreatureMotionSectorDivisor = NeuralBrainSchema.OutputCount * CreatureMotionSectorInputCount;
 
     AssertEqual(1, summary.EvaluatedCreatureCount, "Brain diagnostic evaluated count");
     AssertClose(3f / NeuralBrainSchema.OutputCount, summary.DirectFreshnessWeightMagnitude, 0.000001, "Direct freshness magnitude");
     AssertClose(7f / (NeuralBrainSchema.OutputCount * 3f), summary.DirectRotScentWeightMagnitude, 0.000001, "Direct rot magnitude");
-    AssertClose(3f / DirectCreatureSizeSectorDivisor, summary.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Direct smaller creature sector magnitude");
-    AssertClose(1.8f / DirectCreatureSizeSectorDivisor, summary.DirectSimilarCreatureSectorWeightMagnitude, 0.000001, "Direct similar creature sector magnitude");
-    AssertClose(2.4f / DirectCreatureSizeSectorDivisor, summary.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Direct larger creature sector magnitude");
+    AssertClose((3f + 2.4f) / DirectCreatureSizeSectorDivisor, summary.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Direct smaller creature sector magnitude");
+    AssertClose(1.8f / DirectSimilarCreatureSectorDivisor, summary.DirectSimilarCreatureSectorWeightMagnitude, 0.000001, "Direct similar creature sector magnitude");
+    AssertClose(2.4f / DirectLargerCreatureSectorDivisor, summary.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Direct larger creature sector magnitude");
     AssertClose(2.7f / DirectCreatureMotionSectorDivisor, summary.DirectCreatureApproachSectorWeightMagnitude, 0.000001, "Direct creature approach sector magnitude");
     AssertClose(1.5f / DirectCreatureMotionSectorDivisor, summary.DirectCreatureFacingSectorWeightMagnitude, 0.000001, "Direct creature facing sector magnitude");
     AssertClose(0.5f, summary.HiddenFreshnessWeightMagnitude, 0.000001, "Hidden freshness magnitude");
     AssertClose(0.25f, summary.HiddenRotScentWeightMagnitude, 0.000001, "Hidden rot magnitude");
-    AssertClose(0.9f / CreatureSizeSectorInputCount, summary.HiddenSmallerCreatureSectorWeightMagnitude, 0.000001, "Hidden smaller creature sector magnitude");
-    AssertClose(0.6f / CreatureSizeSectorInputCount, summary.HiddenSimilarCreatureSectorWeightMagnitude, 0.000001, "Hidden similar creature sector magnitude");
-    AssertClose(1.2f / CreatureSizeSectorInputCount, summary.HiddenLargerCreatureSectorWeightMagnitude, 0.000001, "Hidden larger creature sector magnitude");
+    AssertClose((0.9f + 1.2f) / CreatureSizeSectorInputCount, summary.HiddenSmallerCreatureSectorWeightMagnitude, 0.000001, "Hidden smaller creature sector magnitude");
+    AssertClose(0.6f / SimilarCreatureSectorInputCount, summary.HiddenSimilarCreatureSectorWeightMagnitude, 0.000001, "Hidden similar creature sector magnitude");
+    AssertClose(1.2f / LargerCreatureSectorInputCount, summary.HiddenLargerCreatureSectorWeightMagnitude, 0.000001, "Hidden larger creature sector magnitude");
     AssertClose(0.8f / CreatureMotionSectorInputCount, summary.HiddenCreatureApproachSectorWeightMagnitude, 0.000001, "Hidden creature approach sector magnitude");
     AssertClose(0.4f / CreatureMotionSectorInputCount, summary.HiddenCreatureFacingSectorWeightMagnitude, 0.000001, "Hidden creature facing sector magnitude");
     AssertClose(2f, summary.MoveFreshnessWeight, 0.000001, "Move freshness weight");
     AssertClose(-1f, summary.EatFreshnessWeight, 0.000001, "Eat freshness weight");
     AssertClose(-4f, summary.MoveRotScentForwardWeight, 0.000001, "Move rot forward weight");
     AssertClose(-3f, summary.TurnRotScentRightWeight, 0.000001, "Turn rot right weight");
-    AssertClose(3f / CreatureSizeSectorInputCount, summary.AttackSmallerCreatureSectorWeight, 0.000001, "Attack smaller creature sector weight");
-    AssertClose(-2.4f / CreatureSizeSectorInputCount, summary.AttackLargerCreatureSectorWeight, 0.000001, "Attack larger creature sector weight");
+    AssertClose((3f - 2.4f) / CreatureSizeSectorInputCount, summary.AttackSmallerCreatureSectorWeight, 0.000001, "Attack smaller creature sector weight");
+    AssertClose(-2.4f / LargerCreatureSectorInputCount, summary.AttackLargerCreatureSectorWeight, 0.000001, "Attack larger creature sector weight");
     AssertClose(2.7f / CreatureMotionSectorInputCount, summary.AttackCreatureApproachSectorWeight, 0.000001, "Attack creature approach sector weight");
     AssertClose(-1.5f / CreatureMotionSectorInputCount, summary.AttackCreatureFacingSectorWeight, 0.000001, "Attack creature facing sector weight");
 
@@ -6860,18 +6864,18 @@ static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
     wiredWeights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = -1f;
     wiredWeights[NeuralBrainSchema.MoveForwardOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentForwardInput] = -4f;
     wiredWeights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.RottenMeatScentRightInput] = -3f;
-    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSmallerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = 3f;
-    wiredWeights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 1.8f;
-    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)] = -2.4f;
-    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 2.7f;
-    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -1.5f;
+    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleCreatureDensityInput] = 3f;
+    wiredWeights[NeuralBrainSchema.TurnOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureVisualTraitSimilarityInput] = 1.8f;
+    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureRelativeBodySizeInput] = -2.4f;
+    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureApproachRateInput] = 2.7f;
+    wiredWeights[NeuralBrainSchema.AttackOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.CreatureFacingAlignmentInput] = -1.5f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleMeatFreshnessInput] = 0.5f;
     wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.RottenMeatScentDensityInput] = -0.75f;
-    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.9f;
-    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorSimilarCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = 0.6f;
-    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorLargerCreatureDensityInput(VisionSectorSet.CenterSectorIndex)] = -1.2f;
-    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)] = 0.8f;
-    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)] = -0.4f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.VisibleCreatureDensityInput] = 0.9f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureVisualTraitSimilarityInput] = 0.6f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureRelativeBodySizeInput] = -1.2f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureApproachRateInput] = 0.8f;
+    wiredWeights[NeuralBrainGenome.DirectWeightCount + NeuralBrainSchema.CreatureFacingAlignmentInput] = -0.4f;
     var wiredBrainId = simulation.State.AddBrain(new NeuralBrainGenome(wiredWeights));
     var quietBrainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero(hiddenNodeCount: 1));
 
@@ -6882,9 +6886,13 @@ static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
     simulation.State.SpawnCreature(genomeId, new SimVector2(200f, 30f), energy: 35f, brainId: quietBrainId);
 
     var summaries = SpeciesClusterAnalyzer.AnalyzeBrainInputDiagnostics(simulation.State, 10);
-    const int CreatureSizeSectorInputCount = VisionSectorSet.SectorCount * 2;
+    const int CreatureSizeSectorInputCount = 3;
     const int DirectCreatureSizeSectorDivisor = NeuralBrainSchema.OutputCount * CreatureSizeSectorInputCount;
-    const int CreatureMotionSectorInputCount = VisionSectorSet.SectorCount;
+    const int SimilarCreatureSectorInputCount = 3;
+    const int LargerCreatureSectorInputCount = 2;
+    const int DirectSimilarCreatureSectorDivisor = NeuralBrainSchema.OutputCount * SimilarCreatureSectorInputCount;
+    const int DirectLargerCreatureSectorDivisor = NeuralBrainSchema.OutputCount * LargerCreatureSectorInputCount;
+    const int CreatureMotionSectorInputCount = 1;
     const int DirectCreatureMotionSectorDivisor = NeuralBrainSchema.OutputCount * CreatureMotionSectorInputCount;
 
     AssertEqual(2, summaries.Count, "Species diagnostic cluster count");
@@ -6894,21 +6902,21 @@ static void SpeciesBrainInputDiagnosticsSummarizeClusterWiring()
     AssertEqual(2, wired.LivingCreatures, "Wired species diagnostic living count");
     AssertClose(3f / NeuralBrainSchema.OutputCount, wired.Diagnostics.DirectFreshnessWeightMagnitude, 0.000001, "Species direct freshness magnitude");
     AssertClose(7f / (NeuralBrainSchema.OutputCount * 3f), wired.Diagnostics.DirectRotScentWeightMagnitude, 0.000001, "Species direct rot magnitude");
-    AssertClose(3f / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Species direct smaller creature sector magnitude");
-    AssertClose(1.8f / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectSimilarCreatureSectorWeightMagnitude, 0.000001, "Species direct similar creature sector magnitude");
-    AssertClose(2.4f / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Species direct larger creature sector magnitude");
+    AssertClose((3f + 2.4f) / DirectCreatureSizeSectorDivisor, wired.Diagnostics.DirectSmallerCreatureSectorWeightMagnitude, 0.000001, "Species direct smaller creature sector magnitude");
+    AssertClose(1.8f / DirectSimilarCreatureSectorDivisor, wired.Diagnostics.DirectSimilarCreatureSectorWeightMagnitude, 0.000001, "Species direct similar creature sector magnitude");
+    AssertClose(2.4f / DirectLargerCreatureSectorDivisor, wired.Diagnostics.DirectLargerCreatureSectorWeightMagnitude, 0.000001, "Species direct larger creature sector magnitude");
     AssertClose(2.7f / DirectCreatureMotionSectorDivisor, wired.Diagnostics.DirectCreatureApproachSectorWeightMagnitude, 0.000001, "Species direct creature approach sector magnitude");
     AssertClose(1.5f / DirectCreatureMotionSectorDivisor, wired.Diagnostics.DirectCreatureFacingSectorWeightMagnitude, 0.000001, "Species direct creature facing sector magnitude");
     AssertClose(0.5f, wired.Diagnostics.HiddenFreshnessWeightMagnitude, 0.000001, "Species hidden freshness magnitude");
     AssertClose(0.25f, wired.Diagnostics.HiddenRotScentWeightMagnitude, 0.000001, "Species hidden rot magnitude");
-    AssertClose(0.9f / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenSmallerCreatureSectorWeightMagnitude, 0.000001, "Species hidden smaller creature sector magnitude");
-    AssertClose(0.6f / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenSimilarCreatureSectorWeightMagnitude, 0.000001, "Species hidden similar creature sector magnitude");
-    AssertClose(1.2f / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenLargerCreatureSectorWeightMagnitude, 0.000001, "Species hidden larger creature sector magnitude");
+    AssertClose((0.9f + 1.2f) / CreatureSizeSectorInputCount, wired.Diagnostics.HiddenSmallerCreatureSectorWeightMagnitude, 0.000001, "Species hidden smaller creature sector magnitude");
+    AssertClose(0.6f / SimilarCreatureSectorInputCount, wired.Diagnostics.HiddenSimilarCreatureSectorWeightMagnitude, 0.000001, "Species hidden similar creature sector magnitude");
+    AssertClose(1.2f / LargerCreatureSectorInputCount, wired.Diagnostics.HiddenLargerCreatureSectorWeightMagnitude, 0.000001, "Species hidden larger creature sector magnitude");
     AssertClose(0.8f / CreatureMotionSectorInputCount, wired.Diagnostics.HiddenCreatureApproachSectorWeightMagnitude, 0.000001, "Species hidden creature approach sector magnitude");
     AssertClose(0.4f / CreatureMotionSectorInputCount, wired.Diagnostics.HiddenCreatureFacingSectorWeightMagnitude, 0.000001, "Species hidden creature facing sector magnitude");
     AssertClose(-4f, wired.Diagnostics.MoveRotScentForwardWeight, 0.000001, "Species move rot forward weight");
-    AssertClose(3f / CreatureSizeSectorInputCount, wired.Diagnostics.AttackSmallerCreatureSectorWeight, 0.000001, "Species attack smaller creature sector weight");
-    AssertClose(-2.4f / CreatureSizeSectorInputCount, wired.Diagnostics.AttackLargerCreatureSectorWeight, 0.000001, "Species attack larger creature sector weight");
+    AssertClose((3f - 2.4f) / CreatureSizeSectorInputCount, wired.Diagnostics.AttackSmallerCreatureSectorWeight, 0.000001, "Species attack smaller creature sector weight");
+    AssertClose(-2.4f / LargerCreatureSectorInputCount, wired.Diagnostics.AttackLargerCreatureSectorWeight, 0.000001, "Species attack larger creature sector weight");
     AssertClose(2.7f / CreatureMotionSectorInputCount, wired.Diagnostics.AttackCreatureApproachSectorWeight, 0.000001, "Species attack creature approach sector weight");
     AssertClose(-1.5f / CreatureMotionSectorInputCount, wired.Diagnostics.AttackCreatureFacingSectorWeight, 0.000001, "Species attack creature facing sector weight");
 
@@ -6992,6 +7000,7 @@ static void BehaviorAssaySummarizesLateralTerrainResponse()
     AssertEqual("steers toward easier terrain", summary.TerrainResponse, "Lateral terrain response classification");
 }
 
+#pragma warning disable CS8321
 static void NeuralBrainMigratesReproductiveContextInputs()
 {
     const int legacyInputCount = 33;
@@ -7147,14 +7156,14 @@ static void NeuralBrainMigratesSectorVisionInputs()
     AssertClose(-2.2f, brain.GetHiddenOutputWeight(NeuralBrainSchema.TurnOutput, 0), 0.000001, "Existing hidden output remains in place");
     AssertClose(
         0f,
-        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisionSectorPlantDensityInput(VisionSectorSet.CenterSectorIndex)),
+        brain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisiblePlantDensityInput),
         0.000001,
-        "New sector plant density input starts neutral");
+        "New semantic plant density input starts neutral");
     AssertClose(
         0f,
-        brain.GetHiddenInputWeight(0, NeuralBrainSchema.VisionSectorMeatProximityInput(VisionSectorSet.CenterSectorIndex)),
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.MeatProximityInput),
         0.000001,
-        "New hidden sector meat proximity input starts neutral");
+        "New hidden semantic meat proximity input starts neutral");
 }
 
 static void NeuralBrainMigratesNearestAggregateSchema()
@@ -7203,9 +7212,9 @@ static void NeuralBrainMigratesNearestAggregateSchema()
         2.3f,
         brain.GetWeight(
             NeuralBrainSchema.TurnOutput,
-            NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex)),
+            NeuralBrainSchema.PlantProximityInput),
         0.000001,
-        "Existing full sector input shifts into current sector range");
+        "Existing full sector input collapses into semantic plant proximity");
     AssertClose(
         3.4f,
         brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.FoodContactInput),
@@ -7236,7 +7245,7 @@ static void NeuralBrainMigratesFoodContactInput()
     const int legacySectorChannelCount = 8;
     var legacyWeights = new float[legacyInputCount * legacyOutputCount];
     var oldCenterPlantInput = 46 + VisionSectorSet.CenterSectorIndex * legacySectorChannelCount + 1;
-    var centerPlantInput = NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex);
+    var centerPlantInput = NeuralBrainSchema.PlantProximityInput;
     legacyWeights[NeuralBrainSchema.MoveForwardOutput * legacyInputCount + oldCenterPlantInput] = 2.4f;
 
     var brain = new NeuralBrainGenome(legacyWeights);
@@ -7335,9 +7344,9 @@ static void NeuralBrainMigratesHealthRatioInput()
         "Existing health ratio input remains in place after creature sector size inputs are added");
     AssertClose(
         0f,
-        healthBrain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisionSectorSmallerCreatureDensityInput(0)),
+        healthBrain.GetWeight(NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.VisibleCreatureDensityInput),
         0.000001,
-        "New creature size sector input starts neutral");
+        "New creature visual density input starts neutral");
 }
 
 static void NeuralBrainMigratesCreatureSectorMotionInputs()
@@ -7369,9 +7378,9 @@ static void NeuralBrainMigratesCreatureSectorMotionInputs()
         2.2f,
         brain.GetWeight(
             NeuralBrainSchema.MoveForwardOutput,
-            NeuralBrainSchema.VisionSectorLargerCreatureProximityInput(VisionSectorSet.CenterSectorIndex)),
+            NeuralBrainSchema.CreatureProximityInput),
         0.000001,
-        "Existing larger-creature sector input remains in place");
+        "Existing larger-creature sector input collapses into semantic creature proximity");
     AssertClose(
         3.3f,
         brain.GetWeight(NeuralBrainSchema.EatOutput, NeuralBrainSchema.FoodContactInput),
@@ -7391,16 +7400,16 @@ static void NeuralBrainMigratesCreatureSectorMotionInputs()
         0f,
         brain.GetWeight(
             NeuralBrainSchema.MoveForwardOutput,
-            NeuralBrainSchema.VisionSectorCreatureApproachRateInput(VisionSectorSet.CenterSectorIndex)),
+            NeuralBrainSchema.CreatureApproachRateInput),
         0.000001,
-        "New sector creature approach input starts neutral");
+        "New creature approach input starts neutral");
     AssertClose(
         0f,
         brain.GetHiddenInputWeight(
             0,
-            NeuralBrainSchema.VisionSectorCreatureFacingAlignmentInput(VisionSectorSet.CenterSectorIndex)),
+            NeuralBrainSchema.CreatureFacingAlignmentInput),
         0.000001,
-        "New hidden sector creature facing input starts neutral");
+        "New hidden creature facing input starts neutral");
 }
 
 static void NeuralBrainMigratesCreatureContactInput()
@@ -7573,9 +7582,9 @@ static void NeuralBrainMigratesSectorPlantQualityInputs()
     AssertEqual(NeuralBrainGenome.GetExpectedWeightCount(hiddenNodeCount), brain.Weights.Length, "Sector plant quality migrated weight count");
     AssertClose(
         1.9f,
-        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.VisionSectorMeatProximityInput(VisionSectorSet.CenterSectorIndex)),
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatProximityInput),
         0.000001,
-        "Existing sector meat proximity input remains in place");
+        "Existing sector meat proximity input collapses into semantic meat proximity");
     AssertClose(
         0.7f,
         brain.GetHiddenInputWeight(0, NeuralBrainSchema.RecentFoodEnergyYieldInput),
@@ -7588,14 +7597,14 @@ static void NeuralBrainMigratesSectorPlantQualityInputs()
         "Existing hidden eat output remains in place");
     AssertClose(
         0f,
-        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.VisionSectorPlantEnergyQualityInput(VisionSectorSet.CenterSectorIndex)),
+        brain.GetWeight(NeuralBrainSchema.TurnOutput, NeuralBrainSchema.VisiblePlantEnergyQualityInput),
         0.000001,
-        "New sector plant energy quality direct input starts neutral");
+        "New visible plant energy quality direct input starts neutral");
     AssertClose(
         0f,
-        brain.GetHiddenInputWeight(0, NeuralBrainSchema.VisionSectorPlantBiteEaseInput(VisionSectorSet.CenterSectorIndex)),
+        brain.GetHiddenInputWeight(0, NeuralBrainSchema.VisiblePlantBiteEaseInput),
         0.000001,
-        "New sector plant bite ease hidden input starts neutral");
+        "New visible plant bite ease hidden input starts neutral");
 }
 
 static void NeuralBrainMigratesTypedPlantEnergyYieldInputs()
@@ -8282,6 +8291,7 @@ static void NeuralBrainMigratesMaturityProgressInput()
     AssertClose(0f, brain.GetHiddenInputWeight(0, NeuralBrainSchema.MaturityProgressInput), 0.000001, "New maturity progress hidden input starts neutral");
 }
 
+#pragma warning restore CS8321
 static void NeuralBrainSupportsHiddenNodes()
 {
     const int hiddenNodeCount = 4;
@@ -8331,7 +8341,7 @@ static void NeuralBrainSupportsHiddenNodes()
         0.000001,
         "Seed hidden outputs start neutral");
     AssertTrue(
-        Math.Abs(seedBrain.GetHiddenInputWeight(0, NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex))) > 0.000001f,
+        Math.Abs(seedBrain.GetHiddenInputWeight(0, NeuralBrainSchema.PlantProximityInput)) > 0.000001f,
         "Seed hidden concepts should be prewired on the input side");
 }
 
@@ -8467,7 +8477,7 @@ static void BrainFactorySupportsHiddenLayerNeuralArchitecture()
     Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
     inputs[NeuralBrainSchema.BiasInput] = 1f;
     inputs[NeuralBrainSchema.HungerInput] = 1f;
-    inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex - 1)] = 1f;
+    inputs[NeuralBrainSchema.PlantDirectionRightInput] = -1f;
     starter.Evaluate(inputs, outputs);
     AssertTrue(Math.Abs(outputs[NeuralBrainSchema.TurnOutput]) > 0.01f, "Hidden-layer starter should respond through hidden nodes");
 
@@ -8545,7 +8555,7 @@ static void BrainFactorySupportsHybridDeep8x8NeuralArchitecture()
     Span<float> starterOutputs = stackalloc float[NeuralBrainSchema.OutputCount];
     inputs[NeuralBrainSchema.BiasInput] = 1f;
     inputs[NeuralBrainSchema.HungerInput] = 1f;
-    inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex + 1)] = 1f;
+    inputs[NeuralBrainSchema.PlantDirectionRightInput] = 1f;
     source.Evaluate(inputs, sourceOutputs);
     starter.Evaluate(inputs, starterOutputs);
     for (var output = 0; output < NeuralBrainSchema.OutputCount; output++)
@@ -8623,7 +8633,7 @@ static void BrainFactorySupportsHiddenDeep8x8NeuralArchitecture()
     Span<float> outputs = stackalloc float[NeuralBrainSchema.OutputCount];
     inputs[NeuralBrainSchema.BiasInput] = 1f;
     inputs[NeuralBrainSchema.HungerInput] = 1f;
-    inputs[NeuralBrainSchema.VisionSectorPlantProximityInput(VisionSectorSet.CenterSectorIndex)] = 1f;
+    inputs[NeuralBrainSchema.PlantDirectionForwardInput] = 1f;
     starter.Evaluate(inputs, outputs);
     AssertTrue(outputs[NeuralBrainSchema.MoveForwardOutput] > 0.01f, "Hidden deep starter should respond through hidden layers");
 
@@ -8677,7 +8687,7 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
 
     AssertEqual(BrainArchitectureKind.RtNeatGraph, descriptor.Kind, "rtNEAT descriptor kind");
     AssertEqual("rtNEAT graph", descriptor.Name, "rtNEAT descriptor name");
-    AssertTrue(descriptor.InputCount >= BrainIoRegistry.Inputs.Count, "rtNEAT should expose semantic inputs");
+    AssertEqual(RtNeatBrainIoRegistry.Inputs.Count, descriptor.InputCount, "rtNEAT input count");
     AssertTrue(
         RtNeatBrainIoRegistry.Inputs.Any(input => string.Equals(input.Key, "internal.maturity_progress", StringComparison.Ordinal)),
         "rtNEAT should expose maturity progress input");
@@ -9045,6 +9055,60 @@ static void BrainProbeEditsRtNeatGraphInputs()
     var turnOutput = senseEvaluation.Outputs.Single(output => output.Key == "action.turn");
     AssertTrue(senseEvaluation.OverrideCount > 0, "rtNEAT modified senses should count changed inputs");
     AssertTrue(turnOutput.ModifiedValue > turnOutput.BaselineValue + 0.25f, "rtNEAT modified semantic plant direction should turn right");
+}
+
+static void BrainProbeFoodPresetsIncludeSmallPreyInputs()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            WorldWidth = 100f,
+            WorldHeight = 100f,
+            FixedDeltaSeconds = 1f
+        },
+        seed: 734,
+        systems: []);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
+    var weights = new float[NeuralBrainGenome.DirectWeightCount];
+    weights[NeuralBrainSchema.EatOutput * NeuralBrainSchema.InputCount + NeuralBrainSchema.VisibleSmallPreyDensityInput] = 4f;
+    var brainId = simulation.State.AddBrain(new NeuralBrainGenome(weights));
+    simulation.State.SpawnCreature(
+        genomeId,
+        new SimVector2(50f, 50f),
+        energy: 20f,
+        brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        WorldSenseRefreshed = true,
+        WorldSenseTick = 0,
+        VisibleSmallPreyDensity = 1f,
+        VisibleFoodDensity = 1f,
+        VisibleMeatDensity = 1f,
+        VisibleMeatFreshness = 1f,
+        SmallPreyDetected = true,
+        SmallPreyProximity = 1f,
+        EnergyRatio = 1f,
+        HealthRatio = 1f
+    };
+    simulation.State.Creatures[0] = creature;
+
+    var service = new BrainProbeService();
+    var noFood = service.EvaluatePopulationPreset(
+        simulation.State,
+        BrainProbePresetKind.NoFood,
+        maxCreatures: 10);
+    var eatOutput = noFood.Outputs.Single(output => output.Key == "action.eat");
+    AssertTrue(eatOutput.BaselineMean > 0.9f, "Small prey density should drive the probe brain to eat");
+    AssertClose(0f, eatOutput.ModifiedMean, 0.000001, "No Food preset should neutralize small prey inputs");
+    AssertEqual(1, eatOutput.GateFlipCount, "No Food preset should flip the small-prey eat gate");
+
+    var onlyPlants = service.EvaluatePopulationPreset(
+        simulation.State,
+        BrainProbePresetKind.OnlyPlants,
+        maxCreatures: 10);
+    eatOutput = onlyPlants.Outputs.Single(output => output.Key == "action.eat");
+    AssertClose(0f, eatOutput.ModifiedMean, 0.000001, "Only Plants preset should neutralize small prey inputs");
 }
 
 static void RtNeatMutationCreatesBranchedDiverseGraphGrowth()
@@ -12966,6 +13030,45 @@ static void BrainProfileCompatibilityReportsSchemaStatus()
     AssertTrue(
         futureSchema.Status.Contains("newer than supported", StringComparison.OrdinalIgnoreCase),
         "Future brain schema warning should explain the version mismatch");
+}
+
+static void CheckedInSpeciesCatalogProfilesLoad()
+{
+    var speciesRoot = Path.Combine(FindTestRepositoryRoot(), "species");
+    AssertTrue(Directory.Exists(speciesRoot), "Checked-in species catalog directory should exist");
+
+    var profilePaths = Directory
+        .EnumerateFiles(speciesRoot, SpeciesProfileJson.FilePattern, SearchOption.TopDirectoryOnly)
+        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    AssertTrue(profilePaths.Length > 0, "Checked-in species catalog should contain profiles");
+
+    foreach (var profilePath in profilePaths)
+    {
+        var profile = SpeciesProfileJson.Load(profilePath);
+        AssertTrue(
+            !string.IsNullOrWhiteSpace(profile.Name),
+            $"Species profile {Path.GetFileName(profilePath)} should load with a name");
+        AssertTrue(
+            profile.BrainWeightCount > 0,
+            $"Species profile {Path.GetFileName(profilePath)} should load brain weights");
+    }
+}
+
+static string FindTestRepositoryRoot()
+{
+    var directory = new DirectoryInfo(AppContext.BaseDirectory);
+    while (directory is not null)
+    {
+        if (File.Exists(Path.Combine(directory.FullName, "Lineage.slnx")))
+        {
+            return directory.FullName;
+        }
+
+        directory = directory.Parent;
+    }
+
+    throw new InvalidOperationException("Could not locate Lineage.slnx from the test app directory.");
 }
 
 static void StarterCatalogHybridBrainsReproduceWhenReady()

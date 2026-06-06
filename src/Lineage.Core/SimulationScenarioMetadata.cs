@@ -229,7 +229,7 @@ public static class SimulationScenarioMetadata
             "BrainHiddenNodeCount" => "Hidden-node count requested for neural brain genomes.",
             "InitialCreatureCount" => "Number of founders spawned when no species roster is enabled.",
             "InitialResourcesPerMillionArea" => "Plant density scaled by world area.",
-            "EnableSectorVision" => "Enables grouped sector vision inputs for the neural controller.",
+            "EnableSectorVision" => "Collects grouped raw sector vision samples for overlays and diagnostics; brain inputs use semantic visual summaries.",
             "ReuseNeuralActionsOnSkippedWorldSenses" => "Reuses the previous neural action on ticks where expensive world senses were not refreshed, unless contact or internal-state changes force a new decision.",
             "SensingThreadCount" => "Maximum worker threads used for creature sensing. Use 1 for the fully detailed single-threaded path.",
             "NeuralControllerThreadCount" => "Maximum worker threads used for neural controller evaluation. Defaults to 8; use 1 for the single-threaded deterministic path.",
