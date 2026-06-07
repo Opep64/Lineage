@@ -54,11 +54,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private readonly CreatureSensingScratch _sequentialScratch = new();
     private readonly ThreadLocal<CreatureSensingScratch> _parallelScratch = new(() => new CreatureSensingScratch());
     private readonly Dictionary<EntityId, int> _creatureIndexById = [];
+    private readonly Dictionary<EntityId, EntityId> _founderIdByCreatureId = [];
     private CreatureState[] _parallelCreatureBuffer = [];
     private float[] _cachedBodyRadii = [];
     private float[] _cachedMaxSpeeds = [];
     private int[] _cachedTraitStamps = [];
     private int _traitCacheStamp;
+    private int _founderCacheRecordCount;
 
     public CreatureSensingSystem(
         UniformSpatialIndex spatialIndex,
@@ -650,7 +652,8 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             if (edgeDistance <= eggLineageScentRadius)
             {
                 eggLineageScentCandidates++;
-                var lineageWeight = LineageFamiliarity.ScentWeight(LineageFamiliarity.EggSimilarity(state, creature.Id, egg));
+                var lineageWeight = LineageFamiliarity.ScentWeight(
+                    CalculateLineageSimilarity(creature.Id, egg.ParentId));
                 if (lineageWeight > 0f)
                 {
                     var distanceFactor = 1f - Math.Clamp(edgeDistance / eggLineageScentRadius, 0f, 1f);
@@ -1672,7 +1675,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             Math.Clamp(SimVector2.Dot(direction, right), -1f, 1f) * directionalConfidence;
     }
 
-    private static float CalculateEggContactLineageSimilarity(WorldState state, CreatureState creature)
+    private float CalculateEggContactLineageSimilarity(WorldState state, CreatureState creature)
     {
         if (!creature.IsTouchingFood
             || creature.FoodContactKind != FoodContactKind.Egg
@@ -1686,7 +1689,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var egg = state.Eggs[eggIndex];
             if (egg.Id == creature.FoodContactResourceId)
             {
-                return LineageFamiliarity.EggSimilarity(state, creature.Id, egg);
+                return CalculateLineageSimilarity(creature.Id, egg.ParentId);
             }
         }
 
@@ -1808,7 +1811,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             var otherTraits = GetCreatureTraits(state, otherCreatureIndex);
             var similarity = CreatureSimilarity.GeneticSimilarity(creatureTraits.Genome, otherTraits.Genome);
-            var lineageSimilarity = LineageFamiliarity.CreatureSimilarity(state, creature.Id, otherCreature.Id);
+            var lineageSimilarity = CalculateLineageSimilarity(creature.Id, otherCreature.Id);
             var identitySimilarity = ScentIdentity.SignatureSimilarity(creatureTraits.Genome, otherTraits.Genome);
             if (hasContact && otherCreature.Id == creature.CreatureContactId)
             {
@@ -1934,7 +1937,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         var contactGenome = state.GetGenome(contact.GenomeId);
         senses.CreatureContactSimilarity = CreatureSimilarity.GeneticSimilarity(genome, contactGenome);
-        senses.CreatureContactLineageSimilarity = LineageFamiliarity.CreatureSimilarity(state, creature.Id, contact.Id);
+        senses.CreatureContactLineageSimilarity = CalculateLineageSimilarity(creature.Id, contact.Id);
         senses.CreatureContactIdentitySimilarity = ScentIdentity.SignatureSimilarity(genome, contactGenome);
     }
 
@@ -2050,7 +2053,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.MeatDirectionRight = sense.DirectionRight;
     }
 
-    private static void ApplyEggSense(
+    private void ApplyEggSense(
         ref CreatureSenseState senses,
         WorldState state,
         EggState egg,
@@ -2065,7 +2068,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.EggProximity = sense.Proximity;
         senses.EggDirectionForward = sense.DirectionForward;
         senses.EggDirectionRight = sense.DirectionRight;
-        senses.EggVisualLineageSimilarity = LineageFamiliarity.EggSimilarity(state, creature.Id, egg);
+        senses.EggVisualLineageSimilarity = CalculateLineageSimilarity(creature.Id, egg.ParentId);
         senses.EggVisualIdentitySimilarity = ScentIdentity.SignatureSimilarity(genome, state.GetGenome(egg.GenomeId));
     }
 
@@ -2090,7 +2093,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.PreyDirectionRight = sense.DirectionRight;
     }
 
-    private static void ApplyCreatureSense(
+    private void ApplyCreatureSense(
         ref CreatureSenseState senses,
         WorldState state,
         CreatureState visibleCreature,
@@ -2120,10 +2123,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.CreatureVisualTraitSimilarity = CreatureSimilarity.GeneticSimilarity(
             creatureTraits.Genome,
             visibleTraits.Genome);
-        senses.CreatureVisualLineageSimilarity = LineageFamiliarity.CreatureSimilarity(
-            state,
-            creature.Id,
-            visibleCreature.Id);
+        senses.CreatureVisualLineageSimilarity = CalculateLineageSimilarity(creature.Id, visibleCreature.Id);
         senses.CreatureVisualIdentitySimilarity = ScentIdentity.SignatureSimilarity(
             creatureTraits.Genome,
             visibleTraits.Genome);
@@ -2260,6 +2260,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
     private void BeginTraitCache(WorldState state, bool precomputeTraits)
     {
         var creatureCount = state.Creatures.Count;
+        UpdateFounderCache(state);
         if (_cachedTraitStamps.Length < creatureCount)
         {
             Array.Resize(ref _cachedBodyRadii, creatureCount);
@@ -2295,6 +2296,78 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             _cachedTraitStamps[i] = _traitCacheStamp;
         }
+    }
+
+    private void UpdateFounderCache(WorldState state)
+    {
+        var recordCount = state.LineageRecords.Count;
+        if (recordCount < _founderCacheRecordCount)
+        {
+            _founderIdByCreatureId.Clear();
+            _founderCacheRecordCount = 0;
+        }
+
+        for (var recordIndex = _founderCacheRecordCount; recordIndex < recordCount; recordIndex++)
+        {
+            var record = state.LineageRecords[recordIndex];
+            var founderId = ResolveFounderId(state, record);
+            if (record.Id != default && founderId != default)
+            {
+                _founderIdByCreatureId[record.Id] = founderId;
+            }
+        }
+
+        _founderCacheRecordCount = recordCount;
+    }
+
+    private EntityId ResolveFounderId(WorldState state, CreatureLineageRecord record)
+    {
+        if (record.Id == default)
+        {
+            return default;
+        }
+
+        if (record.IsFounder)
+        {
+            return record.Id;
+        }
+
+        if (_founderIdByCreatureId.TryGetValue(record.ParentId, out var cachedFounderId))
+        {
+            return cachedFounderId;
+        }
+
+        var current = record;
+        while (!current.IsFounder && state.TryGetLineageRecord(current.ParentId, out var parent))
+        {
+            if (_founderIdByCreatureId.TryGetValue(parent.Id, out cachedFounderId))
+            {
+                return cachedFounderId;
+            }
+
+            current = parent;
+        }
+
+        return current.IsFounder ? current.Id : current.ParentId;
+    }
+
+    private float CalculateLineageSimilarity(EntityId leftCreatureId, EntityId rightCreatureId)
+    {
+        if (leftCreatureId == default || rightCreatureId == default)
+        {
+            return 0f;
+        }
+
+        if (leftCreatureId == rightCreatureId)
+        {
+            return 1f;
+        }
+
+        return _founderIdByCreatureId.TryGetValue(leftCreatureId, out var leftFounderId)
+            && _founderIdByCreatureId.TryGetValue(rightCreatureId, out var rightFounderId)
+            && leftFounderId == rightFounderId
+                ? 1f
+                : 0f;
     }
 
     private void EnsureParallelCreatureBufferCapacity(int creatureCount)
