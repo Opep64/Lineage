@@ -360,4 +360,5 @@ public readonly record struct SimulationStatsSnapshot(
     float AverageMetabolicPace,
     int LowMetabolicPaceCreatureCount,
     int NormalMetabolicPaceCreatureCount,
-    int HighMetabolicPaceCreatureCount);
+    int HighMetabolicPaceCreatureCount,
+    GenomeTraitAverages AverageGenomeTraits);

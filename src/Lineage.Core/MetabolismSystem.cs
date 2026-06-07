@@ -71,17 +71,33 @@ public sealed class MetabolismSystem(
                 0f,
                 creature.ReproductionCooldownSeconds
                     - deltaSeconds * CreatureMetabolism.CooldownRecoveryMultiplier(genome));
+            var effectiveBodyRadius = CreatureGrowth.EffectiveBodyRadius(creature, genome);
+            var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
+            var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
+            var effectiveDamageResistance = CreatureGrowth.EffectiveDamageResistance(creature, genome);
             var traitUpkeep =
-                CreatureGrowth.EffectiveBodyRadius(creature, genome) * _bodyRadiusEnergyCostPerSecond
+                BaselineScaledQuadraticUpkeep(
+                    effectiveBodyRadius,
+                    CreatureGenome.Baseline.BodyRadius,
+                    _bodyRadiusEnergyCostPerSecond)
                 + CreatureGrowth.EffectiveMaxSpeed(creature, genome) * _maxSpeedEnergyCostPerSecond
                 + CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome) * _turnRateEnergyCostPerSecond
-                + CreatureGrowth.EffectiveSenseRadius(creature, genome) * _senseRadiusEnergyCostPerSecond
-                + CreatureGrowth.EffectiveVisionAngleRadians(creature, genome) * _visionAngleEnergyCostPerSecond
+                + BaselineScaledQuadraticUpkeep(
+                    effectiveSenseRadius,
+                    CreatureGenome.Baseline.SenseRadius,
+                    _senseRadiusEnergyCostPerSecond)
+                + BaselineScaledQuadraticUpkeep(
+                    effectiveVisionAngle,
+                    CreatureGenome.Baseline.VisionAngleRadians,
+                    _visionAngleEnergyCostPerSecond)
                 + CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * _eatRateEnergyCostPerSecond
                 + CreatureGrowth.EffectiveGutCapacityCalories(creature, genome) * _gutCapacityEnergyCostPerSecond
                 + CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond
                 + CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond
-                + CreatureGrowth.EffectiveDamageResistance(creature, genome) * _damageResistanceEnergyCostPerSecond
+                + BaselineScaledQuadraticUpkeep(
+                    effectiveDamageResistance,
+                    CreatureGenome.Baseline.DamageResistance,
+                    _damageResistanceEnergyCostPerSecond)
                 + CreatureDigestion.PlantSpecializationUpkeepFactor(genome) * _plantSpecializationEnergyCostPerSecond
                 + Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond
                 + BrainTopologyUpkeep(state, creature.BrainId);
@@ -138,6 +154,17 @@ public sealed class MetabolismSystem(
         return float.IsFinite(value) && value >= 0f
             ? value
             : throw new ArgumentOutOfRangeException(name, "Energy cost must be finite and non-negative.");
+    }
+
+    private static float BaselineScaledQuadraticUpkeep(float value, float baselineValue, float costPerBaselineUnit)
+    {
+        if (costPerBaselineUnit <= 0f || value <= 0f)
+        {
+            return 0f;
+        }
+
+        var baseline = Math.Max(0.000001f, baselineValue);
+        return value * value / baseline * costPerBaselineUnit;
     }
 }
 

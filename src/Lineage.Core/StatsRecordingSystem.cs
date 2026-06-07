@@ -135,6 +135,7 @@ public sealed class StatsRecordingSystem(
         var nonMemoryUserMaxXReachedTotal = 0f;
         var totalVisionRange = 0f;
         var totalVisionAngle = 0f;
+        var genomeTraitAccumulator = new GenomeTraitAccumulator();
         var totalMetabolicPace = 0f;
         var totalDietaryAdaptation = 0f;
         var totalCarrionAdaptation = 0f;
@@ -432,6 +433,7 @@ public sealed class StatsRecordingSystem(
 
             totalVisionRange += CreatureGrowth.EffectiveSenseRadius(creature, genome);
             totalVisionAngle += CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
+            genomeTraitAccumulator.Add(genome);
             var metabolicPace = CreatureMetabolism.NormalizePace(genome.MetabolicPace);
             totalMetabolicPace += metabolicPace;
             AddMetabolicPaceBandCount(
@@ -1591,7 +1593,8 @@ public sealed class StatsRecordingSystem(
             totalMetabolicPace / divisor,
             lowMetabolicPaceCreatureCount,
             normalMetabolicPaceCreatureCount,
-            highMetabolicPaceCreatureCount));
+            highMetabolicPaceCreatureCount,
+            genomeTraitAccumulator.Average(divisor)));
     }
 
     private static void AddMetabolicPaceBandCount(

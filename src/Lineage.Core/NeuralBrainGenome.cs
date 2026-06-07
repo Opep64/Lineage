@@ -509,8 +509,8 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.MovementBlockedInput, -1.5f);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.BiasInput, -2.5f);
+        SeedOpportunisticMeatContactEatingWeights(weights);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
-        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
         SeedPlantForagingWeights(weights);
         SeedMeatForagingWeights(weights, turnScale: 1.2f, forwardScale: 0.35f);
@@ -538,8 +538,8 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.MoveForwardOutput, NeuralBrainSchema.HungerInput, 0.35f);
 
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.BiasInput, -2.5f);
+        SeedOpportunisticMeatContactEatingWeights(weights);
         Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.PlantFoodContactInput, 5.0f);
-        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.0f);
 
         SeedPlantForagingWeights(weights);
 
@@ -576,6 +576,13 @@ public sealed class NeuralBrainGenome
         Set(weights, NeuralBrainSchema.TurnOutput, NeuralBrainSchema.MeatScentRightInput, 2.5f);
 
         Set(weights, NeuralBrainSchema.AttackOutput, NeuralBrainSchema.BiasInput, -4f);
+    }
+
+    private static void SeedOpportunisticMeatContactEatingWeights(float[] weights)
+    {
+        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.FoodContactInput, 1.0f);
+        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.MeatFoodContactInput, 1.35f);
+        Set(weights, NeuralBrainSchema.EatOutput, NeuralBrainSchema.HungerInput, 0.35f);
     }
 
     private static void SeedPlantForagingWeights(float[] weights)

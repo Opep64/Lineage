@@ -2930,6 +2930,65 @@ public static class ViewerReportWriter
             new ChartSeries("Rotten affected", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.RottenMeatDamagedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
+            "Genome Drift: body and senses",
+            "",
+            snapshots,
+            new ChartSeries("Body radius", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.BodyRadius).ToArray()),
+            new ChartSeries("Max speed", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.MaxSpeed).ToArray()),
+            new ChartSeries("Turn rate", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.MaxTurnRadiansPerSecond).ToArray()),
+            new ChartSeries("Sense radius", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.SenseRadius).ToArray()),
+            new ChartSeries("Vision angle deg", "#b84a4a", snapshots.Select(snapshot => ToDegrees(snapshot.AverageGenomeTraits.VisionAngleRadians)).ToArray()));
+        WriteLineChart(
+            writer,
+            "Genome Drift: energy and feeding",
+            "",
+            snapshots,
+            new ChartSeries("Basal", "#7d5546", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.BasalEnergyPerSecond).ToArray()),
+            new ChartSeries("Move cost", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.MovementEnergyPerSecond).ToArray()),
+            new ChartSeries("Eat rate", "#35a862", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.EatCaloriesPerSecond).ToArray()),
+            new ChartSeries("Gut cap", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.GutCapacityCalories).ToArray()),
+            new ChartSeries("Digest rate", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.DigestionCaloriesPerSecond).ToArray()),
+            new ChartSeries("Fat cap", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.FatStorageCapacityCalories).ToArray()),
+            new ChartSeries("Fat efficiency %", "#4b8f83", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.FatStorageEfficiency * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Genome Drift: reproduction and lifespan",
+            " s/kcal",
+            snapshots,
+            new ChartSeries("Repro threshold", "#2f7d4f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ReproductionEnergyThreshold).ToArray()),
+            new ChartSeries("Offspring invest", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.OffspringEnergyInvestment).ToArray()),
+            new ChartSeries("Egg prod/s", "#35a862", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.EggProductionEnergyPerSecond).ToArray()),
+            new ChartSeries("Incubation", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.EggIncubationSeconds).ToArray()),
+            new ChartSeries("Maturity age", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.MaturityAgeSeconds).ToArray()),
+            new ChartSeries("Cooldown", "#7d5546", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ReproductionCooldownSeconds).ToArray()),
+            new ChartSeries("Life expectancy", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.MaxLifeExpectancySeconds).ToArray()));
+        WriteLineChart(
+            writer,
+            "Genome Drift: diet and combat",
+            "",
+            snapshots,
+            new ChartSeries("Diet meat bias", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.DietaryAdaptation).ToArray()),
+            new ChartSeries("Carrion bias", "#7d5546", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.CarrionAdaptation).ToArray()),
+            new ChartSeries("Tender", "#8fd36b", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.TenderPlantAdaptation).ToArray()),
+            new ChartSeries("Rich", "#178a4a", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.RichPlantAdaptation).ToArray()),
+            new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ToughPlantAdaptation).ToArray()),
+            new ChartSeries("Bite", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.BiteStrength).ToArray()),
+            new ChartSeries("Resistance", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.DamageResistance).ToArray()));
+        WriteLineChart(
+            writer,
+            "Genome Drift: thermal, scent, mutation",
+            "",
+            snapshots,
+            new ChartSeries("Thermal opt", "#c9492e", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ThermalOptimum).ToArray()),
+            new ChartSeries("Thermal tol", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ThermalTolerance).ToArray()),
+            new ChartSeries("Scent A", "#35a862", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ScentSignatureA).ToArray()),
+            new ChartSeries("Scent B", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ScentSignatureB).ToArray()),
+            new ChartSeries("Scent C", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.ScentSignatureC).ToArray()),
+            new ChartSeries("Mutation strength", "#7d5546", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.MutationStrength).ToArray()),
+            new ChartSeries("Trait rate", "#4b8f83", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.TraitMutationRate).ToArray()),
+            new ChartSeries("Brain rate", "#b84a4a", snapshots.Select(snapshot => snapshot.AverageGenomeTraits.BrainMutationRate).ToArray()));
+        WriteLineChart(
+            writer,
             "Diet Traits",
             "",
             snapshots,
@@ -3195,6 +3254,8 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Egg familiarity response", summary.EggFamiliarityResponse);
         WriteMetric(writer, "Egg laying", summary.ReproductionTendency);
         WriteMetric(writer, "Rotten meat response", summary.RottenMeatResponse);
+        WriteMetric(writer, "Meat contact eat", FormatPercent(summary.MeatContact.EatShare));
+        WriteMetric(writer, "Egg contact eat", FormatPercent(summary.EggContact.EatShare));
         WriteMetric(writer, "Fresh meat preference", summary.FreshMeatPreferenceScore.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Rot scent avoidance", summary.RottenScentAvoidanceScore.ToString("0.###", CultureInfo.InvariantCulture));
         writer.WriteLine("</div>");

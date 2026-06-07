@@ -138,6 +138,7 @@ var tests = new (string Name, Action Body)[]
     ("Sector forager starter follows semantic plant cues", SectorForagerStarterFollowsSemanticPlantCues),
     ("Scavenger starter follows semantic meat cues", ScavengerStarterFollowsSemanticMeatCues),
     ("Predator starter follows semantic creature cues", PredatorStarterFollowsSemanticCreatureCues),
+    ("Plant forager starters sample meat on contact", PlantForagerStartersSampleMeatOnContact),
     ("Opportunistic forager samples meat on contact", OpportunisticForagerSamplesMeatOnContact),
     ("Seed forager slows down near food", SeedForagerSlowsDownNearFood),
     ("Behavior assay summarizes seed forager responses", BehaviorAssaySummarizesSeedForagerResponses),
@@ -200,6 +201,7 @@ var tests = new (string Name, Action Body)[]
     ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
     ("Stats recording reports metabolic pace bands", StatsRecordingReportsMetabolicPaceBands),
+    ("Stats recording reports genome trait averages", StatsRecordingReportsGenomeTraitAverages),
     ("Stats recording ignores extinct brain payloads", StatsRecordingIgnoresExtinctBrainPayloads),
     ("Stats recording reports rtNEAT topology telemetry", StatsRecordingReportsRtNeatTopologyTelemetry),
     ("Stats recording reports biome pressure telemetry", StatsRecordingReportsBiomePressureTelemetry),
@@ -2960,7 +2962,7 @@ static void MetabolismChargesBodySizeUpkeep()
 
     simulation.Step();
 
-    AssertClose(7f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after basal and body-size upkeep");
+    AssertClose(6.333333f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after basal and body-size upkeep");
 }
 
 static void MetabolismChargesTraitUpkeep()
@@ -6528,6 +6530,14 @@ static void OpportunisticForagerSamplesMeatOnContact()
     AssertMeatContactTriggersEat(NeuralBrainGenome.CreateOpportunisticForager(), "Opportunistic forager");
 }
 
+static void PlantForagerStartersSampleMeatOnContact()
+{
+    AssertMeatContactTriggersEat(NeuralBrainGenome.CreateSeedForager(), "Seed forager");
+    AssertMeatContactTriggersEat(NeuralBrainGenome.CreateSectorForager(), "Sector forager");
+    AssertEggContactDoesNotTriggerEat(NeuralBrainGenome.CreateSeedForager(), "Seed forager");
+    AssertEggContactDoesNotTriggerEat(NeuralBrainGenome.CreateSectorForager(), "Sector forager");
+}
+
 static void SeedForagerSlowsDownNearFood()
 {
     var farMove = MeasureSeedForagerMove(resourcePosition: new SimVector2(100f, 20f));
@@ -6567,6 +6577,8 @@ static void BehaviorAssaySummarizesSeedForagerResponses()
     AssertTrue(summary.TenderPlantContact.EatShare > 0.9f, "Tender plant contact should trigger eating");
     AssertTrue(summary.RichPlantContact.EatShare > 0.9f, "Rich plant contact should trigger eating");
     AssertTrue(summary.ToughPlantContact.EatShare > 0.9f, "Tough plant contact should trigger eating");
+    AssertTrue(summary.MeatContact.EatShare > 0.9f, "Meat contact should trigger opportunistic eating");
+    AssertTrue(summary.EggContact.EatShare < 0.1f, "Egg contact should not trigger seed eating");
     AssertClose(
         summary.RichPlantRight.Turn,
         summary.RichTraceRichRight.Turn,
@@ -9688,6 +9700,34 @@ static void AssertMeatContactTriggersEat(NeuralBrainGenome brain, string label)
     AssertTrue(simulation.State.Creatures[0].Actions.WantsEat, $"{label} should intentionally eat meat on body contact");
 }
 
+static void AssertEggContactDoesNotTriggerEat(NeuralBrainGenome brain, string label)
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 415,
+        systems: [new NeuralControllerSystem()]);
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        DietaryAdaptation = 0.1f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(brain);
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f, brainId: brainId);
+    var creature = simulation.State.Creatures[0];
+    creature.Senses = new CreatureSenseState
+    {
+        Hunger = 1f,
+        FoodContact = 1f,
+        EggFoodContact = 1f
+    };
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    AssertTrue(!simulation.State.Creatures[0].Actions.WantsEat, $"{label} should not automatically eat eggs on body contact");
+}
+
 static void LineageBehaviorAssaysSummarizeTopFounderStrategies()
 {
     var simulation = new Simulation(new SimulationConfig(), seed: 403, systems: []);
@@ -11311,6 +11351,91 @@ static void StatsRecordingReportsMetabolicPaceBands()
     AssertEqual(1, snapshot.LowMetabolicPaceCreatureCount, "Low pace count");
     AssertEqual(1, snapshot.NormalMetabolicPaceCreatureCount, "Normal pace count");
     AssertEqual(1, snapshot.HighMetabolicPaceCreatureCount, "High pace count");
+}
+
+static void StatsRecordingReportsGenomeTraitAverages()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 840,
+        systems: [new StatsRecordingSystem()]);
+
+    var firstGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 2f,
+        MaxSpeed = 20f,
+        SenseRadius = 60f,
+        VisionAngleRadians = MathF.PI / 2f,
+        MetabolicPace = 0.8f,
+        EatCaloriesPerSecond = 10f,
+        ReproductionEnergyThreshold = 50f,
+        MaxLifeExpectancySeconds = 800f,
+        DietaryAdaptation = 0.2f,
+        CarrionAdaptation = 0.3f,
+        ThermalOptimum = 0.4f,
+        ThermalTolerance = 0.2f,
+        ScentSignatureA = 0.1f,
+        ScentSignatureB = 0.2f,
+        ScentSignatureC = 0.3f,
+        BiteStrength = 0.4f,
+        DamageResistance = 0.6f,
+        MutationStrength = 0.04f,
+        TraitMutationRate = 0.1f,
+        BrainMutationRate = 0.05f
+    });
+    var secondGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BodyRadius = 6f,
+        MaxSpeed = 40f,
+        SenseRadius = 140f,
+        VisionAngleRadians = MathF.PI,
+        MetabolicPace = 1.4f,
+        EatCaloriesPerSecond = 30f,
+        ReproductionEnergyThreshold = 90f,
+        MaxLifeExpectancySeconds = 1600f,
+        DietaryAdaptation = 0.8f,
+        CarrionAdaptation = 0.7f,
+        ThermalOptimum = 0.6f,
+        ThermalTolerance = 0.3f,
+        ScentSignatureA = 0.9f,
+        ScentSignatureB = 0.8f,
+        ScentSignatureC = 0.7f,
+        BiteStrength = 1.2f,
+        DamageResistance = 1.6f,
+        MutationStrength = 0.12f,
+        TraitMutationRate = 0.3f,
+        BrainMutationRate = 0.15f
+    });
+    simulation.State.SpawnCreature(firstGenomeId, new SimVector2(10f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(secondGenomeId, new SimVector2(20f, 10f), energy: 10f);
+
+    simulation.Step();
+
+    var traits = simulation.State.Stats.Snapshots.Single().AverageGenomeTraits;
+    AssertClose(4f, traits.BodyRadius, 0.000001, "Average genome body radius");
+    AssertClose(30f, traits.MaxSpeed, 0.000001, "Average genome speed");
+    AssertClose(100f, traits.SenseRadius, 0.000001, "Average genome sense radius");
+    AssertClose(MathF.PI * 0.75f, traits.VisionAngleRadians, 0.000001, "Average genome vision angle");
+    AssertClose(1.1f, traits.MetabolicPace, 0.000001, "Average genome metabolic pace");
+    AssertClose(20f, traits.EatCaloriesPerSecond, 0.000001, "Average genome eating rate");
+    AssertClose(70f, traits.ReproductionEnergyThreshold, 0.000001, "Average genome reproduction threshold");
+    AssertClose(1200f, traits.MaxLifeExpectancySeconds, 0.000001, "Average genome life expectancy");
+    AssertClose(0.5f, traits.DietaryAdaptation, 0.000001, "Average genome diet adaptation");
+    AssertClose(0.5f, traits.CarrionAdaptation, 0.000001, "Average genome carrion adaptation");
+    AssertClose(0.5f, traits.ThermalOptimum, 0.000001, "Average genome thermal optimum");
+    AssertClose(0.25f, traits.ThermalTolerance, 0.000001, "Average genome thermal tolerance");
+    AssertClose(0.5f, traits.ScentSignatureA, 0.000001, "Average genome scent A");
+    AssertClose(0.5f, traits.ScentSignatureB, 0.000001, "Average genome scent B");
+    AssertClose(0.5f, traits.ScentSignatureC, 0.000001, "Average genome scent C");
+    AssertClose(0.8f, traits.BiteStrength, 0.000001, "Average genome bite strength");
+    AssertClose(1.1f, traits.DamageResistance, 0.000001, "Average genome damage resistance");
+    AssertClose(0.08f, traits.MutationStrength, 0.000001, "Average genome mutation strength");
+    AssertClose(0.2f, traits.TraitMutationRate, 0.000001, "Average genome trait mutation rate");
+    AssertClose(0.1f, traits.BrainMutationRate, 0.000001, "Average genome brain mutation rate");
+    AssertEqual(
+        GenomeTraitAveragesCsv.Header.Split(',').Length,
+        GenomeTraitAveragesCsv.Values(traits).Split(',').Length,
+        "Genome trait CSV header/value column count");
 }
 
 static void StatsRecordingIgnoresExtinctBrainPayloads()
@@ -14824,7 +14949,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         * (MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, scenario.MovementSpeedCostExponent)
             - MovementSystem.CalculateSpeedCostMultiplier(preLocomotionMovementSpeed, scenario.MovementSpeedCostExponent));
     AssertClose(
-        7.608353f
+        7.6138835f
             - metabolicPaceExtraBasal
             - metabolicPaceExtraDigestionUpkeep
             - metabolicPaceExtraLocomotionUpkeep
