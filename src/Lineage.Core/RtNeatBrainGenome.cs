@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Lineage.Core;
 
 public enum RtNeatNodeKind
@@ -404,6 +406,7 @@ public sealed record RtNeatBrainGenome
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     private static readonly HashSet<int> FixedNodeIds =
         InputNodeIdByKey.Values.Concat(OutputNodeIdByKey.Values).ToHashSet();
+    private static readonly ConditionalWeakTable<RtNeatBrainGenome, RtNeatEvaluationPlan> EvaluationPlans = new();
     private static readonly int MoveForwardOutputNodeId = OutputNodeId("action.move_forward");
     private static readonly int TurnOutputNodeId = OutputNodeId("action.turn");
     private static readonly int EatOutputNodeId = OutputNodeId("action.eat");
@@ -885,75 +888,215 @@ public sealed record RtNeatBrainGenome
         ReadOnlySpan<float> modifiedDenseInputs,
         bool useDenseOverrideInputs)
     {
-        var activations = new Dictionary<int, float>(Math.Min(brain.Nodes.Length, brain.Connections.Length + RtNeatBrainIoRegistry.Outputs.Count));
-        foreach (var node in brain.Nodes)
+        var plan = EvaluationPlans.GetValue(brain, static brain => RtNeatEvaluationPlan.Create(brain));
+        Span<float> activations = plan.NodeCount <= 512
+            ? stackalloc float[plan.NodeCount]
+            : new float[plan.NodeCount];
+
+        foreach (var input in plan.UsedInputs)
         {
-            if (node.Kind == RtNeatNodeKind.Input)
+            activations[input.NodeSlot] = ReadInputNodeActivation(
+                input.NodeId,
+                input.Key,
+                frame,
+                memory,
+                baselineDenseInputs,
+                modifiedDenseInputs,
+                useDenseOverrideInputs);
+        }
+
+        foreach (var nodeSlot in plan.EvaluationNodeSlots)
+        {
+            var node = plan.Nodes[nodeSlot];
+            var sum = node.Bias;
+            var incomingEnd = node.IncomingStart + node.IncomingCount;
+            for (var incomingIndex = node.IncomingStart; incomingIndex < incomingEnd; incomingIndex++)
             {
-                continue;
+                var connection = plan.IncomingConnections[incomingIndex];
+                sum += activations[connection.SourceSlot] * connection.Weight;
             }
 
-            var sum = node.Bias;
+            activations[nodeSlot] = Activate(node.Activation, sum);
+        }
+
+        return new BrainOutputFrame(
+            ClampOutput(activations, plan.MoveForwardOutputSlot, 0f, 1f),
+            ClampOutput(activations, plan.TurnOutputSlot, -1f, 1f),
+            ClampOutput(activations, plan.EatOutputSlot, -1f, 1f),
+            ClampOutput(activations, plan.ReproduceOutputSlot, -1f, 1f),
+            ClampOutput(activations, plan.AttackOutputSlot, -1f, 1f),
+            ClampOutput(activations, plan.GrabOutputSlot, 0f, 1f),
+            ClampOutput(activations, plan.SoundAmplitudeOutputSlot, 0f, 1f),
+            ClampOutput(activations, plan.SoundToneOutputSlot, -1f, 1f));
+    }
+
+    private sealed class RtNeatEvaluationPlan
+    {
+        private RtNeatEvaluationPlan(
+            RtNeatEvaluationNode[] nodes,
+            RtNeatCompiledConnection[] incomingConnections,
+            RtNeatInputSlot[] usedInputs,
+            int[] evaluationNodeSlots,
+            int moveForwardOutputSlot,
+            int turnOutputSlot,
+            int eatOutputSlot,
+            int reproduceOutputSlot,
+            int attackOutputSlot,
+            int grabOutputSlot,
+            int soundAmplitudeOutputSlot,
+            int soundToneOutputSlot)
+        {
+            Nodes = nodes;
+            IncomingConnections = incomingConnections;
+            UsedInputs = usedInputs;
+            EvaluationNodeSlots = evaluationNodeSlots;
+            MoveForwardOutputSlot = moveForwardOutputSlot;
+            TurnOutputSlot = turnOutputSlot;
+            EatOutputSlot = eatOutputSlot;
+            ReproduceOutputSlot = reproduceOutputSlot;
+            AttackOutputSlot = attackOutputSlot;
+            GrabOutputSlot = grabOutputSlot;
+            SoundAmplitudeOutputSlot = soundAmplitudeOutputSlot;
+            SoundToneOutputSlot = soundToneOutputSlot;
+        }
+
+        public RtNeatEvaluationNode[] Nodes { get; }
+
+        public RtNeatCompiledConnection[] IncomingConnections { get; }
+
+        public RtNeatInputSlot[] UsedInputs { get; }
+
+        public int[] EvaluationNodeSlots { get; }
+
+        public int NodeCount => Nodes.Length;
+
+        public int MoveForwardOutputSlot { get; }
+
+        public int TurnOutputSlot { get; }
+
+        public int EatOutputSlot { get; }
+
+        public int ReproduceOutputSlot { get; }
+
+        public int AttackOutputSlot { get; }
+
+        public int GrabOutputSlot { get; }
+
+        public int SoundAmplitudeOutputSlot { get; }
+
+        public int SoundToneOutputSlot { get; }
+
+        public static RtNeatEvaluationPlan Create(RtNeatBrainGenome brain)
+        {
+            var nodes = brain.Nodes;
+            var slotByNodeId = new Dictionary<int, int>(nodes.Length);
+            for (var i = 0; i < nodes.Length; i++)
+            {
+                slotByNodeId[nodes[i].Id] = i;
+            }
+
+            var incomingByTargetSlot = new Dictionary<int, List<RtNeatCompiledConnection>>();
+            var usedInputSlots = new HashSet<int>();
             foreach (var connection in brain.Connections)
             {
-                if (!connection.Enabled || connection.TargetNodeId != node.Id)
+                if (!connection.Enabled
+                    || !slotByNodeId.TryGetValue(connection.SourceNodeId, out var sourceSlot)
+                    || !slotByNodeId.TryGetValue(connection.TargetNodeId, out var targetSlot))
                 {
                     continue;
                 }
 
-                if (!activations.TryGetValue(connection.SourceNodeId, out var sourceValue)
-                    && TryReadInputNodeActivation(
-                        connection.SourceNodeId,
-                        frame,
-                        memory,
-                        baselineDenseInputs,
-                        modifiedDenseInputs,
-                        useDenseOverrideInputs,
-                        out sourceValue))
+                if (!incomingByTargetSlot.TryGetValue(targetSlot, out var incoming))
                 {
-                    activations[connection.SourceNodeId] = sourceValue;
+                    incoming = [];
+                    incomingByTargetSlot.Add(targetSlot, incoming);
                 }
 
-                if (activations.TryGetValue(connection.SourceNodeId, out sourceValue))
+                incoming.Add(new RtNeatCompiledConnection(sourceSlot, connection.Weight));
+                if (nodes[sourceSlot].Kind == RtNeatNodeKind.Input)
                 {
-                    sum += sourceValue * connection.Weight;
+                    usedInputSlots.Add(sourceSlot);
                 }
             }
 
-            activations[node.Id] = Activate(node.Activation, sum);
+            var compiledNodes = new RtNeatEvaluationNode[nodes.Length];
+            var incomingConnections = new List<RtNeatCompiledConnection>(brain.EnabledConnectionCount);
+            var evaluationNodeSlots = new List<int>(nodes.Length - RtNeatBrainIoRegistry.Inputs.Count);
+            for (var slot = 0; slot < nodes.Length; slot++)
+            {
+                var node = nodes[slot];
+                var incomingStart = incomingConnections.Count;
+                if (incomingByTargetSlot.TryGetValue(slot, out var incoming))
+                {
+                    incomingConnections.AddRange(incoming);
+                }
+
+                compiledNodes[slot] = new RtNeatEvaluationNode(
+                    node.Activation,
+                    node.Bias,
+                    incomingStart,
+                    incomingConnections.Count - incomingStart);
+                if (node.Kind != RtNeatNodeKind.Input)
+                {
+                    evaluationNodeSlots.Add(slot);
+                }
+            }
+
+            var usedInputs = usedInputSlots
+                .Order()
+                .Select(slot => new RtNeatInputSlot(nodes[slot].Id, nodes[slot].Key, slot))
+                .ToArray();
+
+            return new RtNeatEvaluationPlan(
+                compiledNodes,
+                incomingConnections.ToArray(),
+                usedInputs,
+                evaluationNodeSlots.ToArray(),
+                OutputSlot(slotByNodeId, MoveForwardOutputNodeId),
+                OutputSlot(slotByNodeId, TurnOutputNodeId),
+                OutputSlot(slotByNodeId, EatOutputNodeId),
+                OutputSlot(slotByNodeId, ReproduceOutputNodeId),
+                OutputSlot(slotByNodeId, AttackOutputNodeId),
+                OutputSlot(slotByNodeId, GrabOutputNodeId),
+                OutputSlot(slotByNodeId, SoundAmplitudeOutputNodeId),
+                OutputSlot(slotByNodeId, SoundToneOutputNodeId));
         }
 
-        return new BrainOutputFrame(
-            ClampOutput(activations, MoveForwardOutputNodeId, 0f, 1f),
-            ClampOutput(activations, TurnOutputNodeId, -1f, 1f),
-            ClampOutput(activations, EatOutputNodeId, -1f, 1f),
-            ClampOutput(activations, ReproduceOutputNodeId, -1f, 1f),
-            ClampOutput(activations, AttackOutputNodeId, -1f, 1f),
-            ClampOutput(activations, GrabOutputNodeId, 0f, 1f),
-            ClampOutput(activations, SoundAmplitudeOutputNodeId, 0f, 1f),
-            ClampOutput(activations, SoundToneOutputNodeId, -1f, 1f));
+        private static int OutputSlot(IReadOnlyDictionary<int, int> slotByNodeId, int nodeId)
+        {
+            return slotByNodeId.TryGetValue(nodeId, out var slot)
+                ? slot
+                : -1;
+        }
     }
 
-    private static bool TryReadInputNodeActivation(
+    private readonly record struct RtNeatEvaluationNode(
+        RtNeatActivationKind Activation,
+        float Bias,
+        int IncomingStart,
+        int IncomingCount);
+
+    private readonly record struct RtNeatCompiledConnection(int SourceSlot, float Weight);
+
+    private readonly record struct RtNeatInputSlot(int NodeId, string Key, int NodeSlot);
+
+    private static float ReadInputNodeActivation(
         int nodeId,
+        string key,
         in BrainInputFrame frame,
         in LegacyNeuralMemoryInputFrame memory,
         ReadOnlySpan<float> baselineDenseInputs,
         ReadOnlySpan<float> modifiedDenseInputs,
-        bool useDenseOverrideInputs,
-        out float value)
+        bool useDenseOverrideInputs)
     {
         if ((uint)nodeId >= (uint)RtNeatBrainIoRegistry.Inputs.Count)
         {
-            value = 0f;
-            return false;
+            return 0f;
         }
 
-        var key = RtNeatBrainIoRegistry.Inputs[nodeId].Key;
-        value = useDenseOverrideInputs
+        return useDenseOverrideInputs
             ? ReadDenseOverrideInput(key, frame, memory, baselineDenseInputs, modifiedDenseInputs)
             : RtNeatBrainIoRegistry.ReadInput(key, frame, memory);
-        return true;
     }
 
     private static float ReadDenseOverrideInput(
@@ -2015,10 +2158,13 @@ public sealed record RtNeatBrainGenome
         };
     }
 
-    private static float ClampOutput(Dictionary<int, float> activations, int id, float min, float max)
+    private static float ClampOutput(ReadOnlySpan<float> activations, int slot, float min, float max)
     {
-        return activations.TryGetValue(id, out var value)
-            ? Math.Clamp(value, min, max)
-            : 0f;
+        if ((uint)slot >= (uint)activations.Length)
+        {
+            return 0f;
+        }
+
+        return Math.Clamp(activations[slot], min, max);
     }
 }
