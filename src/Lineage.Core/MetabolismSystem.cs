@@ -56,6 +56,7 @@ public sealed class MetabolismSystem(
         ValidateCost(rtNeatEnabledConnectionEnergyCostPerSecond, nameof(rtNeatEnabledConnectionEnergyCostPerSecond));
     private readonly float _thermalMismatchBasalCostMultiplier =
         ValidateCost(thermalMismatchBasalCostMultiplier, nameof(thermalMismatchBasalCostMultiplier));
+    private BrainTopologyUpkeepCacheEntry?[] _brainTopologyUpkeepCache = [];
 
     public void Update(WorldState state, float deltaSeconds)
     {
@@ -109,8 +110,27 @@ public sealed class MetabolismSystem(
             return 0f;
         }
 
-        return rtNeat.HiddenNodeCount * _rtNeatHiddenNodeEnergyCostPerSecond
+        EnsureBrainTopologyUpkeepCacheCapacity(brainId);
+        var cacheEntry = _brainTopologyUpkeepCache[brainId];
+        if (cacheEntry is not null && ReferenceEquals(cacheEntry.Brain, rtNeat))
+        {
+            return cacheEntry.Upkeep;
+        }
+
+        var upkeep = rtNeat.HiddenNodeCount * _rtNeatHiddenNodeEnergyCostPerSecond
             + rtNeat.EnabledConnectionCount * _rtNeatEnabledConnectionEnergyCostPerSecond;
+        _brainTopologyUpkeepCache[brainId] = new BrainTopologyUpkeepCacheEntry(rtNeat, upkeep);
+        return upkeep;
+    }
+
+    private void EnsureBrainTopologyUpkeepCacheCapacity(int brainId)
+    {
+        if (_brainTopologyUpkeepCache.Length > brainId)
+        {
+            return;
+        }
+
+        Array.Resize(ref _brainTopologyUpkeepCache, Math.Max(brainId + 1, _brainTopologyUpkeepCache.Length * 2));
     }
 
     private static float ValidateCost(float value, string name)
@@ -119,4 +139,11 @@ public sealed class MetabolismSystem(
             ? value
             : throw new ArgumentOutOfRangeException(name, "Energy cost must be finite and non-negative.");
     }
+}
+
+internal sealed class BrainTopologyUpkeepCacheEntry(RtNeatBrainGenome brain, float upkeep)
+{
+    public RtNeatBrainGenome Brain { get; } = brain;
+
+    public float Upkeep { get; } = upkeep;
 }

@@ -172,15 +172,44 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         }
 
         EnsureParallelCreatureBufferCapacity(creatureCount);
-        Parallel.For(
-            0,
+        sensingProfile?.RecordTraitCache(
             creatureCount,
-            _parallelOptions,
-            creatureIndex =>
-            {
-                var scratch = _parallelScratch.Value ?? throw new InvalidOperationException("Parallel sensing scratch was not initialized.");
-                _parallelCreatureBuffer[creatureIndex] = SenseCreature(state, creatureIndex, deltaSeconds, scratch, sensingProfile: null);
-            });
+            Stopwatch.GetTimestamp() - traitCacheStartedAt);
+        sensingProfile?.BeginUpdate(creatureCount);
+        if (sensingProfile is null)
+        {
+            Parallel.For(
+                0,
+                creatureCount,
+                _parallelOptions,
+                creatureIndex =>
+                {
+                    var scratch = _parallelScratch.Value ?? throw new InvalidOperationException("Parallel sensing scratch was not initialized.");
+                    _parallelCreatureBuffer[creatureIndex] = SenseCreature(state, creatureIndex, deltaSeconds, scratch, sensingProfile: null);
+                });
+        }
+        else
+        {
+            var profileMergeLock = new object();
+            Parallel.For(
+                0,
+                creatureCount,
+                _parallelOptions,
+                () => new SimulationSensingProfile(),
+                (creatureIndex, _, localProfile) =>
+                {
+                    var scratch = _parallelScratch.Value ?? throw new InvalidOperationException("Parallel sensing scratch was not initialized.");
+                    _parallelCreatureBuffer[creatureIndex] = SenseCreature(state, creatureIndex, deltaSeconds, scratch, localProfile);
+                    return localProfile;
+                },
+                localProfile =>
+                {
+                    lock (profileMergeLock)
+                    {
+                        sensingProfile.MergeFrom(localProfile);
+                    }
+                });
+        }
 
         for (var i = 0; i < creatureCount; i++)
         {
@@ -935,13 +964,13 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         if (HasImmediateCloseWorldSenseRefreshCue(creature))
         {
-            return WorldSenseRefreshReason.Close;
+            return WorldSenseRefreshReason.ImmediateClose;
         }
 
         if (NeedsProximityCloseWorldSenseRefresh(creature)
             && WorldSenseAgeTicks(state, creature) >= _closeSenseRefreshMinimumTicks)
         {
-            return WorldSenseRefreshReason.Close;
+            return WorldSenseRefreshReason.ProximityClose;
         }
 
         return (state.Tick + creature.Id.Value) % _worldSenseIntervalTicks == 0

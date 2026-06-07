@@ -938,7 +938,8 @@ static void PrintSensingProfileSummary(SimulationSensingProfile profile)
         $"  Trait cache: {profile.TraitCacheMilliseconds:0.000}ms, {FormatAverage(profile.TraitCacheCreatures, profile.Updates):0.00} creatures/update");
     Console.WriteLine(
         $"  World sense refreshes: {profile.WorldSenseRefreshes} refreshed, {profile.WorldSenseSkippedUpdates} skipped"
-        + $" (scheduled {profile.WorldSenseScheduledRefreshes}, close {profile.WorldSenseCloseRefreshes}, forced {profile.WorldSenseForcedRefreshes})");
+        + $" (scheduled {profile.WorldSenseScheduledRefreshes}, close {profile.WorldSenseCloseRefreshes}"
+        + $" = immediate {profile.WorldSenseImmediateCloseRefreshes} + proximity {profile.WorldSenseProximityCloseRefreshes}, forced {profile.WorldSenseForcedRefreshes})");
     Console.WriteLine(
         $"  Creature setup: {profile.CreatureSetupMilliseconds:0.000}ms");
     Console.WriteLine(
@@ -4836,7 +4837,7 @@ internal static class SensingProfileCsvWriter
     public static void Write(string path, SimulationSensingProfile profile)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("phase,queries,candidates,plant_candidates,meat_candidates,visible,total_ms,avg_candidates_per_query,avg_ms_per_query,cells_visited,non_empty_cells,distance_rejects,self_rejects,nonviable_rejects,range_rejects,vision_rejects,body_radius_cache_misses,scheduled_refreshes,close_refreshes,forced_refreshes,skipped_updates");
+        writer.WriteLine("phase,queries,candidates,plant_candidates,meat_candidates,visible,total_ms,avg_candidates_per_query,avg_ms_per_query,cells_visited,non_empty_cells,distance_rejects,self_rejects,nonviable_rejects,range_rejects,vision_rejects,body_radius_cache_misses,scheduled_refreshes,close_refreshes,immediate_close_refreshes,proximity_close_refreshes,forced_refreshes,skipped_updates");
         WriteRow(
             writer,
             "trait_cache",
@@ -4873,13 +4874,15 @@ internal static class SensingProfileCsvWriter
             0,
             scheduledRefreshes: profile.WorldSenseScheduledRefreshes,
             closeRefreshes: profile.WorldSenseCloseRefreshes,
+            immediateCloseRefreshes: profile.WorldSenseImmediateCloseRefreshes,
+            proximityCloseRefreshes: profile.WorldSenseProximityCloseRefreshes,
             forcedRefreshes: profile.WorldSenseForcedRefreshes,
             skippedUpdates: profile.WorldSenseSkippedUpdates);
         WriteRow(
             writer,
             "creature_setup",
-            profile.CreaturesSensed,
-            profile.CreaturesSensed,
+            profile.CreatureSetupSamples,
+            profile.CreatureSetupSamples,
             0,
             0,
             0,
@@ -4895,8 +4898,8 @@ internal static class SensingProfileCsvWriter
         WriteRow(
             writer,
             "internal_state",
-            profile.CreaturesSensed,
-            profile.CreaturesSensed,
+            profile.InternalStateSamples,
+            profile.InternalStateSamples,
             0,
             0,
             0,
@@ -5014,8 +5017,8 @@ internal static class SensingProfileCsvWriter
         WriteRow(
             writer,
             "terrain_sense",
-            profile.CreaturesSensed,
-            profile.CreaturesSensed,
+            profile.TerrainSenseSamples,
+            profile.TerrainSenseSamples,
             0,
             0,
             0,
@@ -5048,8 +5051,8 @@ internal static class SensingProfileCsvWriter
         WriteRow(
             writer,
             "memory_sense",
-            profile.CreaturesSensed,
-            profile.CreaturesSensed,
+            profile.MemorySenseSamples,
+            profile.MemorySenseSamples,
             0,
             0,
             0,
@@ -5065,8 +5068,8 @@ internal static class SensingProfileCsvWriter
         WriteRow(
             writer,
             "sense_finalization",
-            profile.CreaturesSensed,
-            profile.CreaturesSensed,
+            profile.SenseFinalizationSamples,
+            profile.SenseFinalizationSamples,
             0,
             0,
             0,
@@ -5100,6 +5103,8 @@ internal static class SensingProfileCsvWriter
         long bodyRadiusCacheMisses,
         long scheduledRefreshes = 0,
         long closeRefreshes = 0,
+        long immediateCloseRefreshes = 0,
+        long proximityCloseRefreshes = 0,
         long forcedRefreshes = 0,
         long skippedUpdates = 0)
     {
@@ -5131,6 +5136,8 @@ internal static class SensingProfileCsvWriter
             bodyRadiusCacheMisses.ToString(CultureInfo.InvariantCulture),
             scheduledRefreshes.ToString(CultureInfo.InvariantCulture),
             closeRefreshes.ToString(CultureInfo.InvariantCulture),
+            immediateCloseRefreshes.ToString(CultureInfo.InvariantCulture),
+            proximityCloseRefreshes.ToString(CultureInfo.InvariantCulture),
             forcedRefreshes.ToString(CultureInfo.InvariantCulture),
             skippedUpdates.ToString(CultureInfo.InvariantCulture)));
     }

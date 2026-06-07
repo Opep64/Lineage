@@ -10,6 +10,7 @@ var tests = new (string Name, Action Body)[]
     ("Simulation profiler records system timings", SimulationProfilerRecordsSystemTimings),
     ("Simulation profiler can be paused", SimulationProfilerCanBePaused),
     ("Sensing profiler records candidate counts", SensingProfilerRecordsCandidateCounts),
+    ("Parallel sensing profiler records candidate counts", ParallelSensingProfilerRecordsCandidateCounts),
     ("Creature sensing time slices world queries", CreatureSensingTimeSlicesWorldQueries),
     ("Creature sensing parallel path matches single-threaded path", CreatureSensingParallelPathMatchesSingleThreadedPath),
     ("Creature sensing throttles proximity close refreshes", CreatureSensingThrottlesProximityCloseRefreshes),
@@ -164,6 +165,7 @@ var tests = new (string Name, Action Body)[]
     ("Brain factory supports hybrid deep 8x8 neural architecture", BrainFactorySupportsHybridDeep8x8NeuralArchitecture),
     ("Brain factory supports hidden deep 8x8 neural architecture", BrainFactorySupportsHiddenDeep8x8NeuralArchitecture),
     ("Brain factory supports rtNEAT graph architecture", BrainFactorySupportsRtNeatGraphArchitecture),
+    ("rtNEAT evaluation does not change genome equality", RtNeatEvaluationDoesNotChangeGenomeEquality),
     ("Brain probe edits rtNEAT graph inputs", BrainProbeEditsRtNeatGraphInputs),
     ("Brain probe food presets include small prey inputs", BrainProbeFoodPresetsIncludeSmallPreyInputs),
     ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
@@ -397,7 +399,9 @@ static void SensingProfilerRecordsCandidateCounts()
     AssertEqual(1L, sensing.WorldSenseRefreshes, "World sense refresh count");
     AssertEqual(1L, sensing.WorldSenseForcedRefreshes, "World sense forced refresh count");
     AssertEqual(0L, sensing.WorldSenseSkippedUpdates, "World sense skipped count");
+    AssertEqual(1L, sensing.CreatureSetupSamples, "Creature setup sample count");
     AssertTrue(sensing.CreatureSetupMilliseconds >= 0.0, "Creature setup time should be non-negative");
+    AssertEqual(1L, sensing.InternalStateSamples, "Internal state sample count");
     AssertTrue(sensing.InternalStateMilliseconds >= 0.0, "Internal state time should be non-negative");
     AssertEqual(1L, sensing.ResourceQueries, "Resource query count");
     AssertEqual(2L, sensing.ResourceCandidates, "Resource candidate count");
@@ -415,12 +419,68 @@ static void SensingProfilerRecordsCandidateCounts()
     AssertTrue(sensing.CreatureCellsVisited > 0, "Creature query should record visited cells");
     AssertTrue(sensing.CreatureNonEmptyCellsVisited > 0, "Creature query should record non-empty cells");
     AssertEqual(1L, sensing.CreatureSelfRejectedCandidates, "Self creature reject count");
+    AssertEqual(1L, sensing.TerrainSenseSamples, "Terrain sense sample count");
     AssertTrue(sensing.TerrainSenseMilliseconds >= 0.0, "Terrain sensing time should be non-negative");
     AssertEqual(1L, sensing.ObstacleSenseSamples, "Obstacle sense sample count");
     AssertTrue(sensing.ObstacleSenseMilliseconds >= 0.0, "Obstacle sensing time should be non-negative");
+    AssertEqual(1L, sensing.MemorySenseSamples, "Memory sense sample count");
     AssertTrue(sensing.MemorySenseMilliseconds >= 0.0, "Memory sensing time should be non-negative");
+    AssertEqual(1L, sensing.SenseFinalizationSamples, "Sense finalization sample count");
     AssertTrue(sensing.SenseFinalizationMilliseconds >= 0.0, "Sense finalization time should be non-negative");
     AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Measured sensing time should be non-negative");
+}
+
+static void ParallelSensingProfilerRecordsCandidateCounts()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 71,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(spatialIndex, sensingThreadCount: 2)
+        ]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(35f, 20f), energy: 25f);
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Plant,
+        Position = new SimVector2(30f, 20f),
+        Radius = 1f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        RegrowthCaloriesPerSecond = 0f
+    });
+
+    simulation.Step();
+
+    var sensing = simulation.Profile.Sensing;
+    AssertEqual(2L, sensing.CreaturesSensed, "Parallel sensed creature count");
+    AssertEqual(2L, sensing.TraitCacheCreatures, "Parallel trait cache creature count");
+    AssertEqual(2L, sensing.WorldSenseRefreshes, "Parallel world sense refresh count");
+    AssertEqual(2L, sensing.WorldSenseForcedRefreshes, "Parallel forced refresh count");
+    AssertEqual(2L, sensing.CreatureSetupSamples, "Parallel creature setup sample count");
+    AssertEqual(2L, sensing.InternalStateSamples, "Parallel internal state sample count");
+    AssertEqual(2L, sensing.ResourceQueries, "Parallel resource query count");
+    AssertTrue(sensing.ResourceCandidates >= 2, "Parallel resource candidates should be recorded");
+    AssertEqual(2L, sensing.CreatureQueries, "Parallel creature query count");
+    AssertTrue(sensing.CreatureCandidates >= 2, "Parallel creature candidates should be recorded");
+    AssertEqual(2L, sensing.TerrainSenseSamples, "Parallel terrain sense sample count");
+    AssertEqual(2L, sensing.ObstacleSenseSamples, "Parallel obstacle sense sample count");
+    AssertEqual(2L, sensing.MemorySenseSamples, "Parallel memory sense sample count");
+    AssertEqual(2L, sensing.SenseFinalizationSamples, "Parallel sense finalization sample count");
+    AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Parallel measured sensing time should be non-negative");
 }
 
 static void CreatureSensingTimeSlicesWorldQueries()
@@ -483,6 +543,8 @@ static void CreatureSensingTimeSlicesWorldQueries()
 
     var closeSensing = simulation.Profile.Sensing;
     AssertEqual(1L, closeSensing.WorldSenseCloseRefreshes, "Close food should force a world sense refresh");
+    AssertEqual(0L, closeSensing.WorldSenseImmediateCloseRefreshes, "Close food proximity should not count as immediate contact refresh");
+    AssertEqual(1L, closeSensing.WorldSenseProximityCloseRefreshes, "Close food proximity should count as proximity refresh");
     AssertEqual(0L, closeSensing.WorldSenseSkippedUpdates, "Close food should not skip world sensing");
     AssertEqual(1L, closeSensing.ResourceQueries, "Close refresh should run resource query");
 }
@@ -674,6 +736,8 @@ static void CreatureSensingThrottlesProximityCloseRefreshes()
     var sensing = simulation.Profile.Sensing;
     AssertEqual(2L, sensing.WorldSenseSkippedUpdates, "Two proximity refreshes should be throttled");
     AssertEqual(1L, sensing.WorldSenseCloseRefreshes, "Close proximity should refresh once the minimum age is reached");
+    AssertEqual(0L, sensing.WorldSenseImmediateCloseRefreshes, "Throttled proximity refresh should not count as immediate contact refresh");
+    AssertEqual(1L, sensing.WorldSenseProximityCloseRefreshes, "Throttled close refresh should count as proximity refresh");
     AssertEqual(1L, sensing.ResourceQueries, "Only the delayed close refresh should run resource queries");
 }
 
@@ -718,6 +782,8 @@ static void CreatureSensingKeepsContactCloseRefreshImmediate()
     var sensing = simulation.Profile.Sensing;
     var senses = simulation.State.Creatures[0].Senses;
     AssertEqual(1L, sensing.WorldSenseCloseRefreshes, "Direct food contact should bypass the close refresh minimum");
+    AssertEqual(1L, sensing.WorldSenseImmediateCloseRefreshes, "Direct food contact should count as immediate close refresh");
+    AssertEqual(0L, sensing.WorldSenseProximityCloseRefreshes, "Direct food contact should not count as proximity close refresh");
     AssertEqual(0L, sensing.WorldSenseSkippedUpdates, "Direct food contact should not be skipped");
     AssertClose(1f, senses.FoodContact, 0.000001, "Food contact should stay fresh");
     AssertClose(1f, senses.PlantFoodContact, 0.000001, "Plant contact should stay fresh");
@@ -8973,6 +9039,21 @@ static void BrainFactorySupportsRtNeatGraphArchitecture()
     var restoredBrain = restored.Simulation.State.GetBrain(restoredCreature.BrainId);
     AssertEqual(BrainArchitectureKind.RtNeatGraph, restoredBrain.ArchitectureKind, "Restored rtNEAT brain architecture");
     AssertTrue(restoredBrain.RtNeat is not null, "Restored rtNEAT brain should retain graph payload");
+}
+
+static void RtNeatEvaluationDoesNotChangeGenomeEquality()
+{
+    var brain = RtNeatBrainGenome.CreateStarterForager();
+    var equivalent = brain with { };
+    var hash = brain.GetHashCode();
+    var equivalentHash = equivalent.GetHashCode();
+    AssertTrue(brain.Equals(equivalent), "rtNEAT equivalent brain should start equal");
+
+    _ = brain.Evaluate(default, default);
+
+    AssertEqual(hash, brain.GetHashCode(), "rtNEAT brain hash after evaluation");
+    AssertEqual(equivalentHash, equivalent.GetHashCode(), "rtNEAT equivalent brain hash after evaluation");
+    AssertTrue(brain.Equals(equivalent), "rtNEAT evaluation should not change genome equality");
 }
 
 static void BrainProbeEditsRtNeatGraphInputs()

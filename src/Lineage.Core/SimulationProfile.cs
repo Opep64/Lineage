@@ -158,6 +158,10 @@ public sealed class SimulationSensingProfile
 
     public long WorldSenseCloseRefreshes { get; internal set; }
 
+    public long WorldSenseImmediateCloseRefreshes { get; internal set; }
+
+    public long WorldSenseProximityCloseRefreshes { get; internal set; }
+
     public long WorldSenseForcedRefreshes { get; internal set; }
 
     public long WorldSenseSkippedUpdates { get; internal set; }
@@ -211,6 +215,16 @@ public sealed class SimulationSensingProfile
     public long CreatureBodyRadiusCacheMisses { get; internal set; }
 
     public long ObstacleSenseSamples { get; internal set; }
+
+    public long CreatureSetupSamples { get; internal set; }
+
+    public long InternalStateSamples { get; internal set; }
+
+    public long TerrainSenseSamples { get; internal set; }
+
+    public long MemorySenseSamples { get; internal set; }
+
+    public long SenseFinalizationSamples { get; internal set; }
 
     public long ResourceQueryTimestampTicks { get; internal set; }
 
@@ -306,9 +320,15 @@ public sealed class SimulationSensingProfile
             case WorldSenseRefreshReason.Skipped:
                 WorldSenseSkippedUpdates++;
                 break;
-            case WorldSenseRefreshReason.Close:
+            case WorldSenseRefreshReason.ImmediateClose:
                 WorldSenseRefreshes++;
                 WorldSenseCloseRefreshes++;
+                WorldSenseImmediateCloseRefreshes++;
+                break;
+            case WorldSenseRefreshReason.ProximityClose:
+                WorldSenseRefreshes++;
+                WorldSenseCloseRefreshes++;
+                WorldSenseProximityCloseRefreshes++;
                 break;
             case WorldSenseRefreshReason.Scheduled:
                 WorldSenseRefreshes++;
@@ -325,26 +345,31 @@ public sealed class SimulationSensingProfile
 
     internal void RecordCreatureSetup(long elapsedTimestampTicks)
     {
+        CreatureSetupSamples++;
         CreatureSetupTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     internal void RecordInternalState(long elapsedTimestampTicks)
     {
+        InternalStateSamples++;
         InternalStateTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     internal void RecordTerrainSense(long elapsedTimestampTicks)
     {
+        TerrainSenseSamples++;
         TerrainSenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     internal void RecordMemorySense(long elapsedTimestampTicks)
     {
+        MemorySenseSamples++;
         MemorySenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
     internal void RecordSenseFinalization(long elapsedTimestampTicks)
     {
+        SenseFinalizationSamples++;
         SenseFinalizationTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
@@ -446,6 +471,66 @@ public sealed class SimulationSensingProfile
         ObstacleSenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
+    internal void MergeFrom(SimulationSensingProfile other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        Updates += other.Updates;
+        CreaturesSensed += other.CreaturesSensed;
+        TraitCacheCreatures += other.TraitCacheCreatures;
+        WorldSenseRefreshes += other.WorldSenseRefreshes;
+        WorldSenseScheduledRefreshes += other.WorldSenseScheduledRefreshes;
+        WorldSenseCloseRefreshes += other.WorldSenseCloseRefreshes;
+        WorldSenseImmediateCloseRefreshes += other.WorldSenseImmediateCloseRefreshes;
+        WorldSenseProximityCloseRefreshes += other.WorldSenseProximityCloseRefreshes;
+        WorldSenseForcedRefreshes += other.WorldSenseForcedRefreshes;
+        WorldSenseSkippedUpdates += other.WorldSenseSkippedUpdates;
+        ResourceQueries += other.ResourceQueries;
+        ResourceCandidates += other.ResourceCandidates;
+        PlantResourceQueries += other.PlantResourceQueries;
+        PlantResourceQueryCandidates += other.PlantResourceQueryCandidates;
+        MeatResourceQueries += other.MeatResourceQueries;
+        MeatResourceQueryCandidates += other.MeatResourceQueryCandidates;
+        PlantCandidates += other.PlantCandidates;
+        MeatResourceCandidates += other.MeatResourceCandidates;
+        VisiblePlantCandidates += other.VisiblePlantCandidates;
+        VisibleMeatResourceCandidates += other.VisibleMeatResourceCandidates;
+        EggQueries += other.EggQueries;
+        EggCandidates += other.EggCandidates;
+        VisibleEggCandidates += other.VisibleEggCandidates;
+        CreatureQueries += other.CreatureQueries;
+        CreatureCandidates += other.CreatureCandidates;
+        VisibleCreatureCandidates += other.VisibleCreatureCandidates;
+        CreatureCellsVisited += other.CreatureCellsVisited;
+        CreatureNonEmptyCellsVisited += other.CreatureNonEmptyCellsVisited;
+        CreatureDistanceRejectedCandidates += other.CreatureDistanceRejectedCandidates;
+        CreatureSelfRejectedCandidates += other.CreatureSelfRejectedCandidates;
+        CreatureNonviableRejectedCandidates += other.CreatureNonviableRejectedCandidates;
+        CreatureRangeRejectedCandidates += other.CreatureRangeRejectedCandidates;
+        CreatureVisionRejectedCandidates += other.CreatureVisionRejectedCandidates;
+        CreatureBodyRadiusCacheMisses += other.CreatureBodyRadiusCacheMisses;
+        ObstacleSenseSamples += other.ObstacleSenseSamples;
+        CreatureSetupSamples += other.CreatureSetupSamples;
+        InternalStateSamples += other.InternalStateSamples;
+        TerrainSenseSamples += other.TerrainSenseSamples;
+        MemorySenseSamples += other.MemorySenseSamples;
+        SenseFinalizationSamples += other.SenseFinalizationSamples;
+        ResourceQueryTimestampTicks += other.ResourceQueryTimestampTicks;
+        PlantResourceQueryTimestampTicks += other.PlantResourceQueryTimestampTicks;
+        MeatResourceQueryTimestampTicks += other.MeatResourceQueryTimestampTicks;
+        ResourceScanTimestampTicks += other.ResourceScanTimestampTicks;
+        EggQueryTimestampTicks += other.EggQueryTimestampTicks;
+        EggScanTimestampTicks += other.EggScanTimestampTicks;
+        CreatureQueryTimestampTicks += other.CreatureQueryTimestampTicks;
+        CreatureScanTimestampTicks += other.CreatureScanTimestampTicks;
+        TraitCacheTimestampTicks += other.TraitCacheTimestampTicks;
+        CreatureSetupTimestampTicks += other.CreatureSetupTimestampTicks;
+        InternalStateTimestampTicks += other.InternalStateTimestampTicks;
+        TerrainSenseTimestampTicks += other.TerrainSenseTimestampTicks;
+        MemorySenseTimestampTicks += other.MemorySenseTimestampTicks;
+        SenseFinalizationTimestampTicks += other.SenseFinalizationTimestampTicks;
+        ObstacleSenseTimestampTicks += other.ObstacleSenseTimestampTicks;
+    }
+
     private static double ToMilliseconds(long elapsedTimestampTicks)
     {
         return elapsedTimestampTicks * 1000.0 / Stopwatch.Frequency;
@@ -456,6 +541,7 @@ internal enum WorldSenseRefreshReason
 {
     Skipped,
     Scheduled,
-    Close,
+    ImmediateClose,
+    ProximityClose,
     Forced
 }
