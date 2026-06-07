@@ -1121,6 +1121,14 @@ public sealed class StatsRecordingSystem(
         var maxRtNeatConnectionCount = 0;
         var totalRtNeatEnabledConnectionCount = 0;
         var maxRtNeatEnabledConnectionCount = 0;
+        var totalRtNeatFunctionalHiddenNodeCount = 0;
+        var maxRtNeatFunctionalHiddenNodeCount = 0;
+        var totalRtNeatFunctionalConnectionCount = 0;
+        var maxRtNeatFunctionalConnectionCount = 0;
+        var totalRtNeatDisabledConnectionCount = 0;
+        var maxRtNeatDisabledConnectionCount = 0;
+        var totalRtNeatLongestPathLength = 0;
+        var maxRtNeatLongestPathLength = 0;
         foreach (var creature in state.Creatures)
         {
             if (creature.BrainId >= 0)
@@ -1162,6 +1170,18 @@ public sealed class StatsRecordingSystem(
                 maxRtNeatConnectionCount = Math.Max(maxRtNeatConnectionCount, rtNeat.ConnectionCount);
                 totalRtNeatEnabledConnectionCount += rtNeat.EnabledConnectionCount;
                 maxRtNeatEnabledConnectionCount = Math.Max(maxRtNeatEnabledConnectionCount, rtNeat.EnabledConnectionCount);
+                var functionalHiddenNodeCount = rtNeat.FunctionalHiddenNodeCount;
+                var functionalConnectionCount = rtNeat.FunctionalConnectionCount;
+                var disabledConnectionCount = rtNeat.DisabledConnectionCount;
+                var longestPathLength = rtNeat.LongestEnabledHiddenPathLength;
+                totalRtNeatFunctionalHiddenNodeCount += functionalHiddenNodeCount;
+                maxRtNeatFunctionalHiddenNodeCount = Math.Max(maxRtNeatFunctionalHiddenNodeCount, functionalHiddenNodeCount);
+                totalRtNeatFunctionalConnectionCount += functionalConnectionCount;
+                maxRtNeatFunctionalConnectionCount = Math.Max(maxRtNeatFunctionalConnectionCount, functionalConnectionCount);
+                totalRtNeatDisabledConnectionCount += disabledConnectionCount;
+                maxRtNeatDisabledConnectionCount = Math.Max(maxRtNeatDisabledConnectionCount, disabledConnectionCount);
+                totalRtNeatLongestPathLength += longestPathLength;
+                maxRtNeatLongestPathLength = Math.Max(maxRtNeatLongestPathLength, longestPathLength);
             }
         }
 
@@ -1179,6 +1199,18 @@ public sealed class StatsRecordingSystem(
             : 0f;
         var averageRtNeatEnabledConnectionCount = rtNeatBrainCount > 0
             ? totalRtNeatEnabledConnectionCount / (float)rtNeatBrainCount
+            : 0f;
+        var averageRtNeatFunctionalHiddenNodeCount = rtNeatBrainCount > 0
+            ? totalRtNeatFunctionalHiddenNodeCount / (float)rtNeatBrainCount
+            : 0f;
+        var averageRtNeatFunctionalConnectionCount = rtNeatBrainCount > 0
+            ? totalRtNeatFunctionalConnectionCount / (float)rtNeatBrainCount
+            : 0f;
+        var averageRtNeatDisabledConnectionCount = rtNeatBrainCount > 0
+            ? totalRtNeatDisabledConnectionCount / (float)rtNeatBrainCount
+            : 0f;
+        var averageRtNeatLongestPathLength = rtNeatBrainCount > 0
+            ? totalRtNeatLongestPathLength / (float)rtNeatBrainCount
             : 0f;
         var averageHiddenInputWeightMagnitude = hiddenInputWeightCount > 0
             ? totalHiddenInputWeightMagnitude / hiddenInputWeightCount
@@ -1514,6 +1546,14 @@ public sealed class StatsRecordingSystem(
             maxRtNeatConnectionCount,
             averageRtNeatEnabledConnectionCount,
             maxRtNeatEnabledConnectionCount,
+            averageRtNeatFunctionalHiddenNodeCount,
+            maxRtNeatFunctionalHiddenNodeCount,
+            averageRtNeatFunctionalConnectionCount,
+            maxRtNeatFunctionalConnectionCount,
+            averageRtNeatDisabledConnectionCount,
+            maxRtNeatDisabledConnectionCount,
+            averageRtNeatLongestPathLength,
+            maxRtNeatLongestPathLength,
             liveSmallPreyCount,
             totalSmallPreyCalories,
             state.Stats.SmallPreySpawnedCount,

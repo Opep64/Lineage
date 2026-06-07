@@ -169,6 +169,8 @@ var tests = new (string Name, Action Body)[]
     ("rtNEAT mutation creates branched diverse graph growth", RtNeatMutationCreatesBranchedDiverseGraphGrowth),
     ("rtNEAT mutation can remove graph structure", RtNeatMutationCanRemoveGraphStructure),
     ("rtNEAT mutation prunes inactive hidden nodes", RtNeatMutationPrunesInactiveHiddenNodes),
+    ("rtNEAT mutation trims disabled connection overflow", RtNeatMutationTrimsDisabledConnectionOverflow),
+    ("rtNEAT mutation respects hard hidden node cap", RtNeatMutationRespectsHardHiddenNodeCap),
     ("World state tracks brain architecture metadata", WorldStateTracksBrainArchitectureMetadata),
     ("Lineage behavior assays summarize top founder strategies", LineageBehaviorAssaysSummarizeTopFounderStrategies),
     ("Creature attack damages contact targets", CreatureAttackDamagesContactTargets),
@@ -9287,6 +9289,76 @@ static void RtNeatMutationPrunesInactiveHiddenNodes()
         "rtNEAT pruning should remove connections attached to inactive hidden nodes");
 }
 
+static void RtNeatMutationTrimsDisabledConnectionOverflow()
+{
+    var starter = RtNeatBrainGenome.CreateStarterForager();
+    var inputId = starter.Nodes.First(node => node.Kind == RtNeatNodeKind.Input).Id;
+    var outputId = starter.Nodes.First(node => node.Kind == RtNeatNodeKind.Output).Id;
+    var connections = starter.Connections.ToList();
+    var nextInnovationId = starter.NextInnovationId;
+    for (var i = 0; i < 12; i++)
+    {
+        connections.Add(new RtNeatConnectionGene
+        {
+            InnovationId = nextInnovationId++,
+            SourceNodeId = inputId,
+            TargetNodeId = outputId,
+            Weight = 0.25f,
+            Enabled = false
+        });
+    }
+
+    var brain = (starter with
+    {
+        Connections = connections.ToArray(),
+        NextInnovationId = nextInnovationId
+    }).Validated();
+
+    var mutated = brain.Mutated(
+        new DeterministicRandom(260604),
+        mutationStrength: 0.1f,
+        brainMutationRate: MutationProfile.Default.BrainMutationRate,
+        new RtNeatMutationPolicy
+        {
+            BackgroundMutationChance = 1f,
+            BackgroundMutationVariance = 0f,
+            SynapseMutationProbability = 1f,
+            NeuronMutationProbability = 0f,
+            SynapseStrengthMutationProbability = 1f,
+            SynapseFlipProbability = 0f,
+            SynapseToggleProbability = 0f,
+            SynapseAddProbability = 0f,
+            SynapseRemovalProbability = 0f,
+            DisabledConnectionRetentionLimit = 3
+        });
+
+    AssertTrue(mutated.DisabledConnectionCount <= 3, "rtNEAT mutation should trim disabled connection overflow");
+}
+
+static void RtNeatMutationRespectsHardHiddenNodeCap()
+{
+    var brain = CreateRtNeatTopologyTestBrain(hiddenNodeCount: 24).RtNeat!;
+    var mutated = brain.Mutated(
+        new DeterministicRandom(260605),
+        mutationStrength: 0.5f,
+        brainMutationRate: MutationProfile.Default.BrainMutationRate,
+        new RtNeatMutationPolicy
+        {
+            BackgroundMutationChance = 1f,
+            BackgroundMutationVariance = 0f,
+            SynapseMutationProbability = 0f,
+            NeuronMutationProbability = 1f,
+            NeuronAddProbability = 1f,
+            NeuronRemovalProbability = 0f,
+            NeuronActivationMutationProbability = 0f,
+            NeuronBiasMutationProbability = 0f,
+            SoftHiddenNodeLimit = 8,
+            HardHiddenNodeLimit = 24
+        });
+
+    AssertEqual(24, mutated.HiddenNodeCount, "rtNEAT hard hidden-node cap should block forced add mutations");
+}
+
 static int LongestEnabledRtNeatHiddenPath(RtNeatBrainGenome brain)
 {
     var nodeById = brain.Nodes.ToDictionary(node => node.Id);
@@ -10841,6 +10913,14 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.MaxRtNeatConnectionCount, "Snapshot max rtNEAT connections");
     AssertClose(0f, snapshot.AverageRtNeatEnabledConnectionCount, 0.000001, "Snapshot average rtNEAT enabled connections");
     AssertEqual(0, snapshot.MaxRtNeatEnabledConnectionCount, "Snapshot max rtNEAT enabled connections");
+    AssertClose(0f, snapshot.AverageRtNeatFunctionalHiddenNodeCount, 0.000001, "Snapshot average rtNEAT functional hidden nodes");
+    AssertEqual(0, snapshot.MaxRtNeatFunctionalHiddenNodeCount, "Snapshot max rtNEAT functional hidden nodes");
+    AssertClose(0f, snapshot.AverageRtNeatFunctionalConnectionCount, 0.000001, "Snapshot average rtNEAT functional connections");
+    AssertEqual(0, snapshot.MaxRtNeatFunctionalConnectionCount, "Snapshot max rtNEAT functional connections");
+    AssertClose(0f, snapshot.AverageRtNeatDisabledConnectionCount, 0.000001, "Snapshot average rtNEAT disabled connections");
+    AssertEqual(0, snapshot.MaxRtNeatDisabledConnectionCount, "Snapshot max rtNEAT disabled connections");
+    AssertClose(0f, snapshot.AverageRtNeatLongestPathLength, 0.000001, "Snapshot average rtNEAT longest path");
+    AssertEqual(0, snapshot.MaxRtNeatLongestPathLength, "Snapshot max rtNEAT longest path");
     AssertEqual(2, snapshot.MaxGeneration, "Snapshot max generation");
     AssertClose(12f, snapshot.TotalCreatureEnergy, 0.000001, "Snapshot creature energy");
     AssertClose(8f, snapshot.TotalFatCalories, 0.000001, "Snapshot fat energy");
@@ -11113,8 +11193,12 @@ static void StatsRecordingReportsRtNeatTopologyTelemetry()
         seed: 115,
         systems: [new StatsRecordingSystem()]);
     var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline);
-    var firstBrainId = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(hiddenNodeCount: 1, disabledHiddenOutputCount: 1));
-    var secondBrainId = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(hiddenNodeCount: 2));
+    var firstBrain = CreateRtNeatTopologyTestBrain(hiddenNodeCount: 1, disabledHiddenOutputCount: 1);
+    var secondBrain = CreateRtNeatTopologyTestBrain(hiddenNodeCount: 2);
+    var firstRtNeat = firstBrain.RtNeat!;
+    var secondRtNeat = secondBrain.RtNeat!;
+    var firstBrainId = simulation.State.AddBrain(firstBrain);
+    var secondBrainId = simulation.State.AddBrain(secondBrain);
     _ = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(hiddenNodeCount: 4));
 
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 8f, brainId: firstBrainId);
@@ -11135,6 +11219,42 @@ static void StatsRecordingReportsRtNeatTopologyTelemetry()
     AssertEqual(10, snapshot.MaxRtNeatConnectionCount, "Snapshot max rtNEAT connections");
     AssertClose(8.5f, snapshot.AverageRtNeatEnabledConnectionCount, 0.000001, "Snapshot average rtNEAT enabled connections");
     AssertEqual(10, snapshot.MaxRtNeatEnabledConnectionCount, "Snapshot max rtNEAT enabled connections");
+    AssertClose(
+        (firstRtNeat.FunctionalHiddenNodeCount + secondRtNeat.FunctionalHiddenNodeCount) / 2f,
+        snapshot.AverageRtNeatFunctionalHiddenNodeCount,
+        0.000001,
+        "Snapshot average rtNEAT functional hidden nodes");
+    AssertEqual(
+        Math.Max(firstRtNeat.FunctionalHiddenNodeCount, secondRtNeat.FunctionalHiddenNodeCount),
+        snapshot.MaxRtNeatFunctionalHiddenNodeCount,
+        "Snapshot max rtNEAT functional hidden nodes");
+    AssertClose(
+        (firstRtNeat.FunctionalConnectionCount + secondRtNeat.FunctionalConnectionCount) / 2f,
+        snapshot.AverageRtNeatFunctionalConnectionCount,
+        0.000001,
+        "Snapshot average rtNEAT functional connections");
+    AssertEqual(
+        Math.Max(firstRtNeat.FunctionalConnectionCount, secondRtNeat.FunctionalConnectionCount),
+        snapshot.MaxRtNeatFunctionalConnectionCount,
+        "Snapshot max rtNEAT functional connections");
+    AssertClose(
+        (firstRtNeat.DisabledConnectionCount + secondRtNeat.DisabledConnectionCount) / 2f,
+        snapshot.AverageRtNeatDisabledConnectionCount,
+        0.000001,
+        "Snapshot average rtNEAT disabled connections");
+    AssertEqual(
+        Math.Max(firstRtNeat.DisabledConnectionCount, secondRtNeat.DisabledConnectionCount),
+        snapshot.MaxRtNeatDisabledConnectionCount,
+        "Snapshot max rtNEAT disabled connections");
+    AssertClose(
+        (firstRtNeat.LongestEnabledHiddenPathLength + secondRtNeat.LongestEnabledHiddenPathLength) / 2f,
+        snapshot.AverageRtNeatLongestPathLength,
+        0.000001,
+        "Snapshot average rtNEAT longest path");
+    AssertEqual(
+        Math.Max(firstRtNeat.LongestEnabledHiddenPathLength, secondRtNeat.LongestEnabledHiddenPathLength),
+        snapshot.MaxRtNeatLongestPathLength,
+        "Snapshot max rtNEAT longest path");
 }
 
 static BrainGenome CreateRtNeatTopologyTestBrain(int hiddenNodeCount, int disabledHiddenOutputCount = 0)

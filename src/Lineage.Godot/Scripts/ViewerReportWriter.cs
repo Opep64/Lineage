@@ -228,6 +228,10 @@ public static class ViewerReportWriter
             WriteMetric(writer, "rtNEAT hidden nodes", $"{snapshot.AverageRtNeatHiddenNodeCount:0.###} avg / {snapshot.MaxRtNeatHiddenNodeCount} max");
             WriteMetric(writer, "rtNEAT connections", $"{snapshot.AverageRtNeatConnectionCount:0.###} avg / {snapshot.MaxRtNeatConnectionCount} max");
             WriteMetric(writer, "rtNEAT enabled conn", $"{snapshot.AverageRtNeatEnabledConnectionCount:0.###} avg / {snapshot.MaxRtNeatEnabledConnectionCount} max");
+            WriteMetric(writer, "rtNEAT functional hidden", $"{snapshot.AverageRtNeatFunctionalHiddenNodeCount:0.###} avg / {snapshot.MaxRtNeatFunctionalHiddenNodeCount} max");
+            WriteMetric(writer, "rtNEAT functional conn", $"{snapshot.AverageRtNeatFunctionalConnectionCount:0.###} avg / {snapshot.MaxRtNeatFunctionalConnectionCount} max");
+            WriteMetric(writer, "rtNEAT disabled conn", $"{snapshot.AverageRtNeatDisabledConnectionCount:0.###} avg / {snapshot.MaxRtNeatDisabledConnectionCount} max");
+            WriteMetric(writer, "rtNEAT longest path", $"{snapshot.AverageRtNeatLongestPathLength:0.###} avg / {snapshot.MaxRtNeatLongestPathLength} max");
         }
         WriteMetric(writer, "Avg movement biome cost", $"{snapshot.AverageBiomeMovementCostMultiplier:0.###}x");
         WriteMetric(writer, "Avg basal biome cost", $"{snapshot.AverageBiomeBasalCostMultiplier:0.###}x");

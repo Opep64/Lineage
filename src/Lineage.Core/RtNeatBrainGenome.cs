@@ -49,7 +49,7 @@ public sealed record RtNeatMutationPolicy
 {
     public static RtNeatMutationPolicy Default { get; } = new();
 
-    public float BackgroundMutationChance { get; init; } = 1.5f;
+    public float BackgroundMutationChance { get; init; } = 1.25f;
 
     public float BackgroundMutationVariance { get; init; } = 0.05f;
 
@@ -59,25 +59,35 @@ public sealed record RtNeatMutationPolicy
 
     public float NeuronMutationProbability { get; init; } = 0.4f;
 
-    public float SynapseStrengthMutationProbability { get; init; } = 0.6f;
+    public float SynapseStrengthMutationProbability { get; init; } = 0.65f;
 
-    public float SynapseFlipProbability { get; init; } = 0.025f;
+    public float SynapseFlipProbability { get; init; } = 0.02f;
 
-    public float SynapseToggleProbability { get; init; } = 0.025f;
+    public float SynapseToggleProbability { get; init; } = 0.02f;
 
-    public float SynapseAddProbability { get; init; } = 0.25f;
+    public float SynapseAddProbability { get; init; } = 0.18f;
 
-    public float SynapseRemovalProbability { get; init; } = 0.1f;
+    public float SynapseRemovalProbability { get; init; } = 0.15f;
 
-    public float NeuronAddProbability { get; init; } = 0.35f;
+    public float NeuronAddProbability { get; init; } = 0.25f;
 
-    public float NeuronRemovalProbability { get; init; } = 0.15f;
+    public float NeuronRemovalProbability { get; init; } = 0.2f;
 
     public float NeuronActivationMutationProbability { get; init; } = 0.25f;
 
     public float NeuronBiasMutationProbability { get; init; } = 0.25f;
 
-    public float NeuronSplitSideConnectionProbability { get; init; } = 0.65f;
+    public float NeuronSplitSideConnectionProbability { get; init; } = 0.5f;
+
+    public int SoftHiddenNodeLimit { get; init; } = 8;
+
+    public int HardHiddenNodeLimit { get; init; } = 24;
+
+    public int SoftEnabledConnectionLimit { get; init; } = 64;
+
+    public int HardEnabledConnectionLimit { get; init; } = 128;
+
+    public int DisabledConnectionRetentionLimit { get; init; } = 8;
 
     public RtNeatMutationPolicy Validated()
     {
@@ -96,6 +106,13 @@ public sealed record RtNeatMutationPolicy
         EnsureNonNegative(NeuronActivationMutationProbability, nameof(NeuronActivationMutationProbability));
         EnsureNonNegative(NeuronBiasMutationProbability, nameof(NeuronBiasMutationProbability));
         EnsureRange(NeuronSplitSideConnectionProbability, 0f, 1f, nameof(NeuronSplitSideConnectionProbability));
+        EnsureNonNegative(SoftHiddenNodeLimit, nameof(SoftHiddenNodeLimit));
+        EnsurePositive(HardHiddenNodeLimit, nameof(HardHiddenNodeLimit));
+        EnsureOrderedLimit(SoftHiddenNodeLimit, HardHiddenNodeLimit, nameof(SoftHiddenNodeLimit), nameof(HardHiddenNodeLimit));
+        EnsureNonNegative(SoftEnabledConnectionLimit, nameof(SoftEnabledConnectionLimit));
+        EnsurePositive(HardEnabledConnectionLimit, nameof(HardEnabledConnectionLimit));
+        EnsureOrderedLimit(SoftEnabledConnectionLimit, HardEnabledConnectionLimit, nameof(SoftEnabledConnectionLimit), nameof(HardEnabledConnectionLimit));
+        EnsureNonNegative(DisabledConnectionRetentionLimit, nameof(DisabledConnectionRetentionLimit));
         EnsurePositiveSum(SynapseMutationProbability, NeuronMutationProbability, "rtNEAT top-level mutation probabilities");
         EnsurePositiveSum(
             SynapseStrengthMutationProbability,
@@ -118,6 +135,30 @@ public sealed record RtNeatMutationPolicy
         if (!float.IsFinite(value) || value < 0f)
         {
             throw new InvalidOperationException($"{name} must be finite and non-negative.");
+        }
+    }
+
+    private static void EnsureNonNegative(int value, string name)
+    {
+        if (value < 0)
+        {
+            throw new InvalidOperationException($"{name} must be non-negative.");
+        }
+    }
+
+    private static void EnsurePositive(int value, string name)
+    {
+        if (value <= 0)
+        {
+            throw new InvalidOperationException($"{name} must be positive.");
+        }
+    }
+
+    private static void EnsureOrderedLimit(int softLimit, int hardLimit, string softName, string hardName)
+    {
+        if (softLimit > hardLimit)
+        {
+            throw new InvalidOperationException($"{softName} must be less than or equal to {hardName}.");
         }
     }
 
@@ -392,7 +433,15 @@ public sealed record RtNeatBrainGenome
 
     public int EnabledConnectionCount => Connections.Count(connection => connection.Enabled);
 
+    public int DisabledConnectionCount => Connections.Count(connection => !connection.Enabled);
+
     public int ConnectionCount => Connections.Length;
+
+    public int FunctionalHiddenNodeCount => CountFunctionalHiddenNodes(Nodes, Connections);
+
+    public int FunctionalConnectionCount => CountFunctionalConnections(Nodes, Connections);
+
+    public int LongestEnabledHiddenPathLength => CountLongestEnabledHiddenPath(Nodes, Connections);
 
     public int WeightCount => Connections.Length + Nodes.Count(node => node.Kind != RtNeatNodeKind.Input);
 
@@ -1004,6 +1053,7 @@ public sealed record RtNeatBrainGenome
         }
 
         PruneInactiveHiddenNodes(nodes, connections);
+        PruneDisabledConnectionOverflow(connections, policy);
 
         return (mutated with
         {
@@ -1262,13 +1312,32 @@ public sealed record RtNeatBrainGenome
         List<RtNeatConnectionGene> connections,
         ref int nextInnovationId)
     {
+        var enabledConnectionCount = connections.Count(connection => connection.Enabled);
+        var growthScale = GrowthScaleForLimit(
+            enabledConnectionCount,
+            policy.SoftEnabledConnectionLimit,
+            policy.HardEnabledConnectionLimit);
+        var removalScale = RemovalScaleForLimit(
+            enabledConnectionCount,
+            policy.SoftEnabledConnectionLimit,
+            policy.HardEnabledConnectionLimit);
+        var strengthWeight = policy.SynapseStrengthMutationProbability;
+        var flipWeight = policy.SynapseFlipProbability;
+        var toggleWeight = policy.SynapseToggleProbability;
+        var addWeight = policy.SynapseAddProbability * growthScale;
+        var removeWeight = policy.SynapseRemovalProbability * removalScale;
+        if (strengthWeight + flipWeight + toggleWeight + addWeight + removeWeight <= 0f)
+        {
+            return;
+        }
+
         var choice = RollWeighted(
             random,
-            policy.SynapseStrengthMutationProbability,
-            policy.SynapseFlipProbability,
-            policy.SynapseToggleProbability,
-            policy.SynapseAddProbability,
-            policy.SynapseRemovalProbability);
+            strengthWeight,
+            flipWeight,
+            toggleWeight,
+            addWeight,
+            removeWeight);
 
         if (connections.Count == 0)
         {
@@ -1287,6 +1356,11 @@ public sealed record RtNeatBrainGenome
                 MutateConnectionToggle(random, connections);
                 break;
             case 3:
+                if (enabledConnectionCount >= policy.HardEnabledConnectionLimit)
+                {
+                    return;
+                }
+
                 AddRandomConnection(random, strength, nodes, connections, ref nextInnovationId);
                 break;
             case 4:
@@ -1304,14 +1378,32 @@ public sealed record RtNeatBrainGenome
         ref int nextNodeId,
         ref int nextInnovationId)
     {
+        var hiddenNodeCount = nodes.Count(node => node.Kind == RtNeatNodeKind.Hidden);
+        var growthScale = GrowthScaleForLimit(
+            hiddenNodeCount,
+            policy.SoftHiddenNodeLimit,
+            policy.HardHiddenNodeLimit);
+        var removalScale = RemovalScaleForLimit(
+            hiddenNodeCount,
+            policy.SoftHiddenNodeLimit,
+            policy.HardHiddenNodeLimit);
+        var addWeight = policy.NeuronAddProbability * growthScale;
+        var removeWeight = policy.NeuronRemovalProbability * removalScale;
+        var activationWeight = policy.NeuronActivationMutationProbability;
+        var biasWeight = policy.NeuronBiasMutationProbability;
+        if (addWeight + removeWeight + activationWeight + biasWeight <= 0f)
+        {
+            return;
+        }
+
         var choice = RollWeighted(
             random,
-            policy.NeuronAddProbability,
-            policy.NeuronRemovalProbability,
-            policy.NeuronActivationMutationProbability,
-            policy.NeuronBiasMutationProbability);
+            addWeight,
+            removeWeight,
+            activationWeight,
+            biasWeight);
 
-        if (nodes.All(node => node.Kind != RtNeatNodeKind.Hidden) && choice == 1)
+        if (hiddenNodeCount == 0 && choice == 1)
         {
             choice = 0;
         }
@@ -1319,6 +1411,11 @@ public sealed record RtNeatBrainGenome
         switch (choice)
         {
             case 0:
+                if (hiddenNodeCount >= policy.HardHiddenNodeLimit)
+                {
+                    return;
+                }
+
                 AddHiddenNodeBySplittingConnection(
                     random,
                     strength,
@@ -1338,6 +1435,35 @@ public sealed record RtNeatBrainGenome
                 MutateNodeBias(random, strength, policy, nodes);
                 break;
         }
+    }
+
+    private static float GrowthScaleForLimit(int count, int softLimit, int hardLimit)
+    {
+        if (count >= hardLimit)
+        {
+            return 0f;
+        }
+
+        if (count <= softLimit)
+        {
+            return 1f;
+        }
+
+        var span = Math.Max(1, hardLimit - softLimit);
+        var pressure = Math.Clamp((count - softLimit) / (float)span, 0f, 1f);
+        return Math.Clamp(1f - pressure, 0.05f, 1f);
+    }
+
+    private static float RemovalScaleForLimit(int count, int softLimit, int hardLimit)
+    {
+        if (count <= softLimit)
+        {
+            return 1f;
+        }
+
+        var span = Math.Max(1, hardLimit - softLimit);
+        var pressure = Math.Clamp((count - softLimit) / (float)span, 0f, 1f);
+        return 1f + pressure * 2.5f;
     }
 
     private static void MutateConnectionStrength(
@@ -1688,9 +1814,85 @@ public sealed record RtNeatBrainGenome
             || inactiveHiddenNodeIds.Contains(connection.TargetNodeId));
     }
 
+    private static void PruneDisabledConnectionOverflow(
+        List<RtNeatConnectionGene> connections,
+        RtNeatMutationPolicy policy)
+    {
+        var retentionLimit = Math.Max(0, policy.DisabledConnectionRetentionLimit);
+        var disabledOverflow = connections
+            .Where(connection => !connection.Enabled)
+            .OrderBy(connection => connection.InnovationId)
+            .Take(Math.Max(0, connections.Count(connection => !connection.Enabled) - retentionLimit))
+            .Select(connection => connection.InnovationId)
+            .ToHashSet();
+        if (disabledOverflow.Count == 0)
+        {
+            return;
+        }
+
+        connections.RemoveAll(connection => disabledOverflow.Contains(connection.InnovationId));
+    }
+
+    private static int CountFunctionalHiddenNodes(
+        IReadOnlyList<RtNeatNodeGene> nodes,
+        IReadOnlyList<RtNeatConnectionGene> connections)
+    {
+        var inputReachable = EnabledReachableFromInputs(nodes, connections);
+        var outputReachable = EnabledCanReachOutputs(nodes, connections);
+        return nodes.Count(node =>
+            node.Kind == RtNeatNodeKind.Hidden
+            && inputReachable.Contains(node.Id)
+            && outputReachable.Contains(node.Id));
+    }
+
+    private static int CountFunctionalConnections(
+        IReadOnlyList<RtNeatNodeGene> nodes,
+        IReadOnlyList<RtNeatConnectionGene> connections)
+    {
+        var inputReachable = EnabledReachableFromInputs(nodes, connections);
+        var outputReachable = EnabledCanReachOutputs(nodes, connections);
+        return connections.Count(connection =>
+            connection.Enabled
+            && inputReachable.Contains(connection.SourceNodeId)
+            && outputReachable.Contains(connection.TargetNodeId));
+    }
+
+    private static int CountLongestEnabledHiddenPath(
+        IReadOnlyList<RtNeatNodeGene> nodes,
+        IReadOnlyList<RtNeatConnectionGene> connections)
+    {
+        var nodeById = nodes.ToDictionary(node => node.Id);
+        var distances = nodes
+            .Where(node => node.Kind == RtNeatNodeKind.Input)
+            .ToDictionary(node => node.Id, _ => 0);
+        foreach (var connection in connections
+            .Where(connection => connection.Enabled)
+            .OrderBy(connection => nodeById[connection.TargetNodeId].Depth)
+            .ThenBy(connection => connection.InnovationId))
+        {
+            if (!distances.TryGetValue(connection.SourceNodeId, out var sourceDistance))
+            {
+                continue;
+            }
+
+            var target = nodeById[connection.TargetNodeId];
+            var targetDistance = sourceDistance + (target.Kind == RtNeatNodeKind.Hidden ? 1 : 0);
+            if (!distances.TryGetValue(target.Id, out var currentDistance) || targetDistance > currentDistance)
+            {
+                distances[target.Id] = targetDistance;
+            }
+        }
+
+        return nodes
+            .Where(node => node.Kind == RtNeatNodeKind.Output)
+            .Select(node => distances.GetValueOrDefault(node.Id))
+            .DefaultIfEmpty()
+            .Max();
+    }
+
     private static HashSet<int> EnabledReachableFromInputs(
-        List<RtNeatNodeGene> nodes,
-        List<RtNeatConnectionGene> connections)
+        IReadOnlyList<RtNeatNodeGene> nodes,
+        IReadOnlyList<RtNeatConnectionGene> connections)
     {
         var nodeById = nodes.ToDictionary(node => node.Id);
         var reachable = nodes
@@ -1711,8 +1913,8 @@ public sealed record RtNeatBrainGenome
     }
 
     private static HashSet<int> EnabledCanReachOutputs(
-        List<RtNeatNodeGene> nodes,
-        List<RtNeatConnectionGene> connections)
+        IReadOnlyList<RtNeatNodeGene> nodes,
+        IReadOnlyList<RtNeatConnectionGene> connections)
     {
         var nodeById = nodes.ToDictionary(node => node.Id);
         var reachable = nodes
