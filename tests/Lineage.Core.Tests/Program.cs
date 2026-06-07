@@ -200,6 +200,7 @@ var tests = new (string Name, Action Body)[]
     ("Pruned simulation snapshots restore continuation", PrunedSimulationSnapshotsRestoreContinuation),
     ("Extinct payload pruning system runs in pipeline", ExtinctPayloadPruningSystemRunsInPipeline),
     ("Stats recording captures aggregate snapshot", StatsRecordingCapturesAggregateSnapshot),
+    ("Stats recording reports meat opportunity gap", StatsRecordingReportsMeatOpportunityGap),
     ("Stats recording reports metabolic pace bands", StatsRecordingReportsMetabolicPaceBands),
     ("Stats recording reports genome trait averages", StatsRecordingReportsGenomeTraitAverages),
     ("Stats recording ignores extinct brain payloads", StatsRecordingIgnoresExtinctBrainPayloads),
@@ -11328,6 +11329,95 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertEqual(0, snapshot.PlantDormancyCompletedCount, "Snapshot plant dormancy completed count");
     AssertClose(0f, snapshot.AverageLifespanSeconds, 0.000001, "Snapshot average lifespan without deaths");
     AssertClose(0f, snapshot.MedianLifespanSeconds, 0.000001, "Snapshot median lifespan without deaths");
+}
+
+static void StatsRecordingReportsMeatOpportunityGap()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 112,
+        systems: [new StatsRecordingSystem()]);
+
+    var genome = CreatureGenome.Baseline with { MaturityAgeSeconds = 0f };
+    var genomeId = simulation.State.AddGenome(genome);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(10f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(30f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(40f, 10f), energy: 10f);
+    simulation.State.SpawnCreature(genomeId, new SimVector2(50f, 10f), energy: 10f);
+
+    var freshMeatId = simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(12f, 10f),
+        Radius = 2f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        MeatAgeSeconds = 0f
+    });
+    var staleMeatId = simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(22f, 10f),
+        Radius = 2f,
+        Calories = 20f,
+        MaxCalories = 20f,
+        MeatAgeSeconds = MeatQuality.StaleAgeSeconds
+    });
+
+    var freshEatingCreature = simulation.State.Creatures[0];
+    freshEatingCreature.IsTouchingFood = true;
+    freshEatingCreature.FoodContactKind = FoodContactKind.Resource;
+    freshEatingCreature.FoodContactResourceKind = ResourceKind.Meat;
+    freshEatingCreature.FoodContactResourceId = freshMeatId;
+    freshEatingCreature.LastCarcassCaloriesEaten = 2f;
+    freshEatingCreature.LastFreshMeatCaloriesEaten = 2f;
+    simulation.State.Creatures[0] = freshEatingCreature;
+
+    var staleMissingCreature = simulation.State.Creatures[1];
+    staleMissingCreature.IsTouchingFood = true;
+    staleMissingCreature.FoodContactKind = FoodContactKind.Resource;
+    staleMissingCreature.FoodContactResourceKind = ResourceKind.Meat;
+    staleMissingCreature.FoodContactResourceId = staleMeatId;
+    simulation.State.Creatures[1] = staleMissingCreature;
+
+    var smallPreyMissingCreature = simulation.State.Creatures[2];
+    smallPreyMissingCreature.IsTouchingFood = true;
+    smallPreyMissingCreature.FoodContactKind = FoodContactKind.SmallPrey;
+    simulation.State.Creatures[2] = smallPreyMissingCreature;
+
+    var gutFullMissingCreature = simulation.State.Creatures[3];
+    gutFullMissingCreature.IsTouchingFood = true;
+    gutFullMissingCreature.FoodContactKind = FoodContactKind.Resource;
+    gutFullMissingCreature.FoodContactResourceKind = ResourceKind.Meat;
+    gutFullMissingCreature.FoodContactResourceId = freshMeatId;
+    gutFullMissingCreature.Actions = new CreatureActionState { WantsEat = true, EatOutput = 1f };
+    gutFullMissingCreature.GutMeatCalories = CreatureGrowth.EffectiveGutCapacityCalories(gutFullMissingCreature, genome);
+    simulation.State.Creatures[3] = gutFullMissingCreature;
+
+    var storageFullMissingCreature = simulation.State.Creatures[4];
+    storageFullMissingCreature.IsTouchingFood = true;
+    storageFullMissingCreature.FoodContactKind = FoodContactKind.Resource;
+    storageFullMissingCreature.FoodContactResourceKind = ResourceKind.Meat;
+    storageFullMissingCreature.FoodContactResourceId = freshMeatId;
+    storageFullMissingCreature.Actions = new CreatureActionState { WantsEat = true, EatOutput = 1f };
+    storageFullMissingCreature.Energy = CreatureGrowth.EffectiveEnergyCapacityCalories(storageFullMissingCreature, genome);
+    storageFullMissingCreature.FatCalories = CreatureGrowth.EffectiveFatStorageCapacityCalories(storageFullMissingCreature, genome);
+    simulation.State.Creatures[4] = storageFullMissingCreature;
+
+    simulation.Step();
+
+    var snapshot = simulation.State.Stats.Snapshots[0];
+    AssertEqual(5, snapshot.FoodContactCreatureCount, "Food contact count");
+    AssertEqual(5, snapshot.MeatContactCreatureCount, "Meat contact count");
+    AssertEqual(4, snapshot.FreshMeatContactCreatureCount, "Fresh meat contact count");
+    AssertEqual(1, snapshot.StaleMeatContactCreatureCount, "Stale meat contact count");
+    AssertEqual(4, snapshot.MeatContactNotEatingCreatureCount, "Meat contact not eating count");
+    AssertEqual(2, snapshot.MeatContactNotEatingNoIntentCreatureCount, "Meat contact not eating no-intent count");
+    AssertEqual(1, snapshot.MeatContactNotEatingGutFullCreatureCount, "Meat contact not eating gut-full count");
+    AssertEqual(1, snapshot.MeatContactNotEatingStorageFullCreatureCount, "Meat contact not eating storage-full count");
+    AssertEqual(1, snapshot.MeatContactNotEatingStaleCreatureCount, "Meat contact not eating stale count");
+    AssertEqual(0, snapshot.MeatContactNotEatingOtherCreatureCount, "Meat contact not eating other count");
 }
 
 static void StatsRecordingReportsMetabolicPaceBands()

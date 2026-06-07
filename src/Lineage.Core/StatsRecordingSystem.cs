@@ -195,6 +195,15 @@ public sealed class StatsRecordingSystem(
         var creatureIdentityScentDetectedCreatureCount = 0;
         var eggIdentityScentDetectedCreatureCount = 0;
         var foodContactCreatureCount = 0;
+        var meatContactCreatureCount = 0;
+        var freshMeatContactCreatureCount = 0;
+        var staleMeatContactCreatureCount = 0;
+        var meatContactNotEatingCreatureCount = 0;
+        var meatContactNotEatingNoIntentCreatureCount = 0;
+        var meatContactNotEatingGutFullCreatureCount = 0;
+        var meatContactNotEatingStorageFullCreatureCount = 0;
+        var meatContactNotEatingStaleCreatureCount = 0;
+        var meatContactNotEatingOtherCreatureCount = 0;
         var eggContactCreatureCount = 0;
         var eatingCreatureCount = 0;
         var rottenMeatDamagedCreatureCount = 0;
@@ -664,6 +673,53 @@ public sealed class StatsRecordingSystem(
             if (creature.IsTouchingFood)
             {
                 foodContactCreatureCount++;
+                if (IsTouchingMeatFood(creature))
+                {
+                    meatContactCreatureCount++;
+                    if (IsFreshMeatContact(state, creature))
+                    {
+                        freshMeatContactCreatureCount++;
+                    }
+                    else
+                    {
+                        staleMeatContactCreatureCount++;
+                    }
+
+                    if (creature.LastCarcassCaloriesEaten + creature.LastLivePreyCaloriesEaten <= 0f)
+                    {
+                        meatContactNotEatingCreatureCount++;
+                        var noIntent = !creature.Actions.WantsEat;
+                        var gutFull = IsGutFull(creature, genome);
+                        var storageFull = IsStorageFull(creature, genome);
+                        var staleContact = !IsFreshMeatContact(state, creature);
+
+                        if (noIntent)
+                        {
+                            meatContactNotEatingNoIntentCreatureCount++;
+                        }
+
+                        if (gutFull)
+                        {
+                            meatContactNotEatingGutFullCreatureCount++;
+                        }
+
+                        if (storageFull)
+                        {
+                            meatContactNotEatingStorageFullCreatureCount++;
+                        }
+
+                        if (staleContact)
+                        {
+                            meatContactNotEatingStaleCreatureCount++;
+                        }
+
+                        if (!noIntent && !gutFull && !storageFull && !staleContact)
+                        {
+                            meatContactNotEatingOtherCreatureCount++;
+                        }
+                    }
+                }
+
                 if (creature.Senses.EggFoodContact > 0f)
                 {
                     eggContactCreatureCount++;
@@ -1336,6 +1392,15 @@ public sealed class StatsRecordingSystem(
             plantDetectedCreatureCount,
             meatDetectedCreatureCount,
             foodContactCreatureCount,
+            meatContactCreatureCount,
+            freshMeatContactCreatureCount,
+            staleMeatContactCreatureCount,
+            meatContactNotEatingCreatureCount,
+            meatContactNotEatingNoIntentCreatureCount,
+            meatContactNotEatingGutFullCreatureCount,
+            meatContactNotEatingStorageFullCreatureCount,
+            meatContactNotEatingStaleCreatureCount,
+            meatContactNotEatingOtherCreatureCount,
             eatingCreatureCount,
             totalVisibleFoodDensity / divisor,
             totalVisiblePlantDensity / divisor,
@@ -1872,6 +1937,59 @@ public sealed class StatsRecordingSystem(
         {
             (topValues[i - 1], topValues[i]) = (topValues[i], topValues[i - 1]);
         }
+    }
+
+    private static bool IsTouchingMeatFood(CreatureState creature)
+    {
+        return creature.IsTouchingFood
+            && ((creature.FoodContactKind == FoodContactKind.Resource
+                    && creature.FoodContactResourceKind == ResourceKind.Meat)
+                || creature.FoodContactKind == FoodContactKind.SmallPrey);
+    }
+
+    private static bool IsFreshMeatContact(WorldState state, CreatureState creature)
+    {
+        if (creature.FoodContactKind == FoodContactKind.SmallPrey)
+        {
+            return true;
+        }
+
+        if (creature.LastFreshMeatCaloriesEaten > 0f)
+        {
+            return true;
+        }
+
+        if (creature.LastStaleMeatCaloriesEaten > 0f)
+        {
+            return false;
+        }
+
+        if (creature.FoodContactKind == FoodContactKind.Resource
+            && creature.FoodContactResourceKind == ResourceKind.Meat)
+        {
+            for (var i = 0; i < state.Resources.Count; i++)
+            {
+                var resource = state.Resources[i];
+                if (resource.Id == creature.FoodContactResourceId)
+                {
+                    return MeatQuality.IsFresh(resource);
+                }
+            }
+        }
+
+        return MeatQuality.IsFresh(creature.Senses.VisibleMeatFreshness);
+    }
+
+    private static bool IsGutFull(CreatureState creature, CreatureGenome genome)
+    {
+        return CreatureIntakeCapacity.AvailableGutCapacity(creature, genome) <= 0.0001f;
+    }
+
+    private static bool IsStorageFull(CreatureState creature, CreatureGenome genome)
+    {
+        var usableRoom = CreatureIntakeCapacity.AvailableUsableEnergyCapacity(creature, genome)
+            - CreatureIntakeCapacity.PendingGutEnergy(creature, genome);
+        return usableRoom <= 0.0001f;
     }
 
     private static float Rate(float value, float seconds)

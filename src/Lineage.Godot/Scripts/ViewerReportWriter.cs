@@ -275,6 +275,15 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Smelling rot", FormatPercent(Share(snapshot.RottenMeatScentDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Seeing creatures", FormatPercent(Share(snapshot.CreatureDetectedCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Touching food", FormatPercent(Share(snapshot.FoodContactCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Touching meat", FormatPercent(Share(snapshot.MeatContactCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Touching fresh meat", FormatPercent(Share(snapshot.FreshMeatContactCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Touching stale meat", FormatPercent(Share(snapshot.StaleMeatContactCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "Meat contact not eating", FormatPercent(Share(snapshot.MeatContactNotEatingCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "No meat eat: no intent", FormatPercent(Share(snapshot.MeatContactNotEatingNoIntentCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "No meat eat: gut full", FormatPercent(Share(snapshot.MeatContactNotEatingGutFullCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "No meat eat: storage full", FormatPercent(Share(snapshot.MeatContactNotEatingStorageFullCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "No meat eat: stale", FormatPercent(Share(snapshot.MeatContactNotEatingStaleCreatureCount, snapshot.CreatureCount)));
+        WriteMetric(writer, "No meat eat: other", FormatPercent(Share(snapshot.MeatContactNotEatingOtherCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Eating this tick", FormatPercent(Share(snapshot.EatingCreatureCount, snapshot.CreatureCount)));
         WriteMetric(writer, "Visible food density", snapshot.AverageVisibleFoodDensity.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Visible plant density", snapshot.AverageVisiblePlantDensity.ToString("0.###", CultureInfo.InvariantCulture));
@@ -2918,6 +2927,16 @@ public static class ViewerReportWriter
             new ChartSeries("Avg clarity", "#d69d2f", snapshots.Select(snapshot => snapshot.AverageSoundToneClarity * 100f).ToArray()));
         WriteLineChart(
             writer,
+            "Meat Opportunity Gap",
+            "%",
+            snapshots,
+            new ChartSeries("Meat seen", "#d69d2f", snapshots.Select(snapshot => Share(snapshot.MeatDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Meat scent", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.MeatScentDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Meat contact", "#35a862", snapshots.Select(snapshot => Share(snapshot.MeatContactCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Contact no eat", "#b84a4a", snapshots.Select(snapshot => Share(snapshot.MeatContactNotEatingCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Stale contact", "#7d5546", snapshots.Select(snapshot => Share(snapshot.StaleMeatContactCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
             "Meat Freshness",
             "%",
             snapshots,
@@ -2928,6 +2947,16 @@ public static class ViewerReportWriter
             new ChartSeries("Stale seen", "#7d5546", snapshots.Select(snapshot => Share(snapshot.StaleMeatDetectedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Stale avoided", "#9a6b3b", snapshots.Select(snapshot => Share(snapshot.StaleMeatAvoidedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
             new ChartSeries("Rotten affected", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.RottenMeatDamagedCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
+        WriteLineChart(
+            writer,
+            "Meat No-Eat Causes",
+            "%",
+            snapshots,
+            new ChartSeries("No intent", "#b84a4a", snapshots.Select(snapshot => Share(snapshot.MeatContactNotEatingNoIntentCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Gut full", "#6a8fce", snapshots.Select(snapshot => Share(snapshot.MeatContactNotEatingGutFullCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Storage full", "#35a862", snapshots.Select(snapshot => Share(snapshot.MeatContactNotEatingStorageFullCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Stale", "#7d5546", snapshots.Select(snapshot => Share(snapshot.MeatContactNotEatingStaleCreatureCount, snapshot.CreatureCount) * 100f).ToArray()),
+            new ChartSeries("Other", "#8f4cb8", snapshots.Select(snapshot => Share(snapshot.MeatContactNotEatingOtherCreatureCount, snapshot.CreatureCount) * 100f).ToArray()));
         WriteLineChart(
             writer,
             "Genome Drift: body and senses",
