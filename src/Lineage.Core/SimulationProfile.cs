@@ -182,6 +182,10 @@ public sealed class SimulationSensingProfile
 
     public long MeatResourceCandidates { get; internal set; }
 
+    public long PlantResourceScanSamples { get; internal set; }
+
+    public long MeatResourceScanSamples { get; internal set; }
+
     public long VisiblePlantCandidates { get; internal set; }
 
     public long VisibleMeatResourceCandidates { get; internal set; }
@@ -189,6 +193,14 @@ public sealed class SimulationSensingProfile
     public long EggQueries { get; internal set; }
 
     public long EggCandidates { get; internal set; }
+
+    public long EggLineageScentCandidates { get; internal set; }
+
+    public long EggIdentityScentCandidates { get; internal set; }
+
+    public long EggLineageScentHits { get; internal set; }
+
+    public long EggIdentityScentHits { get; internal set; }
 
     public long VisibleEggCandidates { get; internal set; }
 
@@ -226,6 +238,12 @@ public sealed class SimulationSensingProfile
 
     public long SenseFinalizationSamples { get; internal set; }
 
+    public long SenseFinalizationRefreshedSamples { get; internal set; }
+
+    public long SenseFinalizationSkippedSamples { get; internal set; }
+
+    public long PlantPreferenceBridgeSamples { get; internal set; }
+
     public long ResourceQueryTimestampTicks { get; internal set; }
 
     public long PlantResourceQueryTimestampTicks { get; internal set; }
@@ -233,6 +251,10 @@ public sealed class SimulationSensingProfile
     public long MeatResourceQueryTimestampTicks { get; internal set; }
 
     public long ResourceScanTimestampTicks { get; internal set; }
+
+    public long PlantResourceScanTimestampTicks { get; internal set; }
+
+    public long MeatResourceScanTimestampTicks { get; internal set; }
 
     public long EggQueryTimestampTicks { get; internal set; }
 
@@ -253,6 +275,12 @@ public sealed class SimulationSensingProfile
     public long MemorySenseTimestampTicks { get; internal set; }
 
     public long SenseFinalizationTimestampTicks { get; internal set; }
+
+    public long SenseFinalizationRefreshedTimestampTicks { get; internal set; }
+
+    public long SenseFinalizationSkippedTimestampTicks { get; internal set; }
+
+    public long PlantPreferenceBridgeTimestampTicks { get; internal set; }
 
     public long ObstacleSenseTimestampTicks { get; internal set; }
 
@@ -276,6 +304,10 @@ public sealed class SimulationSensingProfile
 
     public double ResourceScanMilliseconds => ToMilliseconds(ResourceScanTimestampTicks);
 
+    public double PlantResourceScanMilliseconds => ToMilliseconds(PlantResourceScanTimestampTicks);
+
+    public double MeatResourceScanMilliseconds => ToMilliseconds(MeatResourceScanTimestampTicks);
+
     public double EggQueryMilliseconds => ToMilliseconds(EggQueryTimestampTicks);
 
     public double EggScanMilliseconds => ToMilliseconds(EggScanTimestampTicks);
@@ -285,6 +317,12 @@ public sealed class SimulationSensingProfile
     public double CreatureScanMilliseconds => ToMilliseconds(CreatureScanTimestampTicks);
 
     public double ObstacleSenseMilliseconds => ToMilliseconds(ObstacleSenseTimestampTicks);
+
+    public double SenseFinalizationRefreshedMilliseconds => ToMilliseconds(SenseFinalizationRefreshedTimestampTicks);
+
+    public double SenseFinalizationSkippedMilliseconds => ToMilliseconds(SenseFinalizationSkippedTimestampTicks);
+
+    public double PlantPreferenceBridgeMilliseconds => ToMilliseconds(PlantPreferenceBridgeTimestampTicks);
 
     public double TotalMeasuredMilliseconds =>
         TraitCacheMilliseconds
@@ -367,10 +405,27 @@ public sealed class SimulationSensingProfile
         MemorySenseTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
-    internal void RecordSenseFinalization(long elapsedTimestampTicks)
+    internal void RecordSenseFinalization(
+        long elapsedTimestampTicks,
+        bool refreshedWorldSense,
+        long plantPreferenceBridgeTimestampTicks)
     {
+        var safeElapsed = Math.Max(0, elapsedTimestampTicks);
+        var safeBridgeElapsed = Math.Max(0, plantPreferenceBridgeTimestampTicks);
         SenseFinalizationSamples++;
-        SenseFinalizationTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+        SenseFinalizationTimestampTicks += safeElapsed;
+        PlantPreferenceBridgeSamples++;
+        PlantPreferenceBridgeTimestampTicks += safeBridgeElapsed;
+        if (refreshedWorldSense)
+        {
+            SenseFinalizationRefreshedSamples++;
+            SenseFinalizationRefreshedTimestampTicks += safeElapsed;
+        }
+        else
+        {
+            SenseFinalizationSkippedSamples++;
+            SenseFinalizationSkippedTimestampTicks += safeElapsed;
+        }
     }
 
     internal void RecordResourceQuery(int candidateCount, long elapsedTimestampTicks)
@@ -417,13 +472,19 @@ public sealed class SimulationSensingProfile
         int meatCandidates,
         int visiblePlants,
         int visibleMeatResources,
-        long elapsedTimestampTicks)
+        long elapsedTimestampTicks,
+        long plantScanTimestampTicks,
+        long meatScanTimestampTicks)
     {
         PlantCandidates += Math.Max(0, plantCandidates);
         MeatResourceCandidates += Math.Max(0, meatCandidates);
+        PlantResourceScanSamples++;
+        MeatResourceScanSamples++;
         VisiblePlantCandidates += Math.Max(0, visiblePlants);
         VisibleMeatResourceCandidates += Math.Max(0, visibleMeatResources);
         ResourceScanTimestampTicks += Math.Max(0, elapsedTimestampTicks);
+        PlantResourceScanTimestampTicks += Math.Max(0, plantScanTimestampTicks);
+        MeatResourceScanTimestampTicks += Math.Max(0, meatScanTimestampTicks);
     }
 
     internal void RecordEggQuery(int candidateCount, long elapsedTimestampTicks)
@@ -433,9 +494,19 @@ public sealed class SimulationSensingProfile
         EggQueryTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
-    internal void RecordEggScan(int visibleEggs, long elapsedTimestampTicks)
+    internal void RecordEggScan(
+        int visibleEggs,
+        int lineageScentCandidates,
+        int identityScentCandidates,
+        int lineageScentHits,
+        int identityScentHits,
+        long elapsedTimestampTicks)
     {
         VisibleEggCandidates += Math.Max(0, visibleEggs);
+        EggLineageScentCandidates += Math.Max(0, lineageScentCandidates);
+        EggIdentityScentCandidates += Math.Max(0, identityScentCandidates);
+        EggLineageScentHits += Math.Max(0, lineageScentHits);
+        EggIdentityScentHits += Math.Max(0, identityScentHits);
         EggScanTimestampTicks += Math.Max(0, elapsedTimestampTicks);
     }
 
@@ -492,10 +563,16 @@ public sealed class SimulationSensingProfile
         MeatResourceQueryCandidates += other.MeatResourceQueryCandidates;
         PlantCandidates += other.PlantCandidates;
         MeatResourceCandidates += other.MeatResourceCandidates;
+        PlantResourceScanSamples += other.PlantResourceScanSamples;
+        MeatResourceScanSamples += other.MeatResourceScanSamples;
         VisiblePlantCandidates += other.VisiblePlantCandidates;
         VisibleMeatResourceCandidates += other.VisibleMeatResourceCandidates;
         EggQueries += other.EggQueries;
         EggCandidates += other.EggCandidates;
+        EggLineageScentCandidates += other.EggLineageScentCandidates;
+        EggIdentityScentCandidates += other.EggIdentityScentCandidates;
+        EggLineageScentHits += other.EggLineageScentHits;
+        EggIdentityScentHits += other.EggIdentityScentHits;
         VisibleEggCandidates += other.VisibleEggCandidates;
         CreatureQueries += other.CreatureQueries;
         CreatureCandidates += other.CreatureCandidates;
@@ -514,10 +591,15 @@ public sealed class SimulationSensingProfile
         TerrainSenseSamples += other.TerrainSenseSamples;
         MemorySenseSamples += other.MemorySenseSamples;
         SenseFinalizationSamples += other.SenseFinalizationSamples;
+        SenseFinalizationRefreshedSamples += other.SenseFinalizationRefreshedSamples;
+        SenseFinalizationSkippedSamples += other.SenseFinalizationSkippedSamples;
+        PlantPreferenceBridgeSamples += other.PlantPreferenceBridgeSamples;
         ResourceQueryTimestampTicks += other.ResourceQueryTimestampTicks;
         PlantResourceQueryTimestampTicks += other.PlantResourceQueryTimestampTicks;
         MeatResourceQueryTimestampTicks += other.MeatResourceQueryTimestampTicks;
         ResourceScanTimestampTicks += other.ResourceScanTimestampTicks;
+        PlantResourceScanTimestampTicks += other.PlantResourceScanTimestampTicks;
+        MeatResourceScanTimestampTicks += other.MeatResourceScanTimestampTicks;
         EggQueryTimestampTicks += other.EggQueryTimestampTicks;
         EggScanTimestampTicks += other.EggScanTimestampTicks;
         CreatureQueryTimestampTicks += other.CreatureQueryTimestampTicks;
@@ -528,6 +610,9 @@ public sealed class SimulationSensingProfile
         TerrainSenseTimestampTicks += other.TerrainSenseTimestampTicks;
         MemorySenseTimestampTicks += other.MemorySenseTimestampTicks;
         SenseFinalizationTimestampTicks += other.SenseFinalizationTimestampTicks;
+        SenseFinalizationRefreshedTimestampTicks += other.SenseFinalizationRefreshedTimestampTicks;
+        SenseFinalizationSkippedTimestampTicks += other.SenseFinalizationSkippedTimestampTicks;
+        PlantPreferenceBridgeTimestampTicks += other.PlantPreferenceBridgeTimestampTicks;
         ObstacleSenseTimestampTicks += other.ObstacleSenseTimestampTicks;
     }
 

@@ -328,9 +328,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             var skippedFinalizationStartedAt = sensingProfile is not null
                 ? Stopwatch.GetTimestamp()
                 : 0L;
+            var skippedBridgeStartedAt = sensingProfile is not null
+                ? Stopwatch.GetTimestamp()
+                : 0L;
             ApplyPlantPreferenceBridge(ref senses);
+            var skippedBridgeElapsed = sensingProfile is not null
+                ? Stopwatch.GetTimestamp() - skippedBridgeStartedAt
+                : 0L;
             creature.Senses = senses;
-            sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - skippedFinalizationStartedAt);
+            sensingProfile?.RecordSenseFinalization(
+                Stopwatch.GetTimestamp() - skippedFinalizationStartedAt,
+                refreshedWorldSense: false,
+                skippedBridgeElapsed);
             return creature;
         }
 
@@ -462,6 +471,9 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         var visiblePlantCandidates = 0;
         var visibleMeatResourceCandidates = 0;
 
+        var plantScanStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
         foreach (var resourceIndex in scratch.PlantResourceCandidates)
         {
             var resource = state.Resources[resourceIndex];
@@ -526,6 +538,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             }
         }
 
+        var plantScanElapsed = sensingProfile is not null
+            ? Stopwatch.GetTimestamp() - plantScanStartedAt
+            : 0L;
+        var meatScanStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
         foreach (var resourceIndex in scratch.MeatResourceCandidates)
         {
             var resource = state.Resources[resourceIndex];
@@ -598,18 +616,27 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 bestVisibleFoodIndex = resourceIndex;
             }
         }
+        var meatScanElapsed = sensingProfile is not null
+            ? Stopwatch.GetTimestamp() - meatScanStartedAt
+            : 0L;
 
         sensingProfile?.RecordResourceScan(
             plantCandidates,
             meatResourceCandidates,
             visiblePlantCandidates,
             visibleMeatResourceCandidates,
-            Stopwatch.GetTimestamp() - resourceScanStartedAt);
+            Stopwatch.GetTimestamp() - resourceScanStartedAt,
+            plantScanElapsed,
+            meatScanElapsed);
 
         var eggScanStartedAt = sensingProfile is not null
             ? Stopwatch.GetTimestamp()
             : 0L;
         var visibleEggCandidates = 0;
+        var eggLineageScentCandidates = 0;
+        var eggIdentityScentCandidates = 0;
+        var eggLineageScentHits = 0;
+        var eggIdentityScentHits = 0;
 
         foreach (var eggIndex in scratch.EggCandidates)
         {
@@ -622,6 +649,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             if (edgeDistance <= eggLineageScentRadius)
             {
+                eggLineageScentCandidates++;
                 var lineageWeight = LineageFamiliarity.ScentWeight(LineageFamiliarity.EggSimilarity(state, creature.Id, egg));
                 if (lineageWeight > 0f)
                 {
@@ -632,6 +660,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                         var scentDirection = centerDistance > 0.0001f
                             ? toEgg / centerDistance
                             : forward;
+                        eggLineageScentHits++;
                         totalEggLineageScentStrength += lineageScentStrength;
                         eggLineageScentVector += scentDirection * lineageScentStrength;
                     }
@@ -640,6 +669,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
             if (edgeDistance <= eggLineageScentRadius)
             {
+                eggIdentityScentCandidates++;
                 var eggGenome = state.GetGenome(egg.GenomeId);
                 var identityWeight = ScentIdentity.ScentWeight(ScentIdentity.SignatureSimilarity(genome, eggGenome));
                 if (identityWeight > 0f)
@@ -651,6 +681,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                         var scentDirection = centerDistance > 0.0001f
                             ? toEgg / centerDistance
                             : forward;
+                        eggIdentityScentHits++;
                         totalEggIdentityScentStrength += identityScentStrength;
                         eggIdentityScentVector += scentDirection * identityScentStrength;
                     }
@@ -708,6 +739,10 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
         sensingProfile?.RecordEggScan(
             visibleEggCandidates,
+            eggLineageScentCandidates,
+            eggIdentityScentCandidates,
+            eggLineageScentHits,
+            eggIdentityScentHits,
             Stopwatch.GetTimestamp() - eggScanStartedAt);
 
         foreach (var preyIndex in scratch.SmallPreyCandidates)
@@ -954,9 +989,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
                 effectiveVisionRadius);
         }
 
+        var plantPreferenceBridgeStartedAt = sensingProfile is not null
+            ? Stopwatch.GetTimestamp()
+            : 0L;
         ApplyPlantPreferenceBridge(ref senses);
+        var plantPreferenceBridgeElapsed = sensingProfile is not null
+            ? Stopwatch.GetTimestamp() - plantPreferenceBridgeStartedAt
+            : 0L;
         creature.Senses = senses;
-        sensingProfile?.RecordSenseFinalization(Stopwatch.GetTimestamp() - senseFinalizationStartedAt);
+        sensingProfile?.RecordSenseFinalization(
+            Stopwatch.GetTimestamp() - senseFinalizationStartedAt,
+            refreshedWorldSense: true,
+            plantPreferenceBridgeElapsed);
         return creature;
     }
 

@@ -951,9 +951,12 @@ static void PrintSensingProfileSummary(SimulationSensingProfile profile)
     Console.WriteLine(
         $"    Meat candidates: {FormatAverage(profile.MeatResourceQueryCandidates, profile.MeatResourceQueries):0.00}/query");
     Console.WriteLine(
-        $"  Resource scan: {profile.ResourceScanMilliseconds:0.000}ms, plants {profile.PlantCandidates}, meat {profile.MeatResourceCandidates}, visible plants {profile.VisiblePlantCandidates}, visible meat {profile.VisibleMeatResourceCandidates}");
+        $"  Resource scan: {profile.ResourceScanMilliseconds:0.000}ms"
+        + $" (plant {profile.PlantResourceScanMilliseconds:0.000}ms, meat {profile.MeatResourceScanMilliseconds:0.000}ms)"
+        + $", plants {profile.PlantCandidates}, meat {profile.MeatResourceCandidates}, visible plants {profile.VisiblePlantCandidates}, visible meat {profile.VisibleMeatResourceCandidates}");
     Console.WriteLine(
-        $"  Egg query/scan: {(profile.EggQueryMilliseconds + profile.EggScanMilliseconds):0.000}ms, {FormatAverage(profile.EggCandidates, profile.EggQueries):0.00} candidates/query, visible {profile.VisibleEggCandidates}");
+        $"  Egg query/scan: {(profile.EggQueryMilliseconds + profile.EggScanMilliseconds):0.000}ms, {FormatAverage(profile.EggCandidates, profile.EggQueries):0.00} candidates/query, visible {profile.VisibleEggCandidates}"
+        + $", lineage scent {profile.EggLineageScentCandidates}/{profile.EggLineageScentHits}, identity scent {profile.EggIdentityScentCandidates}/{profile.EggIdentityScentHits}");
     Console.WriteLine(
         $"  Creature query/scan: {(profile.CreatureQueryMilliseconds + profile.CreatureScanMilliseconds):0.000}ms, {FormatAverage(profile.CreatureCandidates, profile.CreatureQueries):0.00} candidates/query, visible {profile.VisibleCreatureCandidates}");
     Console.WriteLine(
@@ -969,7 +972,8 @@ static void PrintSensingProfileSummary(SimulationSensingProfile profile)
     Console.WriteLine(
         $"  Memory sense: {profile.MemorySenseMilliseconds:0.000}ms");
     Console.WriteLine(
-        $"  Sense finalization: {profile.SenseFinalizationMilliseconds:0.000}ms");
+        $"  Sense finalization: {profile.SenseFinalizationMilliseconds:0.000}ms"
+        + $" (refreshed {profile.SenseFinalizationRefreshedMilliseconds:0.000}ms/{profile.SenseFinalizationRefreshedSamples}, skipped {profile.SenseFinalizationSkippedMilliseconds:0.000}ms/{profile.SenseFinalizationSkippedSamples}, bridge {profile.PlantPreferenceBridgeMilliseconds:0.000}ms)");
 }
 
 static double FormatAverage(long numerator, long denominator)
@@ -4948,6 +4952,44 @@ internal static class SensingProfileCsvWriter
             0);
         WriteRow(
             writer,
+            "plant_resource_scan",
+            profile.PlantResourceScanSamples,
+            profile.PlantCandidates,
+            profile.PlantCandidates,
+            0,
+            profile.VisiblePlantCandidates,
+            profile.PlantResourceScanMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "meat_resource_scan",
+            profile.MeatResourceScanSamples,
+            profile.MeatResourceCandidates,
+            0,
+            profile.MeatResourceCandidates,
+            profile.VisibleMeatResourceCandidates,
+            profile.MeatResourceScanMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
             "egg_query",
             profile.EggQueries,
             profile.EggCandidates,
@@ -4980,6 +5022,40 @@ internal static class SensingProfileCsvWriter
             0,
             0,
             0);
+        WriteRow(
+            writer,
+            "egg_lineage_scent",
+            queries: profile.EggQueries,
+            candidates: profile.EggLineageScentCandidates,
+            plantCandidates: 0,
+            meatCandidates: 0,
+            visible: profile.EggLineageScentHits,
+            totalMilliseconds: 0,
+            cellsVisited: 0,
+            nonEmptyCells: 0,
+            distanceRejects: 0,
+            selfRejects: 0,
+            nonviableRejects: 0,
+            rangeRejects: 0,
+            visionRejects: 0,
+            bodyRadiusCacheMisses: 0);
+        WriteRow(
+            writer,
+            "egg_identity_scent",
+            queries: profile.EggQueries,
+            candidates: profile.EggIdentityScentCandidates,
+            plantCandidates: 0,
+            meatCandidates: 0,
+            visible: profile.EggIdentityScentHits,
+            totalMilliseconds: 0,
+            cellsVisited: 0,
+            nonEmptyCells: 0,
+            distanceRejects: 0,
+            selfRejects: 0,
+            nonviableRejects: 0,
+            rangeRejects: 0,
+            visionRejects: 0,
+            bodyRadiusCacheMisses: 0);
         WriteRow(
             writer,
             "creature_query",
@@ -5074,6 +5150,57 @@ internal static class SensingProfileCsvWriter
             0,
             0,
             profile.SenseFinalizationMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "sense_finalization_refreshed",
+            profile.SenseFinalizationRefreshedSamples,
+            profile.SenseFinalizationRefreshedSamples,
+            0,
+            0,
+            0,
+            profile.SenseFinalizationRefreshedMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "sense_finalization_skipped",
+            profile.SenseFinalizationSkippedSamples,
+            profile.SenseFinalizationSkippedSamples,
+            0,
+            0,
+            0,
+            profile.SenseFinalizationSkippedMilliseconds,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+        WriteRow(
+            writer,
+            "plant_preference_bridge",
+            profile.PlantPreferenceBridgeSamples,
+            profile.PlantPreferenceBridgeSamples,
+            0,
+            0,
+            0,
+            profile.PlantPreferenceBridgeMilliseconds,
             0,
             0,
             0,

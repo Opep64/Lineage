@@ -412,6 +412,10 @@ static void SensingProfilerRecordsCandidateCounts()
     AssertEqual(1L, sensing.MeatResourceQueryCandidates, "Meat resource query candidate count");
     AssertEqual(1L, sensing.PlantCandidates, "Plant candidate count");
     AssertEqual(1L, sensing.MeatResourceCandidates, "Meat candidate count");
+    AssertEqual(1L, sensing.PlantResourceScanSamples, "Plant resource scan sample count");
+    AssertEqual(1L, sensing.MeatResourceScanSamples, "Meat resource scan sample count");
+    AssertTrue(sensing.PlantResourceScanMilliseconds >= 0.0, "Plant resource scan time should be non-negative");
+    AssertTrue(sensing.MeatResourceScanMilliseconds >= 0.0, "Meat resource scan time should be non-negative");
     AssertEqual(1L, sensing.VisiblePlantCandidates, "Visible plant count");
     AssertEqual(1L, sensing.VisibleMeatResourceCandidates, "Visible meat count");
     AssertEqual(1L, sensing.CreatureQueries, "Creature query count");
@@ -427,7 +431,12 @@ static void SensingProfilerRecordsCandidateCounts()
     AssertEqual(1L, sensing.MemorySenseSamples, "Memory sense sample count");
     AssertTrue(sensing.MemorySenseMilliseconds >= 0.0, "Memory sensing time should be non-negative");
     AssertEqual(1L, sensing.SenseFinalizationSamples, "Sense finalization sample count");
+    AssertEqual(1L, sensing.SenseFinalizationRefreshedSamples, "Refreshed sense finalization sample count");
+    AssertEqual(0L, sensing.SenseFinalizationSkippedSamples, "Skipped sense finalization sample count");
+    AssertEqual(1L, sensing.PlantPreferenceBridgeSamples, "Plant preference bridge sample count");
     AssertTrue(sensing.SenseFinalizationMilliseconds >= 0.0, "Sense finalization time should be non-negative");
+    AssertTrue(sensing.SenseFinalizationRefreshedMilliseconds >= 0.0, "Refreshed finalization time should be non-negative");
+    AssertTrue(sensing.PlantPreferenceBridgeMilliseconds >= 0.0, "Plant preference bridge time should be non-negative");
     AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Measured sensing time should be non-negative");
 }
 
@@ -475,12 +484,16 @@ static void ParallelSensingProfilerRecordsCandidateCounts()
     AssertEqual(2L, sensing.InternalStateSamples, "Parallel internal state sample count");
     AssertEqual(2L, sensing.ResourceQueries, "Parallel resource query count");
     AssertTrue(sensing.ResourceCandidates >= 2, "Parallel resource candidates should be recorded");
+    AssertEqual(2L, sensing.PlantResourceScanSamples, "Parallel plant resource scan sample count");
+    AssertEqual(2L, sensing.MeatResourceScanSamples, "Parallel meat resource scan sample count");
     AssertEqual(2L, sensing.CreatureQueries, "Parallel creature query count");
     AssertTrue(sensing.CreatureCandidates >= 2, "Parallel creature candidates should be recorded");
     AssertEqual(2L, sensing.TerrainSenseSamples, "Parallel terrain sense sample count");
     AssertEqual(2L, sensing.ObstacleSenseSamples, "Parallel obstacle sense sample count");
     AssertEqual(2L, sensing.MemorySenseSamples, "Parallel memory sense sample count");
     AssertEqual(2L, sensing.SenseFinalizationSamples, "Parallel sense finalization sample count");
+    AssertEqual(2L, sensing.SenseFinalizationRefreshedSamples, "Parallel refreshed finalization sample count");
+    AssertEqual(2L, sensing.PlantPreferenceBridgeSamples, "Parallel plant preference bridge sample count");
     AssertTrue(sensing.TotalMeasuredMilliseconds >= 0.0, "Parallel measured sensing time should be non-negative");
 }
 
