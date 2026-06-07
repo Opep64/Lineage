@@ -53,6 +53,7 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private readonly CreatureSensingScratch _sequentialScratch = new();
     private readonly ThreadLocal<CreatureSensingScratch> _parallelScratch = new(() => new CreatureSensingScratch());
+    private readonly Dictionary<EntityId, int> _creatureIndexById = [];
     private CreatureState[] _parallelCreatureBuffer = [];
     private float[] _cachedBodyRadii = [];
     private float[] _cachedMaxSpeeds = [];
@@ -289,7 +290,11 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             ? CalculateEggContactIdentitySimilarity(state, creature, genome)
             : 0f;
         senses.CreatureContact = creature.IsTouchingCreature ? 1f : 0f;
-        if (!creature.IsTouchingCreature)
+        if (creature.IsTouchingCreature)
+        {
+            ApplyCreatureContactSense(ref senses, state, creature, genome);
+        }
+        else
         {
             senses.CreatureContactSimilarity = 0f;
             senses.CreatureContactLineageSimilarity = 0f;
@@ -980,21 +985,28 @@ public sealed class CreatureSensingSystem : ISimulationSystem
 
     private static bool HasImmediateCloseWorldSenseRefreshCue(CreatureState creature)
     {
-        return creature.IsTouchingFood
-            || creature.IsTouchingCreature
-            || creature.LastMovementBlocked;
+        return creature.LastMovementBlocked;
     }
 
     private bool NeedsProximityCloseWorldSenseRefresh(CreatureState creature)
     {
         var senses = creature.Senses;
-        return senses.FoodProximity >= _closeSenseRefreshProximity
-            || senses.PlantProximity >= _closeSenseRefreshProximity
-            || senses.MeatProximity >= _closeSenseRefreshProximity
-            || senses.EggProximity >= _closeSenseRefreshProximity
-            || senses.SmallPreyProximity >= _closeSenseRefreshProximity
-            || senses.CreatureProximity >= _closeSenseRefreshProximity
-            || senses.PreyProximity >= _closeSenseRefreshProximity
+        var touchingFood = creature.IsTouchingFood;
+        var touchingPlant = touchingFood
+            && creature.FoodContactKind == FoodContactKind.Resource
+            && creature.FoodContactResourceKind == ResourceKind.Plant;
+        var touchingMeat = touchingFood
+            && creature.FoodContactKind == FoodContactKind.Resource
+            && creature.FoodContactResourceKind == ResourceKind.Meat;
+        var touchingEgg = touchingFood && creature.FoodContactKind == FoodContactKind.Egg;
+        var touchingSmallPrey = touchingFood && creature.FoodContactKind == FoodContactKind.SmallPrey;
+        return (!touchingFood && senses.FoodProximity >= _closeSenseRefreshProximity)
+            || (!touchingPlant && senses.PlantProximity >= _closeSenseRefreshProximity)
+            || (!touchingMeat && !touchingSmallPrey && senses.MeatProximity >= _closeSenseRefreshProximity)
+            || (!touchingEgg && senses.EggProximity >= _closeSenseRefreshProximity)
+            || (!touchingSmallPrey && senses.SmallPreyProximity >= _closeSenseRefreshProximity)
+            || (!creature.IsTouchingCreature && senses.CreatureProximity >= _closeSenseRefreshProximity)
+            || (!creature.IsTouchingCreature && senses.PreyProximity >= _closeSenseRefreshProximity)
             || senses.ForwardObstacle >= _closeSenseRefreshProximity
             || senses.LeftObstacle >= _closeSenseRefreshProximity
             || senses.RightObstacle >= _closeSenseRefreshProximity;
@@ -1851,6 +1863,44 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             soundToneSquaredWeightedTotal);
     }
 
+    private void ApplyCreatureContactSense(
+        ref CreatureSenseState senses,
+        WorldState state,
+        CreatureState creature,
+        CreatureGenome genome)
+    {
+        if (creature.CreatureContactId == default
+            || creature.CreatureContactId == creature.Id
+            || !_creatureIndexById.TryGetValue(creature.CreatureContactId, out var contactIndex)
+            || contactIndex < 0
+            || contactIndex >= state.Creatures.Count)
+        {
+            ClearCreatureContactSimilarity(ref senses);
+            return;
+        }
+
+        var contact = state.Creatures[contactIndex];
+        if (contact.Id == creature.Id
+            || contact.Health <= 0f
+            || contact.Energy <= 0f)
+        {
+            ClearCreatureContactSimilarity(ref senses);
+            return;
+        }
+
+        var contactGenome = state.GetGenome(contact.GenomeId);
+        senses.CreatureContactSimilarity = CreatureSimilarity.GeneticSimilarity(genome, contactGenome);
+        senses.CreatureContactLineageSimilarity = LineageFamiliarity.CreatureSimilarity(state, creature.Id, contact.Id);
+        senses.CreatureContactIdentitySimilarity = ScentIdentity.SignatureSimilarity(genome, contactGenome);
+    }
+
+    private static void ClearCreatureContactSimilarity(ref CreatureSenseState senses)
+    {
+        senses.CreatureContactSimilarity = 0f;
+        senses.CreatureContactLineageSimilarity = 0f;
+        senses.CreatureContactIdentitySimilarity = 0f;
+    }
+
     private static void ApplyGenericFoodSense(
         ref CreatureSenseState senses,
         ResourcePatchState resource,
@@ -2180,9 +2230,12 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         }
 
         _traitCacheStamp++;
+        _creatureIndexById.Clear();
 
         for (var i = 0; i < creatureCount; i++)
         {
+            _creatureIndexById[state.Creatures[i].Id] = i;
+
             if (precomputeTraits)
             {
                 var creature = state.Creatures[i];

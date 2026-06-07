@@ -14,7 +14,8 @@ var tests = new (string Name, Action Body)[]
     ("Creature sensing time slices world queries", CreatureSensingTimeSlicesWorldQueries),
     ("Creature sensing parallel path matches single-threaded path", CreatureSensingParallelPathMatchesSingleThreadedPath),
     ("Creature sensing throttles proximity close refreshes", CreatureSensingThrottlesProximityCloseRefreshes),
-    ("Creature sensing keeps contact close refresh immediate", CreatureSensingKeepsContactCloseRefreshImmediate),
+    ("Creature sensing keeps food contact fresh without world refresh", CreatureSensingKeepsFoodContactFreshWithoutWorldRefresh),
+    ("Creature sensing keeps creature contact identity fresh without world refresh", CreatureSensingKeepsCreatureContactIdentityFreshWithoutWorldRefresh),
     ("DeterministicRandom repeats sequences from the same seed", RandomRepeatsFromSameSeed),
     ("System pipeline produces repeatable world changes", SystemPipelineIsRepeatable),
     ("Movement records search distance", MovementRecordsSearchDistance),
@@ -741,7 +742,7 @@ static void CreatureSensingThrottlesProximityCloseRefreshes()
     AssertEqual(1L, sensing.ResourceQueries, "Only the delayed close refresh should run resource queries");
 }
 
-static void CreatureSensingKeepsContactCloseRefreshImmediate()
+static void CreatureSensingKeepsFoodContactFreshWithoutWorldRefresh()
 {
     var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
     var simulation = new Simulation(
@@ -775,19 +776,77 @@ static void CreatureSensingKeepsContactCloseRefreshImmediate()
     creature.FoodContactKind = FoodContactKind.Resource;
     creature.FoodContactResourceKind = ResourceKind.Plant;
     creature.FoodContactPlantKind = PlantResourceKind.Rich;
+    var staleFoodSenses = creature.Senses;
+    staleFoodSenses.FoodProximity = 0.95f;
+    staleFoodSenses.PlantProximity = 0.95f;
+    creature.Senses = staleFoodSenses;
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
 
     var sensing = simulation.Profile.Sensing;
     var senses = simulation.State.Creatures[0].Senses;
-    AssertEqual(1L, sensing.WorldSenseCloseRefreshes, "Direct food contact should bypass the close refresh minimum");
-    AssertEqual(1L, sensing.WorldSenseImmediateCloseRefreshes, "Direct food contact should count as immediate close refresh");
-    AssertEqual(0L, sensing.WorldSenseProximityCloseRefreshes, "Direct food contact should not count as proximity close refresh");
-    AssertEqual(0L, sensing.WorldSenseSkippedUpdates, "Direct food contact should not be skipped");
+    AssertEqual(0L, sensing.WorldSenseCloseRefreshes, "Direct food contact should not force a close world refresh");
+    AssertEqual(0L, sensing.WorldSenseImmediateCloseRefreshes, "Direct food contact should not count as immediate close refresh");
+    AssertEqual(0L, sensing.WorldSenseProximityCloseRefreshes, "Direct food contact should suppress stale food proximity close refresh");
+    AssertEqual(1L, sensing.WorldSenseSkippedUpdates, "Direct food contact can reuse stale world sense");
+    AssertEqual(0L, sensing.ResourceQueries, "Direct food contact should avoid resource queries");
     AssertClose(1f, senses.FoodContact, 0.000001, "Food contact should stay fresh");
     AssertClose(1f, senses.PlantFoodContact, 0.000001, "Plant contact should stay fresh");
     AssertClose(PlantResourceTraits.EnergyQualitySense(PlantResourceKind.Rich), senses.PlantFoodContactEnergyQuality, 0.000001, "Plant contact quality should stay fresh");
+}
+
+static void CreatureSensingKeepsCreatureContactIdentityFreshWithoutWorldRefresh()
+{
+    var spatialIndex = new UniformSpatialIndex(cellSize: 16f);
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 0.1f },
+        seed: 83,
+        systems:
+        [
+            new SpatialIndexRebuildSystem(spatialIndex),
+            new CreatureSensingSystem(
+                spatialIndex,
+                worldSenseIntervalTicks: 10,
+                closeSenseRefreshProximity: 0.7f,
+                closeSenseRefreshMinimumTicks: 3)
+        ]);
+    simulation.Profile = new SimulationProfile();
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        SenseRadius = 100f,
+        VisionAngleRadians = MathF.Tau,
+        ReproductionEnergyThreshold = 100f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 25f);
+    var contactId = simulation.State.SpawnCreature(genomeId, new SimVector2(80f, 80f), energy: 25f);
+    simulation.Step();
+
+    simulation.Profile = new SimulationProfile();
+    var observer = simulation.State.Creatures[0];
+    observer.IsTouchingCreature = true;
+    observer.CreatureContactId = contactId;
+    var staleCreatureSenses = observer.Senses;
+    staleCreatureSenses.CreatureProximity = 0.95f;
+    staleCreatureSenses.PreyProximity = 0.95f;
+    observer.Senses = staleCreatureSenses;
+    simulation.State.Creatures[0] = observer;
+
+    simulation.Step();
+
+    var sensing = simulation.Profile.Sensing;
+    var senses = simulation.State.Creatures[0].Senses;
+    AssertEqual(0L, sensing.WorldSenseCloseRefreshes, "Direct creature contact should not force a close world refresh");
+    AssertEqual(0L, sensing.WorldSenseImmediateCloseRefreshes, "Direct creature contact should not count as immediate close refresh");
+    AssertEqual(0L, sensing.WorldSenseProximityCloseRefreshes, "Direct creature contact should suppress stale creature proximity close refresh");
+    AssertEqual(2L, sensing.WorldSenseSkippedUpdates, "Creature contact can reuse stale world sense");
+    AssertEqual(0L, sensing.CreatureQueries, "Direct creature contact should avoid creature queries");
+    AssertClose(1f, senses.CreatureContact, 0.000001, "Creature contact should stay fresh");
+    AssertClose(1f, senses.CreatureContactSimilarity, 0.000001, "Creature contact trait similarity should stay fresh");
+    AssertClose(1f, senses.CreatureContactIdentitySimilarity, 0.000001, "Creature contact identity similarity should stay fresh");
 }
 
 static void RandomRepeatsFromSameSeed()
