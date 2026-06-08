@@ -46,6 +46,7 @@ var tests = new (string Name, Action Body)[]
     ("Depleted plants enter dormancy before respawning", DepletedPlantsEnterDormancyBeforeRespawning),
     ("Dormant plants are absent from the spatial index", DormantPlantsAreAbsentFromSpatialIndex),
     ("Meat resources decay and disappear", MeatResourcesDecayAndDisappear),
+    ("Stale meat decay multiplier accelerates stale carcasses", StaleMeatDecayMultiplierAcceleratesStaleCarcasses),
     ("Fresh-kill resource credit expires", FreshKillResourceCreditExpires),
     ("Small prey spawn and wander", SmallPreySpawnAndWander),
     ("Meat freshness reduces digested energy", MeatFreshnessReducesDigestedEnergy),
@@ -1998,6 +1999,42 @@ static void MeatResourcesDecayAndDisappear()
     simulation.Step();
 
     AssertEqual(0, simulation.State.Resources.Count, "Decayed meat resource count");
+}
+
+static void StaleMeatDecayMultiplierAcceleratesStaleCarcasses()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 231,
+        systems: [new ResourceRegrowthSystem(staleMeatDecayMultiplier: 3f)]);
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(10f, 10f),
+        Radius = 2f,
+        Calories = 10f,
+        MaxCalories = 10f,
+        DecayCaloriesPerSecond = 1f,
+        MeatAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnResourcePatch(new ResourcePatchState
+    {
+        Kind = ResourceKind.Meat,
+        Position = new SimVector2(20f, 10f),
+        Radius = 2f,
+        Calories = 10f,
+        MaxCalories = 10f,
+        DecayCaloriesPerSecond = 1f,
+        MeatAgeSeconds = MeatQuality.StaleAgeSeconds
+    });
+
+    simulation.Step();
+
+    AssertEqual(2, simulation.State.Resources.Count, "Meat resources remain after partial decay");
+    AssertClose(9f, simulation.State.Resources[0].Calories, 0.000001, "Fresh meat pays base decay");
+    AssertClose(7f, simulation.State.Resources[1].Calories, 0.000001, "Stale meat pays multiplied decay");
 }
 
 static void FreshKillResourceCreditExpires()
@@ -14973,6 +15010,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         DeathMeatCaloriesPerBodyRadius = 5f,
         DeathMeatEnergyFraction = 0.4f,
         MeatDecayCaloriesPerSecond = 0.08f,
+        StaleMeatDecayMultiplier = 2.75f,
         RottenMeatDamagePerRawKcal = 0.005f,
         MeatScentRangeMultiplier = 4f,
         MeatScentCaloriesForFullStrength = 70f,
@@ -15033,6 +15071,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
     AssertClose(5f, scenario.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
     AssertClose(0.4f, scenario.DeathMeatEnergyFraction, 0.000001, "Scenario death meat energy fraction");
     AssertClose(0.08f, scenario.MeatDecayCaloriesPerSecond, 0.000001, "Scenario meat decay");
+    AssertClose(2.75f, scenario.StaleMeatDecayMultiplier, 0.000001, "Scenario stale meat decay");
     AssertClose(0.005f, scenario.RottenMeatDamagePerRawKcal, 0.000001, "Scenario rotten meat damage");
     AssertClose(4f, scenario.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
     AssertClose(70f, scenario.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");
@@ -15447,6 +15486,7 @@ static void ScenarioJsonRoundTrips()
         DeathMeatCaloriesPerBodyRadius = 3.5f,
         DeathMeatEnergyFraction = 0.25f,
         MeatDecayCaloriesPerSecond = 0.09f,
+        StaleMeatDecayMultiplier = 2.4f,
         RottenMeatDamagePerRawKcal = 0.006f,
         MeatScentRangeMultiplier = 2.5f,
         MeatScentCaloriesForFullStrength = 55f,
@@ -15530,6 +15570,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"enableSectorVision\""), "JSON should serialize sector vision toggle");
     AssertTrue(json.Contains("\"reuseNeuralActionsOnSkippedWorldSenses\""), "JSON should serialize neural action reuse toggle");
     AssertTrue(json.Contains("\"neuralControllerThreadCount\""), "JSON should serialize neural controller thread count");
+    AssertTrue(json.Contains("\"staleMeatDecayMultiplier\""), "JSON should serialize stale meat decay multiplier");
     AssertTrue(json.Contains("\"rottenMeatDamagePerRawKcal\""), "JSON should serialize rotten meat damage");
     AssertTrue(json.Contains("\"plantSpecializationEnergyCostPerSecond\""), "JSON should serialize plant specialization cost");
     AssertTrue(json.Contains("\"rtNeatHiddenNodeEnergyCostPerSecond\""), "JSON should serialize rtNEAT hidden-node cost");
@@ -15689,6 +15730,7 @@ static void ScenarioJsonRoundTrips()
     AssertClose(scenario.DeathMeatCaloriesPerBodyRadius, roundTripped.DeathMeatCaloriesPerBodyRadius, 0.000001, "Scenario death meat body calories");
     AssertClose(scenario.DeathMeatEnergyFraction, roundTripped.DeathMeatEnergyFraction, 0.000001, "Scenario death meat energy fraction");
     AssertClose(scenario.MeatDecayCaloriesPerSecond, roundTripped.MeatDecayCaloriesPerSecond, 0.000001, "Scenario meat decay");
+    AssertClose(scenario.StaleMeatDecayMultiplier, roundTripped.StaleMeatDecayMultiplier, 0.000001, "Scenario stale meat decay");
     AssertClose(scenario.RottenMeatDamagePerRawKcal, roundTripped.RottenMeatDamagePerRawKcal, 0.000001, "Scenario rotten meat damage");
     AssertClose(scenario.MeatScentRangeMultiplier, roundTripped.MeatScentRangeMultiplier, 0.000001, "Scenario meat scent range");
     AssertClose(scenario.MeatScentCaloriesForFullStrength, roundTripped.MeatScentCaloriesForFullStrength, 0.000001, "Scenario meat scent calorie scale");

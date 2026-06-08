@@ -1693,6 +1693,7 @@ public sealed partial class LineageRunManager
                 DeathMeatCaloriesPerBodyRadius: GetDouble(root, "deathMeatCaloriesPerBodyRadius"),
                 DeathMeatEnergyFraction: GetDouble(root, "deathMeatEnergyFraction"),
                 MeatDecayCaloriesPerSecond: GetDouble(root, "meatDecayCaloriesPerSecond"),
+                StaleMeatDecayMultiplier: GetDouble(root, "staleMeatDecayMultiplier"),
                 RottenMeatDamagePerRawKcal: GetDouble(root, "rottenMeatDamagePerRawKcal"),
                 SpeciesSeedCount: speciesSeeds.Count(seed => seed.Enabled),
                 SpeciesSeeds: speciesSeeds);
@@ -3081,6 +3082,7 @@ public sealed partial class LineageRunManager
                 summary.DeathMeatCaloriesPerBodyRadius is null ? null : $"death meat/body-radius {summary.DeathMeatCaloriesPerBodyRadius.Value.ToString("0.###", CultureInfo.InvariantCulture)}",
                 summary.DeathMeatEnergyFraction is null ? null : $"death energy {FormatPercent(summary.DeathMeatEnergyFraction.Value)}",
                 summary.MeatDecayCaloriesPerSecond is null ? null : $"decay {summary.MeatDecayCaloriesPerSecond.Value.ToString("0.###", CultureInfo.InvariantCulture)} kcal/s",
+                summary.StaleMeatDecayMultiplier is null ? null : $"stale decay {summary.StaleMeatDecayMultiplier.Value.ToString("0.###", CultureInfo.InvariantCulture)}x",
                 summary.RottenMeatDamagePerRawKcal is null ? null : $"rot damage {summary.RottenMeatDamagePerRawKcal.Value.ToString("0.###", CultureInfo.InvariantCulture)}"
             }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }

@@ -517,6 +517,7 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Death meat body calories", $"{scenario.DeathMeatCaloriesPerBodyRadius:0.###} kcal/radius");
         WriteMetric(writer, "Death meat energy fraction", FormatPercent(scenario.DeathMeatEnergyFraction));
         WriteMetric(writer, "Meat decay", $"{scenario.MeatDecayCaloriesPerSecond:0.###} kcal/s");
+        WriteMetric(writer, "Stale meat decay", $"{scenario.StaleMeatDecayMultiplier:0.###}x");
         WriteMetric(writer, "Rotten meat damage", $"{scenario.RottenMeatDamagePerRawKcal:0.####} health/raw kcal");
         WriteMetric(writer, "Meat scent range", $"{scenario.MeatScentRangeMultiplier:0.###}x vision");
         WriteMetric(writer, "Meat scent full strength", $"{scenario.MeatScentCaloriesForFullStrength:0.###} kcal");

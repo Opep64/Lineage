@@ -101,6 +101,11 @@ public static class SimulationScenarioMetadata
             return (Math.PI / 12d, Math.Tau, 0.01d, units, description);
         }
 
+        if (name == "StaleMeatDecayMultiplier")
+        {
+            return (1d, null, 0.1d, units, description);
+        }
+
         if (name == "BrainHiddenNodeCount")
         {
             return (0d, NeuralBrainSchema.MaxHiddenNodeCount, 1d, units, description);
@@ -165,6 +170,11 @@ public static class SimulationScenarioMetadata
         if (name == "HealingEnergyCostPerHealth")
         {
             return "energy per health";
+        }
+
+        if (name == "StaleMeatDecayMultiplier")
+        {
+            return "x";
         }
 
         if (name.Contains("Calories", StringComparison.Ordinal)
@@ -244,6 +254,7 @@ public static class SimulationScenarioMetadata
             "RtNeatEnabledConnectionEnergyCostPerSecond" => "Metabolic upkeep charged for each enabled connection in an rtNEAT graph brain.",
             "MetabolicPace" => "Starting life-history pace. Higher values burn more basal energy while speeding digestion, maturity, reproduction, healing, fertility aging, locomotion, and biological aging.",
             "MaxLifeExpectancySeconds" => "Baseline adult life expectancy before old-age mortality risk, adjusted by body size and metabolic pace.",
+            "StaleMeatDecayMultiplier" => "Multiplier applied to meat calorie decay after carcasses become stale. Use 1x for carrion-heavy recipes.",
             "HealingDelaySeconds" => "Time after taking damage before passive healing can begin.",
             "HealingHealthFractionPerSecond" => "Fraction of maximum health restored per second once passive healing is active.",
             "HealingEnergyCostPerHealth" => "Energy spent for each point of health restored by passive healing.",

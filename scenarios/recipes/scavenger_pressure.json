@@ -45,6 +45,7 @@
     "deathMeatCaloriesPerBodyRadius": 12,
     "deathMeatEnergyFraction": 0.75,
     "meatDecayCaloriesPerSecond": 0.004,
+    "staleMeatDecayMultiplier": 1,
     "mutationStrength": 0.07,
     "traitMutationRate": 0.22,
     "brainMutationRate": 0.09

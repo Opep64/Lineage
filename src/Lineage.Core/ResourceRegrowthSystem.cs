@@ -5,6 +5,8 @@ namespace Lineage.Core;
 /// </summary>
 public sealed class ResourceRegrowthSystem : ISimulationSystem
 {
+    public const float DefaultStaleMeatDecayMultiplier = 3f;
+
     private const float DormantPlacementRetrySeconds = 1f;
 
     private readonly bool _relocateDepletedResources;
@@ -22,6 +24,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
     private readonly float _seasonPhaseOffsetSeconds;
     private readonly SeasonPhaseMode _seasonPhaseMode;
     private readonly BiomePressureProfile _biomeSeasonalAmplitudeProfile;
+    private readonly float _staleMeatDecayMultiplier;
 
     public ResourceRegrowthSystem(
         bool relocateDepletedResources = false,
@@ -38,7 +41,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         float seasonFertilityAmplitude = 0.3f,
         float seasonPhaseOffsetSeconds = 0f,
         SeasonPhaseMode seasonPhaseMode = SeasonPhaseMode.Global,
-        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null)
+        BiomePressureProfile? biomeSeasonalAmplitudeProfile = null,
+        float staleMeatDecayMultiplier = DefaultStaleMeatDecayMultiplier)
     {
         EnsureNonNegative(plantRespawnDelaySecondsMin, nameof(plantRespawnDelaySecondsMin));
         EnsureNonNegative(plantRespawnDelaySecondsMax, nameof(plantRespawnDelaySecondsMax));
@@ -49,6 +53,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         EnsurePositive(seasonLengthSeconds, nameof(seasonLengthSeconds));
         EnsureRange(seasonFertilityAmplitude, 0f, 0.95f, nameof(seasonFertilityAmplitude));
         EnsureFinite(seasonPhaseOffsetSeconds, nameof(seasonPhaseOffsetSeconds));
+        EnsureAtLeast(staleMeatDecayMultiplier, 1f, nameof(staleMeatDecayMultiplier));
 
         if (plantLocalDispersalChance > 0f && plantLocalDispersalRadius <= 0f)
         {
@@ -82,6 +87,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         _biomeSeasonalAmplitudeProfile = BiomePressureProfile.Validate(
             biomeSeasonalAmplitudeProfile ?? BiomePressureProfile.Neutral,
             nameof(biomeSeasonalAmplitudeProfile));
+        _staleMeatDecayMultiplier = staleMeatDecayMultiplier;
     }
 
     public void Update(WorldState state, float deltaSeconds)
@@ -123,7 +129,7 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         }
     }
 
-    private static bool UpdateMeat(ref ResourcePatchState resource, float deltaSeconds)
+    private bool UpdateMeat(ref ResourcePatchState resource, float deltaSeconds)
     {
         resource.MeatAgeSeconds = Math.Max(0f, resource.MeatAgeSeconds + deltaSeconds);
         if (resource.FreshKillSecondsRemaining > 0f)
@@ -136,7 +142,8 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
             }
         }
 
-        resource.Calories -= resource.DecayCaloriesPerSecond * deltaSeconds;
+        var decayMultiplier = MeatQuality.IsFresh(resource) ? 1f : _staleMeatDecayMultiplier;
+        resource.Calories -= resource.DecayCaloriesPerSecond * decayMultiplier * deltaSeconds;
         return resource.Calories > 0f;
     }
 
@@ -323,6 +330,14 @@ public sealed class ResourceRegrowthSystem : ISimulationSystem
         if (!float.IsFinite(value) || value < inclusiveMin || value > inclusiveMax)
         {
             throw new ArgumentOutOfRangeException(name, $"{name} must be finite and between {inclusiveMin} and {inclusiveMax}.");
+        }
+    }
+
+    private static void EnsureAtLeast(float value, float inclusiveMin, string name)
+    {
+        if (!float.IsFinite(value) || value < inclusiveMin)
+        {
+            throw new ArgumentOutOfRangeException(name, $"{name} must be finite and at least {inclusiveMin}.");
         }
     }
 

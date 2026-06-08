@@ -706,6 +706,7 @@ public sealed record RunScenarioSummary(
     double? DeathMeatCaloriesPerBodyRadius,
     double? DeathMeatEnergyFraction,
     double? MeatDecayCaloriesPerSecond,
+    double? StaleMeatDecayMultiplier,
     double? RottenMeatDamagePerRawKcal,
     int SpeciesSeedCount,
     IReadOnlyList<RunScenarioSpeciesSeedSummary> SpeciesSeeds);

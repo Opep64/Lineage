@@ -59,6 +59,7 @@
     "deathMeatCaloriesPerBodyRadius": 10,
     "deathMeatEnergyFraction": 0.65,
     "meatDecayCaloriesPerSecond": 0.008,
+    "staleMeatDecayMultiplier": 1,
     "meatScentRangeMultiplier": 2,
     "meatScentCaloriesForFullStrength": 60,
     "meatScentDensitySaturation": 1,

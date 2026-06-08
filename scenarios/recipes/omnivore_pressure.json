@@ -53,6 +53,7 @@
     "deathMeatCaloriesPerBodyRadius": 12,
     "deathMeatEnergyFraction": 0.7,
     "meatDecayCaloriesPerSecond": 0.006,
+    "staleMeatDecayMultiplier": 1,
     "biteDamagePerSecond": 0.19,
     "biteEnergyCostPerSecond": 0.16,
     "mutationStrength": 0.07,
