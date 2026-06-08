@@ -261,7 +261,7 @@ public sealed record SimulationScenario
 
     public float TurnRateEnergyCostPerSecond { get; init; } = 0.03f;
 
-    public float SenseRadiusEnergyCostPerSecond { get; init; } = 0.0012f;
+    public float SenseRadiusEnergyCostPerSecond { get; init; } = 0.0010f;
 
     public float VisionAngleRadians { get; init; } = MathF.PI * 2f / 3f;
 

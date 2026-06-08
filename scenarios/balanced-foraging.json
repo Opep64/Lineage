@@ -82,7 +82,7 @@
   "bodyRadiusEnergyCostPerSecond": 0.04,
   "maxSpeedEnergyCostPerSecond": 0.006,
   "turnRateEnergyCostPerSecond": 0.03,
-  "senseRadiusEnergyCostPerSecond": 0.0012,
+  "senseRadiusEnergyCostPerSecond": 0.001,
   "visionAngleRadians": 2.0943952,
   "visionAngleEnergyCostPerSecond": 0.02,
   "eatRateEnergyCostPerSecond": 0.006,
