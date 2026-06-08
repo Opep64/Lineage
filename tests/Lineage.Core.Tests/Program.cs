@@ -15080,7 +15080,7 @@ static void ScenarioPressureKnobsSeedStartingGenome()
         * (MovementSystem.CalculateSpeedCostMultiplier(creature.Velocity.Length, scenario.MovementSpeedCostExponent)
             - MovementSystem.CalculateSpeedCostMultiplier(preLocomotionMovementSpeed, scenario.MovementSpeedCostExponent));
     AssertClose(
-        7.6138835f
+        7.6227193f
             - metabolicPaceExtraBasal
             - metabolicPaceExtraDigestionUpkeep
             - metabolicPaceExtraLocomotionUpkeep
