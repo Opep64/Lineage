@@ -70,6 +70,7 @@ var tests = new (string Name, Action Body)[]
     ("Dead creatures leave meat resources", DeadCreaturesLeaveMeatResources),
     ("Metabolism can charge body-size upkeep", MetabolismChargesBodySizeUpkeep),
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
+    ("Metabolism charges cubic vision angle upkeep", MetabolismChargesCubicVisionAngleUpkeep),
     ("Metabolism charges plant specialization upkeep", MetabolismChargesPlantSpecializationUpkeep),
     ("Metabolism charges rtNEAT topology upkeep", MetabolismChargesRtNeatTopologyUpkeep),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
@@ -2995,6 +2996,46 @@ static void MetabolismChargesTraitUpkeep()
     simulation.Step();
 
     AssertClose(8.525f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after trait upkeep");
+}
+
+static void MetabolismChargesCubicVisionAngleUpkeep()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 132,
+        systems:
+        [
+            new MetabolismSystem(visionAngleEnergyCostPerSecond: 0.02f)
+        ]);
+
+    var baselineAngleGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 0f,
+        MaturityAgeSeconds = 0f
+    });
+    var panoramicGenomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 0f,
+        MaturityAgeSeconds = 0f,
+        VisionAngleRadians = MathF.Tau
+    });
+
+    simulation.State.SpawnCreature(baselineAngleGenomeId, new SimVector2(20f, 20f), energy: 10f);
+    simulation.State.SpawnCreature(panoramicGenomeId, new SimVector2(40f, 20f), energy: 10f);
+
+    simulation.Step();
+
+    var baselineAngleCost = CreatureGenome.Baseline.VisionAngleRadians * 0.02f;
+    AssertClose(
+        10f - baselineAngleCost,
+        simulation.State.Creatures[0].Energy,
+        0.000001,
+        "Baseline vision angle upkeep");
+    AssertClose(
+        10f - baselineAngleCost * 27f,
+        simulation.State.Creatures[1].Energy,
+        0.000001,
+        "Panoramic vision angle upkeep");
 }
 
 static void MetabolismChargesPlantSpecializationUpkeep()

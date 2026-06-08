@@ -235,6 +235,7 @@ public static class SimulationScenarioMetadata
             "NeuralControllerThreadCount" => "Maximum worker threads used for neural controller evaluation. Defaults to 8; use 1 for the single-threaded deterministic path.",
             "CloseSenseRefreshMinimumTicks" => "Minimum age of stale world senses before proximity-only close cues can force an extra world refresh.",
             "PlantPayoffTraceHalfLifeSeconds" => "Controls how long recent typed plant payoff signals remain available to the brain.",
+            "VisionAngleEnergyCostPerSecond" => "Baseline-scaled cubic upkeep for field-of-view width. Starter vision pays the configured baseline rate; panoramic vision rises steeply.",
             "SoundRangeMultiplier" => "Intentional communication sound range as a multiplier of sense radius.",
             "SoundDensitySaturation" => "Total nearby sound strength needed to saturate the sound-density input.",
             "EnableExtinctPayloadPruning" => "Drops genome and brain payloads that are not referenced by living creatures, eggs, or the current survivor ancestry chain.",

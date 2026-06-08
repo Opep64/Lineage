@@ -23,6 +23,7 @@ public sealed class MetabolismSystem(
 {
     public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0.002f;
     public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0.0005f;
+    private const float VisionAngleUpkeepExponent = 3f;
 
     private readonly BiomePressureProfile _biomeBasalCostProfile =
         BiomePressureProfile.Validate(biomeBasalCostProfile ?? BiomePressureProfile.Neutral, nameof(biomeBasalCostProfile));
@@ -86,10 +87,11 @@ public sealed class MetabolismSystem(
                     effectiveSenseRadius,
                     CreatureGenome.Baseline.SenseRadius,
                     _senseRadiusEnergyCostPerSecond)
-                + BaselineScaledQuadraticUpkeep(
+                + BaselineScaledPowerUpkeep(
                     effectiveVisionAngle,
                     CreatureGenome.Baseline.VisionAngleRadians,
-                    _visionAngleEnergyCostPerSecond)
+                    _visionAngleEnergyCostPerSecond,
+                    VisionAngleUpkeepExponent)
                 + CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * _eatRateEnergyCostPerSecond
                 + CreatureGrowth.EffectiveGutCapacityCalories(creature, genome) * _gutCapacityEnergyCostPerSecond
                 + CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond
@@ -165,6 +167,22 @@ public sealed class MetabolismSystem(
 
         var baseline = Math.Max(0.000001f, baselineValue);
         return value * value / baseline * costPerBaselineUnit;
+    }
+
+    private static float BaselineScaledPowerUpkeep(
+        float value,
+        float baselineValue,
+        float costPerBaselineUnit,
+        float exponent)
+    {
+        if (costPerBaselineUnit <= 0f || value <= 0f)
+        {
+            return 0f;
+        }
+
+        var baseline = Math.Max(0.000001f, baselineValue);
+        var ratio = Math.Max(0.000001f, value / baseline);
+        return baseline * MathF.Pow(ratio, exponent) * costPerBaselineUnit;
     }
 }
 
