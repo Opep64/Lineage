@@ -1,6 +1,6 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-06-05
+Last reviewed: 2026-06-09
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
@@ -75,7 +75,8 @@ Status: active design direction
 - Add distance-dependent visual clarity later:
   - far objects appear as broad categories;
   - close objects reveal freshness, type, size, or identity details.
-- Decide whether vision should remain fixed sectors or move toward a small preprocessed visual field layer.
+- Continue evaluating the compact semantic visual-summary contract. Raw visual sectors should remain available for Godot/debug/reporting, while brain-facing inputs should prefer category density, proximity, direction, quality, familiarity, relative size, approach, and grab-opportunity summaries.
+- If visual-field detail is reintroduced later, prefer coarse left/front/right or near/mid/far bands over many independent sector feature channels.
 - Add obstacle/terrain/plant occlusion only after basic sector vision is stable and benchmarked.
 - Avoid one brain input per resource instance or real plant species; use broad channels, compact top-K candidates, or compressed field representations.
 - Add sensory cost tuning if selection always maximizes range/angle.
@@ -104,6 +105,10 @@ Status: ongoing tuning
 - Keep birth rates controlled through egg reserve, maturity, investment, cooldown, crowding, fertility, and resource scarcity.
 - Add stronger search pressure without causing frequent long-run extinction.
 - Watch for scarcity boom-crash cycles.
+- Use gene-drift report graphs and tail-window summaries when tuning trait costs. Tune only repeated always-win structural traits, not one-seed or stale-run artifacts.
+- Continue watching body radius, sense radius, damage resistance, metabolic pace, offspring investment, egg timing, rich-plant specialization, and gut/digestion as long-run cost-balance candidates.
+- Body size remains a special watchpoint because it bundles contact reach, collision mass, working energy capacity, lifespan scaling, bite scaling, and death-meat output. If current-code long runs drift strongly large again, first consider a modest body-upkeep bump or body-size movement-cost term before changing damage resistance.
+- Do not retune damage resistance from the latest evidence alone; current benefit and upkeep curves look plausible unless future current-code runs show renewed armor runaway.
 - Potential future stabilizers:
   - idle/low-speed conservation payoffs;
   - reproduction suppression in poor local food conditions;
@@ -116,6 +121,8 @@ Status: ongoing tuning
 Status: first pass implemented, not final ecology
 
 - Make freshness-aware and carrion-aware behavior more discoverable without prewiring every founder.
+- Current meat-payoff traces are useful feedback, but recent validation suggests the scavenging bottleneck is mostly encounter/contact opportunity or occasional sampling pressure, not refusal to eat contacted meat or missing digestion reward.
+- Explore gentle scavenging bridges that create discoverable meat opportunities without scripting scavenger behavior, such as better fresh-carcass encounter pressure, low-risk sampling routes, or scenario-specific meat-contact assays.
 - Improve predation-specific diagnostics and long-run stability.
 - Tune predator/prey starter behavior through scenario rosters and catalog profiles rather than globally increasing bite damage.
 - Revisit combat lethality tuning: baseline bite damage currently requires long sustained contact for a kill, so future work should evaluate bite damage, bite-strength scaling, attack-output intensity, target body/health scaling, and how easily predators can maintain contact.
@@ -158,6 +165,8 @@ Status: always relevant
 - Consider chunk-level resource/plant summaries for huge sparse worlds.
 - Consider compact history mode that keeps full ancestor paths and heatmap/death positions while pruning dead side-branch brain/genome payloads and summarizing side branches.
 - Improve report/export streaming for very long runs.
+- Keep sensing-detail profiling visible enough to separate resource query load, plant/meat scan load, egg/identity scent load, finalization, and skipped/refreshed world-sense cadence in long-run slowdowns.
+- For rtNEAT performance, profile repeated topology/feature analysis and sensing pressure before deeper evaluator rewrites; direct neural evaluation is not always the dominant late-run bottleneck.
 - Continue Godot render decoupling and draw aggregation when visual refresh lags simulation speed.
 
 ## Reports, Analysis, And Taxonomy
@@ -172,6 +181,7 @@ Status: first pass implemented, future refinement needed
   - richer selected segment details;
   - easier ancestor comparison along dominant and side branches.
 - Add spatial heatmaps for occupancy, deaths by cause, food consumption, births/eggs, and successful lineages.
+- Keep genome-trait drift graphs and tail-window summaries prominent enough to support cost tuning across body, senses, metabolism, reproduction, diet, combat, thermal, scent, and brain-complexity traits.
 - Improve species/cluster thresholds without implying false precision.
 - Distinguish lineage relatedness from behavioral convergence.
 - Use functional brain fingerprints for future richer brain architectures.
