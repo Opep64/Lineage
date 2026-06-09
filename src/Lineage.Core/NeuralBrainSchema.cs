@@ -5,7 +5,7 @@ namespace Lineage.Core;
 /// </summary>
 public static class NeuralBrainSchema
 {
-    public const int InputSchemaVersion = 13;
+    public const int InputSchemaVersion = 14;
 
     public const int OutputSchemaVersion = 3;
 
@@ -288,7 +288,19 @@ public static class NeuralBrainSchema
 
     public const int MaturityProgressInput = InjuryMemoryStrengthInput + 1;
 
-    public const int InputCount = MaturityProgressInput + 1;
+    public const int RecentMeatRawYieldInput = MaturityProgressInput + 1;
+
+    public const int RecentMeatEnergyYieldInput = RecentMeatRawYieldInput + 1;
+
+    public const int RecentFreshMeatEnergyYieldInput = RecentMeatEnergyYieldInput + 1;
+
+    public const int RecentStaleMeatEnergyYieldInput = RecentFreshMeatEnergyYieldInput + 1;
+
+    public const int FreshMeatPayoffTraceInput = RecentStaleMeatEnergyYieldInput + 1;
+
+    public const int StaleMeatPayoffTraceInput = FreshMeatPayoffTraceInput + 1;
+
+    public const int InputCount = StaleMeatPayoffTraceInput + 1;
 
     public const int VisiblePreyDensityInput = VisibleSmallPreyDensityInput;
 

@@ -1112,8 +1112,18 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creature.LastPlantCaloriesEaten / expectedFoodTransfer,
             0f,
             1f);
+        var recentMeatRawYield = Math.Clamp(
+            (creature.LastCarcassCaloriesEaten
+                + creature.LastEggCaloriesEaten
+                + creature.LastLivePreyCaloriesEaten) / expectedFoodTransfer,
+            0f,
+            1f);
         var recentPlantEnergyYield = Math.Clamp(
             creature.LastPlantDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
+        var recentMeatEnergyYield = Math.Clamp(
+            creature.LastMeatDigestedEnergy / expectedPlantDigestiveYield,
             0f,
             1f);
         var recentTenderPlantEnergyYield = Math.Clamp(
@@ -1128,23 +1138,41 @@ public sealed class CreatureSensingSystem : ISimulationSystem
             creature.LastToughPlantDigestedEnergy / expectedPlantDigestiveYield,
             0f,
             1f);
+        var recentFreshMeatEnergyYield = Math.Clamp(
+            creature.LastFreshMeatDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
+        var recentStaleMeatEnergyYield = Math.Clamp(
+            creature.LastStaleMeatDigestedEnergy / expectedPlantDigestiveYield,
+            0f,
+            1f);
         var recentFoodEnergyYield = Math.Clamp(
             creature.LastCaloriesDigested / expectedPlantDigestiveYield,
             0f,
             1f);
-        creature.TenderPlantPayoffTrace = UpdatePlantPayoffTrace(
+        creature.TenderPlantPayoffTrace = UpdatePayoffTrace(
             creature.TenderPlantPayoffTrace,
             recentTenderPlantEnergyYield,
             deltaSeconds,
             plantPayoffTraceHalfLifeSeconds);
-        creature.RichPlantPayoffTrace = UpdatePlantPayoffTrace(
+        creature.RichPlantPayoffTrace = UpdatePayoffTrace(
             creature.RichPlantPayoffTrace,
             recentRichPlantEnergyYield,
             deltaSeconds,
             plantPayoffTraceHalfLifeSeconds);
-        creature.ToughPlantPayoffTrace = UpdatePlantPayoffTrace(
+        creature.ToughPlantPayoffTrace = UpdatePayoffTrace(
             creature.ToughPlantPayoffTrace,
             recentToughPlantEnergyYield,
+            deltaSeconds,
+            plantPayoffTraceHalfLifeSeconds);
+        creature.FreshMeatPayoffTrace = UpdatePayoffTrace(
+            creature.FreshMeatPayoffTrace,
+            recentFreshMeatEnergyYield,
+            deltaSeconds,
+            plantPayoffTraceHalfLifeSeconds);
+        creature.StaleMeatPayoffTrace = UpdatePayoffTrace(
+            creature.StaleMeatPayoffTrace,
+            recentStaleMeatEnergyYield,
             deltaSeconds,
             plantPayoffTraceHalfLifeSeconds);
         var isReadyToLay =
@@ -1164,18 +1192,24 @@ public sealed class CreatureSensingSystem : ISimulationSystem
         senses.MassBurdenRatio = CreatureGrowth.FatMassBurdenRatio(creature, genome);
         senses.RecentFoodSuccess = recentFoodSuccess;
         senses.RecentPlantRawYield = recentPlantRawYield;
+        senses.RecentMeatRawYield = recentMeatRawYield;
         senses.RecentPlantEnergyYield = recentPlantEnergyYield;
+        senses.RecentMeatEnergyYield = recentMeatEnergyYield;
         senses.RecentTenderPlantEnergyYield = recentTenderPlantEnergyYield;
         senses.RecentRichPlantEnergyYield = recentRichPlantEnergyYield;
         senses.RecentToughPlantEnergyYield = recentToughPlantEnergyYield;
+        senses.RecentFreshMeatEnergyYield = recentFreshMeatEnergyYield;
+        senses.RecentStaleMeatEnergyYield = recentStaleMeatEnergyYield;
         senses.TenderPlantPayoffTrace = creature.TenderPlantPayoffTrace;
         senses.RichPlantPayoffTrace = creature.RichPlantPayoffTrace;
         senses.ToughPlantPayoffTrace = creature.ToughPlantPayoffTrace;
+        senses.FreshMeatPayoffTrace = creature.FreshMeatPayoffTrace;
+        senses.StaleMeatPayoffTrace = creature.StaleMeatPayoffTrace;
         senses.RecentFoodEnergyYield = recentFoodEnergyYield;
         senses.ReproductionReadiness = isReadyToLay ? 1f : 0f;
     }
 
-    private static float UpdatePlantPayoffTrace(
+    private static float UpdatePayoffTrace(
         float currentTrace,
         float immediateYield,
         float deltaSeconds,

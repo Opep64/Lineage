@@ -114,9 +114,15 @@ public sealed class StatsRecordingSystem(
         var totalEnergyOverflowCalories = 0f;
         var totalRecentFoodSuccess = 0f;
         var totalRecentFoodEnergyYield = 0f;
+        var totalRecentMeatRawYield = 0f;
+        var totalRecentMeatEnergyYield = 0f;
+        var totalRecentFreshMeatEnergyYield = 0f;
+        var totalRecentStaleMeatEnergyYield = 0f;
         var totalTenderPlantPayoffTrace = 0f;
         var totalRichPlantPayoffTrace = 0f;
         var totalToughPlantPayoffTrace = 0f;
+        var totalFreshMeatPayoffTrace = 0f;
+        var totalStaleMeatPayoffTrace = 0f;
         var totalMemoryStrength = 0f;
         var totalInjuryMemoryStrength = 0f;
         var memoryUserCaloriesEaten = 0f;
@@ -384,9 +390,15 @@ public sealed class StatsRecordingSystem(
             totalEnergyOverflowCalories += creature.LastEnergyOverflowCalories;
             totalRecentFoodSuccess += creature.Senses.RecentFoodSuccess;
             totalRecentFoodEnergyYield += creature.Senses.RecentFoodEnergyYield;
+            totalRecentMeatRawYield += creature.Senses.RecentMeatRawYield;
+            totalRecentMeatEnergyYield += creature.Senses.RecentMeatEnergyYield;
+            totalRecentFreshMeatEnergyYield += creature.Senses.RecentFreshMeatEnergyYield;
+            totalRecentStaleMeatEnergyYield += creature.Senses.RecentStaleMeatEnergyYield;
             totalTenderPlantPayoffTrace += creature.Senses.TenderPlantPayoffTrace;
             totalRichPlantPayoffTrace += creature.Senses.RichPlantPayoffTrace;
             totalToughPlantPayoffTrace += creature.Senses.ToughPlantPayoffTrace;
+            totalFreshMeatPayoffTrace += creature.Senses.FreshMeatPayoffTrace;
+            totalStaleMeatPayoffTrace += creature.Senses.StaleMeatPayoffTrace;
             var memoryStrength = Math.Clamp(creature.MemoryVector.Length, 0f, 1f);
             totalMemoryStrength += memoryStrength;
             var injuryMemoryStrength = creature.InjuryMemoryVector.IsFinite
@@ -1562,9 +1574,15 @@ public sealed class StatsRecordingSystem(
             Rate(totalFatReleasedCalories, deltaSeconds),
             totalRecentFoodSuccess / divisor,
             totalRecentFoodEnergyYield / divisor,
+            totalRecentMeatRawYield / divisor,
+            totalRecentMeatEnergyYield / divisor,
+            totalRecentFreshMeatEnergyYield / divisor,
+            totalRecentStaleMeatEnergyYield / divisor,
             totalTenderPlantPayoffTrace / divisor,
             totalRichPlantPayoffTrace / divisor,
             totalToughPlantPayoffTrace / divisor,
+            totalFreshMeatPayoffTrace / divisor,
+            totalStaleMeatPayoffTrace / divisor,
             activeMemoryCreatureCount,
             totalMemoryStrength / divisor,
             activeInjuryMemoryCreatureCount,

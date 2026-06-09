@@ -1704,8 +1704,9 @@ public partial class Main : Node2D
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Energy surplus {senses.EnergySurplusRatio:0.00}  full {senses.EnergyFullnessRatio:0.00}  gut full {senses.GutFullnessRatio:0.00}  food success {senses.RecentFoodSuccess:0.00}\n" +
             $"Food energy yield {senses.RecentFoodEnergyYield:0.00}  plant energy {senses.RecentPlantEnergyYield:0.00}\n" +
-            $"Plant yield raw {senses.RecentPlantRawYield:0.00}\n" +
+            $"Yield raw plant {senses.RecentPlantRawYield:0.00}  meat {senses.RecentMeatRawYield:0.00}  meat energy {senses.RecentMeatEnergyYield:0.00}\n" +
             $"Plant payoff trace T {senses.TenderPlantPayoffTrace:0.00}  R {senses.RichPlantPayoffTrace:0.00}  Tough {senses.ToughPlantPayoffTrace:0.00}\n" +
+            $"Meat payoff trace fresh {senses.FreshMeatPayoffTrace:0.00}  stale {senses.StaleMeatPayoffTrace:0.00}\n" +
             $"Memory {senses.MemoryStrength:0.00}  fwd {senses.MemoryDirectionForward:0.00}  right {senses.MemoryDirectionRight:0.00}\n" +
             $"Memory write fwd {creature.Actions.MemoryForward:0.00}  right {creature.Actions.MemoryRight:0.00}\n" +
             $"Egg build {genome.EggProductionEnergyPerSecond:0.0}/s\n" +
@@ -2057,8 +2058,10 @@ public partial class Main : Node2D
             $"Energy surplus {senses.EnergySurplusRatio:0.00}   full {senses.EnergyFullnessRatio:0.00}   gut full {senses.GutFullnessRatio:0.00}\n" +
             $"Fat {senses.FatRatio:0.00}   mass {senses.MassBurdenRatio:0.00}\n" +
             $"Food success {senses.RecentFoodSuccess:0.00}\n" +
-            $"Food yield {senses.RecentFoodEnergyYield:0.00}   plant energy {senses.RecentPlantEnergyYield:0.00}   raw {senses.RecentPlantRawYield:0.00}\n" +
+            $"Food yield {senses.RecentFoodEnergyYield:0.00}   plant {senses.RecentPlantEnergyYield:0.00}   meat {senses.RecentMeatEnergyYield:0.00}\n" +
+            $"Raw yield plant {senses.RecentPlantRawYield:0.00}   meat {senses.RecentMeatRawYield:0.00}\n" +
             $"Payoff trace T {senses.TenderPlantPayoffTrace:0.00}   R {senses.RichPlantPayoffTrace:0.00}   Tough {senses.ToughPlantPayoffTrace:0.00}\n" +
+            $"Meat trace fresh {senses.FreshMeatPayoffTrace:0.00}   stale {senses.StaleMeatPayoffTrace:0.00}\n" +
             $"Memory {senses.MemoryStrength:0.00}   fwd {senses.MemoryDirectionForward:0.00}   right {senses.MemoryDirectionRight:0.00}\n";
     }
 
@@ -2090,9 +2093,12 @@ public partial class Main : Node2D
             $"Attack near gate {creature.Actions.AttackOutput:0.00}   last damage {creature.LastAttackDamageDealt:0.000}\n\n" +
             $"Recent Reward Signals\n" +
             $"Food success {senses.RecentFoodSuccess:0.00}   food energy {senses.RecentFoodEnergyYield:0.00}\n" +
-            $"Plant energy {senses.RecentPlantEnergyYield:0.00}   raw plant {senses.RecentPlantRawYield:0.00}\n" +
+            $"Plant energy {senses.RecentPlantEnergyYield:0.00}   meat energy {senses.RecentMeatEnergyYield:0.00}\n" +
+            $"Raw plant {senses.RecentPlantRawYield:0.00}   raw meat {senses.RecentMeatRawYield:0.00}\n" +
             $"Typed payoff T {senses.RecentTenderPlantEnergyYield:0.00}   R {senses.RecentRichPlantEnergyYield:0.00}   Tough {senses.RecentToughPlantEnergyYield:0.00}\n" +
+            $"Meat payoff fresh {senses.RecentFreshMeatEnergyYield:0.00}   stale {senses.RecentStaleMeatEnergyYield:0.00}\n" +
             $"Trace T {senses.TenderPlantPayoffTrace:0.00}   R {senses.RichPlantPayoffTrace:0.00}   Tough {senses.ToughPlantPayoffTrace:0.00}\n\n" +
+            $"Meat trace fresh {senses.FreshMeatPayoffTrace:0.00}   stale {senses.StaleMeatPayoffTrace:0.00}\n\n" +
             $"Memory\n" +
             $"Stored vector strength {senses.MemoryStrength:0.00}\n" +
             $"Input fwd {senses.MemoryDirectionForward:0.00}   right {senses.MemoryDirectionRight:0.00}\n" +

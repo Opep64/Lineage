@@ -208,7 +208,9 @@ public static class ViewerReportWriter
         WriteMetric(writer, "Fat flow", $"{snapshot.TotalFatStoredCaloriesPerSecond:0.###}/s stored, {snapshot.TotalFatReleasedCaloriesPerSecond:0.###}/s released");
         WriteMetric(writer, "Food success", FormatPercent(snapshot.AverageRecentFoodSuccess));
         WriteMetric(writer, "Food energy yield", FormatPercent(snapshot.AverageRecentFoodEnergyYield));
+        WriteMetric(writer, "Meat reward yield", $"raw {FormatPercent(snapshot.AverageRecentMeatRawYield)}, energy {FormatPercent(snapshot.AverageRecentMeatEnergyYield)}");
         WriteMetric(writer, "Plant payoff traces", FormatPlantPayoffTraces(snapshot));
+        WriteMetric(writer, "Meat payoff traces", FormatMeatPayoffTraces(snapshot));
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(snapshot.ActiveMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveMemoryCreatureCount})");
         WriteMetric(writer, "Memory strength", snapshot.AverageMemoryStrength.ToString("0.###", CultureInfo.InvariantCulture));
         WriteMetric(writer, "Injury memory", $"{FormatPercent(Share(snapshot.ActiveInjuryMemoryCreatureCount, snapshot.CreatureCount))} ({snapshot.ActiveInjuryMemoryCreatureCount}) @ {snapshot.AverageInjuryMemoryStrength:0.###}");
@@ -2894,6 +2896,14 @@ public static class ViewerReportWriter
             new ChartSeries("Tough", "#7f8f3a", snapshots.Select(snapshot => snapshot.AverageToughPlantPayoffTrace).ToArray()));
         WriteLineChart(
             writer,
+            "Meat payoff trace",
+            "",
+            snapshots,
+            new ChartSeries("Fresh", "#d96b3b", snapshots.Select(snapshot => snapshot.AverageFreshMeatPayoffTrace).ToArray()),
+            new ChartSeries("Stale", "#8f4cb8", snapshots.Select(snapshot => snapshot.AverageStaleMeatPayoffTrace).ToArray()),
+            new ChartSeries("Energy yield", "#6a8fce", snapshots.Select(snapshot => snapshot.AverageRecentMeatEnergyYield).ToArray()));
+        WriteLineChart(
+            writer,
             "Predation Diagnostics",
             "%",
             snapshots,
@@ -5131,6 +5141,13 @@ public static class ViewerReportWriter
         return string.Create(
             CultureInfo.InvariantCulture,
             $"tender {snapshot.AverageTenderPlantPayoffTrace:0.###}, rich {snapshot.AverageRichPlantPayoffTrace:0.###}, tough {snapshot.AverageToughPlantPayoffTrace:0.###}");
+    }
+
+    private static string FormatMeatPayoffTraces(SimulationStatsSnapshot snapshot)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"fresh {snapshot.AverageFreshMeatPayoffTrace:0.###}, stale {snapshot.AverageStaleMeatPayoffTrace:0.###}");
     }
 
     private static string FormatPlantTypeValues(float generic, float tender, float rich, float tough, string format)

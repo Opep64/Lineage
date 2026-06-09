@@ -5301,11 +5301,15 @@ static void CreatureSensingReportsReproductiveContext()
     simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 115f, health: 0.4f);
     var creature = simulation.State.Creatures[0];
     creature.LastCaloriesEaten = 0.25f;
+    creature.LastCarcassCaloriesEaten = 0.25f;
     creature.LastCaloriesDigested = 0.5f;
     creature.LastPlantDigestedEnergy = 0.5f;
     creature.LastTenderPlantDigestedEnergy = 0.1f;
     creature.LastRichPlantDigestedEnergy = 0.25f;
     creature.LastToughPlantDigestedEnergy = 0.15f;
+    creature.LastMeatDigestedEnergy = 0.25f;
+    creature.LastFreshMeatDigestedEnergy = 0.2f;
+    creature.LastStaleMeatDigestedEnergy = 0.05f;
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
@@ -5315,20 +5319,30 @@ static void CreatureSensingReportsReproductiveContext()
     AssertClose(0.75f, senses.EnergySurplusRatio, 0.000001, "Energy surplus ratio");
     AssertClose(0.75f, senses.RecentFoodSuccess, 0.000001, "Recent food success");
     AssertClose(1f, senses.RecentFoodEnergyYield, 0.000001, "Recent food energy yield");
+    AssertClose(0.25f, senses.RecentMeatRawYield, 0.000001, "Recent meat raw yield");
+    AssertClose(0.5f, senses.RecentMeatEnergyYield, 0.000001, "Recent meat energy yield");
     AssertClose(0.2f, senses.RecentTenderPlantEnergyYield, 0.000001, "Recent tender plant energy yield");
     AssertClose(0.5f, senses.RecentRichPlantEnergyYield, 0.000001, "Recent rich plant energy yield");
     AssertClose(0.3f, senses.RecentToughPlantEnergyYield, 0.000001, "Recent tough plant energy yield");
+    AssertClose(0.4f, senses.RecentFreshMeatEnergyYield, 0.000001, "Recent fresh meat energy yield");
+    AssertClose(0.1f, senses.RecentStaleMeatEnergyYield, 0.000001, "Recent stale meat energy yield");
     AssertClose(0.2f, senses.TenderPlantPayoffTrace, 0.000001, "Tender plant payoff trace");
     AssertClose(0.5f, senses.RichPlantPayoffTrace, 0.000001, "Rich plant payoff trace");
     AssertClose(0.3f, senses.ToughPlantPayoffTrace, 0.000001, "Tough plant payoff trace");
+    AssertClose(0.4f, senses.FreshMeatPayoffTrace, 0.000001, "Fresh meat payoff trace");
+    AssertClose(0.1f, senses.StaleMeatPayoffTrace, 0.000001, "Stale meat payoff trace");
 
     creature = simulation.State.Creatures[0];
     creature.LastCaloriesEaten = 0f;
+    creature.LastCarcassCaloriesEaten = 0f;
     creature.LastCaloriesDigested = 0f;
     creature.LastPlantDigestedEnergy = 0f;
     creature.LastTenderPlantDigestedEnergy = 0f;
     creature.LastRichPlantDigestedEnergy = 0f;
     creature.LastToughPlantDigestedEnergy = 0f;
+    creature.LastMeatDigestedEnergy = 0f;
+    creature.LastFreshMeatDigestedEnergy = 0f;
+    creature.LastStaleMeatDigestedEnergy = 0f;
     simulation.State.Creatures[0] = creature;
 
     simulation.Step();
@@ -5339,6 +5353,9 @@ static void CreatureSensingReportsReproductiveContext()
         decayedSenses.RichPlantPayoffTrace < senses.RichPlantPayoffTrace,
         "Plant payoff trace should decay without new payoff");
     AssertTrue(decayedSenses.RichPlantPayoffTrace > 0f, "Plant payoff trace should persist briefly after payoff");
+    AssertClose(0.2f, decayedSenses.FreshMeatPayoffTrace, 0.000001, "Configured fresh meat payoff trace half-life");
+    AssertClose(0.05f, decayedSenses.StaleMeatPayoffTrace, 0.000001, "Configured stale meat payoff trace half-life");
+    AssertTrue(decayedSenses.FreshMeatPayoffTrace > 0f, "Meat payoff trace should persist briefly after payoff");
 }
 
 static void CreatureSensingReportsFullness()
@@ -5580,6 +5597,8 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     var identityContactInput = BrainIoRegistry.GetInput(NeuralBrainSchema.CreatureContactIdentitySimilarityInput);
     var injuryMemoryInput = BrainIoRegistry.GetInput(NeuralBrainSchema.InjuryMemoryStrengthInput);
     var maturityProgressInput = BrainIoRegistry.GetInput(NeuralBrainSchema.MaturityProgressInput);
+    var recentMeatEnergyInput = BrainIoRegistry.GetInput(NeuralBrainSchema.RecentMeatEnergyYieldInput);
+    var staleMeatTraceInput = BrainIoRegistry.GetInput(NeuralBrainSchema.StaleMeatPayoffTraceInput);
     AssertEqual(BrainInputFreshnessPolicy.AdapterRuntime, memoryInput.Freshness, "Memory input freshness");
     AssertEqual(BrainInputFreshnessPolicy.WorldSenseStale, creatureApproachInput.Freshness, "Creature approach input freshness");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, contactInput.Freshness, "Contact input freshness");
@@ -5604,6 +5623,12 @@ static void BrainIoRegistryDescribesDenseAdapterContract()
     AssertEqual("internal.maturity_progress", maturityProgressInput.Key, "Maturity progress input key");
     AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, maturityProgressInput.Freshness, "Maturity progress input freshness");
     AssertEqual(12, maturityProgressInput.IntroducedVersion, "Maturity progress input introduced version");
+    AssertEqual("internal.recent_meat_energy_yield", recentMeatEnergyInput.Key, "Recent meat energy input key");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, recentMeatEnergyInput.Freshness, "Recent meat energy input freshness");
+    AssertEqual(14, recentMeatEnergyInput.IntroducedVersion, "Recent meat energy input introduced version");
+    AssertEqual("internal.stale_meat_payoff_trace", staleMeatTraceInput.Key, "Stale meat payoff trace input key");
+    AssertEqual(BrainInputFreshnessPolicy.InternalOrContactFresh, staleMeatTraceInput.Freshness, "Stale meat payoff trace input freshness");
+    AssertEqual(14, staleMeatTraceInput.IntroducedVersion, "Stale meat payoff trace input introduced version");
     AssertEqual("internal.energy_fullness", fullnessInput.Key, "Fullness input key");
     AssertEqual("scent.egg_lineage_density", eggLineageScentInput.Key, "Egg lineage scent input key");
     AssertEqual("scent.creature_identity_density", identityScentInput.Key, "Identity scent input key");
@@ -5656,14 +5681,20 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
         GutFullnessRatio = 0.81f,
         RecentFoodSuccess = 0.42f,
         RecentPlantRawYield = 0.36f,
+        RecentMeatRawYield = 0.41f,
         RecentPlantEnergyYield = 0.46f,
+        RecentMeatEnergyYield = 0.51f,
         RecentFoodEnergyYield = 0.56f,
         RecentTenderPlantEnergyYield = 0.16f,
         RecentRichPlantEnergyYield = 0.26f,
         RecentToughPlantEnergyYield = 0.36f,
+        RecentFreshMeatEnergyYield = 0.61f,
+        RecentStaleMeatEnergyYield = 0.21f,
         TenderPlantPayoffTrace = 0.06f,
         RichPlantPayoffTrace = 0.07f,
         ToughPlantPayoffTrace = 0.08f,
+        FreshMeatPayoffTrace = 0.18f,
+        StaleMeatPayoffTrace = 0.28f,
         PlantPreferenceDensity = 0.17f,
         PlantPreferenceDirectionForward = 0.27f,
         PlantPreferenceDirectionRight = -0.37f,
@@ -5857,14 +5888,20 @@ static void LegacyNeuralAdapterMapsGroupedBrainInputs()
     AssertClose(1f, inputs[NeuralBrainSchema.CanGrabCreatureInput], 0.000001, "Can grab creature input");
     AssertClose(1f, inputs[NeuralBrainSchema.IsHoldingCreatureInput], 0.000001, "Is holding creature input");
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentPlantRawYieldInput], 0.000001, "Recent plant raw yield input");
+    AssertClose(0.41f, inputs[NeuralBrainSchema.RecentMeatRawYieldInput], 0.000001, "Recent meat raw yield input");
     AssertClose(0.46f, inputs[NeuralBrainSchema.RecentPlantEnergyYieldInput], 0.000001, "Recent plant energy yield input");
+    AssertClose(0.51f, inputs[NeuralBrainSchema.RecentMeatEnergyYieldInput], 0.000001, "Recent meat energy yield input");
     AssertClose(0.56f, inputs[NeuralBrainSchema.RecentFoodEnergyYieldInput], 0.000001, "Recent food energy yield input");
     AssertClose(0.16f, inputs[NeuralBrainSchema.RecentTenderPlantEnergyYieldInput], 0.000001, "Recent tender plant energy yield input");
     AssertClose(0.26f, inputs[NeuralBrainSchema.RecentRichPlantEnergyYieldInput], 0.000001, "Recent rich plant energy yield input");
     AssertClose(0.36f, inputs[NeuralBrainSchema.RecentToughPlantEnergyYieldInput], 0.000001, "Recent tough plant energy yield input");
+    AssertClose(0.61f, inputs[NeuralBrainSchema.RecentFreshMeatEnergyYieldInput], 0.000001, "Recent fresh meat energy yield input");
+    AssertClose(0.21f, inputs[NeuralBrainSchema.RecentStaleMeatEnergyYieldInput], 0.000001, "Recent stale meat energy yield input");
     AssertClose(0.06f, inputs[NeuralBrainSchema.TenderPlantPayoffTraceInput], 0.000001, "Tender plant payoff trace input");
     AssertClose(0.07f, inputs[NeuralBrainSchema.RichPlantPayoffTraceInput], 0.000001, "Rich plant payoff trace input");
     AssertClose(0.08f, inputs[NeuralBrainSchema.ToughPlantPayoffTraceInput], 0.000001, "Tough plant payoff trace input");
+    AssertClose(0.18f, inputs[NeuralBrainSchema.FreshMeatPayoffTraceInput], 0.000001, "Fresh meat payoff trace input");
+    AssertClose(0.28f, inputs[NeuralBrainSchema.StaleMeatPayoffTraceInput], 0.000001, "Stale meat payoff trace input");
     AssertClose(0.17f, inputs[NeuralBrainSchema.PlantPreferenceDensityInput], 0.000001, "Plant preference density input");
     AssertClose(0.27f, inputs[NeuralBrainSchema.PlantPreferenceForwardInput], 0.000001, "Plant preference forward input");
     AssertClose(-0.37f, inputs[NeuralBrainSchema.PlantPreferenceRightInput], 0.000001, "Plant preference right input");
@@ -11019,9 +11056,15 @@ static void StatsRecordingCapturesAggregateSnapshot()
         MassBurdenRatio = 0.1f,
         RecentFoodSuccess = 0.75f,
         RecentFoodEnergyYield = 0.6f,
+        RecentMeatRawYield = 0.6f,
+        RecentMeatEnergyYield = 0.4f,
+        RecentFreshMeatEnergyYield = 0.3f,
+        RecentStaleMeatEnergyYield = 0.1f,
         TenderPlantPayoffTrace = 0.9f,
         RichPlantPayoffTrace = 0.3f,
         ToughPlantPayoffTrace = 0.1f,
+        FreshMeatPayoffTrace = 0.8f,
+        StaleMeatPayoffTrace = 0.2f,
         ReproductionReadiness = 1f,
         ForwardObstacle = 0.5f,
         LeftObstacle = 0.25f,
@@ -11102,9 +11145,15 @@ static void StatsRecordingCapturesAggregateSnapshot()
         MassBurdenRatio = 0.05f,
         RecentFoodSuccess = 0.25f,
         RecentFoodEnergyYield = 0.2f,
+        RecentMeatRawYield = 0.2f,
+        RecentMeatEnergyYield = 0.1f,
+        RecentFreshMeatEnergyYield = 0.05f,
+        RecentStaleMeatEnergyYield = 0.05f,
         TenderPlantPayoffTrace = 0.1f,
         RichPlantPayoffTrace = 0.7f,
         ToughPlantPayoffTrace = 0.2f,
+        FreshMeatPayoffTrace = 0.2f,
+        StaleMeatPayoffTrace = 0.6f,
         ForwardObstacle = 0.25f,
         LeftObstacle = 0.5f,
         RightObstacle = 0.2f
@@ -11362,9 +11411,15 @@ static void StatsRecordingCapturesAggregateSnapshot()
     AssertClose(0.4f, snapshot.TotalFatReleasedCaloriesPerSecond, 0.000001, "Fat released calories per second");
     AssertClose(0.5f, snapshot.AverageRecentFoodSuccess, 0.000001, "Average recent food success");
     AssertClose(0.4f, snapshot.AverageRecentFoodEnergyYield, 0.000001, "Average recent food energy yield");
+    AssertClose(0.4f, snapshot.AverageRecentMeatRawYield, 0.000001, "Average recent meat raw yield");
+    AssertClose(0.25f, snapshot.AverageRecentMeatEnergyYield, 0.000001, "Average recent meat energy yield");
+    AssertClose(0.175f, snapshot.AverageRecentFreshMeatEnergyYield, 0.000001, "Average recent fresh meat energy yield");
+    AssertClose(0.075f, snapshot.AverageRecentStaleMeatEnergyYield, 0.000001, "Average recent stale meat energy yield");
     AssertClose(0.5f, snapshot.AverageTenderPlantPayoffTrace, 0.000001, "Average tender plant payoff trace");
     AssertClose(0.5f, snapshot.AverageRichPlantPayoffTrace, 0.000001, "Average rich plant payoff trace");
     AssertClose(0.15f, snapshot.AverageToughPlantPayoffTrace, 0.000001, "Average tough plant payoff trace");
+    AssertClose(0.5f, snapshot.AverageFreshMeatPayoffTrace, 0.000001, "Average fresh meat payoff trace");
+    AssertClose(0.4f, snapshot.AverageStaleMeatPayoffTrace, 0.000001, "Average stale meat payoff trace");
     AssertEqual(1, snapshot.ActiveMemoryCreatureCount, "Active memory creature count");
     AssertClose(0.1f, snapshot.AverageMemoryStrength, 0.000001, "Average memory strength");
     AssertEqual(1, snapshot.ActiveInjuryMemoryCreatureCount, "Active injury memory creature count");

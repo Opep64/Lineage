@@ -208,6 +208,20 @@ public struct CreatureState
 
     public float LastMeatDigestedEnergy { get; set; }
 
+    public float LastFreshMeatDigestedEnergy { get; set; }
+
+    public float LastStaleMeatDigestedEnergy { get; set; }
+
+    /// <summary>
+    /// Short-lived internal trace of recent fresh meat digestion payoff.
+    /// </summary>
+    public float FreshMeatPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Short-lived internal trace of recent stale meat digestion payoff.
+    /// </summary>
+    public float StaleMeatPayoffTrace { get; set; }
+
     public float LastRottenMeatDamage { get; set; }
 
     public float GutPlantCalories { get; set; }

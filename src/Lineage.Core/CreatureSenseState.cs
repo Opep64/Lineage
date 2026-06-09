@@ -432,9 +432,19 @@ public struct CreatureSenseState
     public float RecentPlantRawYield { get; set; }
 
     /// <summary>
+    /// Recent raw meat calories transferred into the gut, normalized to expected bite capacity.
+    /// </summary>
+    public float RecentMeatRawYield { get; set; }
+
+    /// <summary>
     /// Recent plant energy released by digestion, normalized to expected digestion capacity.
     /// </summary>
     public float RecentPlantEnergyYield { get; set; }
+
+    /// <summary>
+    /// Recent meat energy released by digestion, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentMeatEnergyYield { get; set; }
 
     /// <summary>
     /// Recent usable energy released from tender plant gut contents, normalized to expected digestion capacity.
@@ -452,6 +462,16 @@ public struct CreatureSenseState
     public float RecentToughPlantEnergyYield { get; set; }
 
     /// <summary>
+    /// Recent usable energy released from fresh meat gut contents, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentFreshMeatEnergyYield { get; set; }
+
+    /// <summary>
+    /// Recent usable energy released from stale meat gut contents, normalized to expected digestion capacity.
+    /// </summary>
+    public float RecentStaleMeatEnergyYield { get; set; }
+
+    /// <summary>
     /// Decaying trace of recent tender plant digestion payoff.
     /// </summary>
     public float TenderPlantPayoffTrace { get; set; }
@@ -465,6 +485,16 @@ public struct CreatureSenseState
     /// Decaying trace of recent tough plant digestion payoff.
     /// </summary>
     public float ToughPlantPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Decaying trace of recent fresh meat digestion payoff.
+    /// </summary>
+    public float FreshMeatPayoffTrace { get; set; }
+
+    /// <summary>
+    /// Decaying trace of recent stale meat digestion payoff.
+    /// </summary>
+    public float StaleMeatPayoffTrace { get; set; }
 
     /// <summary>
     /// Fuzzy visible-plant cue combining current plant quality with recent typed plant payoff.

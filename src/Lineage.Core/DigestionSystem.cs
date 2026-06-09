@@ -34,6 +34,8 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.LastRichPlantDigestedEnergy = 0f;
             creature.LastToughPlantDigestedEnergy = 0f;
             creature.LastMeatDigestedEnergy = 0f;
+            creature.LastFreshMeatDigestedEnergy = 0f;
+            creature.LastStaleMeatDigestedEnergy = 0f;
             creature.LastRottenMeatDamage = 0f;
             NormalizePlantSubtypes(ref creature);
             NormalizeMeatQuality(ref creature);
@@ -80,6 +82,9 @@ public sealed class DigestionSystem : ISimulationSystem
 
             var plantReleasedEnergy = plantDigestion.TotalEnergy;
             var meatReleasedEnergy = meatDigested * CreatureDigestion.MeatEnergyEfficiency(genome, meatQuality);
+            var staleMeatShare = MeatQuality.Staleness(meatQuality);
+            var freshMeatReleasedEnergy = meatReleasedEnergy * (1f - staleMeatShare);
+            var staleMeatReleasedEnergy = meatReleasedEnergy * staleMeatShare;
             var releasedEnergy = plantReleasedEnergy + meatReleasedEnergy;
             var rottenMeatDamage = CalculateRottenMeatDamage(genome, meatQuality, meatDigested);
             creature.Energy += releasedEnergy;
@@ -90,6 +95,8 @@ public sealed class DigestionSystem : ISimulationSystem
             creature.LastRichPlantDigestedEnergy = plantDigestion.RichEnergy;
             creature.LastToughPlantDigestedEnergy = plantDigestion.ToughEnergy;
             creature.LastMeatDigestedEnergy = meatReleasedEnergy;
+            creature.LastFreshMeatDigestedEnergy = freshMeatReleasedEnergy;
+            creature.LastStaleMeatDigestedEnergy = staleMeatReleasedEnergy;
             creature.LastRottenMeatDamage = rottenMeatDamage;
 
             state.Creatures[i] = creature;
