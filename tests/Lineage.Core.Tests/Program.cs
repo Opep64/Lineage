@@ -73,7 +73,9 @@ var tests = new (string Name, Action Body)[]
     ("Metabolism can charge trait upkeep", MetabolismChargesTraitUpkeep),
     ("Metabolism charges cubic vision angle upkeep", MetabolismChargesCubicVisionAngleUpkeep),
     ("Metabolism charges plant specialization upkeep", MetabolismChargesPlantSpecializationUpkeep),
+    ("Metabolism defaults rtNEAT topology upkeep to zero", MetabolismDefaultsRtNeatTopologyUpkeepToZero),
     ("Metabolism charges rtNEAT topology upkeep", MetabolismChargesRtNeatTopologyUpkeep),
+    ("Energy ledger records current tick costs", EnergyLedgerRecordsCurrentTickCosts),
     ("Metabolism basal cost follows biome multiplier", MetabolismBasalCostFollowsBiomeMultiplier),
     ("Metabolism basal cost follows thermal mismatch", MetabolismBasalCostFollowsThermalMismatch),
     ("Metabolic pace scales helper rates", MetabolicPaceScalesHelperRates),
@@ -3101,6 +3103,34 @@ static void MetabolismChargesPlantSpecializationUpkeep()
     AssertClose(7.6875f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after plant specialization upkeep");
 }
 
+static void MetabolismDefaultsRtNeatTopologyUpkeepToZero()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 134,
+        systems:
+        [
+            new MetabolismSystem()
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 0f,
+        MaturityAgeSeconds = 0f
+    });
+    var brainId = simulation.State.AddBrain(CreateRtNeatTopologyTestBrain(
+        hiddenNodeCount: 2,
+        disabledHiddenOutputCount: 1));
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 10f, brainId: brainId);
+
+    simulation.Step();
+
+    var creature = simulation.State.Creatures[0];
+    AssertClose(10f, creature.Energy, 0.000001, "Default rtNEAT topology upkeep should be free");
+    AssertClose(0f, creature.LastEnergyLedger.BrainUpkeepCalories, 0.000001, "Default rtNEAT ledger brain upkeep");
+}
+
 static void MetabolismChargesRtNeatTopologyUpkeep()
 {
     var simulation = new Simulation(
@@ -3127,6 +3157,101 @@ static void MetabolismChargesRtNeatTopologyUpkeep()
     simulation.Step();
 
     AssertClose(5.75f, simulation.State.Creatures[0].Energy, 0.000001, "Energy after rtNEAT topology upkeep");
+}
+
+static void EnergyLedgerRecordsCurrentTickCosts()
+{
+    var simulation = new Simulation(
+        new SimulationConfig
+        {
+            FixedDeltaSeconds = 1f,
+            WorldWidth = 100f,
+            WorldHeight = 100f
+        },
+        seed: 135,
+        systems:
+        [
+            new MetabolismSystem(
+                bodyRadiusEnergyCostPerSecond: 0.2f,
+                maxSpeedEnergyCostPerSecond: 0.01f,
+                turnRateEnergyCostPerSecond: 0.02f,
+                senseRadiusEnergyCostPerSecond: 0.001f,
+                visionAngleEnergyCostPerSecond: 0.03f,
+                eatRateEnergyCostPerSecond: 0.004f,
+                gutCapacityEnergyCostPerSecond: 0.007f,
+                digestionRateEnergyCostPerSecond: 0.008f,
+                biteStrengthEnergyCostPerSecond: 0.05f,
+                damageResistanceEnergyCostPerSecond: 0.02f,
+                plantSpecializationEnergyCostPerSecond: 0.25f,
+                memoryEnergyCostPerSecond: 0.5f),
+            new MovementSystem(),
+            new ReproductionSystem(
+                requireReproductionIntent: false,
+                reproductivePrimeAgeSeconds: 0f,
+                reproductiveSenescenceAgeSeconds: 100f,
+                senescentFertilityMultiplier: 1f,
+                crowdingFertilityPenalty: 0f),
+            new CreatureHealingSystem(
+                healingDelaySeconds: 0f,
+                healingHealthFractionPerSecond: 0.2f,
+                healingEnergyCostPerHealth: 2f,
+                healingMinimumEnergy: 0f)
+        ]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        BasalEnergyPerSecond = 1f,
+        BodyRadius = 4f,
+        MaxTurnRadiansPerSecond = 3f,
+        EatCaloriesPerSecond = 6f,
+        GutCapacityCalories = 30f,
+        DigestionCaloriesPerSecond = 5f,
+        BiteStrength = 1.5f,
+        DamageResistance = 1.4f,
+        TenderPlantAdaptation = 0.5f,
+        RichPlantAdaptation = 0.25f,
+        ToughPlantAdaptation = 1f,
+        MovementEnergyPerSecond = 1f,
+        ReproductionEnergyThreshold = 20f,
+        OffspringEnergyInvestment = 20f,
+        EggProductionEnergyPerSecond = 3f,
+        MaturityAgeSeconds = 0f
+    });
+
+    simulation.State.SpawnCreature(genomeId, new SimVector2(20f, 20f), energy: 50f, health: 0.5f);
+    var creature = simulation.State.Creatures[0];
+    creature.DesiredVelocity = new SimVector2(CreatureGenome.Baseline.MaxSpeed * 0.5f, 0f);
+    creature.MemoryVector = SimVector2.FromAngle(0f);
+    simulation.State.Creatures[0] = creature;
+
+    simulation.Step();
+
+    creature = simulation.State.Creatures[0];
+    var ledger = creature.LastEnergyLedger;
+
+    AssertTrue(ledger.BasalCalories > 0f, "Ledger records basal cost");
+    AssertTrue(ledger.BodyUpkeepCalories > 0f, "Ledger records body upkeep");
+    AssertTrue(ledger.SpeedUpkeepCalories > 0f, "Ledger records speed upkeep");
+    AssertTrue(ledger.TurnUpkeepCalories > 0f, "Ledger records turn upkeep");
+    AssertTrue(ledger.SenseUpkeepCalories > 0f, "Ledger records sense upkeep");
+    AssertTrue(ledger.VisionUpkeepCalories > 0f, "Ledger records vision upkeep");
+    AssertTrue(ledger.EatRateUpkeepCalories > 0f, "Ledger records eat-rate upkeep");
+    AssertTrue(ledger.GutCapacityUpkeepCalories > 0f, "Ledger records gut-capacity upkeep");
+    AssertTrue(ledger.DigestionUpkeepCalories > 0f, "Ledger records digestion upkeep");
+    AssertTrue(ledger.BiteStrengthUpkeepCalories > 0f, "Ledger records bite-strength upkeep");
+    AssertTrue(ledger.DamageResistanceUpkeepCalories > 0f, "Ledger records damage-resistance upkeep");
+    AssertTrue(ledger.PlantSpecializationUpkeepCalories > 0f, "Ledger records plant specialization upkeep");
+    AssertTrue(ledger.MemoryUpkeepCalories > 0f, "Ledger records memory upkeep");
+    AssertClose(0f, ledger.BrainUpkeepCalories, 0.000001, "Non-rtNEAT creature has no brain topology upkeep");
+    AssertTrue(ledger.MovementCalories > 0f, "Ledger records movement cost");
+    AssertTrue(ledger.ReproductionCalories > 0f, "Ledger records reproduction transfer");
+    AssertTrue(ledger.HealingCalories > 0f, "Ledger records healing cost");
+    AssertClose(0f, ledger.AttackCalories, 0.000001, "Ledger has no attack cost without a bite");
+    AssertClose(
+        50f - ledger.TotalCostCalories(),
+        creature.Energy,
+        0.00001,
+        "Ledger accounts for current tick energy costs");
 }
 
 static void MetabolismBasalCostFollowsBiomeMultiplier()

@@ -21,8 +21,8 @@ public sealed class MetabolismSystem(
     BiomePressureProfile? biomeBasalCostProfile = null,
     float thermalMismatchBasalCostMultiplier = 0f) : ISimulationSystem
 {
-    public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0.002f;
-    public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0.0005f;
+    public const float DefaultRtNeatHiddenNodeEnergyCostPerSecond = 0f;
+    public const float DefaultRtNeatEnabledConnectionEnergyCostPerSecond = 0f;
     private const float VisionAngleUpkeepExponent = 3f;
 
     private readonly BiomePressureProfile _biomeBasalCostProfile =
@@ -66,6 +66,7 @@ public sealed class MetabolismSystem(
             var creature = state.Creatures[i];
             var genome = state.GetGenome(creature.GenomeId);
 
+            creature.LastEnergyLedger = default;
             creature.AgeSeconds += deltaSeconds;
             creature.SecondsSinceLastMeal += deltaSeconds;
             creature.ReproductionCooldownSeconds = Math.Max(
@@ -76,44 +77,61 @@ public sealed class MetabolismSystem(
             var effectiveSenseRadius = CreatureGrowth.EffectiveSenseRadius(creature, genome);
             var effectiveVisionAngle = CreatureGrowth.EffectiveVisionAngleRadians(creature, genome);
             var effectiveDamageResistance = CreatureGrowth.EffectiveDamageResistance(creature, genome);
-            var traitUpkeep =
-                BaselineScaledQuadraticUpkeep(
-                    effectiveBodyRadius,
-                    CreatureGenome.Baseline.BodyRadius,
-                    _bodyRadiusEnergyCostPerSecond)
-                + CreatureGrowth.EffectiveMaxSpeed(creature, genome) * _maxSpeedEnergyCostPerSecond
-                + CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome) * _turnRateEnergyCostPerSecond
-                + BaselineScaledQuadraticUpkeep(
-                    effectiveSenseRadius,
-                    CreatureGenome.Baseline.SenseRadius,
-                    _senseRadiusEnergyCostPerSecond)
-                + BaselineScaledPowerUpkeep(
-                    effectiveVisionAngle,
-                    CreatureGenome.Baseline.VisionAngleRadians,
-                    _visionAngleEnergyCostPerSecond,
-                    VisionAngleUpkeepExponent)
-                + CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * _eatRateEnergyCostPerSecond
-                + CreatureGrowth.EffectiveGutCapacityCalories(creature, genome) * _gutCapacityEnergyCostPerSecond
-                + CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond
-                + CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond
-                + BaselineScaledQuadraticUpkeep(
-                    effectiveDamageResistance,
-                    CreatureGenome.Baseline.DamageResistance,
-                    _damageResistanceEnergyCostPerSecond)
-                + CreatureDigestion.PlantSpecializationUpkeepFactor(genome) * _plantSpecializationEnergyCostPerSecond
-                + Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond
-                + BrainTopologyUpkeep(state, creature.BrainId);
+            var bodyUpkeep = BaselineScaledQuadraticUpkeep(
+                effectiveBodyRadius,
+                CreatureGenome.Baseline.BodyRadius,
+                _bodyRadiusEnergyCostPerSecond);
+            var speedUpkeep = CreatureGrowth.EffectiveMaxSpeed(creature, genome) * _maxSpeedEnergyCostPerSecond;
+            var turnUpkeep = CreatureGrowth.EffectiveMaxTurnRadiansPerSecond(creature, genome) * _turnRateEnergyCostPerSecond;
+            var senseUpkeep = BaselineScaledQuadraticUpkeep(
+                effectiveSenseRadius,
+                CreatureGenome.Baseline.SenseRadius,
+                _senseRadiusEnergyCostPerSecond);
+            var visionUpkeep = BaselineScaledPowerUpkeep(
+                effectiveVisionAngle,
+                CreatureGenome.Baseline.VisionAngleRadians,
+                _visionAngleEnergyCostPerSecond,
+                VisionAngleUpkeepExponent);
+            var eatRateUpkeep = CreatureGrowth.EffectiveEatCaloriesPerSecond(creature, genome) * _eatRateEnergyCostPerSecond;
+            var gutCapacityUpkeep = CreatureGrowth.EffectiveGutCapacityCalories(creature, genome) * _gutCapacityEnergyCostPerSecond;
+            var digestionUpkeep = CreatureGrowth.EffectiveDigestionCaloriesPerSecond(creature, genome) * _digestionRateEnergyCostPerSecond;
+            var biteStrengthUpkeep = CreatureGrowth.EffectiveBiteStrength(creature, genome) * _biteStrengthEnergyCostPerSecond;
+            var damageResistanceUpkeep = BaselineScaledQuadraticUpkeep(
+                effectiveDamageResistance,
+                CreatureGenome.Baseline.DamageResistance,
+                _damageResistanceEnergyCostPerSecond);
+            var plantSpecializationUpkeep = CreatureDigestion.PlantSpecializationUpkeepFactor(genome) * _plantSpecializationEnergyCostPerSecond;
+            var memoryUpkeep = Math.Clamp(creature.MemoryVector.Length, 0f, 1f) * _memoryEnergyCostPerSecond;
+            var brainUpkeep = BrainTopologyUpkeep(state, creature.BrainId);
             var biomeBasalCostMultiplier = _biomeBasalCostProfile.For(state.Biomes.GetKindAt(creature.Position));
             var thermalMismatch = _thermalMismatchBasalCostMultiplier > 0f
                 ? CreatureThermal.ThermalMismatch(state.GetTemperatureAt(creature.Position), genome)
                 : 0f;
             var thermalBasalCostMultiplier = 1f + thermalMismatch * _thermalMismatchBasalCostMultiplier;
-            creature.Energy -= (
-                genome.BasalEnergyPerSecond
-                    * CreatureMetabolism.BasalCostMultiplier(genome)
-                    * biomeBasalCostMultiplier
-                    * thermalBasalCostMultiplier
-                + traitUpkeep) * deltaSeconds;
+            var basalUpkeep = genome.BasalEnergyPerSecond
+                * CreatureMetabolism.BasalCostMultiplier(genome)
+                * biomeBasalCostMultiplier
+                * thermalBasalCostMultiplier;
+
+            var ledger = new CreatureEnergyLedger
+            {
+                BasalCalories = basalUpkeep * deltaSeconds,
+                BodyUpkeepCalories = bodyUpkeep * deltaSeconds,
+                SpeedUpkeepCalories = speedUpkeep * deltaSeconds,
+                TurnUpkeepCalories = turnUpkeep * deltaSeconds,
+                SenseUpkeepCalories = senseUpkeep * deltaSeconds,
+                VisionUpkeepCalories = visionUpkeep * deltaSeconds,
+                EatRateUpkeepCalories = eatRateUpkeep * deltaSeconds,
+                GutCapacityUpkeepCalories = gutCapacityUpkeep * deltaSeconds,
+                DigestionUpkeepCalories = digestionUpkeep * deltaSeconds,
+                BiteStrengthUpkeepCalories = biteStrengthUpkeep * deltaSeconds,
+                DamageResistanceUpkeepCalories = damageResistanceUpkeep * deltaSeconds,
+                PlantSpecializationUpkeepCalories = plantSpecializationUpkeep * deltaSeconds,
+                MemoryUpkeepCalories = memoryUpkeep * deltaSeconds,
+                BrainUpkeepCalories = brainUpkeep * deltaSeconds
+            };
+            creature.LastEnergyLedger = ledger;
+            creature.Energy -= ledger.BasalCalories + ledger.TraitUpkeepCalories();
 
             state.Creatures[i] = creature;
         }

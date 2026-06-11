@@ -96,6 +96,9 @@ public sealed class CreatureHealingSystem(
                 creature.Energy -= energySpent;
                 creature.LastHealingReceived = healing;
                 creature.LastHealingEnergySpent = energySpent;
+                var ledger = creature.LastEnergyLedger;
+                ledger.HealingCalories += energySpent;
+                creature.LastEnergyLedger = ledger;
             }
 
             state.Creatures[i] = creature;

@@ -70,6 +70,9 @@ public sealed class ReproductionSystem(
 
                 parent.Energy -= transfer;
                 parent.ReproductiveEnergy += transfer;
+                var ledger = parent.LastEnergyLedger;
+                ledger.ReproductionCalories += transfer;
+                parent.LastEnergyLedger = ledger;
             }
 
             if (parent.ReproductiveEnergy < parentGenome.OffspringEnergyInvestment)

@@ -268,7 +268,12 @@ public sealed class BrainProbeService
                 creature.Senses.Hunger,
                 creature.Senses.SoundDetected,
                 creature.Senses.SoundDensity,
-                creature.Actions.SoundAmplitude),
+                creature.Actions.SoundAmplitude,
+                creature.LastEnergyLedger,
+                creature.LastCaloriesDigested,
+                creature.LastFatStoredCalories,
+                creature.LastFatReleasedCalories,
+                creature.LastEnergyOverflowCalories),
             brain.ArchitectureKind.ToString(),
             true,
             modifiedInputCount,
@@ -654,7 +659,12 @@ public sealed record BrainProbeCreature(
     float Hunger,
     bool SoundDetected,
     float SoundDensity,
-    float SoundAmplitude);
+    float SoundAmplitude,
+    CreatureEnergyLedger EnergyLedger,
+    float LastCaloriesDigested,
+    float LastFatStoredCalories,
+    float LastFatReleasedCalories,
+    float LastEnergyOverflowCalories);
 
 public sealed record BrainProbeInputValue(
     string Key,

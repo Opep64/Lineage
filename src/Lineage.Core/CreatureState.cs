@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Lineage.Core;
 
 /// <summary>
@@ -176,6 +178,12 @@ public struct CreatureState
     /// Energy released from gut contents during the most recent digestion pass.
     /// </summary>
     public float LastCaloriesDigested { get; set; }
+
+    /// <summary>
+    /// Energy debits charged to this creature during the most recent simulation tick.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public CreatureEnergyLedger LastEnergyLedger { get; set; }
 
     public float LastFatStoredCalories { get; set; }
 

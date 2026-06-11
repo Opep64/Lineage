@@ -3576,6 +3576,7 @@ function renderBrainLabOutputs() {
   }
 
   brainLabOutputs.innerHTML = `
+    ${renderBrainLabEnergyBudget()}
     <div class="brain-lab-output-summary">
       <strong>${formatNumber(brainLabEvaluation.overrideCount)} overrides</strong>
       <span>${formatNumber(brainLabEvaluation.changedOutputCount)} changed</span>
@@ -3596,6 +3597,63 @@ function renderBrainLabOutputs() {
       </tbody>
     </table>
   `;
+}
+
+function renderBrainLabEnergyBudget() {
+  const creature = brainLabEvaluation?.creature;
+  const ledger = creature?.energyLedger || {};
+  const basal = brainLabEnergyValue(ledger, "basalCalories");
+  const body = brainLabEnergyValue(ledger, "bodyUpkeepCalories");
+  const speed = brainLabEnergyValue(ledger, "speedUpkeepCalories");
+  const turn = brainLabEnergyValue(ledger, "turnUpkeepCalories");
+  const senses = brainLabEnergyValue(ledger, "senseUpkeepCalories")
+    + brainLabEnergyValue(ledger, "visionUpkeepCalories");
+  const brain = brainLabEnergyValue(ledger, "brainUpkeepCalories");
+  const memory = brainLabEnergyValue(ledger, "memoryUpkeepCalories");
+  const gut = brainLabEnergyValue(ledger, "eatRateUpkeepCalories")
+    + brainLabEnergyValue(ledger, "gutCapacityUpkeepCalories")
+    + brainLabEnergyValue(ledger, "digestionUpkeepCalories");
+  const combatTraits = brainLabEnergyValue(ledger, "biteStrengthUpkeepCalories")
+    + brainLabEnergyValue(ledger, "damageResistanceUpkeepCalories");
+  const plant = brainLabEnergyValue(ledger, "plantSpecializationUpkeepCalories");
+  const movement = brainLabEnergyValue(ledger, "movementCalories");
+  const attack = brainLabEnergyValue(ledger, "attackCalories");
+  const reproduction = brainLabEnergyValue(ledger, "reproductionCalories");
+  const healing = brainLabEnergyValue(ledger, "healingCalories");
+  const trait = body + speed + turn + senses + brain + memory + gut + combatTraits + plant;
+  const action = movement + attack + reproduction + healing;
+  const totalCost = basal + trait + action;
+  const income = Number(creature?.lastCaloriesDigested || 0) + Number(creature?.lastFatReleasedCalories || 0);
+  const reserve = Number(creature?.lastFatStoredCalories || 0) + Number(creature?.lastEnergyOverflowCalories || 0);
+
+  if (totalCost <= 0 && income <= 0 && reserve <= 0) {
+    return "";
+  }
+
+  return `
+    <div class="brain-lab-energy-budget">
+      <div class="brain-lab-energy-budget-heading">
+        <strong>Energy Budget</strong>
+        <span>last tick</span>
+      </div>
+      <div class="brain-lab-energy-budget-grid">
+        ${brainLabEnergyBudgetCell("Flow", `+${formatBrainLabNumber(income)} in, -${formatBrainLabNumber(totalCost)} cost, ${formatBrainLabNumber(reserve)} stored/overflow`)}
+        ${brainLabEnergyBudgetCell("Basal", formatBrainLabNumber(basal))}
+        ${brainLabEnergyBudgetCell("Traits", `body ${formatBrainLabNumber(body)}, speed ${formatBrainLabNumber(speed)}, turn ${formatBrainLabNumber(turn)}, gut ${formatBrainLabNumber(gut)}, combat ${formatBrainLabNumber(combatTraits)}, plant ${formatBrainLabNumber(plant)}`)}
+        ${brainLabEnergyBudgetCell("Senses", formatBrainLabNumber(senses))}
+        ${brainLabEnergyBudgetCell("Brain", `rtNEAT ${formatBrainLabNumber(brain)}, memory ${formatBrainLabNumber(memory)}`)}
+        ${brainLabEnergyBudgetCell("Action", `move ${formatBrainLabNumber(movement)}, attack ${formatBrainLabNumber(attack)}, egg ${formatBrainLabNumber(reproduction)}, heal ${formatBrainLabNumber(healing)}`)}
+      </div>
+    </div>
+  `;
+}
+
+function brainLabEnergyBudgetCell(label, value) {
+  return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function brainLabEnergyValue(ledger, key) {
+  return Math.max(0, Number(ledger?.[key] || 0));
 }
 
 function renderBrainLabOutputRow(output) {

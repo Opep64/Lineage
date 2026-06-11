@@ -49,12 +49,16 @@ public sealed class MovementSystem(
 
             var speedCostMultiplier = CalculateSpeedCostMultiplier(creature.Velocity.Length, _movementSpeedCostExponent);
             var biomeMovementCostMultiplier = _biomeMovementCostProfile.For(state.Biomes.GetKindAt(creature.Position));
-            creature.Energy -= genome.MovementEnergyPerSecond
+            var movementCost = genome.MovementEnergyPerSecond
                 * biomeMovementCostMultiplier
                 * CreatureGrowth.GrowthFactor(creature, genome)
                 * CreatureGrowth.FatMovementCostMultiplier(creature, genome)
                 * speedCostMultiplier
                 * deltaSeconds;
+            creature.Energy -= movementCost;
+            var ledger = creature.LastEnergyLedger;
+            ledger.MovementCalories += movementCost;
+            creature.LastEnergyLedger = ledger;
 
             state.Creatures[i] = creature;
             state.RecordCreatureProgress(creature.Id, creature.MaxXReached);

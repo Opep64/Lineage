@@ -323,6 +323,8 @@ public static class SimulationSnapshotJson
             creature.LastEnergyOverflowCalories = 0f;
         }
 
+        creature.LastEnergyLedger = creature.LastEnergyLedger.Normalized();
+
         creature.InjuryMemoryVector = creature.InjuryMemoryVector.IsFinite
             ? creature.InjuryMemoryVector.ClampedLength(1f)
             : SimVector2.Zero;

@@ -76,6 +76,9 @@ public sealed class CreatureAttackSystem(
             }
 
             attacker.Energy -= biteCost;
+            var ledger = attacker.LastEnergyLedger;
+            ledger.AttackCalories += biteCost;
+            attacker.LastEnergyLedger = ledger;
             attacker.LastAttackDamageDealt = damage;
             state.Stats.RecordAttackDamage(state.Bounds, target.Position, damage);
             _damageByCreature[contact.TargetIndex] += damage;

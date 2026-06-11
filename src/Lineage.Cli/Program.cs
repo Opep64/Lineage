@@ -5975,7 +5975,18 @@ internal static class RunReportWriter
         writer.WriteLine("</header>");
         writer.WriteLine("<main class=\"page-width\">");
 
-        writer.WriteLine("<section>");
+        WriteImpactSummary(
+            writer,
+            state,
+            finalSnapshot,
+            elapsed,
+            populationTrend,
+            resourceTrend,
+            caloriesEatenTrend,
+            caloriesDigestedTrend);
+        WriteReportIndex(writer);
+
+        writer.WriteLine("<section id=\"run\">");
         writer.WriteLine("<h2>Run</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         var hasSpeciesRoster = scenario.EnabledSpeciesSeeds().Any();
@@ -6025,7 +6036,7 @@ internal static class RunReportWriter
             ThermalTolerance = scenario.ThermalTolerance
         };
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"settings\">");
         writer.WriteLine("<h2>Pressure Settings</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Initial creatures", scenario.InitialCreatureCount.ToString(CultureInfo.InvariantCulture));
@@ -6138,7 +6149,7 @@ internal static class RunReportWriter
 
         WriteEcologicalEventsSection(writer, state);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"outcome\">");
         writer.WriteLine("<h2>Outcome</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Final population", state.Creatures.Count.ToString(CultureInfo.InvariantCulture));
@@ -6263,7 +6274,7 @@ internal static class RunReportWriter
             founderSummaries.Count(summary => summary.LivingCreatures > 0),
             founderSummaries.Length);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"foraging\">");
         writer.WriteLine("<h2>Foraging Diagnostics</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Seeing food", FormatPercent(Share(finalSnapshot.FoodDetectedCreatureCount, finalSnapshot.CreatureCount)));
@@ -6328,7 +6339,7 @@ internal static class RunReportWriter
 
         WritePlantTypeDiagnosticsSection(writer, finalSnapshot);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"memory\">");
         writer.WriteLine("<h2>Memory Diagnostics</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Active memory", $"{FormatPercent(Share(finalSnapshot.ActiveMemoryCreatureCount, finalSnapshot.CreatureCount))} ({finalSnapshot.ActiveMemoryCreatureCount})");
@@ -6350,7 +6361,7 @@ internal static class RunReportWriter
         var attackDamagePerAttacker = finalSnapshot.AttackingCreatureCount > 0
             ? finalSnapshot.TotalAttackDamagePerSecond / finalSnapshot.AttackingCreatureCount
             : 0f;
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"predation\">");
         writer.WriteLine("<h2>Predation Diagnostics</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Seeing creatures", FormatPercent(Share(finalSnapshot.CreatureDetectedCreatureCount, finalSnapshot.CreatureCount)));
@@ -6426,7 +6437,7 @@ internal static class RunReportWriter
         WriteBiomeMapSection(writer, state.Biomes);
         WriteTemperatureMapSection(writer, state);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"biomes\">");
         writer.WriteLine("<h2>Biomes</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Biome</th><th>Area</th><th>Area Share</th><th>Density Mult</th><th>Regrowth Mult</th><th>Season Amp</th><th>Move Cost</th><th>Basal Cost</th><th>Speed</th><th>Vision</th><th>Resources</th><th>Resources/M</th><th>Plant kcal</th><th>Meat kcal</th><th>Eaten/s</th><th>Deaths</th><th>Living</th><th>Living Share</th></tr></thead>");
@@ -6504,7 +6515,7 @@ internal static class RunReportWriter
         WriteChartsSection(writer, reportSnapshots, snapshots.Count);
         WriteThermalNicheSection(writer, state, founderSummaries, speciesSummaries, finalSnapshot);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"trends\">");
         writer.WriteLine("<h2>Trends</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Metric</th><th>Start</th><th>Final</th><th>Min</th><th>Max</th><th>Change</th></tr></thead>");
@@ -6543,7 +6554,7 @@ internal static class RunReportWriter
         WriteLineageBrainInputDiagnosticsSection(writer, lineageBrainInputDiagnostics);
         WriteRtNeatBrainGraphSection(writer, state);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"diagnostics\">");
         writer.WriteLine("<h2>Diagnostics</h2>");
         writer.WriteLine("<ul>");
         foreach (var diagnostic in BuildDiagnostics(scenario, state, populationTrend, resourceTrend, finalSnapshot))
@@ -6554,7 +6565,7 @@ internal static class RunReportWriter
         writer.WriteLine("</ul>");
         writer.WriteLine("</section>");
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"dominant-lineage\">");
         writer.WriteLine("<h2>Dominant Lineage Over Time</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Tick</th><th>Time</th><th>Founder</th><th>Living</th><th>Share</th><th>Founder Generations</th><th>Overall Generations</th></tr></thead>");
@@ -6585,7 +6596,7 @@ internal static class RunReportWriter
 
         if (rosterSummaries.Length > 0)
         {
-            writer.WriteLine("<section>");
+            writer.WriteLine("<section id=\"roster-lineages\">");
             writer.WriteLine("<h2>Injected Profile Lineages</h2>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
             writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Tail Living</th><th>kcal/s</th><th>Meat</th><th>Fresh Kill</th><th>Meat Seen</th><th>Attack</th><th>Touch Attack</th><th>Damage/s</th><th>Rot Damage/s</th><th>Extinct At</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Same-Profile Injury</th><th>Other-Profile Injury</th><th>Unattributed Injury</th><th>Cross Kills Dealt</th><th>Same Kills Dealt</th><th>Rotten</th><th>Old Age</th><th>Other</th></tr></thead>");
@@ -6628,7 +6639,7 @@ internal static class RunReportWriter
             writer.WriteLine("</section>");
         }
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"founders\">");
         writer.WriteLine("<h2>Top Founder Lineages</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Founder</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Thermal Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Cold/Temp/Hot</th><th>Cold/Hot Stress</th></tr></thead>");
@@ -6659,7 +6670,7 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"founder-exploration\">");
         writer.WriteLine("<h2>Founder Exploration</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Founder</th><th>Total</th><th>Living</th><th>Max Generation</th><th>Current East</th><th>Ever East</th><th>Living Middle</th><th>Living Right</th></tr></thead>");
@@ -6687,7 +6698,7 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"generation-survival\">");
         writer.WriteLine("<h2>Generation Survival</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Generation</th><th>Births</th><th>Living</th><th>Dead</th><th>Starvation Deaths</th><th>Injury Deaths</th><th>Rotten Meat Deaths</th><th>Old Age Deaths</th><th>Survival Rate</th></tr></thead>");
@@ -6716,7 +6727,7 @@ internal static class RunReportWriter
         writer.WriteLine("</tbody></table></div>");
         writer.WriteLine("</section>");
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"traits\">");
         writer.WriteLine("<h2>Final Living Traits</h2>");
         if (state.Creatures.Count == 0)
         {
@@ -6760,7 +6771,7 @@ internal static class RunReportWriter
 
         if (outputPaths.CheckpointDirectory is not null)
         {
-            writer.WriteLine("<section>");
+            writer.WriteLine("<section id=\"checkpoints\">");
             writer.WriteLine("<h2>Checkpoints</h2>");
             writer.WriteLine($"<p>Checkpoint snapshots can be loaded directly from the Godot launcher.</p>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
@@ -6786,7 +6797,7 @@ internal static class RunReportWriter
             writer.WriteLine("</section>");
         }
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"outputs\">");
         writer.WriteLine("<h2>Output Files</h2>");
         writer.WriteLine("<ul class=\"file-list\">");
         WriteOptionalPath(writer, "Stats CSV", outputPaths.StatsPath);
@@ -6808,6 +6819,129 @@ internal static class RunReportWriter
 
         writer.WriteLine("</main>");
         WriteDocumentEnd(writer);
+    }
+
+    private static void WriteImpactSummary(
+        StreamWriter writer,
+        WorldState state,
+        SimulationStatsSnapshot snapshot,
+        TimeSpan elapsed,
+        Trend populationTrend,
+        Trend resourceTrend,
+        Trend caloriesEatenTrend,
+        Trend caloriesDigestedTrend)
+    {
+        var activeResourceCount = state.Resources.Count(resource => resource.Calories > 0f);
+        var resourceCalories = state.Resources.Sum(resource => MathF.Max(0f, resource.Calories));
+        var totalResourceCalories = resourceCalories > 0f
+            ? resourceCalories
+            : snapshot.TotalResourceCalories;
+        var plantResourceShare = Fraction(snapshot.TotalPlantCalories, snapshot.TotalResourceCalories);
+        var meatResourceShare = Fraction(snapshot.TotalMeatCalories, snapshot.TotalResourceCalories);
+        var plantIntakeShare = Fraction(snapshot.TotalPlantCaloriesEatenPerSecond, snapshot.TotalCaloriesEatenPerSecond);
+        var meatIntakeShare = Fraction(
+            snapshot.TotalCarcassCaloriesEatenPerSecond + snapshot.TotalLivePreyCaloriesEatenPerSecond + snapshot.TotalEggCaloriesEatenPerSecond,
+            snapshot.TotalCaloriesEatenPerSecond);
+        var deathCauseText = string.Create(
+            CultureInfo.InvariantCulture,
+            $"starved {state.Stats.StarvationDeathCount}, injury {state.Stats.InjuryDeathCount}, old age {state.Stats.OldAgeDeathCount}, rotten {state.Stats.RottenMeatDeathCount}");
+        var thermalsEnabled = snapshot.TemperatureCellCount > 0 || snapshot.AverageCreatureThermalMismatch > 0f;
+
+        writer.WriteLine("<section class=\"impact-summary\" id=\"summary\">");
+        writer.WriteLine("<h2>Impact Summary</h2>");
+        writer.WriteLine("<div class=\"impact-grid\">");
+        WriteImpactCard(
+            writer,
+            "Population",
+            $"{state.Creatures.Count.ToString(CultureInfo.InvariantCulture)} creatures",
+            $"{state.Eggs.Count.ToString(CultureInfo.InvariantCulture)} eggs; {FormatTrendChange(populationTrend, "0", "+0;-0;0")} over {state.ElapsedSeconds.ToString("0.#", CultureInfo.InvariantCulture)}s; wall {elapsed.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture)}s");
+        WriteImpactCard(
+            writer,
+            "Energy Flow",
+            $"{snapshot.TotalCaloriesDigestedPerSecond.ToString("0.###", CultureInfo.InvariantCulture)} energy/s",
+            $"raw {snapshot.TotalCaloriesEatenPerSecond.ToString("0.###", CultureInfo.InvariantCulture)} kcal/s; {FormatTrendChange(caloriesDigestedTrend, "0.###", "+0.###;-0.###;0")} digested");
+        WriteImpactCard(
+            writer,
+            "Food Web",
+            $"{snapshot.TotalCaloriesEatenPerSecond.ToString("0.###", CultureInfo.InvariantCulture)} raw kcal/s",
+            $"trend {FormatTrendChange(caloriesEatenTrend, "0.###", "+0.###;-0.###;0")}; plant {FormatPercent(plantIntakeShare)}, meat/egg {FormatPercent(meatIntakeShare)}");
+        WriteImpactCard(
+            writer,
+            "Resource Stock",
+            $"{totalResourceCalories.ToString("0", CultureInfo.InvariantCulture)} kcal",
+            $"{activeResourceCount.ToString(CultureInfo.InvariantCulture)} active; plant {FormatPercent(plantResourceShare)}, meat {FormatPercent(meatResourceShare)}; {FormatTrendChange(resourceTrend, "0", "+0;-0;0")}");
+        WriteImpactCard(
+            writer,
+            "Reproduction",
+            $"{state.Stats.CreatureBirthCount.ToString(CultureInfo.InvariantCulture)} births",
+            $"{state.Stats.EggLaidCount.ToString(CultureInfo.InvariantCulture)} eggs laid; survival {FormatPercent(Share(state.Stats.EggHatchedCount, state.Stats.EggLaidCount))}");
+        WriteImpactCard(
+            writer,
+            "Death Pressure",
+            $"{state.Stats.CreatureDeathCount.ToString(CultureInfo.InvariantCulture)} deaths",
+            deathCauseText);
+        WriteImpactCard(
+            writer,
+            "Evolution",
+            $"generation {snapshot.MaxGeneration.ToString(CultureInfo.InvariantCulture)}",
+            $"avg life {snapshot.AverageLifespanSeconds.ToString("0.#", CultureInfo.InvariantCulture)}s; pace {snapshot.AverageMetabolicPace.ToString("0.###", CultureInfo.InvariantCulture)}x");
+        WriteImpactCard(
+            writer,
+            "Thermal Ecology",
+            thermalsEnabled ? FormatPercent(snapshot.AverageCreatureThermalMismatch) : "off",
+            thermalsEnabled
+                ? $"creature temp {FormatTemperatureIndex(snapshot.AverageCreatureTemperature)}; basal {snapshot.ThermalBasalEnergyPerSecond.ToString("0.###", CultureInfo.InvariantCulture)} energy/s"
+                : "temperature layer not active");
+        writer.WriteLine("</div>");
+        writer.WriteLine("</section>");
+    }
+
+    private static void WriteImpactCard(StreamWriter writer, string label, string value, string note)
+    {
+        writer.WriteLine("<div class=\"impact-card\">");
+        writer.WriteLine($"<span class=\"impact-label\">{Html(label)}</span>");
+        writer.WriteLine($"<span class=\"impact-value\">{Html(value)}</span>");
+        writer.WriteLine($"<p class=\"impact-note\">{Html(note)}</p>");
+        writer.WriteLine("</div>");
+    }
+
+    private static void WriteReportIndex(StreamWriter writer)
+    {
+        writer.WriteLine("<nav class=\"report-index\" aria-label=\"Report sections\">");
+        writer.WriteLine("<h2>Report Index</h2>");
+        writer.WriteLine("<div class=\"report-index-grid\">");
+        WriteReportIndexGroup(writer, "Summary", ("Run", "#run"), ("Settings", "#settings"), ("Outcome", "#outcome"), ("Trends", "#trends"), ("Charts", "#charts"));
+        WriteReportIndexGroup(writer, "Ecology", ("Foraging", "#foraging"), ("Predation", "#predation"), ("Collision", "#collision"), ("Biomes", "#biomes"), ("Thermal", "#thermal"));
+        WriteReportIndexGroup(writer, "Evolution", ("Traits", "#traits"), ("Species", "#species"), ("Founders", "#founders"), ("Lineage", "#lineage"));
+        WriteReportIndexGroup(writer, "Brains", ("Behavior", "#behavior"), ("Brain Wiring", "#brain"), ("rtNEAT", "#rtneat"), ("Diagnostics", "#diagnostics"));
+        writer.WriteLine("</div>");
+        writer.WriteLine("</nav>");
+    }
+
+    private static void WriteReportIndexGroup(StreamWriter writer, string label, params (string Text, string Href)[] links)
+    {
+        writer.WriteLine("<div class=\"report-index-group\">");
+        writer.WriteLine($"<strong>{Html(label)}</strong>");
+        foreach (var (text, href) in links)
+        {
+            writer.WriteLine($"<a href=\"{Html(href)}\">{Html(text)}</a>");
+        }
+
+        writer.WriteLine("</div>");
+    }
+
+    private static string FormatTrendChange(Trend trend, string valueFormat, string deltaFormat)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{trend.Start.ToString(valueFormat, CultureInfo.InvariantCulture)} -> {trend.Final.ToString(valueFormat, CultureInfo.InvariantCulture)} ({trend.Change.ToString(deltaFormat, CultureInfo.InvariantCulture)})");
+    }
+
+    private static float Fraction(float value, float total)
+    {
+        return total > 0f && float.IsFinite(value) && float.IsFinite(total)
+            ? Math.Clamp(value / total, 0f, 1f)
+            : 0f;
     }
 
     private static void WriteDocumentStart(StreamWriter writer, string title)
@@ -6832,6 +6966,7 @@ internal static class RunReportWriter
               --accent-dark: #203b2b;
             }
             * { box-sizing: border-box; }
+            html { scroll-behavior: smooth; }
             body {
               margin: 0;
               font-family: "Segoe UI", Arial, sans-serif;
@@ -6854,6 +6989,7 @@ internal static class RunReportWriter
               background: var(--panel);
               border: 1px solid var(--line);
               border-radius: 8px;
+              scroll-margin-top: 88px;
             }
             .page-width {
               width: min(1760px, calc(100% - 32px));
@@ -6921,6 +7057,76 @@ internal static class RunReportWriter
             }
             .file-list code { overflow-wrap: anywhere; }
             .empty { color: var(--muted); text-align: left; }
+            .impact-summary {
+              border-color: #bfd2b8;
+              background: #f8fbf4;
+            }
+            .impact-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+              gap: 12px;
+            }
+            .impact-card {
+              min-width: 0;
+              padding: 14px;
+              border: 1px solid var(--line);
+              border-radius: 6px;
+              background: #fff;
+            }
+            .impact-label {
+              display: block;
+              color: var(--muted);
+              font-size: 0.75rem;
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+            .impact-value {
+              display: block;
+              margin-top: 4px;
+              overflow-wrap: anywhere;
+              font-size: 1.35rem;
+              font-weight: 750;
+            }
+            .impact-note {
+              margin: 6px 0 0;
+              color: var(--muted);
+              font-size: 0.86rem;
+            }
+            .report-index {
+              position: sticky;
+              top: 0;
+              z-index: 20;
+              margin: 16px 0 20px;
+              padding: 12px 14px;
+              border: 1px solid var(--line);
+              border-radius: 8px;
+              background: rgba(255, 255, 255, 0.96);
+              backdrop-filter: blur(8px);
+            }
+            .report-index h2 {
+              margin-bottom: 8px;
+              font-size: 1rem;
+            }
+            .report-index-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+              gap: 8px 14px;
+            }
+            .report-index-group strong {
+              display: block;
+              margin-bottom: 4px;
+              color: var(--muted);
+              font-size: 0.76rem;
+              text-transform: uppercase;
+            }
+            .report-index-group a {
+              display: inline-block;
+              margin: 0 10px 4px 0;
+              color: var(--accent);
+              font-weight: 650;
+              text-decoration: none;
+            }
+            .report-index-group a:hover { text-decoration: underline; }
             .biome-map-note {
               margin: 0 0 12px;
               color: var(--muted);
@@ -7137,6 +7343,9 @@ internal static class RunReportWriter
             }
             @media (max-width: 820px) {
               .lineage-report-grid { grid-template-columns: 1fr; }
+            }
+            @media (max-width: 700px) {
+              .report-index { position: static; }
             }
             .heatmap-grid {
               display: grid;
@@ -7396,7 +7605,7 @@ internal static class RunReportWriter
         var events = state.EcologicalEvents;
         var activeCount = events.Count(ecologicalEvent => ecologicalEvent.IsActive(state.ElapsedSeconds));
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"events\">");
         writer.WriteLine("<h2>Ecological Events</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Scheduled events", events.Count.ToString(CultureInfo.InvariantCulture));
@@ -7467,7 +7676,7 @@ internal static class RunReportWriter
     {
         var width = MathF.Max(1f, map.Bounds.Width);
         var height = MathF.Max(1f, map.Bounds.Height);
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"biome-map\">");
         writer.WriteLine("<h2>Biome Layout</h2>");
         writer.WriteLine(
             $"<p class=\"biome-map-note\">{Html(map.CellCountX)} x {Html(map.CellCountY)} cells at {Html(map.CellSize.ToString("0.###", CultureInfo.InvariantCulture))} world units per cell. Dashed outline marks the resource spawn area when a void border is configured.</p>");
@@ -7517,7 +7726,7 @@ internal static class RunReportWriter
         var width = MathF.Max(1f, map.Bounds.Width);
         var height = MathF.Max(1f, map.Bounds.Height);
         var summary = state.SummarizeEffectiveTemperature();
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"temperature-map\">");
         writer.WriteLine("<h2>Temperature Layout</h2>");
         writer.WriteLine(
             $"<p class=\"biome-map-note\">{Html(map.CellCountX)} x {Html(map.CellCountY)} cells at {Html(map.CellSize.ToString("0.###", CultureInfo.InvariantCulture))} world units per cell. Temperature index runs 0 cold, 50 temperate, 100 hot. Values include currently active ecological temperature events. Average {Html(FormatTemperatureIndex(summary.AverageTemperature))}, range {Html(FormatTemperatureIndex(summary.MinimumTemperature))} - {Html(FormatTemperatureIndex(summary.MaximumTemperature))}.</p>");
@@ -7554,7 +7763,7 @@ internal static class RunReportWriter
         BiomeMap biomeMap,
         SimulationSpatialHeatmaps heatmaps)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"spatial-heatmaps\">");
         writer.WriteLine("<h2>Spatial Heatmaps</h2>");
         if (heatmaps.CellCountX <= 0
             || heatmaps.CellCountY <= 0
@@ -7864,7 +8073,7 @@ internal static class RunReportWriter
         WorldState state,
         SpeciesClusterHistory speciesHistory)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"lineage\">");
         writer.WriteLine("<h2>Survivor Ancestry Tree</h2>");
         if (analysis.LivingCreatureCount == 0 || analysis.Segments.Count == 0)
         {
@@ -7921,10 +8130,9 @@ internal static class RunReportWriter
             return;
         }
 
-        var layout = LayoutLineageSegments(segments, analysis.MaxGeneration);
+        var layout = LayoutLineageSegments(segments);
         var width = layout.Width;
         var height = layout.Height;
-        var generationStride = analysis.MaxGeneration <= 24 ? 1 : analysis.MaxGeneration <= 120 ? 5 : 25;
 
         writer.WriteLine("<div class=\"lineage-report-grid\" data-lineage-section>");
         writer.WriteLine("<div>");
@@ -7932,12 +8140,6 @@ internal static class RunReportWriter
         writer.WriteLine("<div class=\"lineage-toolbar\"><span>Drag to pan. Wheel to zoom. Click a card for details.</span><button type=\"button\" data-lineage-reset>Reset view</button></div>");
         writer.WriteLine($"<svg class=\"lineage-tree\" data-lineage-panzoom data-lineage-viewbox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" viewBox=\"0 0 {SvgNumber(width)} {SvgNumber(height)}\" role=\"img\" aria-label=\"Survivor lineage segment tree\">");
         writer.WriteLine("<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"#fbfcf8\" />");
-        for (var generation = 0; generation <= analysis.MaxGeneration; generation += generationStride)
-        {
-            var y = layout.YForGeneration(generation);
-            writer.WriteLine($"<line x1=\"24\" y1=\"{SvgNumber(y)}\" x2=\"{SvgNumber(width - 24f)}\" y2=\"{SvgNumber(y)}\" stroke=\"#e3e8dc\" stroke-width=\"1\" />");
-            writer.WriteLine($"<text x=\"28\" y=\"{SvgNumber(y - 4f)}\">g{Html(generation)}</text>");
-        }
 
         foreach (var segment in segments)
         {
@@ -8076,8 +8278,7 @@ internal static class RunReportWriter
     }
 
     private static LineageSegmentLayout LayoutLineageSegments(
-        IReadOnlyList<SurvivorLineageSegment> segments,
-        int maxGeneration)
+        IReadOnlyList<SurvivorLineageSegment> segments)
     {
         var byId = segments.ToDictionary(segment => segment.SegmentId);
         var childrenByParent = segments
@@ -8135,12 +8336,39 @@ internal static class RunReportWriter
 
         var laneCount = Math.Max(1, nextLane);
         const float plotLeft = 112f;
-        const float laneStride = 156f;
+        const float laneStride = 176f;
         var plotWidth = MathF.Max(900f, MathF.Max(1f, laneCount - 1f) * laneStride);
-        const float top = 48f;
-        var plotHeight = MathF.Max(640f, Math.Max(1, maxGeneration) * 72f);
+        const float top = 56f;
+        const float rowStride = 88f;
         const float boxWidth = 146f;
         const float boxHeight = 58f;
+        const float rootStemLength = 34f;
+        const float childStemLength = 22f;
+        var depthById = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        int AssignDepth(SurvivorLineageSegment segment)
+        {
+            if (depthById.TryGetValue(segment.SegmentId, out var existing))
+            {
+                return existing;
+            }
+
+            var depth = 0;
+            if (segment.ParentSegmentId is not null && byId.TryGetValue(segment.ParentSegmentId, out var parent))
+            {
+                depth = AssignDepth(parent) + 1;
+            }
+
+            depthById[segment.SegmentId] = depth;
+            return depth;
+        }
+
+        foreach (var segment in segments)
+        {
+            AssignDepth(segment);
+        }
+
+        var rowCount = Math.Max(1, depthById.Values.DefaultIfEmpty(0).Max() + 1);
         var width = plotLeft + plotWidth + 112f;
         var items = segments
             .Select(segment =>
@@ -8148,9 +8376,13 @@ internal static class RunReportWriter
                 var x = laneCount == 1
                     ? width * 0.5f
                     : plotLeft + laneById[segment.SegmentId] / MathF.Max(1f, laneCount - 1f) * plotWidth;
-                var startY = top + segment.StartRecord.Generation / MathF.Max(1f, maxGeneration) * plotHeight;
-                var endY = top + segment.EndRecord.Generation / MathF.Max(1f, maxGeneration) * plotHeight;
-                var boxY = endY - boxHeight * 0.5f;
+                var depth = depthById[segment.SegmentId];
+                var boxY = top + depth * rowStride;
+                var endY = boxY + boxHeight * 0.5f;
+                var stemLength = segment.ParentSegmentId is null || !byId.ContainsKey(segment.ParentSegmentId)
+                    ? rootStemLength
+                    : childStemLength;
+                var startY = MathF.Max(16f, boxY - stemLength);
                 return new LineageSegmentLayoutItem(
                     segment,
                     x,
@@ -8169,8 +8401,7 @@ internal static class RunReportWriter
             items,
             items.ToDictionary(item => item.Segment.SegmentId, StringComparer.Ordinal),
             width,
-            top + plotHeight + 64f,
-            generation => top + generation / MathF.Max(1f, maxGeneration) * plotHeight);
+            top + (rowCount - 1f) * rowStride + boxHeight + 48f);
     }
 
     private static void WriteDominantLineagePathTable(
@@ -8490,8 +8721,7 @@ internal static class RunReportWriter
         IReadOnlyList<LineageSegmentLayoutItem> Items,
         IReadOnlyDictionary<string, LineageSegmentLayoutItem> ById,
         float Width,
-        float Height,
-        Func<int, float> YForGeneration);
+        float Height);
 
     private sealed record LineageSegmentLayoutItem(
         SurvivorLineageSegment Segment,
@@ -8529,7 +8759,7 @@ internal static class RunReportWriter
         int livingFounderLineages,
         int totalFounderLineages)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"season-pressure\">");
         writer.WriteLine("<h2>Season Pressure</h2>");
         if (!summary.Enabled)
         {
@@ -8648,7 +8878,7 @@ internal static class RunReportWriter
         IReadOnlyList<SimulationStatsSnapshot> snapshots,
         int sourceSnapshotCount)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"charts\">");
         writer.WriteLine("<h2>Graphs</h2>");
         if (snapshots.Count == 0)
         {
@@ -9250,7 +9480,7 @@ internal static class RunReportWriter
             .ToArray();
         var ecotypes = ThermalEcotypeAnalyzer.Analyze(state);
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"thermal\">");
         writer.WriteLine("<h2>Thermal Niches</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Current living C/T/H", FormatThermalBandCounts(snapshot.ColdTemperatureCreatureCount, snapshot.TemperateTemperatureCreatureCount, snapshot.HotTemperatureCreatureCount));
@@ -9354,7 +9584,7 @@ internal static class RunReportWriter
 
     private static void WriteBehaviorAssaySection(StreamWriter writer, BehaviorAssaySummary summary)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"behavior\">");
         writer.WriteLine("<h2>Behavior Assays</h2>");
         if (summary.EvaluatedCreatureCount == 0)
         {
@@ -9433,7 +9663,7 @@ internal static class RunReportWriter
             ? snapshot.TotalCreatureCollisionDamagePerSecond / snapshot.CreatureCollisionDamagedCreatureCount
             : 0f;
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"collision\">");
         writer.WriteLine("<h2>Collision Diagnostics</h2>");
         writer.WriteLine("<div class=\"metric-grid\">");
         WriteMetric(writer, "Movement blocked (all)", $"{FormatPercent(Share(snapshot.ObstacleBlockedCreatureCount, snapshot.CreatureCount))} ({snapshot.ObstacleBlockedCreatureCount})");
@@ -9458,7 +9688,7 @@ internal static class RunReportWriter
         StreamWriter writer,
         IReadOnlyList<SpeciesClusterSummary> summaries)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"species\">");
         writer.WriteLine("<h2>Top Species Clusters</h2>");
         if (summaries.Count == 0)
         {
@@ -9868,7 +10098,7 @@ internal static class RunReportWriter
             return;
         }
 
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"rtneat\">");
         writer.WriteLine("<h2>rtNEAT Brain Graphs</h2>");
         writer.WriteLine("<p class=\"biome-map-note\">Representative living graph brains. Connected inputs are shown on the left, hidden nodes in the middle, and physical action outputs on the right. Green links are positive weights, red links are negative weights, and gray links are disabled.</p>");
         foreach (var candidate in candidates)
@@ -10130,7 +10360,7 @@ internal static class RunReportWriter
 
     private static void WriteBrainInputDiagnosticsSection(StreamWriter writer, BrainInputDiagnosticSummary summary)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"brain\">");
         writer.WriteLine("<h2>Sensory Brain Wiring</h2>");
         if (summary.EvaluatedCreatureCount == 0)
         {
@@ -10836,7 +11066,7 @@ internal static class RunReportWriter
 
     private static void WritePlantTypeDiagnosticsSection(StreamWriter writer, SimulationStatsSnapshot snapshot)
     {
-        writer.WriteLine("<section>");
+        writer.WriteLine("<section id=\"plant-types\">");
         writer.WriteLine("<h2>Plant Type Diagnostics</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
         writer.WriteLine("<thead><tr><th>Type</th><th>Resources</th><th>Plant kcal</th><th>Raw eaten/s</th><th>Intake share</th><th>Raw/resource</th><th>Digested energy/s</th><th>Adaptation</th><th>Payoff trace</th></tr></thead>");

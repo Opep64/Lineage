@@ -1830,8 +1830,40 @@ public partial class Main : Node2D
             $"{ColorText("Energy overflow", "#b8c7bd")} {creature.LastEnergyOverflowCalories:0.00}    " +
             $"{ColorText("Fat stored", "#b8c7bd")} {creature.LastFatStoredCalories:0.00}    " +
             $"{ColorText("Fat released", "#b8c7bd")} {creature.LastFatReleasedCalories:0.00}\n" +
+            BuildEnergyBudgetText(creature, richText: true) +
             $"{ColorText("Sound tone", "#b8c7bd")} {creature.Actions.SoundTone:0.00}    " +
             $"{ColorText("Grab pressure", "#b8c7bd")} {creature.GrabPressure:0.00}\n";
+    }
+
+    private string BuildEnergyBudgetText(CreatureState creature, bool richText)
+    {
+        var ledger = creature.LastEnergyLedger;
+        var trait = ledger.TraitUpkeepCalories();
+        var action = ledger.MovementCalories
+            + ledger.AttackCalories
+            + ledger.ReproductionCalories
+            + ledger.HealingCalories;
+        var total = ledger.TotalCostCalories();
+        var sense = ledger.SenseUpkeepCalories + ledger.VisionUpkeepCalories;
+        var intake = creature.LastCaloriesDigested + creature.LastFatReleasedCalories;
+        var reserve = creature.LastFatStoredCalories + creature.LastEnergyOverflowCalories;
+        var bodyLabel = richText ? ColorText("Body", "#b8c7bd") : "Body";
+        var senseLabel = richText ? ColorText("Senses", "#b8c7bd") : "Senses";
+        var brainLabel = richText ? ColorText("Brain", "#b8c7bd") : "Brain";
+        var actionLabel = richText ? ColorText("Action", "#b8c7bd") : "Action";
+        var flowLabel = richText ? ColorText("Flow", "#b8c7bd") : "Flow";
+        var heading = richText
+            ? $"{ColorText("[b]Energy Budget[/b]", "#f3f0d0")}\n"
+            : "Energy Budget\n";
+
+        return
+            heading +
+            $"{flowLabel} +{intake:0.000} digested/fat release, -{total:0.000} cost, {reserve:0.000} stored/overflow\n" +
+            $"{bodyLabel} basal {ledger.BasalCalories:0.000}  body {ledger.BodyUpkeepCalories:0.000}  speed {ledger.SpeedUpkeepCalories:0.000}  turn {ledger.TurnUpkeepCalories:0.000}\n" +
+            $"{senseLabel} radius {ledger.SenseUpkeepCalories:0.000}  vision {ledger.VisionUpkeepCalories:0.000}  subtotal {sense:0.000}\n" +
+            $"{brainLabel} rtNEAT {ledger.BrainUpkeepCalories:0.000}  memory {ledger.MemoryUpkeepCalories:0.000}\n" +
+            $"{actionLabel} move {ledger.MovementCalories:0.000}  attack {ledger.AttackCalories:0.000}  egg {ledger.ReproductionCalories:0.000}  heal {ledger.HealingCalories:0.000}\n" +
+            $"Trait subtotal {trait:0.000} ({FormatPerSecond(trait)}/s)  total cost {total:0.000} ({FormatPerSecond(total)}/s)\n";
     }
 
     private static string SummaryMetric(string label, string value, float ratio, string suffix)
@@ -1940,6 +1972,8 @@ public partial class Main : Node2D
             $"Swallowed {creature.LastCaloriesEaten:0.00} raw ({FormatCaloriesPerSecond(creature.LastCaloriesEaten)}/s)\n" +
             $"Digested {creature.LastCaloriesDigested:0.00} energy ({FormatPerSecond(creature.LastCaloriesDigested)}/s)\n\n" +
             $"Energy overflow {creature.LastEnergyOverflowCalories:0.00}   fat stored {creature.LastFatStoredCalories:0.00}   released {creature.LastFatReleasedCalories:0.00}\n\n" +
+            BuildEnergyBudgetText(creature, richText: false) +
+            "\n" +
             $"Reproduction\n" +
             $"Egg reserve {creature.ReproductiveEnergy:0.0}/{genome.OffspringEnergyInvestment:0.0}\n" +
             $"Ready {(senses.ReproductionReadiness > 0.5f ? "yes" : "no")}   cooldown {creature.ReproductionCooldownSeconds:0.0}s\n";

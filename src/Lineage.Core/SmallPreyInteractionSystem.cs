@@ -145,6 +145,9 @@ public sealed class SmallPreyInteractionSystem(
         var prey = state.SmallPrey[preyIndex];
         prey.Health = Math.Max(0f, prey.Health - damage);
         creature.Energy -= biteCost;
+        var ledger = creature.LastEnergyLedger;
+        ledger.AttackCalories += biteCost;
+        creature.LastEnergyLedger = ledger;
         creature.LastAttackDamageDealt += damage;
         state.Stats.RecordAttackDamage(state.Bounds, prey.Position, damage);
 
