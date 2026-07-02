@@ -1,201 +1,328 @@
 # Lineage Roadmap
 
-Last reviewed: 2026-06-09
+Last reviewed: 2026-07-01
 
 This file is for work that is not done yet. If a mechanic is implemented, move its durable summary to `IMPLEMENTED_STATE.md` and keep only follow-up work here.
 
+The current roadmap intentionally resets older future-work lists. The simulator already has a rich ecology and analysis surface; the highest-value next work is to make experiments easier to design, run, compare, explain, and reproduce.
+
+## Product Direction
+
+Lineage should become an experiment workbench for embodied artificial life:
+
+- define a question or hypothesis;
+- choose a scenario suite, map, roster, brain/body catalog set, seed matrix, and variants;
+- run the experiment reproducibly;
+- compare results across seeds and variants;
+- understand why a result happened;
+- promote useful scenarios, maps, bodies, brains, and mechanics into the maintained catalog.
+
+New mechanics should be added more slowly until the current mechanics are easier to validate.
+
 ## Highest-Value Next Work
 
-- Report layout and interactivity pass.
-- Catalog assay and starter/rookie tuning against the consolidated role x brain catalog.
-- Map-artifact polish and reusable map workflows.
-- Next measured performance experiment.
-- Brain architecture experiments around Hidden 16, rtNEAT tuning, and deep dense variants.
+1. First-class experiment workbench.
+2. Decision-oriented comparison reports.
+3. Canonical scenario and assay suites.
+4. Report navigation and triage improvements.
+5. Catalog QA as a normal workflow.
+6. Current-ecology validation before new ecology expansion.
+7. Brain Lab explainability.
+8. Experiment-aware map authoring.
+9. Runtime and scheduled obstacle changes.
+10. Generated documentation from code metadata.
+11. Architecture-aware performance work.
 
-The user has postponed quadrant-map scenario work for now.
+## Experiment Workbench
 
-## Species, Brains, And Catalogs
+Status: proposed priority
 
-Status: active
+Create an explicit experiment layer above individual runs.
 
-- Continue treating species profiles as bodies plus embedded compatibility fallback brains.
-- Continue treating brain profiles as separate reusable controllers.
-- Improve catalog UX around body/brain selection, compatibility warnings, labels, and saved profile provenance.
-- Add stronger catalog assays for:
-  - profile default brain viability;
-  - body/brain transplant viability;
-  - rookie starters that survive but leave more room for evolution;
-  - predator/prey starter balance.
-- Add a catalog comparison report that summarizes viability, final population, births/deaths, meal gaps, brain architecture, body traits, and behavior assays.
-- Add explicit profile/schema version migration notes whenever senses or outputs change.
-- Consider brain viewers/editors later, starting with probe-linked contribution traces and manual weight nudge tools before full visual editing.
-- Keep starter bodies and starter brains easy to export from runs so successful or interesting lineages can become future scenario founders.
+Desired shape:
 
-## Brain Architecture
+- experiment name, description, tags, and notes;
+- hypothesis or question being tested;
+- control scenario and one or more variants;
+- seed matrix and tick budget;
+- roster, species catalog, brain catalog, map artifact, and recipe stack;
+- expected metrics and pass/fail criteria;
+- links to run artifacts, reports, checkpoints, and comparison outputs;
+- promotion/rejection notes after review.
 
-Status: active design direction
+The goal is to stop treating each run as an isolated artifact. Runs should belong to a reproducible question.
 
-- Keep `HybridNeural` default until Hidden 16, rtNEAT, and catalog starter behavior have more long-run evidence.
-- Continue comparing `HiddenLayerNeural`; the main visible starter catalog currently uses Hidden 16, while Hidden 8, Hidden 8x8, and Hidden 24 remain experiment references.
-- Continue tuning `RtNeatGraph` topology mutation, graph metabolism cost, species clustering thresholds, and predator/prey payoff.
-- Explore a less dense or modular controller architecture that avoids evaluating every possible connection every tick.
-- Explore drive-modulated sparse graph brains, either as an extension of `RtNeatGraph` or as a second rtNEAT-like architecture. Candidate hidden node/operator types include threshold, gate/amplifier, and integrator nodes so hunger, thirst, temperature stress, injury, reproductive readiness, age pressure, fatigue, fat reserves, and future protein/mineral needs can modulate behavior pathways rather than only acting as flat additive inputs.
-- Keep all current senses unless a specific experiment shows a sense is actively harmful. Rich behavior is more important than saving time by making creatures poorer.
-- Do not do sparse-weight pruning on the current dense controller unless it is introduced as a separate architecture or thoroughly proven safe.
-- Record and test lower brain decision frequency as an optional performance mode; the first accepted version reuses all neural outputs when world senses are stale and remains configurable.
-- Consider evolvable hidden node count later, with explicit costs and serialization/clustering rules.
-- Extend brain complexity costs beyond the first rtNEAT hidden-node/connection upkeep model if larger brains need stronger selection pressure.
+Useful first workflow:
 
-## Memory
+- create experiment from a completed run;
+- add variants by changing one scenario/map/catalog setting;
+- launch the seed matrix;
+- produce an experiment summary with verdicts and links.
 
-Status: partially implemented, future redesign likely
+## Comparison Reports
 
-- Current memory is a single controller-managed world-space vector.
-- Future architectures should own memory internally.
-- Possible future model:
-  - several small continuous memory slots;
-  - decay over time;
-  - brain-controlled writes;
-  - optional write/erase/decay gates;
-  - explicit energy/brain/maturity costs.
-- Avoid perfect coordinate memory and hard-coded home vectors.
-- Add injury/fear memory later as an evolvable, decaying avoidance cue rather than hard-coded fear behavior. Useful signals could include recent damage, near-death stress, failed attacks, predator-like contact, dangerous scent/identity context, and the rough direction or area where the bad event happened.
-- Useful future memories might represent recent food, danger, failed target, successful eating, local depletion, egg-laying mode, or short-term movement tendency.
+Status: proposed priority
 
-## Perception And Senses
+Comparison reports should answer "what changed and should I care?" before showing every supporting detail.
 
-Status: active design direction
+Add comparison verdicts such as:
 
-- Keep plants primarily visual/touch based for now; drop generic plant scent as a near-term sense.
-- If foraging needs longer-range guidance, prefer imperfect biome fertility, habitat quality, or terrain/ecology cues over direct plant scent.
-- Add creature and egg scent identity later for kin/species/familiarity experiments.
-- Scent identity should be an evolvable continuous value/domain, not a perfect species ID.
-- Add "own scent" or scent signature as an internal body signal so creatures can compare nearby signatures.
-- Add `internal.maturity_progress` as a smooth `0..1` body-state input so brains can distinguish juvenile, nearly adult, and adult states without relying only on the coarser reproduction-ready gate.
-- Add distance-dependent visual clarity later:
-  - far objects appear as broad categories;
-  - close objects reveal freshness, type, size, or identity details.
-- Continue evaluating the compact semantic visual-summary contract. Raw visual sectors should remain available for Godot/debug/reporting, while brain-facing inputs should prefer category density, proximity, direction, quality, familiarity, relative size, approach, and grab-opportunity summaries.
-- If visual-field detail is reintroduced later, prefer coarse left/front/right or near/mid/far bands over many independent sector feature channels.
-- Add obstacle/terrain/plant occlusion only after basic sector vision is stable and benchmarked.
-- Avoid one brain input per resource instance or real plant species; use broad channels, compact top-K candidates, or compressed field representations.
-- Add sensory cost tuning if selection always maximizes range/angle.
+- promoted;
+- rejected;
+- inconclusive;
+- unstable across seeds;
+- extinct too early;
+- predator washout;
+- food collapse;
+- thermal mismatch;
+- catalog regression;
+- behavior regression;
+- performance regression.
 
-## Ecology And Resources
+Useful comparison dimensions:
 
-Status: first plant diversity slice implemented, broader ecology future
+- final and tail population;
+- extinction timing;
+- births, deaths, maturity, and replacement rate;
+- meal gaps and calories by source;
+- biome exposure, risk, and reward;
+- thermal niche and thermal stress;
+- spatial heatmap deltas;
+- predation, carrion, small-prey, and combat outcomes;
+- brain architecture and complexity;
+- behavior assay deltas;
+- performance and artifact size.
 
-- Coarse plant types exist now: generic, tender, rich, and tough.
-- Creatures can sense compressed plant quality/ease at close range, taste contacted plant quality/ease, and receive recent plant raw/digested yield feedback.
-- Keep checking that every enabled plant type has viable biome habitat after biome-list changes.
-- Add richer plant/resource traits beyond the first coarse categories: toxicity, water content, fruit/leaf/root distinction, seasonal availability, and richer digestible payoff.
-- Decide whether future plant recognition should remain broad and compressed or add a small top-K visible food candidate model.
-- Add seed dispersal and delayed germination rather than instant plant relocation/respawn.
-- Consider plant populations or field/patch summaries for very large worlds instead of one entity per plant everywhere.
-- Add persistent habitat features such as large bushes, shade, logs, or plant-obstacles later if they become mechanically important.
-- Explore self-sustaining plant ecology later, but keep scenario-controlled spawning for now.
+Reports should support paired-seed comparisons so a variant is compared against the same seed in the control whenever possible.
 
-## Population Stability And Evolutionary Pressure
+## Canonical Scenario And Assay Suites
 
-Status: ongoing tuning
+Status: proposed priority
 
-- Continue seeking lower but stable populations for large worlds.
-- Harsh and Predation are viable but still thin in worst seeds; keep watching 500k+ behavior before adding stronger scarcity.
-- Predator Prey has explicit efficient-prey and meat-biased-predator profiles, but sustained predator/prey loops are not reliable yet.
-- Keep birth rates controlled through egg reserve, maturity, investment, cooldown, crowding, fertility, and resource scarcity.
-- Add stronger search pressure without causing frequent long-run extinction.
-- Watch for scarcity boom-crash cycles.
-- Use gene-drift report graphs and tail-window summaries when tuning trait costs. Tune only repeated always-win structural traits, not one-seed or stale-run artifacts.
-- Continue watching body radius, sense radius, damage resistance, metabolic pace, offspring investment, egg timing, rich-plant specialization, and gut/digestion as long-run cost-balance candidates.
-- Body size remains a special watchpoint because it bundles contact reach, collision mass, working energy capacity, lifespan scaling, bite scaling, and death-meat output. If current-code long runs drift strongly large again, first consider a modest body-upkeep bump or body-size movement-cost term before changing damage resistance.
-- Do not retune damage resistance from the latest evidence alone; current benefit and upkeep curves look plausible unless future current-code runs show renewed armor runaway.
-- Potential future stabilizers:
-  - idle/low-speed conservation payoffs;
-  - reproduction suppression in poor local food conditions;
-  - better local depletion memory;
-  - seasonal/disturbance cues;
-  - richer bottleneck and overshoot reporting.
+Create maintained scenario suites with known intent, seed matrices, expected signals, and acceptance ranges.
 
-## Carrion, Predation, Combat, And Interaction
+Suggested suites:
 
-Status: first pass implemented, not final ecology
+- Core survival: balanced, lean, harsh, and long-tail stability.
+- Predation and scavenging: predator pressure, small prey, carrion, rot, and combat lethality.
+- Thermal ecology: thermal gradients, heat waves, cold snaps, thermal specialization, and thermal stress.
+- Mobility and geography: migration, corridors, islands, barriers, obstacle fields, and map mixing.
+- Memory and contact: injury memory, collision, grab, local depletion, and failed-action feedback.
+- Catalog QA: species body x brain profile x scenario viability.
+- Performance: large-world timing, sensing pressure, neural pressure, report/export size, and deterministic single-thread comparison.
 
-- Make freshness-aware and carrion-aware behavior more discoverable without prewiring every founder.
-- Current meat-payoff traces are useful feedback, but recent validation suggests the scavenging bottleneck is mostly encounter/contact opportunity or occasional sampling pressure, not refusal to eat contacted meat or missing digestion reward.
-- Explore gentle scavenging bridges that create discoverable meat opportunities without scripting scavenger behavior, such as better fresh-carcass encounter pressure, low-risk sampling routes, or scenario-specific meat-contact assays.
-- Improve predation-specific diagnostics and long-run stability.
-- Tune predator/prey starter behavior through scenario rosters and catalog profiles rather than globally increasing bite damage.
-- Revisit combat lethality tuning: baseline bite damage currently requires long sustained contact for a kill, so future work should evaluate bite damage, bite-strength scaling, attack-output intensity, target body/health scaling, and how easily predators can maintain contact.
-- Tune passive healing: validate the current cooldown, heal rate, energy cost, energy floor, telemetry, and predator/prey effects so chip damage does not become either irrelevant or overpowered.
-- Add imperfect similarity/species cues or social-tolerance gates before expecting stable predator-only populations.
-- Investigate hard action gates, especially attack intent, because partial progress toward rare actions may not be rewarded.
-- Add generic intent/progress/frustration feedback so brains can learn when intended effort is not producing results.
-- Future interactions:
-  - guarding eggs;
-  - carrying resources or eggs;
-  - richer grabbing/attaching behavior with grip costs, accumulated escape strain, and held-target sensing;
-  - parasite-like small-creature strategies built on grab plus attack;
-  - social tolerance or aggression based on imperfect similarity cues.
+Each suite should document:
 
-## Terrain, Biomes, Climate, And World Generation
+- what it is testing;
+- what a healthy run looks like;
+- which metrics matter;
+- what common failure modes mean;
+- which results are allowed to be seed-sensitive.
 
-Status: natural biome generation and reusable maps have a first pass
+## Report Usability
 
-- Current canonical biomes are Desert, Scrubland, Grassland, Fertile, Forest, Wetland, Tundra, and Highland.
-- Natural climate generation exists, but map realism and biome adjacency can still improve.
-- Keep generated layers deterministic and editable.
-- Make map artifacts more first-class:
-  - thumbnails and metadata;
-  - better import/export;
-  - clearer saved-map lifecycle;
-  - better Godot/launcher handoff.
-- Later, derive biome labels from elevation, water, moisture, temperature, fertility, terrain cost, and hazards rather than treating biome labels as the only underlying truth.
-- Add lakes/seas as impassable or near-impassable barriers later.
-- Add temperature and water survival mechanics before making Desert/Tundra fully distinct climate extremes.
-- Add manual quadrant/walled scenarios later; quadrant spawn regions are implemented, but the maps and test scenarios are deferred.
+Status: proposed priority
+
+Reports already contain a lot of information. The next pass should make them easier to navigate and interpret rather than simply adding more sections.
+
+Priorities:
+
+- stronger report index and section navigation;
+- executive summary and "why this verdict?" text;
+- collapsible deep-dive sections;
+- wider layout where it helps comparison tables and graphs;
+- searchable/filterable tables;
+- clearer chart labels, legends, hover details, and seed/variant labels;
+- saved report views or compact reviewer mode;
+- links between verdicts, charts, heatmaps, lineages, and source artifacts.
+
+The default report should help a tired reviewer find the important result quickly.
+
+## Catalog QA
+
+Status: proposed priority
+
+Catalog profiles should be tested as maintained product artifacts, not just convenient starter settings.
+
+Needed workflows:
+
+- run body x brain x scenario assay matrices;
+- summarize viable, brittle, overpowered, and obsolete pairings;
+- flag catalog regressions when schema, senses, outputs, costs, or mechanics change;
+- compare starter, rookie, predator, prey, scavenger, and specialist profiles;
+- preserve provenance for profiles exported from successful runs;
+- provide migration notes when brain input/output schemas change.
+
+The launcher should make it natural to pick a profile, see where it has been tested, and know whether it is a good baseline or an experimental profile.
+
+## Current Ecology Validation
+
+Status: proposed priority
+
+Before adding large new ecology systems, validate the mechanics that already exist together and in isolation.
+
+Mechanics to characterize:
+
+- thermal maps and thermal mismatch;
+- small prey;
+- carrion and rot;
+- passive healing;
+- fat storage;
+- creature grabbing;
+- creature collision;
+- injury memory;
+- scent identity and lineage familiarity;
+- ecological events;
+- biome movement, speed, vision, basal, and fertility pressure.
+
+For each mechanic, decide whether it is:
+
+- canonical and enabled in normal scenarios;
+- experimental but maintained;
+- useful only in targeted scenarios;
+- confusing or too expensive until redesigned.
+
+## Brain Lab And Explainability
+
+Status: proposed priority
+
+Brain architecture work should be paired with better tools for understanding decisions.
+
+Useful additions:
+
+- action contribution traces for movement, eating, attacking, grabbing, and reproduction;
+- probe timelines that show sensed inputs, internal state, outputs, and resulting action;
+- brain-vs-brain profile comparisons on the same probe set;
+- mutation lineage snapshots for interesting brains;
+- behavior assay matrices connected to catalog QA;
+- rtNEAT topology and complexity comparisons tied to actual behavior.
+
+Avoid making larger or more expressive brains the default until the current brains are easier to explain and compare.
+
+## Experiment-Aware Map Authoring
+
+Status: proposed priority
+
+Map authoring should help create deliberate experimental worlds, not just pretty biome grids.
+
+Painting and authoring improvements:
+
+- brush sizes, shapes, hardness, and falloff;
+- line, rectangle, fill, lasso, and stamp tools;
+- obstacle, biome, spawn-region, event-region, and annotation layers;
+- named map regions and named obstacle groups;
+- copy/paste and mirror/rotate tools for symmetric tests;
+- undo/redo and version notes;
+- thumbnails and map metadata;
+- map metrics such as biome proportions, obstacle density, corridor width, isolation, connectivity, and resource/temperature gradients;
+- import/export polish for sharing authored maps.
+
+Useful special-built map types:
+
+- quadrant and island isolation maps;
+- corridors and chokepoints;
+- risk/reward patches;
+- thermal-gradient maps;
+- migration lanes;
+- maze-like obstacle pressure;
+- separated founder arenas that later reconnect.
+
+The key question for a map tool should be: "Does this world test the thing I think it tests?"
+
+## Runtime And Scheduled Obstacles
+
+Status: proposed priority
+
+Add support for obstacle areas that can be added, removed, or changed during a run in a reproducible way.
+
+Primary use case:
+
+- start a map with multiple regions separated by barriers;
+- let populations evolve independently for a fixed number of ticks or generations;
+- remove selected barriers later;
+- observe migration, mixing, competition, hybridization of strategies, and lineage replacement.
+
+Suggested model:
+
+- maps contain named obstacle groups, gates, or barrier regions;
+- scenarios can schedule obstacle events by tick, generation window, or named experiment phase;
+- events can open, close, toggle, thin, thicken, or remove an obstacle group;
+- live Godot edits can be allowed for debugging, but they should be recorded into the run event log or saved scenario if the result needs to be reproducible;
+- checkpoints and reports should include the active obstacle state and the obstacle event history.
+
+Report needs:
+
+- mark obstacle-change events on time-series charts;
+- summarize pre-mixing and post-mixing population, lineage, trait, and behavior changes;
+- track crossings through opened regions;
+- show heatmap changes before and after barriers open;
+- identify which isolated region produced dominant later lineages.
+
+Implementation cautions:
+
+- keep deterministic replay intact;
+- define whether creatures, eggs, meat, and small prey inside newly blocked cells are moved, trapped, damaged, or allowed to remain;
+- update spatial indexes and path/contact assumptions when obstacle state changes;
+- make obstacle schedules visible in experiment comparisons so map mixing is not mistaken for spontaneous behavior change.
+
+## Generated Documentation
+
+Status: proposed priority
+
+The implementation is moving faster than the hand-maintained planning docs. Reduce future drift by generating more documentation from code and tests.
+
+Useful generated outputs:
+
+- scenario field reference from scenario metadata;
+- implemented feature inventory from tests and known systems;
+- catalog profile inventory;
+- recipe inventory and behavior-sensitive setting diffs;
+- report-section inventory;
+- map artifact format summary;
+- compatibility notes when schema versions change.
+
+Hand-written docs should focus on intent, interpretation, and design decisions.
 
 ## Performance
 
-Status: always relevant
+Status: ongoing priority
 
-- Preserve deterministic single-threaded mode through thread count settings.
-- Parallel neural and sensing systems are implemented; keep testing default thread counts against behavior and wall-clock performance.
-- The first resource-regrowth active-list attempt was not kept. Revisit only with careful profiling and correctness checks.
-- Try trait/effective-body caches to reduce repeated growth/body calculations across metabolism, sensing, neural, movement, eating, and attack.
-- Consider chunk-level resource/plant summaries for huge sparse worlds.
-- Consider compact history mode that keeps full ancestor paths and heatmap/death positions while pruning dead side-branch brain/genome payloads and summarizing side branches.
-- Improve report/export streaming for very long runs.
-- Keep sensing-detail profiling visible enough to separate resource query load, plant/meat scan load, egg/identity scent load, finalization, and skipped/refreshed world-sense cadence in long-run slowdowns.
-- For rtNEAT performance, profile repeated topology/feature analysis and sensing pressure before deeper evaluator rewrites; direct neural evaluation is not always the dominant late-run bottleneck.
-- Continue Godot render decoupling and draw aggregation when visual refresh lags simulation speed.
+Performance work should be tied to real experiment workflows and current bottlenecks.
 
-## Reports, Analysis, And Taxonomy
+Promising directions:
 
-Status: first pass implemented, future refinement needed
+- profile sensing, neural evaluation, spatial queries, report generation, and serialization separately;
+- cache effective trait/body calculations where repeated across systems;
+- reduce repeated thermal, biome, and trait lookups in hot loops;
+- explore chunk-level plant, prey, scent, obstacle, and resource summaries for large worlds;
+- keep deterministic single-threaded modes available for comparison;
+- preserve behavior when adding parallelism or cadence settings;
+- evaluate sparse or modular brain architectures only with behavior and catalog assays, not speed alone;
+- add compact history modes that preserve ancestry and heatmap evidence while limiting dead-payload growth.
 
-- Make the report use wide screens better; the current layout still leaves too much unused space.
-- Improve population-over-time charts with labels, legends, hover/click details, and filtering.
-- Continue improving the survivor ancestry graph:
-  - clearer explanation that cards are survivor-ancestry segments, not species;
-  - better card spacing and branch layout;
-  - richer selected segment details;
-  - easier ancestor comparison along dominant and side branches.
-- Add spatial heatmaps for occupancy, deaths by cause, food consumption, births/eggs, and successful lineages.
-- Keep genome-trait drift graphs and tail-window summaries prominent enough to support cost tuning across body, senses, metabolism, reproduction, diet, combat, thermal, scent, and brain-complexity traits.
-- Improve species/cluster thresholds without implying false precision.
-- Distinguish lineage relatedness from behavioral convergence.
-- Use functional brain fingerprints for future richer brain architectures.
-- Add a future niche/life-history classification layer rather than overloading existing role labels.
-- Candidate life-history labels include `r-selected`, `K-selected`, `stress-tolerant`, `competitive`, `ruderal/opportunist`, `generalist`, `specialist`, `efficient grazer`, `scavenger`, `predator`, `nomad/explorer`, `resident/patch holder`, and `defensive/durable`.
-- Suggested output shape: `life history / trophic role / habitat or behavior / trend`.
-- Candidate metrics: final and tail population, births/deaths, max and average generation, lifespan, stored creature energy, effective creature energy, body-area biomass proxy, energy per creature, offspring investment, egg count, egg energy per egg, maturity age, reproductive reserve, tail stability, calories per distance, and bottleneck/replacement history.
+Performance recipes should remain explicit because they can change behavior.
+
+## Deprioritized For Now
+
+These ideas remain interesting but should wait until the experiment/comparison/map workflow is stronger:
+
+- large new social systems;
+- richer plant chemistry and nutrient webs;
+- full water survival mechanics;
+- more raw senses;
+- recurrent or plastic brain architectures as defaults;
+- two-parent mating;
+- self-sustaining plant ecology;
+- full visual brain editing;
+- large mechanics that cannot yet be tested by a canonical scenario suite.
 
 ## Open Questions
 
-- Should vision remain fixed sectors or become a small visual field preprocessing layer?
-- Should visual categories blur by distance, freshness, size, or type?
-- What minimum long-run stability target makes a scenario viable?
-- Should future plant ecology use discrete plant entities, patch-level populations, continuous fields, or a hybrid?
-- How should memory-heavy or large-brain lineages pay costs without making useful cognition impossible?
-- When should hidden-layer brains become default, if ever?
-- Should rtNEAT eventually add crossover/innovation lineage and richer recurrent/internal-memory nodes, or stay as one-parent sparse graph mutation?
+- What is the minimum experiment object that makes repeated run comparisons feel natural?
+- Which verdicts should be automatic, and which should require reviewer confirmation?
+- What seed-count and tick-budget standards should define a promoted scenario, map, species, or brain?
+- Should obstacle schedules be scenario-level events, map-level events, or reusable timeline artifacts?
+- Should temporary obstacles be represented as map state, ecological events, or a separate dynamic terrain layer?
+- How should runtime obstacle edits interact with creatures, eggs, meat, and small prey already occupying affected cells?
+- What map metrics best predict whether an authored world will produce useful evolutionary pressure?
+- Which existing mechanics are canonical enough to stay enabled in the default scenario?

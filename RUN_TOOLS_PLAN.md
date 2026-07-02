@@ -1,13 +1,13 @@
 # Lineage Run Tools State And Plan
 
 Created: 2026-05-23
-Last reviewed: 2026-06-03
+Last reviewed: 2026-07-01
 
 This file tracks tools outside Godot for launching, monitoring, cataloging, and analyzing CLI simulation runs. Start with `DOCS_INDEX.md` for the full documentation map.
 
 ## Goal
 
-The run tools should make long simulation work practical: start runs, watch progress, reopen artifacts, compare outcomes, manage reusable maps, curate species/brain catalogs, and export enough context for later analysis.
+The run tools should make long simulation work practical: define experiments, start runs, watch progress, reopen artifacts, compare outcomes, manage reusable maps, curate species/brain catalogs, and export enough context for later analysis.
 
 The first version is now implemented as a local web launcher/run library in `src/Lineage.Runner`.
 
@@ -34,6 +34,7 @@ The launcher should own:
 - CLI process launching and management;
 - active run status and logs;
 - run manifests and run history;
+- experiment grouping, notes, seed matrices, run sets, and comparison launches;
 - finished-run library, filtering, rename/delete/bulk management, and report opening;
 - reusable scenario recipes;
 - reusable map artifact management;
@@ -51,7 +52,7 @@ Godot should continue to own:
 
 - scenario schema and defaults;
 - scenario validation;
-- map, species, and brain artifact formats;
+- map, dynamic obstacle, species, and brain artifact formats;
 - snapshot/report/profile serialization;
 - simulation behavior.
 
@@ -73,6 +74,7 @@ Remaining:
 - Better concurrency controls.
 - Better stalled-run detection and recovery hints.
 - More compact active-run dashboard for many simultaneous runs.
+- Link launched runs to experiments, variants, and paired seed groups.
 
 ### Catalog Finished Runs
 
@@ -86,9 +88,27 @@ Implemented:
 Remaining:
 
 - Manual import of existing `out/` runs.
-- Tags/notes.
-- Cross-run comparison screens beyond ad hoc reports and exported artifacts.
+- Tags, notes, experiment membership, and review verdicts.
+- Cross-run comparison screens with paired-seed controls and variants.
 - Safer artifact move/archive workflows.
+
+### Experiments And Comparisons
+
+Implemented:
+
+- Individual runs can be launched, inspected, rerun, continued, and exported.
+- Reports and exported artifacts provide enough raw material for manual comparisons.
+
+Remaining:
+
+- Add first-class experiment records with hypothesis, control, variants, seed matrix, expected metrics, notes, and verdict.
+- Create experiments from an existing run or scenario recipe.
+- Launch all control/variant/seed combinations as a managed batch.
+- Show experiment progress and failure state across all child runs.
+- Compare paired seeds before aggregating across seeds.
+- Summarize deltas for population, extinction, births/deaths, food sources, biome exposure, thermal stress, predation, behavior assays, brain complexity, and performance.
+- Add reviewer verdicts such as promoted, rejected, inconclusive, unstable, extinct too early, food collapse, predator washout, thermal mismatch, catalog regression, behavior regression, and performance regression.
+- Preserve comparison outputs as artifacts linked from the experiment.
 
 ### Scenario Recipes
 
@@ -105,6 +125,7 @@ Remaining:
 
 - Recipe undo/history beyond removing applied recipes from the active stack.
 - Better warnings when a recipe changes behavior-sensitive settings.
+- Make recipe changes visible inside experiment comparisons and run provenance.
 
 ### Reusable Maps
 
@@ -122,7 +143,14 @@ Remaining:
 - Thumbnails and metadata.
 - Import/export and duplication polish.
 - Godot map editing parity if needed.
-- More authored maps for quadrant, corridor, island, and risk/reward experiments.
+- More authored maps for quadrant, corridor, island, risk/reward, thermal-gradient, and separated-population experiments.
+- Richer painting controls: brush sizes, shapes, line/rectangle/fill/lasso tools, stamps, copy/paste, mirror, undo/redo, and layer visibility.
+- Named map regions and named obstacle groups.
+- Obstacle, biome, spawn-region, event-region, and annotation layers.
+- Map metrics for biome proportions, obstacle density, region isolation, corridor width, connectivity, and resource/temperature gradients.
+- Scheduled obstacle changes so barriers can open, close, thin, thicken, or disappear during a run.
+- Runtime obstacle edits in Godot for debugging, with event-log or scenario recording when reproducibility matters.
+- Report and comparison support for pre-mixing vs post-mixing population, lineage, heatmap, and trait changes.
 
 ### Species And Brain Catalogs
 
@@ -140,6 +168,8 @@ Remaining:
 
 - Catalog assay integration in the launcher.
 - Better body/brain transplant summaries.
+- Experiment-backed body x brain x scenario matrix runs.
+- Viability labels for baseline, experimental, brittle, overpowered, obsolete, and promoted profiles.
 - Brain editor or weight inspection tooling.
 - Profile migration UX when input/output schemas change.
 
@@ -148,22 +178,24 @@ Remaining:
 Implemented:
 
 - CLI and Godot can generate the same report style.
-- Reports include run settings, pressure settings, starting roster, charts, ecology summaries, biome outcomes, lineage summaries, behavior assays, brain diagnostics, rtNEAT graph/topology diagnostics, healing telemetry, and survivor ancestry.
-- Spatial reporting captures plant payoff traces and biome exposure; heatmap-style reports are planned but not fully built.
+- Reports include run settings, pressure settings, starting roster, charts, ecology summaries, biome outcomes, spatial heatmaps, lineage summaries, behavior assays, brain diagnostics, rtNEAT graph/topology diagnostics, healing telemetry, and survivor ancestry.
 
 Remaining:
 
-- Spatial heatmaps for occupancy, deaths, food, births, eggs, and lineage success.
+- Decision-oriented comparison reports.
+- Executive summary and "why this verdict?" report text.
 - Population chart labels/legend/hover/click details.
 - Better wide-screen layout.
-- Cross-run comparison views in the launcher.
+- Stronger report navigation, collapsible deep dives, searchable/filterable tables, and compact reviewer mode.
+- Cross-run and experiment comparison views in the launcher.
+- Chart markers and summaries for scheduled ecological or obstacle events.
 
 ## Export For Codex Analysis
 
 Remaining useful workflow:
 
-- Export compact Markdown or JSON bundles summarizing selected runs.
-- Include scenario names, seeds, command lines, settings, final metrics, tail-window metrics, output paths, and notes.
+- Export compact Markdown or JSON bundles summarizing selected runs or whole experiments.
+- Include experiment hypothesis, scenario names, variants, seeds, command lines, settings, final metrics, tail-window metrics, output paths, notes, and verdicts.
 - Keep exports small enough for future Codex threads to analyze without loading every full CSV/report.
 
 ## Maintenance Notes

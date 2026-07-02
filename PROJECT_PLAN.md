@@ -1,7 +1,7 @@
 # Lineage Project Plan
 
 Created: 2026-05-19
-Last reviewed: 2026-06-03
+Last reviewed: 2026-07-01
 
 This file is the high-level project plan. It is intentionally shorter than the experiment logs; use it to recover the current direction, then jump to the narrower documents listed below.
 
@@ -57,55 +57,67 @@ The recent branch work expanded well beyond biomes and is now part of mainline d
 - the launcher supports scenario recipes with descriptions/diffs, map artifacts, catalogs, starting rosters, run history, reports, checkpoints, Brain Lab probes, and Save Species/Save Brain workflows;
 - HTML reports now include spatial ecology summaries, biome death/exposure tables, starting-roster information, rtNEAT graph/topology diagnostics, healing telemetry, and a panning/zooming survivor ancestry graph.
 
-## Near-Term Priorities
+## Current Development Direction
 
-1. Catalog hardening
-   - Keep improving starter and rookie species/brain catalogs.
-   - Add assays for body/brain swaps so weak starters are viable but not over-optimized.
-   - Make catalog save/export paths predictable and safe.
+The simulator has enough mechanics now that the highest-value work is not simply adding more systems. The project should move toward an experiment workbench: a place to define a question, run controlled variants, compare paired seeds, understand results, and promote useful scenarios, maps, species, brains, and mechanics into maintained catalogs.
 
-2. Report usability
-   - Use more of the available screen width.
-   - Improve population-over-time labeling and interactivity.
-   - Continue the lineage graph work: clearer segment meaning, better selected-card details, and richer ancestor comparisons.
-   - Add the planned spatial heatmap views for occupancy, deaths, births, food intake, and lineage success.
+Near-term work should prioritize:
 
-3. Large-run performance
-   - Keep the 16k x 16k baselines in `PERFORMANCE_BASELINES.md`.
-   - Revisit trait/effective-body caches.
-   - Reconsider resource regrowth with strong safeguards; the last active-list attempt was not kept.
-   - Keep resource/plant chunk summaries and compact history modes on the table for very long runs.
-   - Preserve deterministic single-threaded modes while testing parallel speedups.
+1. Experiment workbench
+   - Group runs by hypothesis, control, variants, seed matrix, map, roster, recipe stack, expected metrics, notes, and verdict.
+   - Make it easy to create an experiment from an existing run and launch paired-seed variants.
 
-4. Authored maps and world pressure
-   - Make reusable maps feel like first-class artifacts in both launcher and Godot.
-   - Add better map previews, metadata, thumbnails, duplication, and import/export workflows.
-   - Later, support quadrant/walled experiments, manual maps seeded from natural maps, and richer terrain layers.
+2. Decision-oriented comparison
+   - Put verdicts and deltas before deep detail.
+   - Compare controls and variants across matched seeds.
+   - Flag instability, extinction, food collapse, thermal stress, predator washout, catalog regression, behavior regression, and performance regression.
 
-5. Brain architecture experiments
-   - Keep `HybridNeural` as default for now.
-   - Continue comparing Hidden 16 catalog profiles against Hybrid 4 and rtNEAT graph profiles.
-   - Tune rtNEAT topology mutation, graph complexity cost, and predator/prey behavior.
-   - Keep deep 8x8 dense variants as experiments until they clearly outperform simpler catalog choices.
-   - Keep all current senses unless a specific experiment proves a sense is harmful rather than merely expensive.
+3. Canonical scenario and assay suites
+   - Maintain suites for core survival, predation/scavenging, thermal ecology, mobility/geography, memory/contact behavior, catalog QA, and performance.
+   - Document what each suite tests, what healthy results look like, and which metrics matter.
 
-## Deferred Direction
+4. Report usability
+   - Improve navigation, executive summaries, chart labels, hover details, collapsible sections, searchable tables, and reviewer-focused compact views.
+   - Treat reports as decision tools rather than raw evidence dumps.
 
-The following are still good ideas, but not the next default work:
+5. Catalog QA
+   - Test body x brain x scenario matrices as a normal workflow.
+   - Mark profiles as viable, brittle, overpowered, obsolete, baseline, or experimental.
+   - Preserve provenance and migration notes for saved species and brain profiles.
 
-- temperature and water as survival mechanics;
-- radiation or mutation-pressure zones;
-- richer carrying/latching interactions beyond the first creature grab pass;
-- richer plant ecology with seeds, dispersal, toxins, and nutrients;
-- creature social behavior, kin/familiarity cues, and imperfect identity;
-- recurrent/memory-owning brains;
-- full map editors in Godot if the launcher map tools remain insufficient.
+6. Map authoring and dynamic terrain
+   - Add richer painting controls, layers, region labels, obstacle groups, map metrics, thumbnails, and reusable authored-map workflows.
+   - Support scheduled obstacle changes so isolated populations can evolve separately and later mix when barriers open.
+   - Keep runtime map edits reproducible by recording obstacle events in scenarios, checkpoints, reports, or run logs.
+
+7. Current-ecology validation
+   - Characterize thermal pressure, small prey, carrion, passive healing, fat, grab, collision, injury memory, scent identity, ecological events, and biome pressure before adding larger new ecology systems.
+
+8. Brain Lab explainability
+   - Add contribution traces, probe timelines, profile comparisons, mutation lineage snapshots, and behavior-assay matrices before making larger brain architectures default.
+
+9. Architecture-aware performance
+   - Profile current bottlenecks, cache repeated trait/body calculations, explore chunk summaries, preserve deterministic single-threaded modes, and connect speed work to experiment quality.
+
+## Deprioritized Direction
+
+These remain interesting, but they should wait until experiment design and comparison are stronger:
+
+- large new social systems;
+- richer plant chemistry and nutrient webs;
+- full water survival mechanics;
+- more raw senses;
+- recurrent or plastic brains as defaults;
+- two-parent mating;
+- self-sustaining plant ecology;
+- full visual brain editing;
+- large mechanics that cannot yet be tested by canonical scenario suites.
 
 ## Practical Next Step
 
-After this documentation refresh, the most useful next coding work is probably one of:
+The most useful next coding work is probably one of:
 
-- a report layout/interactivity pass;
-- catalog assay runs and starter/rookie tuning;
-- map-artifact polish;
-- or the next careful performance experiment from the maintained list.
+- add the first experiment object and paired-run comparison workflow;
+- add comparison verdicts and a compact reviewer summary to existing reports;
+- define one canonical scenario suite and wire it into catalog QA;
+- expand map painting with named obstacle groups and scheduled barrier-opening events.
