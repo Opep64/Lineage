@@ -64,7 +64,8 @@ public sealed record BiomeMapPreview(
     int ObstacleCellCountY,
     int ObstacleBlockedCellCount,
     IReadOnlyList<bool> ObstacleCells,
-    IReadOnlyList<BiomeMapPreviewSummary> Biomes);
+    IReadOnlyList<BiomeMapPreviewSummary> Biomes,
+    IReadOnlyList<MapArtifactObstacleGroupCells> ObstacleGroups);
 
 public sealed record BiomeMapPreviewSummary(
     string Name,
@@ -89,7 +90,20 @@ public sealed record MapArtifactOption(
     ulong? SourceSeed,
     string? SourceBiomeMapKind,
     string? SourceObstacleMapKind,
-    IReadOnlyList<BiomeMapPreviewSummary> Biomes);
+    IReadOnlyList<BiomeMapPreviewSummary> Biomes,
+    IReadOnlyList<MapArtifactObstacleGroupSummary> ObstacleGroups);
+
+public sealed record MapArtifactObstacleGroupSummary(
+    string Id,
+    string Name,
+    bool DefaultBlocked,
+    int CellCount);
+
+public sealed record MapArtifactObstacleGroupCells(
+    string Id,
+    string Name,
+    bool DefaultBlocked,
+    IReadOnlyList<int> Cells);
 
 public sealed record MapArtifactSaveRequest(
     string Name,
@@ -97,7 +111,8 @@ public sealed record MapArtifactSaveRequest(
     ulong? Seed,
     string? ScenarioPath,
     IReadOnlyList<string>? Cells,
-    IReadOnlyList<bool>? ObstacleCells);
+    IReadOnlyList<bool>? ObstacleCells,
+    IReadOnlyList<MapArtifactObstacleGroupCells>? ObstacleGroups);
 
 public sealed record MapArtifactSaveResult(
     MapArtifactOption Map,
@@ -713,6 +728,7 @@ public sealed record RunScenarioSummary(
 
 public sealed record RunScenarioSpeciesSeedSummary(
     string? Label,
+    string? Tag,
     string ProfilePath,
     string ProfileName,
     int Count,

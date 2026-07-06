@@ -262,6 +262,7 @@ public static class SimulationScenarioMetadata
             "EnableTemperature" => "Builds a cached temperature map for climate visualization, telemetry, thermal sensing, and optional thermal stress costs.",
             "ThermalMismatchBasalCostMultiplier" => "Extra basal upkeep applied at full thermal mismatch. Zero keeps temperature sensory and observational only.",
             "EcologicalEvents" => "Optional scheduled regional shocks. Fertility pulse/crash events multiply plant fertility; heat waves and cold snaps temporarily shift effective temperature.",
+            "ObstacleEvents" => "Optional scheduled wall-group changes. Off opens the group; on closes it again at the requested tick.",
             "ThermalOptimum" => "Starting creature thermal optimum on the normalized 0 cold, 0.5 temperate, 1 hot scale.",
             "ThermalTolerance" => "Starting creature thermal tolerance. Larger values make temperature mismatch cues ramp up more slowly.",
             "EnableCreatureCollision" => "Prevents living creatures from passing through one another and records creature body collisions.",

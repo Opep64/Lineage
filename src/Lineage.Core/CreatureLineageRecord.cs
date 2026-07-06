@@ -14,6 +14,8 @@ public struct CreatureLineageRecord
 
     public EntityId ParentId { get; set; }
 
+    public string? Tag { get; set; }
+
     public long BirthTick { get; set; }
 
     public double BirthElapsedSeconds { get; set; }

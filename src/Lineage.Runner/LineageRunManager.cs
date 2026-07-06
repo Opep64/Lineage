@@ -255,6 +255,7 @@ public sealed partial class LineageRunManager
             scenario,
             scenarioDirectory);
         var obstacleMap = SimulationScenarioFactory.CreateObstacleMap(scenario, scenarioDirectory);
+        var obstacleGroups = TryLoadWorldMapObstacleGroups(scenario, scenarioDirectory);
         var previewCellCount = (long)map.CellCountX * map.CellCountY;
         if (previewCellCount > MaxBiomePreviewCells)
         {
@@ -315,7 +316,8 @@ public sealed partial class LineageRunManager
             obstacleMap.CellCountY,
             obstacleMap.BlockedCellCount,
             obstacleMap.GetCellsCopy(),
-            biomes);
+            biomes,
+            obstacleGroups);
     }
 
     public MapArtifactSaveResult SaveMapArtifact(MapArtifactSaveRequest request)
@@ -345,6 +347,7 @@ public sealed partial class LineageRunManager
         var obstacleMap = request.ObstacleCells is { Count: > 0 }
             ? CreateObstacleMapFromEditedCells(scenario, request.ObstacleCells)
             : SimulationScenarioFactory.CreateObstacleMap(scenario, scenarioDirectory);
+        var obstacleGroups = CreateObstacleGroups(request.ObstacleGroups);
 
         var mapRoot = UserMapArtifactRoot();
         Directory.CreateDirectory(mapRoot);
@@ -359,10 +362,33 @@ public sealed partial class LineageRunManager
                 name,
                 scenario.BiomeMapKind,
                 scenario.ObstacleMapKind,
-                scenario.Seed));
+                scenario.Seed) with
+            {
+                ObstacleGroups = obstacleGroups
+            });
 
         var option = ToMapArtifactOption(mapPath, WorldMapArtifactJson.Load(mapPath));
         return new MapArtifactSaveResult(option, option.Path);
+    }
+
+    private MapArtifactObstacleGroupCells[] TryLoadWorldMapObstacleGroups(
+        SimulationScenario scenario,
+        string? scenarioDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(scenario.WorldMapPath))
+        {
+            return [];
+        }
+
+        try
+        {
+            var worldMapPath = SimulationScenarioFactory.ResolveWorldMapPath(scenario.WorldMapPath, scenarioDirectory);
+            return ToObstacleGroupCells(WorldMapArtifactJson.Load(worldMapPath).Validated().ObstacleGroups);
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     public MapArtifactSaveResult RenameMapArtifact(MapArtifactRenameRequest request)
@@ -2080,6 +2106,33 @@ public sealed partial class LineageRunManager
             cells);
     }
 
+    private static WorldMapObstacleGroup[] CreateObstacleGroups(
+        IReadOnlyList<MapArtifactObstacleGroupCells>? groups)
+    {
+        return (groups ?? [])
+            .Where(group => group is not null && group.Cells is { Count: > 0 })
+            .Select(group => new WorldMapObstacleGroup
+            {
+                Id = group.Id,
+                Name = group.Name,
+                DefaultBlocked = group.DefaultBlocked,
+                Cells = group.Cells.ToArray()
+            })
+            .ToArray();
+    }
+
+    private static MapArtifactObstacleGroupCells[] ToObstacleGroupCells(
+        IEnumerable<WorldMapObstacleGroup> groups)
+    {
+        return groups
+            .Select(group => new MapArtifactObstacleGroupCells(
+                group.Id,
+                group.Name,
+                group.DefaultBlocked,
+                group.Cells))
+            .ToArray();
+    }
+
     private static BiomeKind ParseBiomeKindName(string value)
     {
         if (Enum.TryParse<BiomeKind>(value, ignoreCase: true, out var kind))
@@ -2293,6 +2346,13 @@ public sealed partial class LineageRunManager
                 group.Count(),
                 group.Count() / (double)validated.BiomeCells.Length))
             .ToArray();
+        var obstacleGroups = validated.ObstacleGroups
+            .Select(group => new MapArtifactObstacleGroupSummary(
+                group.Id,
+                group.Name,
+                group.DefaultBlocked,
+                group.Cells.Length))
+            .ToArray();
         return new MapArtifactOption(
             Name: string.IsNullOrWhiteSpace(validated.Name)
                 ? Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(path))
@@ -2312,7 +2372,8 @@ public sealed partial class LineageRunManager
             SourceSeed: validated.SourceSeed,
             SourceBiomeMapKind: validated.SourceBiomeMapKind?.ToString(),
             SourceObstacleMapKind: validated.SourceObstacleMapKind?.ToString(),
-            Biomes: biomes);
+            Biomes: biomes,
+            ObstacleGroups: obstacleGroups);
     }
 
     private SpeciesCatalogEntry? TryReadSpeciesCatalogEntry(string path)
@@ -3278,6 +3339,7 @@ public sealed partial class LineageRunManager
 
             var profilePath = GetString(speciesSeed, "profilePath") ?? string.Empty;
             var label = GetString(speciesSeed, "label");
+            var tag = GetString(speciesSeed, "tag");
             var count = Math.Max(0, GetInt32(speciesSeed, "count") ?? 0);
             var spawnRegion = GetString(speciesSeed, "spawnRegion") ?? "uniform";
             var energyOverride = GetDouble(speciesSeed, "energyOverride");
@@ -3299,6 +3361,7 @@ public sealed partial class LineageRunManager
 
             summaries.Add(new RunScenarioSpeciesSeedSummary(
                 Label: label,
+                Tag: tag,
                 ProfilePath: profilePath,
                 ProfileName: profileName ?? string.Empty,
                 Count: count,

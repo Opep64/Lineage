@@ -44,10 +44,11 @@ public static class SimulationSnapshotJson
 
     public static RestoredSimulation LoadSimulation(string path)
     {
-        return RestoreSimulation(Load(path));
+        var fullPath = Path.GetFullPath(path);
+        return RestoreSimulation(Load(fullPath), Path.GetDirectoryName(fullPath));
     }
 
-    public static RestoredSimulation RestoreSimulation(SimulationSnapshot snapshot)
+    public static RestoredSimulation RestoreSimulation(SimulationSnapshot snapshot, string? scenarioDirectory = null)
     {
         snapshot = Validate(snapshot);
         var scenario = snapshot.Scenario.Validated();
@@ -59,7 +60,7 @@ public static class SimulationSnapshotJson
                 FixedDeltaSeconds = scenario.FixedDeltaSeconds
             },
             scenario.Seed,
-            SimulationScenarioFactory.CreatePipeline(scenario));
+            SimulationScenarioFactory.CreatePipeline(scenario, scenarioDirectory));
 
         RestoreState(simulation.State, snapshot);
         simulation.State.SetEcologicalEvents(scenario.EcologicalEvents);

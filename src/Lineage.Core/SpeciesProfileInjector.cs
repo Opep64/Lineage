@@ -44,10 +44,11 @@ public static class SpeciesProfileInjector
                 generation: 0,
                 parentId: default,
                 brainId: brainId,
-                birthMutationProfile: options.MutationProfile);
+                birthMutationProfile: options.MutationProfile,
+                tag: options.Tag);
         }
 
-        return new SpeciesInjectionResult(profile.Name, genomeId, reportedBrainId, creatureIds);
+        return new SpeciesInjectionResult(profile.Name, options.Tag, genomeId, reportedBrainId, creatureIds);
     }
 
     private static CreatureGenome ApplyMutationProfile(CreatureGenome genome, MutationProfile? mutationProfile)
@@ -204,7 +205,8 @@ public readonly record struct SpeciesInjectionOptions(
     BrainProfile? BrainOverrideProfile = null,
     BrainArchitectureKind BrainArchitectureKind = BrainArchitectureKind.HybridNeural,
     int BrainHiddenNodeCount = 0,
-    MutationProfile? MutationProfile = null)
+    MutationProfile? MutationProfile = null,
+    string? Tag = null)
 {
     public float Energy { get; private init; }
 
@@ -252,13 +254,15 @@ public readonly record struct SpeciesInjectionOptions(
             Energy = energy,
             BrainOverrideProfile = brainOverrideProfile,
             BrainHiddenNodeCount = resolvedHiddenNodeCount,
-            MutationProfile = mutationProfile
+            MutationProfile = mutationProfile,
+            Tag = CreatureTag.Normalize(Tag)
         };
     }
 }
 
 public readonly record struct SpeciesInjectionResult(
     string SpeciesName,
+    string? Tag,
     int GenomeId,
     int BrainId,
     IReadOnlyList<EntityId> CreatureIds);

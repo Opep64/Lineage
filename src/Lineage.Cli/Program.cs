@@ -269,7 +269,7 @@ static (SimulationScenario Scenario, Simulation Simulation) CreateSimulationRun(
         var restored = SimulationSnapshotJson.RestoreSimulation(snapshot with
         {
             Scenario = options.ApplySnapshotRuntimeOverrides(snapshot.Scenario)
-        });
+        }, options.ScenarioDirectory);
         return (restored.Scenario, restored.Simulation);
     }
 
@@ -4320,13 +4320,14 @@ internal static class FounderSummaryCsvWriter
     public static void Write(string path, IReadOnlyList<CreatureLineageRecord> records)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("founder_id,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,avg_occupied_temperature,avg_thermal_mismatch,cold_temperature_share,temperate_temperature_share,hot_temperature_share,comfortable_thermal_share,cold_thermal_stress_share,hot_thermal_stress_share,cold_temperature_births,temperate_temperature_births,hot_temperature_births,cold_temperature_deaths,temperate_temperature_deaths,hot_temperature_deaths,thermal_niche_label");
+        writer.WriteLine("founder_id,tag,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,avg_occupied_temperature,avg_thermal_mismatch,cold_temperature_share,temperate_temperature_share,hot_temperature_share,comfortable_thermal_share,cold_thermal_stress_share,hot_thermal_stress_share,cold_temperature_births,temperate_temperature_births,hot_temperature_births,cold_temperature_deaths,temperate_temperature_deaths,hot_temperature_deaths,thermal_niche_label");
 
         foreach (var summary in Summarize(records).OrderBy(summary => summary.FounderId.Value))
         {
             writer.WriteLine(string.Join(
                 ',',
                 summary.FounderId.Value.ToString(CultureInfo.InvariantCulture),
+                Escape(summary.Tag ?? string.Empty),
                 summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
                 summary.DescendantCount.ToString(CultureInfo.InvariantCulture),
                 summary.LivingCreatures.ToString(CultureInfo.InvariantCulture),
@@ -4375,6 +4376,7 @@ internal static class FounderSummaryCsvWriter
                 var livingCreatures = founderRecords.Count(record => record.IsAlive);
                 return new FounderSummary(
                     pair.Key,
+                    FounderTag(pair.Key, founderRecords),
                     totalCreatures,
                     Math.Max(0, totalCreatures - 1),
                     livingCreatures,
@@ -4383,6 +4385,11 @@ internal static class FounderSummaryCsvWriter
                     ThermalNicheTelemetry.SummarizeRecords(founderRecords));
             })
             .ToArray();
+    }
+
+    private static string? FounderTag(EntityId founderId, IReadOnlyList<CreatureLineageRecord> records)
+    {
+        return records.FirstOrDefault(record => record.Id == founderId).Tag;
     }
 
     public static EntityId FindFounderId(
@@ -4413,6 +4420,7 @@ internal static class FounderSummaryCsvWriter
 
 internal readonly record struct FounderSummary(
     EntityId FounderId,
+    string? Tag,
     int TotalCreatures,
     int DescendantCount,
     int LivingCreatures,
@@ -4488,13 +4496,14 @@ internal static class RosterLineageSummaryCsvWriter
         long? finalTick = null)
     {
         using var writer = StatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,old_age_deaths,unknown_deaths,tail_avg_living_creatures,extinction_tick,extinction_elapsed_seconds,injury_deaths_from_same_profile,injury_deaths_from_other_profile,injury_deaths_unattributed,same_profile_injury_kills_dealt,cross_profile_injury_kills_dealt,telemetry_living_seconds,calories_eaten_per_second,plant_calories_eaten_per_second,meat_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,fresh_kill_calories_eaten_per_second,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,attack_damage_dealt_per_second,attack_damage_taken_per_second,eating_share,meat_eating_share,food_contact_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,rotten_meat_scent_detected_share,creature_contact_share,similar_creature_contact_share,lineage_creature_contact_share,egg_lineage_contact_share,attack_intent_share,attack_intent_touching_share,attack_intent_lineage_touching_share,attack_intent_unrelated_touching_share,attack_damage_dealing_share,genome_ids,brain_ids");
+        writer.WriteLine("profile_name,tag,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,old_age_deaths,unknown_deaths,tail_avg_living_creatures,extinction_tick,extinction_elapsed_seconds,injury_deaths_from_same_profile,injury_deaths_from_other_profile,injury_deaths_unattributed,same_profile_injury_kills_dealt,cross_profile_injury_kills_dealt,telemetry_living_seconds,calories_eaten_per_second,plant_calories_eaten_per_second,meat_calories_eaten_per_second,carcass_calories_eaten_per_second,egg_calories_eaten_per_second,fresh_kill_calories_eaten_per_second,fresh_meat_calories_eaten_per_second,stale_meat_calories_eaten_per_second,meat_calories_eaten_share,fresh_kill_calories_eaten_share,fresh_meat_calories_eaten_share,stale_meat_calories_eaten_share,rotten_meat_damage_per_second,attack_damage_dealt_per_second,attack_damage_taken_per_second,eating_share,meat_eating_share,food_contact_share,meat_detected_share,fresh_meat_detected_share,stale_meat_detected_share,rotten_meat_scent_detected_share,creature_contact_share,similar_creature_contact_share,lineage_creature_contact_share,egg_lineage_contact_share,attack_intent_share,attack_intent_touching_share,attack_intent_lineage_touching_share,attack_intent_unrelated_touching_share,attack_damage_dealing_share,genome_ids,brain_ids");
 
         foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections, finalTick))
         {
             writer.WriteLine(string.Join(
                 ',',
                 EscapeCsv(summary.ProfileName),
+                EscapeCsv(summary.Tag ?? string.Empty),
                 summary.FounderCount.ToString(CultureInfo.InvariantCulture),
                 summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
                 summary.DescendantCount.ToString(CultureInfo.InvariantCulture),
@@ -6599,13 +6608,14 @@ internal static class RunReportWriter
             writer.WriteLine("<section id=\"roster-lineages\">");
             writer.WriteLine("<h2>Injected Profile Lineages</h2>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
-            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Tail Living</th><th>kcal/s</th><th>Meat</th><th>Fresh Kill</th><th>Meat Seen</th><th>Attack</th><th>Touch Attack</th><th>Damage/s</th><th>Rot Damage/s</th><th>Extinct At</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Same-Profile Injury</th><th>Other-Profile Injury</th><th>Unattributed Injury</th><th>Cross Kills Dealt</th><th>Same Kills Dealt</th><th>Rotten</th><th>Old Age</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Tag</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Tail Living</th><th>kcal/s</th><th>Meat</th><th>Fresh Kill</th><th>Meat Seen</th><th>Attack</th><th>Touch Attack</th><th>Damage/s</th><th>Rot Damage/s</th><th>Extinct At</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Same-Profile Injury</th><th>Other-Profile Injury</th><th>Unattributed Injury</th><th>Cross Kills Dealt</th><th>Same Kills Dealt</th><th>Rotten</th><th>Old Age</th><th>Other</th></tr></thead>");
             writer.WriteLine("<tbody>");
             foreach (var summary in rosterSummaries)
             {
                 writer.WriteLine(
                     "<tr>" +
                     $"<td>{Html(summary.ProfileName)}</td>" +
+                    $"<td>{Html(CreatureTag.Display(summary.Tag))}</td>" +
                     $"<td>{Html(summary.FounderCount)}</td>" +
                     $"<td>{Html(summary.TotalCreatures)}</td>" +
                     $"<td>{Html(summary.DescendantCount)}</td>" +
@@ -6642,13 +6652,14 @@ internal static class RunReportWriter
         writer.WriteLine("<section id=\"founders\">");
         writer.WriteLine("<h2>Top Founder Lineages</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Thermal Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Cold/Temp/Hot</th><th>Cold/Hot Stress</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Tag</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Thermal Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Cold/Temp/Hot</th><th>Cold/Hot Stress</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var summary in founderSummaries.Take(10))
         {
             writer.WriteLine(
                 "<tr>" +
                 $"<td>{Html(summary.FounderId.Value)}</td>" +
+                $"<td>{Html(CreatureTag.Display(summary.Tag))}</td>" +
                 $"<td>{Html(summary.TotalCreatures)}</td>" +
                 $"<td>{Html(summary.DescendantCount)}</td>" +
                 $"<td>{Html(summary.LivingCreatures)}</td>" +
@@ -6664,7 +6675,7 @@ internal static class RunReportWriter
 
         if (founderSummaries.Length == 0)
         {
-            WriteEmptyRow(writer, 11, "No founder records were present.");
+            WriteEmptyRow(writer, 12, "No founder records were present.");
         }
 
         writer.WriteLine("</tbody></table></div>");
@@ -8459,9 +8470,12 @@ internal static class RunReportWriter
 
     private static string FormatLineageSegmentGraphTitle(SurvivorLineageSegment segment)
     {
-        return segment.ParentSegmentId is null && segment.StartRecord.Generation == 0
+        var title = segment.ParentSegmentId is null && segment.StartRecord.Generation == 0
             ? $"Founder #{segment.StartRecord.Id.Value}"
             : FormatLineageSegmentFallbackId(segment);
+        return string.IsNullOrWhiteSpace(segment.EndRecord.Tag)
+            ? title
+            : $"{title} [{segment.EndRecord.Tag}]";
     }
 
     private static bool TryResolveLineageSpeciesName(
@@ -8527,6 +8541,7 @@ internal static class RunReportWriter
         var entries = new List<LineageDetailEntry>
         {
             new("Species", FormatLineageSegmentName(segment, speciesHistory)),
+            new("Tag", CreatureTag.Display(segment.EndRecord.Tag)),
             new("Segment", FormatLineageSegmentFallbackId(segment)),
             new("Starts at", $"#{segment.StartRecord.Id.Value}, generation {segment.StartRecord.Generation}"),
             new("Endpoint", $"#{segment.EndRecord.Id.Value} ({FormatLineageStatus(segment.EndRecord)})"),
@@ -10861,12 +10876,13 @@ internal static class RunReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Starting Roster</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Profile</th><th>Brain</th><th>Count</th><th>Spawn region</th><th>Energy</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Profile</th><th>Tag</th><th>Brain</th><th>Count</th><th>Spawn region</th><th>Energy</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var seed in seeds)
         {
             writer.WriteLine("<tr>");
             writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedName(seed, scenarioPath))}<br><small>{Html(seed.ProfilePath)}</small></td>");
+            writer.WriteLine($"<td>{Html(CreatureTag.Display(seed.Tag))}</td>");
             writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedBrain(seed, scenarioPath))}</td>");
             writer.WriteLine($"<td>{Html(seed.Count.ToString(CultureInfo.InvariantCulture))}</td>");
             writer.WriteLine($"<td>{Html(seed.SpawnRegion.ToString())}</td>");
@@ -10890,7 +10906,10 @@ internal static class RunReportWriter
         if (seeds.Length == 1)
         {
             var seed = seeds[0];
-            return $"{seed.Count} x {FormatScenarioSpeciesSeedName(seed, scenarioPath)} using {FormatScenarioSpeciesSeedBrain(seed, scenarioPath)}";
+            var tag = string.IsNullOrWhiteSpace(seed.Tag)
+                ? string.Empty
+                : $" tagged {seed.Tag}";
+            return $"{seed.Count} x {FormatScenarioSpeciesSeedName(seed, scenarioPath)}{tag} using {FormatScenarioSpeciesSeedBrain(seed, scenarioPath)}";
         }
 
         var total = seeds.Sum(seed => seed.Count);

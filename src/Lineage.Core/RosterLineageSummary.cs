@@ -16,21 +16,22 @@ public static class RosterLineageAnalyzer
         }
 
         var recordsById = records.ToDictionary(record => record.Id);
-        var recordProfiles = new Dictionary<EntityId, string>();
-        var founderProfiles = new Dictionary<EntityId, string>();
-        var profiles = new Dictionary<string, RosterLineageAccumulator>(StringComparer.Ordinal);
-        var orderedProfileNames = new List<string>();
+        var recordProfiles = new Dictionary<EntityId, RosterLineageKey>();
+        var founderProfiles = new Dictionary<EntityId, RosterLineageKey>();
+        var profiles = new Dictionary<RosterLineageKey, RosterLineageAccumulator>();
+        var orderedProfileKeys = new List<RosterLineageKey>();
         var resolvedFinalTick = ResolveFinalTick(records, finalTick);
         var tailStartTick = (long)Math.Floor(resolvedFinalTick * 0.9);
         var tailWindowTicks = Math.Max(1, resolvedFinalTick - tailStartTick);
 
         foreach (var injection in injections)
         {
-            if (!profiles.TryGetValue(injection.SpeciesName, out var profile))
+            var key = new RosterLineageKey(injection.SpeciesName, CreatureTag.Normalize(injection.Tag));
+            if (!profiles.TryGetValue(key, out var profile))
             {
-                profile = new RosterLineageAccumulator(injection.SpeciesName);
-                profiles[injection.SpeciesName] = profile;
-                orderedProfileNames.Add(injection.SpeciesName);
+                profile = new RosterLineageAccumulator(key.ProfileName, key.Tag);
+                profiles[key] = profile;
+                orderedProfileKeys.Add(key);
             }
 
             profile.FounderCount += injection.CreatureIds.Count;
@@ -39,20 +40,20 @@ public static class RosterLineageAnalyzer
 
             foreach (var creatureId in injection.CreatureIds)
             {
-                founderProfiles[creatureId] = injection.SpeciesName;
+                founderProfiles[creatureId] = key;
             }
         }
 
         foreach (var record in records)
         {
             var founderId = FindFounderId(record, recordsById);
-            if (!founderProfiles.TryGetValue(founderId, out var profileName))
+            if (!founderProfiles.TryGetValue(founderId, out var profileKey))
             {
                 continue;
             }
 
-            recordProfiles[record.Id] = profileName;
-            var profile = profiles[profileName];
+            recordProfiles[record.Id] = profileKey;
+            var profile = profiles[profileKey];
             profile.TotalCreatures++;
             profile.LivingCreatures += record.IsAlive ? 1 : 0;
             profile.DeadCreatures += record.IsAlive ? 0 : 1;
@@ -118,21 +119,21 @@ public static class RosterLineageAnalyzer
         foreach (var record in records)
         {
             if (record.DeathReason != CreatureDeathReason.Injury
-                || !recordProfiles.TryGetValue(record.Id, out var victimProfileName))
+                || !recordProfiles.TryGetValue(record.Id, out var victimProfileKey))
             {
                 continue;
             }
 
-            var victimProfile = profiles[victimProfileName];
+            var victimProfile = profiles[victimProfileKey];
             if (record.DeathAttackerId == default
-                || !recordProfiles.TryGetValue(record.DeathAttackerId, out var attackerProfileName))
+                || !recordProfiles.TryGetValue(record.DeathAttackerId, out var attackerProfileKey))
             {
                 victimProfile.InjuryDeathsFromUnknownProfile++;
                 continue;
             }
 
-            var attackerProfile = profiles[attackerProfileName];
-            if (string.Equals(victimProfileName, attackerProfileName, StringComparison.Ordinal))
+            var attackerProfile = profiles[attackerProfileKey];
+            if (victimProfileKey == attackerProfileKey)
             {
                 victimProfile.InjuryDeathsFromSameProfile++;
                 attackerProfile.SameProfileInjuryKillsDealt++;
@@ -144,10 +145,12 @@ public static class RosterLineageAnalyzer
             }
         }
 
-        return orderedProfileNames
-            .Select(profileName => profiles[profileName].ToSummary(tailWindowTicks))
+        return orderedProfileKeys
+            .Select(profileKey => profiles[profileKey].ToSummary(tailWindowTicks))
             .ToArray();
     }
+
+    private readonly record struct RosterLineageKey(string ProfileName, string? Tag);
 
     private static EntityId FindFounderId(
         CreatureLineageRecord record,
@@ -191,12 +194,15 @@ public static class RosterLineageAnalyzer
 
     private sealed class RosterLineageAccumulator
     {
-        public RosterLineageAccumulator(string profileName)
+        public RosterLineageAccumulator(string profileName, string? tag)
         {
             ProfileName = profileName;
+            Tag = tag;
         }
 
         public string ProfileName { get; }
+
+        public string? Tag { get; }
 
         public int FounderCount;
         public int TotalCreatures;
@@ -255,6 +261,7 @@ public static class RosterLineageAnalyzer
             var carcassMeatCaloriesEaten = TelemetryFreshMeatCaloriesEaten + TelemetryStaleMeatCaloriesEaten;
             return new RosterLineageSummary(
                 ProfileName,
+                Tag,
                 FounderCount,
                 TotalCreatures,
                 Math.Max(0, TotalCreatures - FounderCount),
@@ -328,6 +335,7 @@ public static class RosterLineageAnalyzer
 
 public readonly record struct RosterLineageSummary(
     string ProfileName,
+    string? Tag,
     int FounderCount,
     int TotalCreatures,
     int DescendantCount,

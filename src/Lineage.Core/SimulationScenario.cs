@@ -185,6 +185,8 @@ public sealed record SimulationScenario
 
     public EcologicalEventDefinition[] EcologicalEvents { get; init; } = [];
 
+    public ObstacleEventDefinition[] ObstacleEvents { get; init; } = [];
+
     public float BarrenBiomeMovementCostMultiplier { get; init; } = 1.4f;
 
     public float SparseBiomeMovementCostMultiplier { get; init; } = 1.12f;
@@ -563,6 +565,15 @@ public sealed record SimulationScenario
 
             return ecologicalEvent.Validated();
         }).ToArray();
+        var obstacleEvents = (ObstacleEvents ?? []).Select(obstacleEvent =>
+        {
+            if (obstacleEvent is null)
+            {
+                throw new InvalidOperationException("Obstacle event entries cannot be null.");
+            }
+
+            return obstacleEvent.Validated();
+        }).ToArray();
         EnsureNonNegative(BasalEnergyPerSecond, nameof(BasalEnergyPerSecond));
         EnsureRange(MetabolicPace, CreatureMetabolism.MinimumPace, CreatureMetabolism.MaximumPace, nameof(MetabolicPace));
         EnsureNonNegative(ThermalMismatchBasalCostMultiplier, nameof(ThermalMismatchBasalCostMultiplier));
@@ -697,7 +708,8 @@ public sealed record SimulationScenario
                 ? null
                 : ManualObstacleMapPath.Trim(),
             SpeciesSeeds = speciesSeeds,
-            EcologicalEvents = ecologicalEvents
+            EcologicalEvents = ecologicalEvents,
+            ObstacleEvents = obstacleEvents
         };
     }
 

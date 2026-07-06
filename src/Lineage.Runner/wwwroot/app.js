@@ -60,12 +60,17 @@ const mapBrushSizeSelect = document.querySelector("#mapBrushSizeSelect");
 const mapBrushShapeSelect = document.querySelector("#mapBrushShapeSelect");
 const biomeBrushSelect = document.querySelector("#biomeBrushSelect");
 const obstacleBrushSelect = document.querySelector("#obstacleBrushSelect");
+const obstacleGroupSelect = document.querySelector("#obstacleGroupSelect");
+const newObstacleGroupButton = document.querySelector("#newObstacleGroupButton");
+const deleteObstacleGroupButton = document.querySelector("#deleteObstacleGroupButton");
 const mapArtifactSelect = document.querySelector("#mapArtifactSelect");
 const applyMapArtifactButton = document.querySelector("#applyMapArtifactButton");
 const saveMapArtifactButton = document.querySelector("#saveMapArtifactButton");
 const renameMapArtifactButton = document.querySelector("#renameMapArtifactButton");
 const duplicateMapArtifactButton = document.querySelector("#duplicateMapArtifactButton");
 const deleteMapArtifactButton = document.querySelector("#deleteMapArtifactButton");
+const undoMapPaintButton = document.querySelector("#undoMapPaintButton");
+const redoMapPaintButton = document.querySelector("#redoMapPaintButton");
 const mapArtifactDetails = document.querySelector("#mapArtifactDetails");
 const paintBiomeMapButton = document.querySelector("#paintBiomeMapButton");
 const brainCatalogSelect = document.querySelector("#brainCatalogSelect");
@@ -132,6 +137,7 @@ const speciesSeedBrainSelect = document.querySelector("#speciesSeedBrain");
 const speciesSeedCountInput = document.querySelector("#speciesSeedCount");
 const speciesSeedRegionSelect = document.querySelector("#speciesSeedRegion");
 const speciesSeedEnergyInput = document.querySelector("#speciesSeedEnergy");
+const speciesSeedTagInput = document.querySelector("#speciesSeedTag");
 
 const ecologicalEventKinds = [
   ["regionalFertilityPulse", "Fertility pulse"],
@@ -139,6 +145,24 @@ const ecologicalEventKinds = [
   ["heatWave", "Heat wave"],
   ["coldSnap", "Cold snap"]
 ];
+
+const obstacleEventActions = [
+  ["off", "Off - open"],
+  ["on", "On - closed"]
+];
+
+const obstacleGroupPalette = [
+  "#e4572e",
+  "#2f80ed",
+  "#16a085",
+  "#a855f7",
+  "#f59e0b",
+  "#dc2626",
+  "#0ea5e9",
+  "#65a30d"
+];
+
+const mapPaintHistoryLimit = 100;
 
 let refreshTimer = null;
 let allRuns = [];
@@ -226,6 +250,11 @@ let biomePaintEnabled = false;
 let biomePaintDirty = false;
 let biomePaintPointerDown = false;
 let biomePaintLastCell = null;
+let biomePaintCleanSnapshot = null;
+let biomePaintUndoStack = [];
+let biomePaintRedoStack = [];
+let biomePaintStrokeBefore = null;
+let biomePaintStrokeChanged = false;
 
 function setLauncherTab(tab) {
   if (!launcherTabPanels.some((panel) => panel.dataset.launcherPanel === tab)) {
@@ -5326,6 +5355,7 @@ function renderSpeciesRoster() {
         <tr>
           <th>Profile</th>
           <th>Label</th>
+          <th>Tag</th>
           <th>Brain</th>
           <th>Count</th>
           <th>Region</th>
@@ -5356,6 +5386,9 @@ function renderSpeciesRosterRow(seed, index) {
       </td>
       <td>
         <input class="species-roster-text" type="text" placeholder="optional" value="${escapeHtml(seed?.label || "")}" data-species-roster-field="label" data-index="${index}">
+      </td>
+      <td>
+        <input class="species-roster-text" type="text" maxlength="64" placeholder="optional" value="${escapeHtml(seed?.tag || "")}" data-species-roster-field="tag" data-index="${index}">
       </td>
       <td>
         <select class="species-roster-select" data-species-roster-field="brain" data-index="${index}">
@@ -5538,6 +5571,15 @@ function updateSpeciesRosterField(control) {
   } else if (field === "label") {
     const label = control.value.trim();
     next.label = label === "" ? null : label;
+  } else if (field === "tag") {
+    const tag = control.value.trim();
+    if (tag.length > 64) {
+      formMessage.textContent = "Roster tag must be 64 characters or fewer.";
+      renderSpeciesRoster();
+      return;
+    }
+
+    next.tag = tag === "" ? null : tag;
   } else if (field === "brain") {
     const brainChoice = parseSpeciesBrainChoice(control.value);
     const selectedBrainProfile = brainChoice.brainProfilePath
@@ -5619,6 +5661,9 @@ function renderMapArtifactOptions(selectedPath = "") {
       `${formatDecimal(map.worldWidth)} x ${formatDecimal(map.worldHeight)}`,
       `${formatNumber(map.biomeCellCountX)} x ${formatNumber(map.biomeCellCountY)} biome cells`,
       wallCount > 0 ? `${formatNumber(wallCount)} walls` : "no walls",
+      Array.isArray(map.obstacleGroups) && map.obstacleGroups.length > 0
+        ? `${formatNumber(map.obstacleGroups.length)} wall groups`
+        : null,
       map.sourceSeed === null || map.sourceSeed === undefined ? null : `seed ${formatSeed(map.sourceSeed)}`
     ].filter(Boolean).join(" | ");
     mapArtifactSelect.append(option);
@@ -5668,6 +5713,16 @@ function renderMapArtifactDetails() {
       <div class="map-artifact-warning">Apply Map will update scenario dimensions/settings:</div>
       <ul>${compatibility.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
     `;
+  const obstacleGroups = Array.isArray(map.obstacleGroups)
+    ? map.obstacleGroups
+      .filter((group) => Number(group.cellCount || 0) > 0)
+      .map((group, index) => `
+        <span class="map-artifact-biome">
+          <span class="biome-preview-swatch" style="background:${escapeHtml(obstacleGroupColor(index, 0.9))}"></span>
+          ${escapeHtml(group.name)} ${escapeHtml(formatNumber(group.cellCount))}
+        </span>
+      `).join("")
+    : "";
 
   mapArtifactDetails.hidden = false;
   mapArtifactDetails.innerHTML = `
@@ -5682,6 +5737,7 @@ function renderMapArtifactDetails() {
       <span>${map.sourceSeed === null || map.sourceSeed === undefined ? "seed n/a" : `seed ${escapeHtml(formatSeed(map.sourceSeed))}`}</span>
     </div>
     ${biomeSummary ? `<div class="map-artifact-biomes">${biomeSummary}</div>` : ""}
+    ${obstacleGroups ? `<div class="map-artifact-biomes">${obstacleGroups}</div>` : ""}
     <div class="map-artifact-compatibility">${compatibilityHtml}</div>
   `;
 }
@@ -6488,9 +6544,8 @@ function setBiomePaintEnabled(enabled) {
 
   updateBiomePaintControls();
   if (biomePreviewStatus && currentBiomePreview) {
-    const layer = paintLayerSelect?.value === "obstacle" ? "wall" : "biome";
     biomePreviewStatus.textContent = biomePaintEnabled
-      ? `Painting ${layer} cells with a ${mapBrushDescription()} brush. Drag on the map, then save a reusable map.`
+      ? `${mapPaintActionDescription()}. Drag on the map, then save a reusable map.`
       : biomePaintDirty
         ? "Map edits are unsaved."
         : "Preview reflects the scenario options and launch seed override above.";
@@ -6528,6 +6583,20 @@ function updateBiomePaintControls() {
     obstacleBrushSelect.disabled = !canEditObstacles || layer !== "obstacle";
   }
 
+  renderObstacleGroupOptions();
+  const selectedGroup = selectedObstacleGroup();
+  if (obstacleGroupSelect) {
+    obstacleGroupSelect.disabled = !canEditObstacles || layer !== "obstacle";
+  }
+
+  if (newObstacleGroupButton) {
+    newObstacleGroupButton.disabled = !canEditObstacles || layer !== "obstacle";
+  }
+
+  if (deleteObstacleGroupButton) {
+    deleteObstacleGroupButton.disabled = !selectedGroup || layer !== "obstacle";
+  }
+
   if (paintBiomeMapButton) {
     paintBiomeMapButton.disabled = !canEdit;
     paintBiomeMapButton.textContent = biomePaintEnabled ? "Stop Painting" : "Paint Map";
@@ -6544,6 +6613,14 @@ function updateBiomePaintControls() {
   if (saveMapArtifactButton) {
     saveMapArtifactButton.disabled = !currentBiomePreview;
     saveMapArtifactButton.textContent = biomePaintDirty ? "Save Reusable Map *" : "Save Reusable Map";
+  }
+
+  if (undoMapPaintButton) {
+    undoMapPaintButton.disabled = biomePaintUndoStack.length === 0;
+  }
+
+  if (redoMapPaintButton) {
+    redoMapPaintButton.disabled = biomePaintRedoStack.length === 0;
   }
 
   if (renameMapArtifactButton) {
@@ -6610,7 +6687,7 @@ async function updateBiomePreview() {
     }
 
     currentBiomePreview = normalizeBiomePreview(await response.json());
-    biomePaintDirty = false;
+    setMapPaintCleanSnapshot();
     setBiomePaintEnabled(false);
     renderBiomePreview(currentBiomePreview, seedOverride !== null);
   } catch (error) {
@@ -6628,6 +6705,8 @@ function clearBiomePreview(message) {
   currentBiomePreview = null;
   biomePaintDirty = false;
   biomePaintEnabled = false;
+  clearMapPaintHistory();
+  biomePaintCleanSnapshot = null;
   if (biomePreviewMeta) {
     biomePreviewMeta.textContent = "";
   }
@@ -6698,7 +6777,43 @@ function normalizeBiomePreview(preview) {
   preview.obstacleBlockedCellCount = preview.obstacleCells.reduce(
     (count, blocked) => count + (blocked ? 1 : 0),
     0);
+  preview.obstacleGroups = normalizeObstacleGroups(preview.obstacleGroups, obstacleCellCount);
   return preview;
+}
+
+function normalizeObstacleGroups(groups, obstacleCellCount) {
+  const normalized = [];
+  const seenIds = new Set();
+  const seenCells = new Set();
+  for (const group of Array.isArray(groups) ? groups : []) {
+    const rawId = String(group?.id || "").trim();
+    const id = slugifyObstacleGroupId(rawId);
+    if (!id || seenIds.has(id)) {
+      continue;
+    }
+
+    const cells = [];
+    const rawCells = Array.isArray(group?.cells) ? group.cells : [];
+    for (const rawCell of rawCells) {
+      const cell = Number(rawCell);
+      if (!Number.isInteger(cell) || cell < 0 || cell >= obstacleCellCount || seenCells.has(cell)) {
+        continue;
+      }
+
+      cells.push(cell);
+      seenCells.add(cell);
+    }
+
+    seenIds.add(id);
+    normalized.push({
+      id,
+      name: String(group?.name || rawId || id).trim() || id,
+      defaultBlocked: group?.defaultBlocked !== false,
+      cells
+    });
+  }
+
+  return normalized;
 }
 
 function finitePositiveNumber(value, fallback) {
@@ -6800,8 +6915,8 @@ function drawObstacleOverlay(context, preview, scaleX, scaleY) {
   }
 
   context.save();
-  context.fillStyle = "rgba(6, 9, 8, 0.84)";
-  context.strokeStyle = "rgba(255, 127, 0, 0.95)";
+  const groupByCell = obstacleGroupByCell(preview);
+  const groupIndexById = obstacleGroupIndexById(preview);
   for (let y = 0; y < preview.obstacleCellCountY; y++) {
     for (let x = 0; x < preview.obstacleCellCountX; x++) {
       const index = y * preview.obstacleCellCountX + x;
@@ -6809,6 +6924,14 @@ function drawObstacleOverlay(context, preview, scaleX, scaleY) {
         continue;
       }
 
+      const groupId = groupByCell.get(index);
+      const groupIndex = groupId ? groupIndexById.get(groupId) ?? 0 : -1;
+      context.fillStyle = groupId
+        ? obstacleGroupColor(groupIndex, 0.82)
+        : "rgba(6, 9, 8, 0.84)";
+      context.strokeStyle = groupId
+        ? "rgba(255, 255, 255, 0.9)"
+        : "rgba(255, 127, 0, 0.95)";
       const worldX = x * preview.obstacleCellSize;
       const worldY = y * preview.obstacleCellSize;
       const worldWidth = Math.min(preview.obstacleCellSize, preview.worldWidth - worldX);
@@ -6828,6 +6951,29 @@ function drawObstacleOverlay(context, preview, scaleX, scaleY) {
   context.restore();
 }
 
+function obstacleGroupByCell(preview) {
+  const groupByCell = new Map();
+  for (const group of preview?.obstacleGroups || []) {
+    for (const cell of group.cells || []) {
+      groupByCell.set(cell, group.id);
+    }
+  }
+
+  return groupByCell;
+}
+
+function obstacleGroupIndexById(preview) {
+  return new Map((preview?.obstacleGroups || []).map((group, index) => [group.id, index]));
+}
+
+function obstacleGroupColor(index, alpha = 1) {
+  const hex = obstacleGroupPalette[index % obstacleGroupPalette.length] || "#e4572e";
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function renderBiomePreviewLegend(preview) {
   const biomes = preview.biomes || [];
   const biomeItems = biomes.map((biome) => `
@@ -6845,7 +6991,13 @@ function renderBiomePreviewLegend(preview) {
       Walls ${escapeHtml(formatPercent(obstacleShare))}
     </span>
   `;
-  biomePreviewLegend.innerHTML = [...biomeItems, obstacleItem].join("");
+  const groupItems = (preview.obstacleGroups || []).map((group, index) => `
+    <span class="biome-preview-legend-item">
+      <span class="biome-preview-swatch" style="background:${escapeHtml(obstacleGroupColor(index, 0.9))}"></span>
+      ${escapeHtml(group.name)} ${escapeHtml(formatNumber(group.cells.length))}
+    </span>
+  `);
+  biomePreviewLegend.innerHTML = [...biomeItems, obstacleItem, ...groupItems].join("");
 }
 
 function renderBiomeBrushOptions(preview) {
@@ -6898,6 +7050,316 @@ function mapBrushDescription() {
   return `${size}-cell ${shape}`;
 }
 
+function mapPaintActionDescription() {
+  const brush = mapBrushDescription();
+  if (paintLayerSelect?.value === "obstacle") {
+    if (obstacleBrushSelect?.value === "erase") {
+      return `Erasing wall cells with a ${brush} brush`;
+    }
+
+    const group = selectedObstacleGroup();
+    return group
+      ? `Painting walls and assigning them to ${group.name} with a ${brush} brush`
+      : `Painting ungrouped wall cells with a ${brush} brush`;
+  }
+
+  return `Painting biome cells with a ${brush} brush`;
+}
+
+function cloneObstacleGroups(groups) {
+  return (Array.isArray(groups) ? groups : []).map((group) => ({
+    id: group.id,
+    name: group.name,
+    defaultBlocked: group.defaultBlocked !== false,
+    cells: Array.isArray(group.cells) ? [...group.cells] : []
+  }));
+}
+
+function captureMapPaintSnapshot() {
+  if (!currentBiomePreview) {
+    return null;
+  }
+
+  return {
+    cells: Array.isArray(currentBiomePreview.cells) ? [...currentBiomePreview.cells] : [],
+    obstacleCells: Array.isArray(currentBiomePreview.obstacleCells) ? [...currentBiomePreview.obstacleCells] : [],
+    obstacleGroups: cloneObstacleGroups(currentBiomePreview.obstacleGroups)
+  };
+}
+
+function restoreMapPaintSnapshot(snapshot) {
+  if (!currentBiomePreview || !snapshot) {
+    return;
+  }
+
+  currentBiomePreview.cells = [...snapshot.cells];
+  currentBiomePreview.obstacleCells = [...snapshot.obstacleCells];
+  currentBiomePreview.obstacleGroups = cloneObstacleGroups(snapshot.obstacleGroups);
+  recomputeBiomePreviewSummaries(currentBiomePreview);
+  recomputeObstacleBlockedCellCount(currentBiomePreview);
+  renderBiomePreviewLegend(currentBiomePreview);
+  drawBiomePreview(currentBiomePreview);
+  updateMapPaintDirtyFromCleanSnapshot();
+  updateBiomePaintControls();
+}
+
+function setMapPaintCleanSnapshot() {
+  biomePaintCleanSnapshot = captureMapPaintSnapshot();
+  biomePaintDirty = false;
+  clearMapPaintHistory();
+}
+
+function clearMapPaintHistory() {
+  biomePaintUndoStack = [];
+  biomePaintRedoStack = [];
+  biomePaintStrokeBefore = null;
+  biomePaintStrokeChanged = false;
+  biomePaintLastCell = null;
+}
+
+function beginMapPaintStroke() {
+  biomePaintStrokeBefore = captureMapPaintSnapshot();
+  biomePaintStrokeChanged = false;
+}
+
+function markMapPaintChanged() {
+  biomePaintStrokeChanged = true;
+  biomePaintDirty = true;
+}
+
+function commitMapPaintStroke() {
+  const before = biomePaintStrokeBefore;
+  const after = captureMapPaintSnapshot();
+  const changed = biomePaintStrokeChanged
+    && before
+    && after
+    && !mapPaintSnapshotsEqual(before, after);
+  biomePaintStrokeBefore = null;
+  biomePaintStrokeChanged = false;
+  if (!changed) {
+    updateBiomePaintControls();
+    return;
+  }
+
+  pushMapPaintHistory({ before, after });
+  updateMapPaintDirtyFromCleanSnapshot();
+  updateBiomePaintControls();
+}
+
+function pushMapPaintHistory(entry) {
+  biomePaintUndoStack.push(entry);
+  if (biomePaintUndoStack.length > mapPaintHistoryLimit) {
+    biomePaintUndoStack.shift();
+  }
+
+  biomePaintRedoStack = [];
+}
+
+function undoMapPaintEdit() {
+  const entry = biomePaintUndoStack.pop();
+  if (!entry) {
+    return;
+  }
+
+  biomePaintRedoStack.push(entry);
+  restoreMapPaintSnapshot(entry.before);
+  biomePreviewStatus.textContent = biomePaintDirty
+    ? "Undid map edit. Map edits are still unsaved."
+    : "Undid map edit. Map matches the last rendered/saved state.";
+}
+
+function redoMapPaintEdit() {
+  const entry = biomePaintRedoStack.pop();
+  if (!entry) {
+    return;
+  }
+
+  biomePaintUndoStack.push(entry);
+  restoreMapPaintSnapshot(entry.after);
+  biomePreviewStatus.textContent = "Redid map edit. Map edits are unsaved.";
+}
+
+function updateMapPaintDirtyFromCleanSnapshot() {
+  const current = captureMapPaintSnapshot();
+  biomePaintDirty = Boolean(
+    current
+    && biomePaintCleanSnapshot
+    && !mapPaintSnapshotsEqual(current, biomePaintCleanSnapshot));
+}
+
+function mapPaintSnapshotsEqual(left, right) {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return arraysEqual(left.cells, right.cells)
+    && arraysEqual(left.obstacleCells, right.obstacleCells)
+    && obstacleGroupsEqual(left.obstacleGroups, right.obstacleGroups);
+}
+
+function obstacleGroupsEqual(leftGroups, rightGroups) {
+  const left = cloneObstacleGroups(leftGroups);
+  const right = cloneObstacleGroups(rightGroups);
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index++) {
+    const leftGroup = left[index];
+    const rightGroup = right[index];
+    if (leftGroup.id !== rightGroup.id
+        || leftGroup.name !== rightGroup.name
+        || leftGroup.defaultBlocked !== rightGroup.defaultBlocked
+        || !arraysEqual(leftGroup.cells, rightGroup.cells)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function arraysEqual(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function selectedObstacleGroup() {
+  const id = obstacleGroupSelect?.value || "";
+  if (!id || !Array.isArray(currentBiomePreview?.obstacleGroups)) {
+    return null;
+  }
+
+  return currentBiomePreview.obstacleGroups.find((group) => group.id === id) ?? null;
+}
+
+function renderObstacleGroupOptions() {
+  if (!obstacleGroupSelect) {
+    return;
+  }
+
+  const previous = obstacleGroupSelect.value || "";
+  const groups = Array.isArray(currentBiomePreview?.obstacleGroups)
+    ? currentBiomePreview.obstacleGroups
+    : [];
+  obstacleGroupSelect.innerHTML = "";
+  const ungrouped = document.createElement("option");
+  ungrouped.value = "";
+  ungrouped.textContent = "Ungrouped";
+  obstacleGroupSelect.append(ungrouped);
+  for (const group of groups) {
+    const option = document.createElement("option");
+    option.value = group.id;
+    option.textContent = `${group.name} (${formatNumber(group.cells.length)})`;
+    obstacleGroupSelect.append(option);
+  }
+
+  obstacleGroupSelect.value = groups.some((group) => group.id === previous)
+    ? previous
+    : "";
+}
+
+function createObstacleGroup() {
+  if (!currentBiomePreview?.obstacleCells?.length) {
+    formMessage.textContent = "Render a map with obstacles before creating wall groups.";
+    return;
+  }
+
+  const name = prompt("New wall group name", "Center Barrier");
+  if (name === null) {
+    return;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    formMessage.textContent = "Wall group name is required.";
+    return;
+  }
+
+  if (!Array.isArray(currentBiomePreview.obstacleGroups)) {
+    currentBiomePreview.obstacleGroups = [];
+  }
+
+  const before = captureMapPaintSnapshot();
+  const group = {
+    id: uniqueObstacleGroupId(slugifyObstacleGroupId(trimmedName)),
+    name: trimmedName,
+    defaultBlocked: true,
+    cells: []
+  };
+  currentBiomePreview.obstacleGroups.push(group);
+  const after = captureMapPaintSnapshot();
+  if (before && after && !mapPaintSnapshotsEqual(before, after)) {
+    pushMapPaintHistory({ before, after });
+  }
+
+  obstacleGroupSelect.value = group.id;
+  updateMapPaintDirtyFromCleanSnapshot();
+  updateBiomePaintControls();
+  renderBiomePreviewLegend(currentBiomePreview);
+  drawBiomePreview(currentBiomePreview);
+  biomePreviewStatus.textContent = `Created wall group ${group.name}. Paint walls with this group selected to assign cells.`;
+}
+
+function deleteSelectedObstacleGroup() {
+  const group = selectedObstacleGroup();
+  if (!group || !currentBiomePreview?.obstacleGroups) {
+    return;
+  }
+
+  if (!confirm(`Delete wall group "${group.name}"? The wall cells will remain, but they will be ungrouped.`)) {
+    return;
+  }
+
+  const before = captureMapPaintSnapshot();
+  currentBiomePreview.obstacleGroups = currentBiomePreview.obstacleGroups
+    .filter((candidate) => candidate.id !== group.id);
+  const after = captureMapPaintSnapshot();
+  if (before && after && !mapPaintSnapshotsEqual(before, after)) {
+    pushMapPaintHistory({ before, after });
+  }
+
+  obstacleGroupSelect.value = "";
+  updateMapPaintDirtyFromCleanSnapshot();
+  updateBiomePaintControls();
+  renderBiomePreviewLegend(currentBiomePreview);
+  drawBiomePreview(currentBiomePreview);
+  biomePreviewStatus.textContent = `Deleted wall group ${group.name}. Its wall cells are now ungrouped.`;
+}
+
+function slugifyObstacleGroupId(name) {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return slug || "group";
+}
+
+function uniqueObstacleGroupId(baseId) {
+  const groups = currentBiomePreview?.obstacleGroups || [];
+  const existing = new Set(groups.map((group) => group.id));
+  if (!existing.has(baseId)) {
+    return baseId;
+  }
+
+  for (let index = 2; index < 10000; index++) {
+    const candidate = `${baseId}_${index}`;
+    if (!existing.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return `${baseId}_${Date.now()}`;
+}
+
 function paintBiomeCellAtEvent(event) {
   if (!biomePaintEnabled || !currentBiomePreview) {
     return;
@@ -6929,11 +7391,11 @@ function paintBiomeCellAtEvent(event) {
   }
 
   recomputeBiomePreviewSummaries(currentBiomePreview);
-  biomePaintDirty = true;
+  markMapPaintChanged();
   drawBiomePreview(currentBiomePreview);
   renderBiomePreviewLegend(currentBiomePreview);
   updateBiomePaintControls();
-  biomePreviewStatus.textContent = `Manual map edits are unsaved. ${mapBrushDescription()} brush.`;
+  biomePreviewStatus.textContent = `Manual map edits are unsaved. ${mapPaintActionDescription()}.`;
 }
 
 function paintObstacleCellAtEvent(event) {
@@ -6958,11 +7420,11 @@ function paintObstacleCellAtEvent(event) {
   }
 
   recomputeObstacleBlockedCellCount(currentBiomePreview);
-  biomePaintDirty = true;
+  markMapPaintChanged();
   drawBiomePreview(currentBiomePreview);
   renderBiomePreviewLegend(currentBiomePreview);
   updateBiomePaintControls();
-  biomePreviewStatus.textContent = `Manual map edits are unsaved. ${mapBrushDescription()} brush.`;
+  biomePreviewStatus.textContent = `Manual map edits are unsaved. ${mapPaintActionDescription()}.`;
 }
 
 function paintBiomeBrushAtCell(center) {
@@ -6986,6 +7448,7 @@ function paintBiomeBrushAtCell(center) {
 
 function paintObstacleBrushAtCell(center) {
   const blocked = obstacleBrushSelect?.value !== "erase";
+  const selectedGroupId = obstacleGroupSelect?.value || "";
   let changed = false;
   forEachMapBrushCell(
     center,
@@ -6994,12 +7457,63 @@ function paintObstacleBrushAtCell(center) {
     (x, y) => {
       const index = y * currentBiomePreview.obstacleCellCountX + x;
       if (currentBiomePreview.obstacleCells[index] === blocked) {
+        if (blocked && selectedGroupId) {
+          changed = addObstacleCellToGroup(index, selectedGroupId) || changed;
+        }
+
         return;
       }
 
       currentBiomePreview.obstacleCells[index] = blocked;
+      if (blocked && selectedGroupId) {
+        addObstacleCellToGroup(index, selectedGroupId);
+      } else if (!blocked) {
+        removeObstacleCellFromGroups(index);
+      }
+
       changed = true;
     });
+  return changed;
+}
+
+function addObstacleCellToGroup(cellIndex, groupId) {
+  const groups = currentBiomePreview?.obstacleGroups || [];
+  const target = groups.find((group) => group.id === groupId);
+  if (!target) {
+    return false;
+  }
+
+  let changed = false;
+  for (const group of groups) {
+    if (group.id === groupId) {
+      continue;
+    }
+
+    const nextCells = group.cells.filter((cell) => cell !== cellIndex);
+    if (nextCells.length !== group.cells.length) {
+      group.cells = nextCells;
+      changed = true;
+    }
+  }
+
+  if (!target.cells.includes(cellIndex)) {
+    target.cells = [...target.cells, cellIndex].sort((left, right) => left - right);
+    changed = true;
+  }
+
+  return changed;
+}
+
+function removeObstacleCellFromGroups(cellIndex) {
+  let changed = false;
+  for (const group of currentBiomePreview?.obstacleGroups || []) {
+    const nextCells = group.cells.filter((cell) => cell !== cellIndex);
+    if (nextCells.length !== group.cells.length) {
+      group.cells = nextCells;
+      changed = true;
+    }
+  }
+
   return changed;
 }
 
@@ -7138,6 +7652,7 @@ function beginBiomePaint(event) {
   event.preventDefault();
   biomePaintPointerDown = true;
   biomePaintLastCell = null;
+  beginMapPaintStroke();
   biomePreviewCanvas.setPointerCapture?.(event.pointerId);
   paintBiomeCellAtEvent(event);
 }
@@ -7158,6 +7673,7 @@ function endBiomePaint(event) {
 
   biomePaintPointerDown = false;
   biomePaintLastCell = null;
+  commitMapPaintStroke();
   biomePreviewCanvas.releasePointerCapture?.(event.pointerId);
 }
 
@@ -7209,7 +7725,8 @@ async function saveMapArtifactFromScenario(name, scenario) {
       seed: valueOrNull("#seed"),
       scenarioPath: scenarioSelect.value,
       cells: currentBiomePreview.cells,
-      obstacleCells: currentBiomePreview.obstacleCells
+      obstacleCells: currentBiomePreview.obstacleCells,
+      obstacleGroups: currentBiomePreview.obstacleGroups
     })
   });
 
@@ -7227,7 +7744,7 @@ async function saveMapArtifactFromScenario(name, scenario) {
   const result = await response.json();
   await loadMapArtifacts(result.worldMapPath);
   applyMapArtifactToScenario(result.map);
-  biomePaintDirty = false;
+  setMapPaintCleanSnapshot();
   setBiomePaintEnabled(false);
   return result;
 }
@@ -7250,6 +7767,8 @@ function applySelectedMapArtifact() {
 
   applyMapArtifactToScenario(map);
   biomePaintDirty = false;
+  clearMapPaintHistory();
+  biomePaintCleanSnapshot = captureMapPaintSnapshot();
   setBiomePaintEnabled(false);
   formMessage.textContent = `Applied reusable map ${map.name}. Save the scenario to keep using it.`;
 }
@@ -7457,7 +7976,7 @@ function resetScenarioOptionFilters() {
 }
 
 function createScenarioField(field) {
-  const wrapper = document.createElement(field.jsonName === "ecologicalEvents" ? "div" : "label");
+  const wrapper = document.createElement(isScenarioEventEditorField(field.jsonName) ? "div" : "label");
   wrapper.className = [
     "scenario-field",
     `scenario-field-${field.type}`,
@@ -7488,12 +8007,18 @@ function createScenarioField(field) {
   return wrapper;
 }
 
+function isScenarioEventEditorField(jsonName) {
+  return jsonName === "ecologicalEvents" || jsonName === "obstacleEvents";
+}
+
 function createScenarioControl(field) {
   const value = scenarioEditor.scenario?.[field.jsonName];
   let control;
 
   if (field.jsonName === "ecologicalEvents") {
     control = createEcologicalEventsControl(field, value);
+  } else if (field.jsonName === "obstacleEvents") {
+    control = createObstacleEventsControl(field, value);
   } else if (field.type === "boolean") {
     control = document.createElement("input");
     control.type = "checkbox";
@@ -7792,6 +8317,254 @@ function validateEcologicalEventForEditor(event, rowIndex) {
   };
 }
 
+function createObstacleEventsControl(field, value) {
+  const events = Array.isArray(value) ? value : [];
+  const control = document.createElement("div");
+  control.className = "ecological-event-editor obstacle-event-editor";
+  control.dataset.obstacleEventEditor = "true";
+  control.innerHTML = `
+    <div class="ecological-event-toolbar">
+      <span>${events.length === 0 ? "No wall events scheduled" : `${formatNumber(events.length)} scheduled`}</span>
+      <button class="secondary" type="button" data-obstacle-event-action="add">Add Event</button>
+    </div>
+    ${events.length === 0 ? "" : `
+      <div class="ecological-event-rows">
+        ${events.map((obstacleEvent, index) => renderObstacleEventRow(obstacleEvent, index)).join("")}
+      </div>
+    `}
+  `;
+  return control;
+}
+
+function renderObstacleEventRow(obstacleEvent, index) {
+  const event = normalizeObstacleEvent(obstacleEvent);
+  return `
+    <div class="ecological-event-row obstacle-event-row" data-index="${index}">
+      <div class="ecological-event-row-header">
+        <strong>${escapeHtml(event.name || obstacleEventActionLabel(event.action))}</strong>
+        <div class="ecological-event-row-actions">
+          <button class="secondary" type="button" data-obstacle-event-action="duplicate" data-index="${index}">Duplicate</button>
+          <button class="danger" type="button" data-obstacle-event-action="remove" data-index="${index}">Remove</button>
+        </div>
+      </div>
+      <label>
+        Name
+        <input type="text" value="${escapeHtml(event.name)}" data-obstacle-event-field="name" data-index="${index}">
+      </label>
+      <label>
+        Group
+        ${renderObstacleEventGroupControl(event, index)}
+      </label>
+      <label>
+        Action
+        <select data-obstacle-event-field="action" data-index="${index}">
+          ${obstacleEventActions.map(([value, label]) =>
+            `<option value="${escapeHtml(value)}"${value === event.action ? " selected" : ""}>${escapeHtml(label)}</option>`
+          ).join("")}
+        </select>
+      </label>
+      <label>
+        Tick
+        <input type="number" min="0" step="1" value="${escapeHtml(formatScenarioControlNumber(event.triggerTick))}" data-obstacle-event-field="triggerTick" data-index="${index}">
+      </label>
+      <div class="ecological-event-summary">${escapeHtml(formatObstacleEventSummary(event))}</div>
+    </div>
+  `;
+}
+
+function renderObstacleEventGroupControl(event, index) {
+  const groups = scenarioObstacleGroupOptions();
+  if (groups.length === 0) {
+    return `<input type="text" value="${escapeHtml(event.groupId)}" data-obstacle-event-field="groupId" data-index="${index}">`;
+  }
+
+  const hasCurrentGroup = event.groupId
+    && groups.some((group) => group.id.toLowerCase() === event.groupId.toLowerCase());
+  const unknownOption = event.groupId && !hasCurrentGroup
+    ? `<option value="${escapeHtml(event.groupId)}" selected>${escapeHtml(event.groupId)} (missing)</option>`
+    : "";
+  return `
+    <select data-obstacle-event-field="groupId" data-index="${index}">
+      <option value="">Choose group</option>
+      ${groups.map((group) => `
+        <option value="${escapeHtml(group.id)}"${group.id.toLowerCase() === event.groupId.toLowerCase() ? " selected" : ""}>
+          ${escapeHtml(group.name)} (${escapeHtml(group.id)}, ${escapeHtml(formatNumber(group.cellCount))})
+        </option>
+      `).join("")}
+      ${unknownOption}
+    </select>
+  `;
+}
+
+function scenarioObstacleGroupOptions() {
+  const groups = [];
+  const seen = new Set();
+  const addGroup = (group) => {
+    const id = String(group?.id || "").trim();
+    if (!id || seen.has(id.toLowerCase())) {
+      return;
+    }
+
+    seen.add(id.toLowerCase());
+    groups.push({
+      id,
+      name: String(group?.name || id).trim() || id,
+      cellCount: Array.isArray(group?.cells)
+        ? group.cells.length
+        : Number(group?.cellCount || 0)
+    });
+  };
+
+  const scenarioMapPath = String(scenarioEditor?.scenario?.worldMapPath || "");
+  const scenarioMap = scenarioMapPath
+    ? mapArtifacts.find((map) => map.path === scenarioMapPath)
+    : selectedMapArtifact();
+  for (const group of scenarioMap?.obstacleGroups || []) {
+    addGroup(group);
+  }
+
+  for (const group of currentBiomePreview?.obstacleGroups || []) {
+    addGroup(group);
+  }
+
+  return groups;
+}
+
+function defaultObstacleEvent(action = "off") {
+  const groups = scenarioObstacleGroupOptions();
+  const group = groups[0] ?? null;
+  return {
+    name: group ? `${obstacleEventActionVerb(action)} ${group.name}` : obstacleEventActionLabel(action),
+    triggerTick: 0,
+    groupId: group?.id || "",
+    action
+  };
+}
+
+function normalizeObstacleEvent(event) {
+  const action = obstacleEventActions.some(([value]) => value === event?.action)
+    ? event.action
+    : "off";
+  return {
+    name: String(event?.name ?? "").trim(),
+    triggerTick: finiteNumberOrDefault(event?.triggerTick, 0),
+    groupId: String(event?.groupId ?? "").trim(),
+    action
+  };
+}
+
+function obstacleEventActionLabel(action) {
+  return obstacleEventActions.find(([value]) => value === action)?.[1] || "Wall event";
+}
+
+function obstacleEventActionVerb(action) {
+  return action === "on" ? "Close" : "Open";
+}
+
+function obstacleGroupLabel(groupId) {
+  const group = scenarioObstacleGroupOptions()
+    .find((candidate) => candidate.id.toLowerCase() === String(groupId || "").toLowerCase());
+  return group ? `${group.name} (${group.id})` : groupId || "wall group";
+}
+
+function formatObstacleEventSummary(event) {
+  return `At tick ${formatNumber(event.triggerTick)}, ${obstacleEventActionVerb(event.action).toLowerCase()} ${obstacleGroupLabel(event.groupId)}.`;
+}
+
+function updateObstacleEvents(action, index) {
+  if (!scenarioEditor) {
+    return;
+  }
+
+  try {
+    storeVisibleScenarioValues();
+  } catch (error) {
+    scenarioOptionsStatus.textContent = error.message;
+    return;
+  }
+
+  const events = Array.isArray(scenarioEditor.scenario.obstacleEvents)
+    ? cloneJson(scenarioEditor.scenario.obstacleEvents).map(normalizeObstacleEvent)
+    : [];
+  if (action === "add") {
+    const last = events.at(-1);
+    const next = defaultObstacleEvent(last?.action || "off");
+    if (last) {
+      next.groupId = last.groupId;
+      next.triggerTick = Number(last.triggerTick || 0) + 1000;
+    }
+
+    events.push(next);
+    formMessage.textContent = "Added wall event.";
+  } else if (action === "duplicate" && index >= 0 && index < events.length) {
+    const copy = cloneJson(events[index]);
+    copy.name = `${copy.name || obstacleEventActionLabel(copy.action)} copy`;
+    copy.triggerTick = Number(copy.triggerTick || 0) + 1000;
+    events.splice(index + 1, 0, copy);
+    formMessage.textContent = "Duplicated wall event.";
+  } else if (action === "remove" && index >= 0 && index < events.length) {
+    const [removed] = events.splice(index, 1);
+    formMessage.textContent = `Removed ${removed.name || obstacleEventActionLabel(removed.action)}.`;
+  }
+
+  scenarioEditor.scenario.obstacleEvents = events;
+  renderScenarioEditor();
+  updateScenarioManagementButtons();
+}
+
+function readObstacleEventsControlValue(control) {
+  const rows = [...control.querySelectorAll(".obstacle-event-row")];
+  return rows.map((row, rowIndex) => {
+    const event = {};
+    for (const fieldControl of row.querySelectorAll("[data-obstacle-event-field]")) {
+      const field = fieldControl.dataset.obstacleEventField;
+      if (field === "name" || field === "groupId" || field === "action") {
+        event[field] = String(fieldControl.value ?? "").trim();
+      } else {
+        const raw = String(fieldControl.value ?? "").trim();
+        if (raw === "") {
+          throw new Error(`Wall event ${rowIndex + 1} ${field} needs a numeric value.`);
+        }
+
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+          throw new Error(`Wall event ${rowIndex + 1} ${field} needs a numeric value.`);
+        }
+
+        event[field] = parsed;
+      }
+    }
+
+    return validateObstacleEventForEditor(event, rowIndex);
+  });
+}
+
+function validateObstacleEventForEditor(event, rowIndex) {
+  const indexLabel = `Wall event ${rowIndex + 1}`;
+  if (!obstacleEventActions.some(([value]) => value === event.action)) {
+    throw new Error(`${indexLabel} needs an action.`);
+  }
+
+  if (!event.groupId) {
+    throw new Error(`${indexLabel} needs a wall group.`);
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(event.groupId)) {
+    throw new Error(`${indexLabel} group id can only contain letters, numbers, underscores, or dashes.`);
+  }
+
+  if (!Number.isInteger(event.triggerTick) || event.triggerTick < 0) {
+    throw new Error(`${indexLabel} tick must be a non-negative whole number.`);
+  }
+
+  return {
+    name: event.name,
+    triggerTick: event.triggerTick,
+    groupId: event.groupId,
+    action: event.action
+  };
+}
+
 function requireNumberRange(value, minimum, maximum, label) {
   if (!Number.isFinite(value) || value < minimum || value > maximum) {
     throw new Error(`${label} must be between ${formatDecimal(minimum)} and ${maximum === Number.POSITIVE_INFINITY ? "infinity" : formatDecimal(maximum)}.`);
@@ -8029,6 +8802,10 @@ function readScenarioControlValue(control, field) {
     return readEcologicalEventsControlValue(control);
   }
 
+  if (field.jsonName === "obstacleEvents") {
+    return readObstacleEventsControlValue(control);
+  }
+
   if (field.type === "boolean") {
     return control.checked;
   }
@@ -8082,6 +8859,12 @@ function addSelectedSpeciesToScenario() {
     return;
   }
 
+  const tag = speciesSeedTagInput?.value.trim() || "";
+  if (tag.length > 64) {
+    formMessage.textContent = "Tag must be 64 characters or fewer.";
+    return;
+  }
+
   try {
     storeVisibleScenarioValues();
   } catch (error) {
@@ -8107,6 +8890,7 @@ function addSelectedSpeciesToScenario() {
     count: Math.round(count),
     spawnRegion: speciesSeedRegionSelect?.value || "uniform",
     energyOverride,
+    tag: tag === "" ? null : tag,
     brainOverrideKind: brainChoice.brainOverrideKind,
     brainProfilePath: brainChoice.brainProfilePath,
     enabled: true
@@ -8541,6 +9325,7 @@ function renderRunScenarioRoster(summary) {
             <tr>
               <th>Profile</th>
               <th>Brain</th>
+              <th>Tag</th>
               <th>Count</th>
               <th>Region</th>
               <th>Energy</th>
@@ -8551,6 +9336,7 @@ function renderRunScenarioRoster(summary) {
               <tr>
                 <td>${escapeHtml(seed.label || seed.profileName || seed.profilePath || "species")}<div class="run-sub">${escapeHtml(seed.profilePath || "")}</div></td>
                 <td>${escapeHtml(seed.brain || "profile brain")}${seed.brainProfilePath ? `<div class="run-sub">${escapeHtml(seed.brainProfilePath)}</div>` : ""}</td>
+                <td>${escapeHtml(seed.tag || "")}</td>
                 <td>${formatNumber(seed.count || 0)}</td>
                 <td>${escapeHtml(formatEnumLabel(seed.spawnRegion || "uniform"))}</td>
                 <td>${seed.energyOverride === null || seed.energyOverride === undefined ? "profile" : formatNumber(seed.energyOverride)}</td>
@@ -9199,12 +9985,16 @@ scenarioTabs.addEventListener("click", (event) => {
 });
 
 scenarioFields.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-ecological-event-action]");
-  if (!button) {
+  const ecologicalButton = event.target.closest("button[data-ecological-event-action]");
+  if (ecologicalButton) {
+    updateEcologicalEvents(ecologicalButton.dataset.ecologicalEventAction, Number(ecologicalButton.dataset.index));
     return;
   }
 
-  updateEcologicalEvents(button.dataset.ecologicalEventAction, Number(button.dataset.index));
+  const obstacleButton = event.target.closest("button[data-obstacle-event-action]");
+  if (obstacleButton) {
+    updateObstacleEvents(obstacleButton.dataset.obstacleEventAction, Number(obstacleButton.dataset.index));
+  }
 });
 
 scenarioFields.addEventListener("change", (event) => {
@@ -9246,6 +10036,8 @@ saveMapArtifactButton.addEventListener("click", saveMapArtifact);
 renameMapArtifactButton.addEventListener("click", renameSelectedMapArtifact);
 duplicateMapArtifactButton.addEventListener("click", duplicateSelectedMapArtifact);
 deleteMapArtifactButton.addEventListener("click", deleteSelectedMapArtifact);
+undoMapPaintButton.addEventListener("click", undoMapPaintEdit);
+redoMapPaintButton.addEventListener("click", redoMapPaintEdit);
 paintLayerSelect.addEventListener("change", () => {
   biomePaintLastCell = null;
   if (biomePaintEnabled) {
@@ -9276,7 +10068,22 @@ biomeBrushSelect.addEventListener("change", () => {
     renderBiomePreviewLegend(currentBiomePreview);
   }
 });
-obstacleBrushSelect.addEventListener("change", updateBiomePaintControls);
+obstacleBrushSelect.addEventListener("change", () => {
+  if (biomePaintEnabled) {
+    setBiomePaintEnabled(true);
+  } else {
+    updateBiomePaintControls();
+  }
+});
+obstacleGroupSelect.addEventListener("change", () => {
+  if (biomePaintEnabled) {
+    setBiomePaintEnabled(true);
+  } else {
+    updateBiomePaintControls();
+  }
+});
+newObstacleGroupButton.addEventListener("click", createObstacleGroup);
+deleteObstacleGroupButton.addEventListener("click", deleteSelectedObstacleGroup);
 biomePreviewLegend.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-biome]");
   if (button) {
@@ -9288,6 +10095,10 @@ biomePreviewCanvas.addEventListener("pointermove", continueBiomePaint);
 biomePreviewCanvas.addEventListener("pointerup", endBiomePaint);
 biomePreviewCanvas.addEventListener("pointercancel", endBiomePaint);
 biomePreviewCanvas.addEventListener("lostpointercapture", () => {
+  if (biomePaintPointerDown) {
+    commitMapPaintStroke();
+  }
+
   biomePaintPointerDown = false;
   biomePaintLastCell = null;
 });

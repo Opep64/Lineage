@@ -39,6 +39,8 @@ public sealed record WorldMapArtifactDocument
 
     public bool[] ObstacleBlockedCells { get; init; } = [];
 
+    public WorldMapObstacleGroup[] ObstacleGroups { get; init; } = [];
+
     public static WorldMapArtifactDocument FromMaps(
         BiomeMap biomeMap,
         ObstacleMap obstacleMap,
@@ -118,10 +120,35 @@ public sealed record WorldMapArtifactDocument
                 $"World map obstacle cell count must be {expectedObstacleCellCount}, but was {ObstacleBlockedCells.Length}.");
         }
 
+        var seenGroupIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenGroupCells = new HashSet<int>();
+        var obstacleGroups = (ObstacleGroups ?? [])
+            .Select(group =>
+            {
+                var validated = (group ?? throw new InvalidOperationException("World map obstacle group entries cannot be null."))
+                    .Validated(expectedObstacleCellCount);
+                if (!seenGroupIds.Add(validated.Id))
+                {
+                    throw new InvalidOperationException($"World map obstacle group id '{validated.Id}' is duplicated.");
+                }
+
+                foreach (var cell in validated.Cells)
+                {
+                    if (!seenGroupCells.Add(cell))
+                    {
+                        throw new InvalidOperationException($"World map obstacle cell {cell} is assigned to multiple groups.");
+                    }
+                }
+
+                return validated;
+            })
+            .ToArray();
+
         return this with
         {
             BiomeCells = BiomeCells.Select(BiomeKinds.Canonicalize).ToArray(),
-            ObstacleBlockedCells = ObstacleBlockedCells.ToArray()
+            ObstacleBlockedCells = ObstacleBlockedCells.ToArray(),
+            ObstacleGroups = obstacleGroups
         };
     }
 
@@ -170,6 +197,63 @@ public sealed record WorldMapArtifactDocument
         {
             throw new InvalidOperationException($"{label} cell dimensions must be positive.");
         }
+    }
+}
+
+public sealed record WorldMapObstacleGroup
+{
+    public string Id { get; init; } = string.Empty;
+
+    public string Name { get; init; } = string.Empty;
+
+    public bool DefaultBlocked { get; init; } = true;
+
+    public int[] Cells { get; init; } = [];
+
+    public WorldMapObstacleGroup Validated(int obstacleCellCount)
+    {
+        if (obstacleCellCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(obstacleCellCount), "Obstacle cell count must be positive.");
+        }
+
+        var id = (Id ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            throw new InvalidOperationException("World map obstacle group id is required.");
+        }
+
+        for (var i = 0; i < id.Length; i++)
+        {
+            var ch = id[i];
+            if (!char.IsLetterOrDigit(ch) && ch is not '_' and not '-')
+            {
+                throw new InvalidOperationException("World map obstacle group id can only contain letters, numbers, underscores, or dashes.");
+            }
+        }
+
+        var name = string.IsNullOrWhiteSpace(Name)
+            ? id
+            : Name.Trim();
+        var cells = (Cells ?? [])
+            .Distinct()
+            .Order()
+            .ToArray();
+        for (var i = 0; i < cells.Length; i++)
+        {
+            if (cells[i] < 0 || cells[i] >= obstacleCellCount)
+            {
+                throw new InvalidOperationException(
+                    $"World map obstacle group '{id}' contains cell {cells[i]}, but valid cell indexes are 0 through {obstacleCellCount - 1}.");
+            }
+        }
+
+        return this with
+        {
+            Id = id,
+            Name = name,
+            Cells = cells
+        };
     }
 }
 

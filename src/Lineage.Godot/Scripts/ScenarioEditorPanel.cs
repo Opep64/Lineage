@@ -81,6 +81,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
     private SpinBox _speciesInjectCountInput = null!;
     private SpinBox _speciesInjectEnergyInput = null!;
     private OptionButton _speciesInjectRegionInput = null!;
+    private LineEdit _speciesInjectTagInput = null!;
     private OptionButton _speciesBrainOverrideInput = null!;
     private OptionButton _speciesBrainProfileInput = null!;
     private Label _brainCatalogSummaryLabel = null!;
@@ -213,7 +214,8 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 ? null
                 : (float)_speciesInjectEnergyInput.Value,
             brainProfilePath is null ? ReadSpeciesBrainOverrideKind() : null,
-            brainProfilePath);
+            brainProfilePath,
+            _speciesInjectTagInput.Text.Trim());
     }
 
     public SpeciesExportUiRequest ReadSpeciesExportRequest()
@@ -1069,6 +1071,11 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         _speciesInjectEnergyInput = CreateSpinBox(0, 10_000, step: 1, rounded: false);
         _speciesInjectEnergyInput.Value = 0;
         _speciesInjectEnergyInput.TooltipText = "Use 0 for profile-derived default energy.";
+        _speciesInjectTagInput = new LineEdit
+        {
+            PlaceholderText = "Optional creature tag",
+            MaxLength = CreatureTag.MaxLength
+        };
         _speciesInjectRegionInput = new OptionButton();
         foreach (var name in Enum.GetNames<InitialCreatureSpawnRegion>())
         {
@@ -1124,6 +1131,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
         root.AddChild(CreateFieldRow("Inject count", _speciesInjectCountInput));
         root.AddChild(CreateFieldRow("Inject region", _speciesInjectRegionInput));
         root.AddChild(CreateFieldRow("Inject energy", _speciesInjectEnergyInput));
+        root.AddChild(CreateFieldRow("Creature tag", _speciesInjectTagInput));
         root.AddChild(CreateFieldRow("Brain", _speciesBrainProfileInput));
         _brainCatalogSummaryLabel = new Label
         {
@@ -1171,6 +1179,7 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
             EnergyOverride = request.EnergyOverride,
             BrainOverrideKind = request.BrainProfilePath is null ? request.BrainOverrideKind : null,
             BrainProfilePath = request.BrainProfilePath,
+            Tag = request.Tag,
             Enabled = _speciesSeedEnabledInput.ButtonPressed
         }.Validated();
         _speciesSeedEntries.Add(seed);
@@ -1287,7 +1296,10 @@ public sealed partial class ScenarioEditorPanel : PanelContainer
                 var name = string.IsNullOrWhiteSpace(seed.Label)
                     ? System.IO.Path.GetFileName(seed.ProfilePath)
                     : seed.Label;
-                return $"{index + 1}. {state}: {seed.Count} x {name} in {seed.SpawnRegion} ({energy}, {brain})";
+                var tag = string.IsNullOrWhiteSpace(seed.Tag)
+                    ? "untagged"
+                    : $"tag {seed.Tag}";
+                return $"{index + 1}. {state}: {seed.Count} x {name} in {seed.SpawnRegion} ({tag}, {energy}, {brain})";
             }));
     }
 
@@ -1628,7 +1640,8 @@ public readonly record struct SpeciesInjectionUiRequest(
     InitialCreatureSpawnRegion SpawnRegion,
     float? EnergyOverride,
     InitialBrainKind? BrainOverrideKind,
-    string? BrainProfilePath);
+    string? BrainProfilePath,
+    string? Tag);
 
 public readonly record struct SpeciesExportUiRequest(
     string? Name,

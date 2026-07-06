@@ -14,6 +14,8 @@ public struct CreatureState
     /// </summary>
     public EntityId ParentId { get; set; }
 
+    public string? Tag { get; set; }
+
     public SimVector2 Position { get; set; }
 
     /// <summary>

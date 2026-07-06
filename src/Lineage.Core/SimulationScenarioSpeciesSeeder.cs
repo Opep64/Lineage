@@ -35,7 +35,8 @@ public static class SimulationScenarioSpeciesSeeder
                     brainProfile,
                     scenario.BrainArchitectureKind,
                     scenario.BrainHiddenNodeCount,
-                    MutationProfile.FromScenario(scenario)));
+                    MutationProfile.FromScenario(scenario),
+                    seed.Tag));
             results.Add(string.IsNullOrWhiteSpace(seed.Label)
                 ? result
                 : result with { SpeciesName = seed.Label });

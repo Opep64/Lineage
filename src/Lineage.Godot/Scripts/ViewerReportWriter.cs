@@ -654,13 +654,14 @@ public static class ViewerReportWriter
             writer.WriteLine("<section id=\"roster-lineages\">");
             writer.WriteLine("<h2>Injected Profile Lineages</h2>");
             writer.WriteLine("<div class=\"table-wrap\"><table>");
-            writer.WriteLine("<thead><tr><th>Profile</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Old Age</th><th>Other</th></tr></thead>");
+            writer.WriteLine("<thead><tr><th>Profile</th><th>Tag</th><th>Founders</th><th>Total</th><th>Descendants</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Starved</th><th>Injury</th><th>Rotten</th><th>Old Age</th><th>Other</th></tr></thead>");
             writer.WriteLine("<tbody>");
             foreach (var summary in rosterSummaries)
             {
                 writer.WriteLine(
                     "<tr>" +
                     $"<td>{Html(summary.ProfileName)}</td>" +
+                    $"<td>{Html(CreatureTag.Display(summary.Tag))}</td>" +
                     $"<td>{Html(summary.FounderCount)}</td>" +
                     $"<td>{Html(summary.TotalCreatures)}</td>" +
                     $"<td>{Html(summary.DescendantCount)}</td>" +
@@ -682,11 +683,11 @@ public static class ViewerReportWriter
         writer.WriteLine("<section id=\"founders\">");
         writer.WriteLine("<h2>Top Founder Lineages</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Founder</th><th>Total Creatures</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Living Share</th><th>Thermal Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Cold/Temp/Hot</th><th>Cold/Hot Stress</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Founder</th><th>Tag</th><th>Total Creatures</th><th>Living</th><th>Dead</th><th>Max Generation</th><th>Living Share</th><th>Thermal Niche</th><th>Avg Temp</th><th>Mismatch</th><th>Cold/Temp/Hot</th><th>Cold/Hot Stress</th></tr></thead>");
         writer.WriteLine("<tbody>");
         if (founderSummaries.Length == 0)
         {
-            writer.WriteLine("<tr><td class=\"empty\" colspan=\"11\">No lineage records are present.</td></tr>");
+            writer.WriteLine("<tr><td class=\"empty\" colspan=\"12\">No lineage records are present.</td></tr>");
         }
         else
         {
@@ -698,6 +699,7 @@ public static class ViewerReportWriter
                 writer.WriteLine(
                     "<tr>" +
                     $"<td>#{Html(summary.FounderId.Value)}</td>" +
+                    $"<td>{Html(CreatureTag.Display(summary.Tag))}</td>" +
                     $"<td>{Html(summary.TotalCreatures)}</td>" +
                     $"<td>{Html(summary.LivingCreatures)}</td>" +
                     $"<td>{Html(summary.DeadCreatures)}</td>" +
@@ -913,6 +915,7 @@ public static class ViewerReportWriter
                 var livingCreatures = founderRecords.Count(record => record.IsAlive);
                 return new FounderSummary(
                     pair.Key,
+                    FounderTag(pair.Key, founderRecords),
                     totalCreatures,
                     livingCreatures,
                     Math.Max(0, totalCreatures - livingCreatures),
@@ -920,6 +923,11 @@ public static class ViewerReportWriter
                     ThermalNicheTelemetry.SummarizeRecords(founderRecords));
             })
             .ToArray();
+    }
+
+    private static string? FounderTag(EntityId founderId, IReadOnlyList<CreatureLineageRecord> records)
+    {
+        return records.FirstOrDefault(record => record.Id == founderId).Tag;
     }
 
     private static EntityId FindFounderId(
@@ -2435,9 +2443,12 @@ public static class ViewerReportWriter
 
     private static string FormatLineageSegmentGraphTitle(SurvivorLineageSegment segment)
     {
-        return segment.ParentSegmentId is null && segment.StartRecord.Generation == 0
+        var title = segment.ParentSegmentId is null && segment.StartRecord.Generation == 0
             ? $"Founder #{segment.StartRecord.Id.Value}"
             : FormatLineageSegmentFallbackId(segment);
+        return string.IsNullOrWhiteSpace(segment.EndRecord.Tag)
+            ? title
+            : $"{title} [{segment.EndRecord.Tag}]";
     }
 
     private static bool TryResolveLineageSpeciesName(
@@ -2503,6 +2514,7 @@ public static class ViewerReportWriter
         var entries = new List<LineageDetailEntry>
         {
             new("Species", FormatLineageSegmentName(segment, speciesHistory)),
+            new("Tag", CreatureTag.Display(segment.EndRecord.Tag)),
             new("Segment", FormatLineageSegmentFallbackId(segment)),
             new("Starts at", $"#{segment.StartRecord.Id.Value}, generation {segment.StartRecord.Generation}"),
             new("Endpoint", $"#{segment.EndRecord.Id.Value} ({FormatLineageStatus(segment.EndRecord)})"),
@@ -4488,12 +4500,13 @@ public static class ViewerReportWriter
         writer.WriteLine("<section>");
         writer.WriteLine("<h2>Starting Roster</h2>");
         writer.WriteLine("<div class=\"table-wrap\"><table>");
-        writer.WriteLine("<thead><tr><th>Profile</th><th>Brain</th><th>Count</th><th>Spawn region</th><th>Energy</th></tr></thead>");
+        writer.WriteLine("<thead><tr><th>Profile</th><th>Tag</th><th>Brain</th><th>Count</th><th>Spawn region</th><th>Energy</th></tr></thead>");
         writer.WriteLine("<tbody>");
         foreach (var seed in seeds)
         {
             writer.WriteLine("<tr>");
             writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedName(seed))}<br><small>{Html(seed.ProfilePath)}</small></td>");
+            writer.WriteLine($"<td>{Html(CreatureTag.Display(seed.Tag))}</td>");
             writer.WriteLine($"<td>{Html(FormatScenarioSpeciesSeedBrain(seed))}</td>");
             writer.WriteLine($"<td>{Html(seed.Count.ToString(CultureInfo.InvariantCulture))}</td>");
             writer.WriteLine($"<td>{Html(seed.SpawnRegion.ToString())}</td>");
@@ -4517,7 +4530,10 @@ public static class ViewerReportWriter
         if (seeds.Length == 1)
         {
             var seed = seeds[0];
-            return $"{seed.Count} x {FormatScenarioSpeciesSeedName(seed)} using {FormatScenarioSpeciesSeedBrain(seed)}";
+            var tag = string.IsNullOrWhiteSpace(seed.Tag)
+                ? string.Empty
+                : $" tagged {seed.Tag}";
+            return $"{seed.Count} x {FormatScenarioSpeciesSeedName(seed)}{tag} using {FormatScenarioSpeciesSeedBrain(seed)}";
         }
 
         var total = seeds.Sum(seed => seed.Count);
@@ -5490,6 +5506,7 @@ public static class ViewerReportWriter
 
     private readonly record struct FounderSummary(
         EntityId FounderId,
+        string? Tag,
         int TotalCreatures,
         int LivingCreatures,
         int DeadCreatures,

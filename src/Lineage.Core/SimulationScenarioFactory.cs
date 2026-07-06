@@ -10,6 +10,8 @@ public static class SimulationScenarioFactory
     public static Simulation CreateSimulation(SimulationScenario scenario, string? scenarioDirectory = null)
     {
         scenario = scenario.Validated();
+        var biomeMap = CreateBiomeMap(scenario, scenarioDirectory);
+        var obstacleMap = CreateObstacleMap(scenario, scenarioDirectory);
 
         var simulation = new Simulation(
             new SimulationConfig
@@ -19,21 +21,24 @@ public static class SimulationScenarioFactory
                 FixedDeltaSeconds = scenario.FixedDeltaSeconds
             },
             scenario.Seed,
-            CreatePipeline(scenario));
+            CreatePipeline(scenario, scenarioDirectory, obstacleMap));
 
-        var biomeMap = CreateBiomeMap(scenario, scenarioDirectory);
         simulation.State.SetBiomes(biomeMap);
         simulation.State.SetTemperature(CreateTemperatureMap(scenario, biomeMap));
-        simulation.State.SetObstacles(CreateObstacleMap(scenario, scenarioDirectory));
+        simulation.State.SetObstacles(obstacleMap);
         simulation.State.SetLocalFertility(CreateLocalFertilityMap(scenario));
         simulation.State.SetEcologicalEvents(scenario.EcologicalEvents);
         SeedWorld(simulation, scenario);
         return simulation;
     }
 
-    public static ISimulationSystem[] CreatePipeline(SimulationScenario scenario)
+    public static ISimulationSystem[] CreatePipeline(
+        SimulationScenario scenario,
+        string? scenarioDirectory = null,
+        ObstacleMap? baseObstacleMap = null)
     {
-        return scenario.PipelineKind switch
+        scenario = scenario.Validated();
+        var systems = scenario.PipelineKind switch
         {
             SimulationPipelineKind.Neural => SimulationPipelines.CreateNeuralLifeLoop(
                 scenario.SpatialCellSize,
@@ -218,6 +223,43 @@ public static class SimulationScenarioFactory
                 scenario.HealingMinimumEnergy),
             _ => throw new InvalidOperationException($"Unsupported pipeline kind: {scenario.PipelineKind}.")
         };
+
+        var scheduledObstacles = CreateScheduledObstacleSystem(scenario, scenarioDirectory, baseObstacleMap);
+        if (scheduledObstacles is null)
+        {
+            return systems;
+        }
+
+        var pipeline = new ISimulationSystem[systems.Length + 1];
+        pipeline[0] = scheduledObstacles;
+        Array.Copy(systems, 0, pipeline, 1, systems.Length);
+        return pipeline;
+    }
+
+    private static ScheduledObstacleSystem? CreateScheduledObstacleSystem(
+        SimulationScenario scenario,
+        string? scenarioDirectory,
+        ObstacleMap? baseObstacleMap)
+    {
+        if (scenario.ObstacleEvents.Length == 0)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(scenario.WorldMapPath))
+        {
+            throw new InvalidOperationException("Scheduled obstacle events require a world map artifact with obstacle groups.");
+        }
+
+        var worldMapPath = ResolveWorldMapPath(scenario.WorldMapPath, scenarioDirectory);
+        var worldMap = WorldMapArtifactJson.Load(worldMapPath);
+        ValidateWorldMapObstacleMatchesScenario(worldMap, scenario, worldMapPath);
+        var obstacleMap = baseObstacleMap ?? CreateObstacleMap(scenario, scenarioDirectory);
+        var system = new ScheduledObstacleSystem(
+            obstacleMap,
+            worldMap.ObstacleGroups,
+            scenario.ObstacleEvents);
+        return system.HasEvents ? system : null;
     }
 
     private static void SeedWorld(Simulation simulation, SimulationScenario scenario)

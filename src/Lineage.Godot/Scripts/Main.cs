@@ -151,6 +151,7 @@ public partial class Main : Node2D
     private Label _hudSecondary = null!;
     private PanelContainer _selectionPanel = null!;
     private Label _selectionTitle = null!;
+    private LineEdit _creatureTagInput = null!;
     private ScrollContainer _inspectorScroll = null!;
     private RichTextLabel _inspector = null!;
     private Label _graphLegend = null!;
@@ -400,6 +401,15 @@ public partial class Main : Node2D
         };
         root.AddChild(_selectionTitle);
 
+        _creatureTagInput = new LineEdit
+        {
+            PlaceholderText = "Creature tag",
+            MaxLength = CreatureTag.MaxLength
+        };
+        _creatureTagInput.TextSubmitted += _ => ApplySelectedCreatureTag();
+        _creatureTagInput.FocusExited += ApplySelectedCreatureTag;
+        root.AddChild(CreateFieldRow("Tag", _creatureTagInput));
+
         var buttonRow = new HBoxContainer();
         buttonRow.AddThemeConstantOverride("separation", 6);
         root.AddChild(buttonRow);
@@ -428,6 +438,21 @@ public partial class Main : Node2D
 
         RefreshSelectionViewButtons();
         return panel;
+    }
+
+    private static Control CreateFieldRow(string label, Control editor)
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 8);
+        var labelNode = new Label
+        {
+            Text = label,
+            CustomMinimumSize = new Vector2(80f, 0f)
+        };
+        row.AddChild(labelNode);
+        editor.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        row.AddChild(editor);
+        return row;
     }
 
     private PanelContainer BuildRuntimeStatsPanel()
@@ -1393,6 +1418,7 @@ public partial class Main : Node2D
             $"Color {FormatColorMode(_colorMode)}";
 
         _selectionTitle.Text = BuildSelectionTitle();
+        UpdateCreatureTagInput();
         _inspector.Text = BuildInspectorText();
         RefreshSelectionViewButtons();
         _graphLegend.Text =
@@ -1538,7 +1564,10 @@ public partial class Main : Node2D
         if (_selectedCreatureId != default && TryGetSelectedCreature(out var creature))
         {
             var genome = _simulation.State.GetGenome(creature.GenomeId);
-            return $"Creature #{creature.Id.Value} ({CreatureRoleName(genome)}) - {_selectedInspectorView}";
+            var tag = string.IsNullOrWhiteSpace(creature.Tag)
+                ? string.Empty
+                : $" [{creature.Tag}]";
+            return $"Creature #{creature.Id.Value}{tag} ({CreatureRoleName(genome)}) - {_selectedInspectorView}";
         }
 
         if (_selectedEggId != default && TryGetSelectedEgg(out var egg))
@@ -1666,6 +1695,7 @@ public partial class Main : Node2D
 
         return
             $"Selected #{creature.Id.Value}\n" +
+            $"Tag {CreatureTag.Display(creature.Tag)}\n" +
             $"{parentText}\n" +
             $"Generation {creature.Generation}\n" +
             $"Genome {creature.GenomeId}  Brain {brainText}\n" +
@@ -5244,6 +5274,50 @@ public partial class Main : Node2D
         _selectedEggId = default;
     }
 
+    private void UpdateCreatureTagInput()
+    {
+        if (_selectedCreatureId == default || !TryGetSelectedCreature(out var creature))
+        {
+            _creatureTagInput.Visible = false;
+            return;
+        }
+
+        _creatureTagInput.Visible = true;
+        if (_creatureTagInput.HasFocus())
+        {
+            return;
+        }
+
+        _creatureTagInput.Text = creature.Tag ?? string.Empty;
+    }
+
+    private void ApplySelectedCreatureTag()
+    {
+        if (_selectedCreatureId == default || _creatureTagInput is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_simulation.State.SetCreatureTag(_selectedCreatureId, _creatureTagInput.Text))
+            {
+                _creatureTagInput.Text = TryGetSelectedCreature(out var selected)
+                    ? selected.Tag ?? string.Empty
+                    : string.Empty;
+                RequestVisualRefresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            _scenarioEditor.SetStatus($"Creature tag update failed: {ex.Message}");
+            if (TryGetSelectedCreature(out var selected))
+            {
+                _creatureTagInput.Text = selected.Tag ?? string.Empty;
+            }
+        }
+    }
+
     private void HandleKeyboardCamera(float deltaSeconds)
     {
         if (IsCameraInputSuppressed())
@@ -5803,7 +5877,8 @@ public partial class Main : Node2D
                     brainOverrideProfile,
                     _scenario.BrainArchitectureKind,
                     _scenario.BrainHiddenNodeCount,
-                    MutationProfile.FromScenario(_scenario)));
+                    MutationProfile.FromScenario(_scenario),
+                    request.Tag));
 
             if (result.CreatureIds.Count > 0)
             {

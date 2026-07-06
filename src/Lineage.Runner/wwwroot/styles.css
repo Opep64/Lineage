@@ -676,6 +676,10 @@ button.scenario-tab.is-active {
   background: #fbfcfd;
 }
 
+.obstacle-event-row {
+  grid-template-columns: minmax(170px, 1.1fr) minmax(220px, 1fr) minmax(130px, 0.55fr) minmax(120px, 0.55fr);
+}
+
 .ecological-event-row-header,
 .ecological-event-summary {
   grid-column: 1 / -1;

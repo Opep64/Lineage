@@ -1006,13 +1006,14 @@ internal static class GodotRosterLineageSummaryCsvWriter
         IReadOnlyList<SpeciesInjectionResult> injections)
     {
         using var writer = GodotStatsCsvWriter.CreateWriter(path);
-        writer.WriteLine("profile_name,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,old_age_deaths,unknown_deaths,genome_ids,brain_ids");
+        writer.WriteLine("profile_name,tag,founder_count,total_creatures,descendant_count,living_creatures,dead_creatures,max_generation,starvation_deaths,injury_deaths,rotten_meat_deaths,old_age_deaths,unknown_deaths,genome_ids,brain_ids");
 
         foreach (var summary in RosterLineageAnalyzer.Analyze(records, injections))
         {
             writer.WriteLine(string.Join(
                 ',',
                 EscapeCsv(summary.ProfileName),
+                EscapeCsv(summary.Tag ?? string.Empty),
                 summary.FounderCount.ToString(CultureInfo.InvariantCulture),
                 summary.TotalCreatures.ToString(CultureInfo.InvariantCulture),
                 summary.DescendantCount.ToString(CultureInfo.InvariantCulture),

@@ -12,6 +12,8 @@ public sealed record SpeciesScenarioSeed
 {
     public string? Label { get; init; }
 
+    public string? Tag { get; init; }
+
     public string ProfilePath { get; init; } = string.Empty;
 
     public int Count { get; init; } = 10;
@@ -64,6 +66,7 @@ public sealed record SpeciesScenarioSeed
             Label = string.IsNullOrWhiteSpace(Label)
                 ? null
                 : Label.Trim(),
+            Tag = CreatureTag.Normalize(Tag),
             ProfilePath = ProfilePath.Trim(),
             BrainProfilePath = string.IsNullOrWhiteSpace(BrainProfilePath)
                 ? null

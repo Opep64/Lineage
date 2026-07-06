@@ -123,7 +123,8 @@ public sealed class ReproductionSystem(
                 energy: eggEnergy,
                 incubationSeconds: childGenome.EggIncubationSeconds,
                 generation: parent.Generation + 1,
-                birthMutationProfile: mutationProfile);
+                birthMutationProfile: mutationProfile,
+                tag: parent.Tag);
         }
     }
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lineage Runner</title>
-  <link rel="stylesheet" href="/styles.css?v=20260602-recipe-descriptions">
+  <link rel="stylesheet" href="/styles.css?v=20260703-creature-tags">
 </head>
 <body>
   <header class="app-header">
@@ -95,6 +95,14 @@
               </select>
             </label>
             <label class="biome-brush-label">
+              Group
+              <select id="obstacleGroupSelect" disabled>
+                <option value="">Ungrouped</option>
+              </select>
+            </label>
+            <button id="newObstacleGroupButton" class="secondary" type="button" disabled>New Group</button>
+            <button id="deleteObstacleGroupButton" class="secondary" type="button" disabled>Delete Group</button>
+            <label class="biome-brush-label">
               Reusable Map
               <select id="mapArtifactSelect" disabled>
                 <option value="">No saved maps</option>
@@ -105,6 +113,8 @@
             <button id="renameMapArtifactButton" class="secondary" type="button" disabled>Rename Map</button>
             <button id="duplicateMapArtifactButton" class="secondary" type="button" disabled>Duplicate Map</button>
             <button id="deleteMapArtifactButton" class="danger" type="button" disabled>Delete Map</button>
+            <button id="undoMapPaintButton" class="secondary" type="button" disabled>Undo</button>
+            <button id="redoMapPaintButton" class="secondary" type="button" disabled>Redo</button>
             <button id="paintBiomeMapButton" class="secondary" type="button" disabled>Paint Map</button>
             <button id="toggleBiomePreviewButton" class="secondary" type="button" aria-expanded="true" aria-controls="biomePreviewContent">Hide Map</button>
             <button id="refreshBiomePreviewButton" class="secondary" type="button">Refresh Map</button>
@@ -233,6 +243,10 @@
         <label>
           Energy override
           <input id="speciesSeedEnergy" type="number" min="1" step="1" placeholder="profile default">
+        </label>
+        <label>
+          Tag
+          <input id="speciesSeedTag" type="text" maxlength="64" placeholder="optional label">
         </label>
         <button id="addSpeciesToScenarioButton" class="secondary" type="button" disabled>Add To Scenario Roster</button>
       </div>
@@ -554,6 +568,6 @@
     </div>
   </main>
 
-  <script src="/app.js?v=20260602-recipe-descriptions"></script>
+  <script src="/app.js?v=20260703-creature-tags"></script>
 </body>
 </html>

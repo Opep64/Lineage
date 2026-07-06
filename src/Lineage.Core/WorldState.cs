@@ -320,7 +320,8 @@ public sealed class WorldState
         EntityId parentId = default,
         int brainId = -1,
         float birthInvestmentRatio = 1f,
-        MutationProfile? birthMutationProfile = null)
+        MutationProfile? birthMutationProfile = null,
+        string? tag = null)
     {
         _ = GetGenome(genomeId);
         if (brainId >= 0)
@@ -344,12 +345,14 @@ public sealed class WorldState
         }
 
         var mutationProfile = birthMutationProfile?.Validated() ?? default;
+        var normalizedTag = CreatureTag.Normalize(tag);
         var id = CreateEntityId();
         var clampedPosition = Bounds.Clamp(position);
         Creatures.Add(new CreatureState
         {
             Id = id,
             ParentId = parentId,
+            Tag = normalizedTag,
             Position = clampedPosition,
             PreviousPosition = clampedPosition,
             MaxXReached = clampedPosition.X,
@@ -368,6 +371,7 @@ public sealed class WorldState
         {
             Id = id,
             ParentId = parentId,
+            Tag = normalizedTag,
             BirthTick = Tick,
             BirthElapsedSeconds = ElapsedSeconds,
             BirthPosition = clampedPosition,
@@ -394,7 +398,8 @@ public sealed class WorldState
         float energy,
         float incubationSeconds,
         int generation,
-        MutationProfile? birthMutationProfile = null)
+        MutationProfile? birthMutationProfile = null,
+        string? tag = null)
     {
         _ = GetGenome(genomeId);
         if (brainId >= 0)
@@ -423,6 +428,7 @@ public sealed class WorldState
         }
 
         var mutationProfile = birthMutationProfile?.Validated() ?? default;
+        var normalizedTag = CreatureTag.Normalize(tag);
         var investmentRatio = OffspringDevelopment.InvestmentRatio(energy);
         var maxHealth = OffspringDevelopment.EggMaxHealth(investmentRatio);
         var id = CreateEntityId();
@@ -430,6 +436,7 @@ public sealed class WorldState
         {
             Id = id,
             ParentId = parentId,
+            Tag = normalizedTag,
             Position = Bounds.Clamp(position),
             Energy = energy,
             Health = maxHealth,
@@ -446,6 +453,32 @@ public sealed class WorldState
         Stats.RecordEggLaid();
         MarkEggsDirty();
         return id;
+    }
+
+    public bool SetCreatureTag(EntityId id, string? tag)
+    {
+        var normalizedTag = CreatureTag.Normalize(tag);
+        for (var i = 0; i < Creatures.Count; i++)
+        {
+            var creature = Creatures[i];
+            if (creature.Id != id)
+            {
+                continue;
+            }
+
+            creature.Tag = normalizedTag;
+            Creatures[i] = creature;
+            if (_lineageRecordByEntityId.TryGetValue(id, out var lineageIndex))
+            {
+                var record = _lineageRecords[lineageIndex];
+                record.Tag = normalizedTag;
+                _lineageRecords[lineageIndex] = record;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     public bool TryGetLineageRecord(EntityId id, out CreatureLineageRecord record)

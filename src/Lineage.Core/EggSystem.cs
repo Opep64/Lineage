@@ -44,7 +44,8 @@ public sealed class EggSystem(float eggEnergyCostPerSecond = 0f) : ISimulationSy
                     birthMutationProfile: new MutationProfile(
                         egg.BirthMutationStrength,
                         egg.BirthTraitMutationRate,
-                        egg.BirthBrainMutationRate));
+                        egg.BirthBrainMutationRate),
+                    tag: egg.Tag);
                 state.Stats.RecordEggHatched();
                 continue;
             }

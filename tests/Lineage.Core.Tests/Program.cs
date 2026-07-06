@@ -91,6 +91,7 @@ var tests = new (string Name, Action Body)[]
     ("Reproduction fertility declines with crowding", ReproductionFertilityDeclinesWithCrowding),
     ("Reproduction lays mutated eggs", ReproductionCreatesOffspring),
     ("Eggs hatch into offspring", EggsHatchIntoOffspring),
+    ("Creature tags inherit through eggs", CreatureTagsInheritThroughEggs),
     ("Egg environmental damage follows void and biome pressure", EggEnvironmentalDamageFollowsVoidAndBiomePressure),
     ("Juvenile creatures cannot reproduce before maturity", JuvenileCreaturesCannotReproduceBeforeMaturity),
     ("Juvenile growth scales effective traits", JuvenileGrowthScalesEffectiveTraits),
@@ -242,6 +243,7 @@ var tests = new (string Name, Action Body)[]
     ("Scenario factory honors manual biome map path", ScenarioFactoryHonorsManualBiomeMapPath),
     ("Scenario factory honors manual obstacle map path", ScenarioFactoryHonorsManualObstacleMapPath),
     ("Scenario factory honors world map path", ScenarioFactoryHonorsWorldMapPath),
+    ("Scheduled obstacle events toggle world map groups", ScheduledObstacleEventsToggleWorldMapGroups),
     ("Scenario factory honors natural climate biome map kind", ScenarioFactoryHonorsNaturalClimateBiomeMapKind),
     ("Scenario factory honors obstacle map kind", ScenarioFactoryHonorsObstacleMapKind),
     ("Scenario factory supports initial brain kinds", ScenarioFactorySupportsInitialBrainKinds),
@@ -3793,6 +3795,46 @@ static void EggsHatchIntoOffspring()
     AssertClose(12f, simulation.State.Creatures[1].Energy, 0.000001, "Hatchling energy");
     AssertClose(12f / CreatureGenome.Baseline.OffspringEnergyInvestment, simulation.State.Creatures[1].BirthInvestmentRatio, 0.000001, "Hatchling investment ratio");
     AssertClose(MathF.Sqrt(12f / CreatureGenome.Baseline.OffspringEnergyInvestment), simulation.State.Creatures[1].Health, 0.000001, "Hatchling health");
+}
+
+static void CreatureTagsInheritThroughEggs()
+{
+    var simulation = new Simulation(
+        new SimulationConfig { FixedDeltaSeconds = 1f },
+        seed: 405,
+        systems: [new ReproductionSystem(), new EggSystem()]);
+
+    var genomeId = simulation.State.AddGenome(CreatureGenome.Baseline with
+    {
+        ReproductionEnergyThreshold = 50f,
+        OffspringEnergyInvestment = 20f,
+        EggProductionEnergyPerSecond = 20f,
+        EggIncubationSeconds = 1f,
+        MaturityAgeSeconds = 0f,
+        ReproductionCooldownSeconds = 5f,
+        MutationStrength = 0.01f
+    });
+    var brainId = simulation.State.AddBrain(NeuralBrainGenome.CreateZero());
+    var parentId = simulation.State.SpawnCreature(
+        genomeId,
+        new SimVector2(50f, 50f),
+        energy: 80f,
+        brainId: brainId,
+        tag: "north cohort");
+
+    simulation.Step();
+
+    AssertEqual(2, simulation.State.Creatures.Count, "Creature count after tagged hatch");
+    var hatchling = simulation.State.Creatures.First(creature => creature.ParentId == parentId);
+    AssertEqual("north cohort", hatchling.Tag, "Hatchling tag");
+    AssertTrue(simulation.State.TryGetLineageRecord(hatchling.Id, out var hatchlingRecord), "Hatchling lineage record should exist");
+    AssertEqual("north cohort", hatchlingRecord.Tag, "Hatchling lineage tag");
+
+    AssertTrue(simulation.State.SetCreatureTag(hatchling.Id, "branch b"), "Living creature tag should be editable");
+    var edited = simulation.State.Creatures.First(creature => creature.Id == hatchling.Id);
+    AssertEqual("branch b", edited.Tag, "Edited living creature tag");
+    AssertTrue(simulation.State.TryGetLineageRecord(hatchling.Id, out var editedRecord), "Edited lineage record should exist");
+    AssertEqual("branch b", editedRecord.Tag, "Edited lineage tag");
 }
 
 static void EggEnvironmentalDamageFollowsVoidAndBiomePressure()
@@ -13092,7 +13134,19 @@ static void WorldMapArtifactJsonRoundTrips()
         "Reusable valley",
         BiomeMapKind.NaturalClimate,
         ObstacleMapKind.VerticalBarrierWithGaps,
-        42UL);
+        42UL) with
+    {
+        ObstacleGroups =
+        [
+            new WorldMapObstacleGroup
+            {
+                Id = "center_wall",
+                Name = "Center Wall",
+                DefaultBlocked = true,
+                Cells = [1, 3, 16]
+            }
+        ]
+    };
 
     var json = WorldMapArtifactJson.ToJson(document);
     var roundTripped = WorldMapArtifactJson.FromJson(json);
@@ -13104,8 +13158,13 @@ static void WorldMapArtifactJsonRoundTrips()
     AssertTrue(json.Contains("\"sourceObstacleMapKind\": \"verticalBarrierWithGaps\""), "World map artifact JSON should serialize source obstacle map kind");
     AssertTrue(json.Contains("\"biomeCells\""), "World map artifact JSON should serialize biome cells");
     AssertTrue(json.Contains("\"obstacleBlockedCells\""), "World map artifact JSON should serialize obstacle cells");
+    AssertTrue(json.Contains("\"obstacleGroups\""), "World map artifact JSON should serialize obstacle groups");
     AssertEqual("Reusable valley", roundTripped.Name, "World map artifact name");
     AssertEqual(42UL, roundTripped.SourceSeed ?? 0UL, "World map artifact source seed");
+    AssertEqual(1, roundTripped.ObstacleGroups.Length, "World map obstacle group count");
+    AssertEqual("center_wall", roundTripped.ObstacleGroups[0].Id, "World map obstacle group id");
+    AssertEqual("Center Wall", roundTripped.ObstacleGroups[0].Name, "World map obstacle group name");
+    AssertEqual(3, roundTripped.ObstacleGroups[0].Cells.Length, "World map obstacle group cell count");
     AssertClose(biomeMap.Bounds.Width, loadedBiomeMap.Bounds.Width, 0.000001, "World map biome width");
     AssertClose(biomeMap.CellSize, loadedBiomeMap.CellSize, 0.000001, "World map biome cell size");
     AssertEqual(BiomeKind.Forest, loadedBiomeMap.GetKind(2, 0), "World map forest cell");
@@ -13231,6 +13290,115 @@ static void ScenarioFactoryHonorsWorldMapPath()
         AssertThrows<InvalidOperationException>(
             () => SimulationScenarioFactory.CreateSimulation(scenario with { ObstacleCellSize = 50f }, tempRoot),
             "World map obstacle dimensions must match the scenario");
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+}
+
+static void ScheduledObstacleEventsToggleWorldMapGroups()
+{
+    var tempRoot = Path.Combine(Path.GetTempPath(), $"lineage_obstacle_events_{Guid.NewGuid():N}");
+    try
+    {
+        var mapPath = Path.Combine(tempRoot, "maps", "gates.lineage-map.json");
+        var biomeMap = BiomeMap.CreateFromCells(
+            new WorldBounds(400f, 100f),
+            100f,
+            4,
+            1,
+            [BiomeKind.Grassland, BiomeKind.Grassland, BiomeKind.Grassland, BiomeKind.Grassland],
+            0f);
+        var obstacleMap = ObstacleMap.CreateFromCells(
+            new WorldBounds(400f, 100f),
+            100f,
+            4,
+            1,
+            [true, true, true, false]);
+        WorldMapArtifactJson.Save(
+            mapPath,
+            WorldMapArtifactDocument.FromMaps(
+                biomeMap,
+                obstacleMap,
+                "Gate test",
+                BiomeMapKind.HorizontalBands,
+                ObstacleMapKind.VerticalBarrierWithGaps,
+                12UL) with
+            {
+                ObstacleGroups =
+                [
+                    new WorldMapObstacleGroup
+                    {
+                        Id = "gate",
+                        Name = "Gate",
+                        Cells = [1, 2]
+                    }
+                ]
+            });
+
+        var scenario = new SimulationScenario
+        {
+            Seed = 77UL,
+            BiomeMapKind = BiomeMapKind.Manual,
+            WorldMapPath = Path.Combine("maps", "gates.lineage-map.json"),
+            EnableObstacles = true,
+            ObstacleMapKind = ObstacleMapKind.Manual,
+            WorldWidth = 400f,
+            WorldHeight = 100f,
+            BiomeCellSize = 100f,
+            ObstacleCellSize = 100f,
+            ResourceVoidBorderWidth = 0f,
+            InitialCreatureCount = 0,
+            InitialResourcesPerMillionArea = 0f,
+            ObstacleEvents =
+            [
+                new ObstacleEventDefinition
+                {
+                    Name = "open gate",
+                    TriggerTick = 1,
+                    GroupId = "gate",
+                    Action = ObstacleEventAction.Off
+                },
+                new ObstacleEventDefinition
+                {
+                    Name = "close gate",
+                    TriggerTick = 3,
+                    GroupId = "gate",
+                    Action = ObstacleEventAction.On
+                }
+            ]
+        };
+
+        var simulation = SimulationScenarioFactory.CreateSimulation(scenario, tempRoot);
+
+        AssertTrue(simulation.State.Obstacles.IsBlocked(0, 0), "Ungrouped wall should start blocked");
+        AssertTrue(simulation.State.Obstacles.IsBlocked(1, 0), "Gate should start blocked");
+        AssertTrue(simulation.State.Obstacles.IsBlocked(2, 0), "Gate should start blocked");
+
+        simulation.Step();
+        AssertTrue(simulation.State.Obstacles.IsBlocked(1, 0), "Gate should stay blocked before trigger tick");
+
+        simulation.Step();
+        AssertTrue(simulation.State.Obstacles.IsBlocked(0, 0), "Ungrouped wall should remain blocked after gate opens");
+        AssertTrue(!simulation.State.Obstacles.IsBlocked(1, 0), "Gate first cell should open at trigger tick");
+        AssertTrue(!simulation.State.Obstacles.IsBlocked(2, 0), "Gate second cell should open at trigger tick");
+
+        var restored = SimulationSnapshotJson.RestoreSimulation(
+            SimulationSnapshot.Capture(scenario, simulation),
+            tempRoot).Simulation;
+        AssertTrue(!restored.State.Obstacles.IsBlocked(1, 0), "Restored gate should remain open before close tick");
+
+        restored.Step();
+        AssertTrue(!restored.State.Obstacles.IsBlocked(1, 0), "Restored gate should stay open until close trigger");
+
+        restored.Step();
+        AssertTrue(restored.State.Obstacles.IsBlocked(0, 0), "Restored ungrouped wall should remain blocked");
+        AssertTrue(restored.State.Obstacles.IsBlocked(1, 0), "Restored gate first cell should close at trigger tick");
+        AssertTrue(restored.State.Obstacles.IsBlocked(2, 0), "Restored gate second cell should close at trigger tick");
     }
     finally
     {
@@ -14578,7 +14746,8 @@ static void ScenarioSpeciesRosterInjectsProfileFounders()
                     ProfilePath = "species/roster-explorer.species.json",
                     Count = 4,
                     SpawnRegion = InitialCreatureSpawnRegion.RightThird,
-                    EnergyOverride = 44f
+                    EnergyOverride = 44f,
+                    Tag = "north cohort"
                 }
             ]
         };
@@ -14597,6 +14766,7 @@ static void ScenarioSpeciesRosterInjectsProfileFounders()
 
         AssertEqual(1, results.Count, "Roster injection result count");
         AssertEqual("Roster explorer", results[0].SpeciesName, "Roster species name");
+        AssertEqual("north cohort", results[0].Tag, "Roster species tag");
         AssertEqual(4, results[0].CreatureIds.Count, "Roster creature count");
         AssertEqual(4, simulation.State.Creatures.Count, "Injected roster living count");
         AssertEqual(4, simulation.State.Stats.FounderCreatureCount, "Injected roster founder count");
@@ -14606,6 +14776,9 @@ static void ScenarioSpeciesRosterInjectsProfileFounders()
         foreach (var creature in simulation.State.Creatures)
         {
             AssertClose(44f, creature.Energy, 0.000001, "Roster energy override");
+            AssertEqual("north cohort", creature.Tag, "Roster creature tag");
+            AssertTrue(simulation.State.TryGetLineageRecord(creature.Id, out var record), "Roster lineage record should exist");
+            AssertEqual("north cohort", record.Tag, "Roster lineage tag");
             AssertTrue(creature.Position.X > simulation.State.Bounds.Width * 2f / 3f, "Roster creature should spawn in right third");
         }
     }
@@ -15530,7 +15703,8 @@ static void ScenarioJsonRoundTrips()
                     Count = 3,
                     SpawnRegion = InitialCreatureSpawnRegion.LeftThird,
                     EnergyOverride = 42f,
-                    BrainOverrideKind = InitialBrainKind.ScavengerForager
+                    BrainOverrideKind = InitialBrainKind.ScavengerForager,
+                    Tag = "north cohort"
                 },
             new SpeciesScenarioSeed
             {
@@ -15591,6 +15765,23 @@ static void ScenarioJsonRoundTrips()
                 RegionY = 0.55f,
                 RegionHeight = 0.45f,
                 Strength = 0.18f
+            }
+        ],
+        ObstacleEvents =
+        [
+            new ObstacleEventDefinition
+            {
+                Name = "open north gate",
+                TriggerTick = 1200,
+                GroupId = "north_gate",
+                Action = ObstacleEventAction.Off
+            },
+            new ObstacleEventDefinition
+            {
+                Name = "close north gate",
+                TriggerTick = 2400,
+                GroupId = "north_gate",
+                Action = ObstacleEventAction.On
             }
         ],
         ResourceClusterStrength = 0.33f,
@@ -15723,6 +15914,7 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"profilePath\": \"species/alpha.species.json\""), "JSON should serialize species seed profile paths");
     AssertTrue(json.Contains("\"spawnRegion\": \"leftThird\""), "JSON should serialize species seed spawn regions");
     AssertTrue(json.Contains("\"brainOverrideKind\": \"scavengerForager\""), "JSON should serialize species seed brain overrides");
+    AssertTrue(json.Contains("\"tag\": \"north cohort\""), "JSON should serialize species seed tags");
     AssertTrue(json.Contains("\"brainProfilePath\": \"brains/disabled.brain.json\""), "JSON should serialize species seed brain profile paths");
     AssertTrue(json.Contains("\"initialResourcesPerMillionArea\""), "JSON should serialize resource density");
     AssertTrue(json.Contains("\"enablePlantTypeHabitatAffinity\""), "JSON should serialize plant habitat affinity");
@@ -15738,6 +15930,10 @@ static void ScenarioJsonRoundTrips()
     AssertTrue(json.Contains("\"ecologicalEvents\""), "JSON should serialize ecological events");
     AssertTrue(json.Contains("\"kind\": \"regionalFertilityPulse\""), "JSON should serialize fertility event kind");
     AssertTrue(json.Contains("\"kind\": \"heatWave\""), "JSON should serialize temperature event kind");
+    AssertTrue(json.Contains("\"obstacleEvents\""), "JSON should serialize obstacle events");
+    AssertTrue(json.Contains("\"groupId\": \"north_gate\""), "JSON should serialize obstacle event group id");
+    AssertTrue(json.Contains("\"action\": \"off\""), "JSON should serialize obstacle off action");
+    AssertTrue(json.Contains("\"action\": \"on\""), "JSON should serialize obstacle on action");
     AssertTrue(json.Contains("\"resourceClusterStrength\""), "JSON should serialize resource clustering");
     AssertTrue(json.Contains("\"barrenBiomeMovementCostMultiplier\""), "JSON should serialize biome movement cost");
     AssertTrue(json.Contains("\"barrenBiomeSpeedMultiplier\""), "JSON should serialize biome speed");
@@ -15795,6 +15991,7 @@ static void ScenarioJsonRoundTrips()
     AssertEqual(InitialCreatureSpawnRegion.LeftThird, roundTripped.SpeciesSeeds[0].SpawnRegion, "Scenario species seed spawn region");
     AssertClose(42f, roundTripped.SpeciesSeeds[0].EnergyOverride ?? 0f, 0.000001, "Scenario species seed energy override");
     AssertEqual(InitialBrainKind.ScavengerForager, roundTripped.SpeciesSeeds[0].BrainOverrideKind, "Scenario species seed brain override");
+    AssertEqual("north cohort", roundTripped.SpeciesSeeds[0].Tag, "Scenario species seed tag");
     AssertEqual("brains/disabled.brain.json", roundTripped.SpeciesSeeds[1].BrainProfilePath, "Scenario species seed brain profile path");
     AssertTrue(!roundTripped.SpeciesSeeds[1].Enabled, "Scenario disabled species seed");
     AssertClose(scenario.InitialResourcesPerMillionArea, roundTripped.InitialResourcesPerMillionArea, 0.000001, "Scenario resource density");
@@ -15837,6 +16034,12 @@ static void ScenarioJsonRoundTrips()
     AssertEqual("southern heat wave", roundTripped.EcologicalEvents[1].Name, "Scenario ecological temperature event name");
     AssertEqual(EcologicalEventKind.HeatWave, roundTripped.EcologicalEvents[1].Kind, "Scenario ecological temperature event kind");
     AssertClose(0.18f, roundTripped.EcologicalEvents[1].Strength, 0.000001, "Scenario ecological temperature event strength");
+    AssertEqual(2, roundTripped.ObstacleEvents.Length, "Scenario obstacle event count");
+    AssertEqual("open north gate", roundTripped.ObstacleEvents[0].Name, "Scenario obstacle event name");
+    AssertEqual(1200L, roundTripped.ObstacleEvents[0].TriggerTick, "Scenario obstacle event trigger tick");
+    AssertEqual("north_gate", roundTripped.ObstacleEvents[0].GroupId, "Scenario obstacle event group id");
+    AssertEqual(ObstacleEventAction.Off, roundTripped.ObstacleEvents[0].Action, "Scenario obstacle event off action");
+    AssertEqual(ObstacleEventAction.On, roundTripped.ObstacleEvents[1].Action, "Scenario obstacle event on action");
     AssertClose(scenario.ResourceClusterStrength, roundTripped.ResourceClusterStrength, 0.000001, "Scenario resource cluster strength");
     AssertClose(scenario.ResourceClusterRadius, roundTripped.ResourceClusterRadius, 0.000001, "Scenario resource cluster radius");
     AssertClose(scenario.BarrenBiomeMovementCostMultiplier, roundTripped.BarrenBiomeMovementCostMultiplier, 0.000001, "Scenario barren movement biome cost");
